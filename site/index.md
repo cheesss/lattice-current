@@ -45,6 +45,25 @@ Lattice Current is built for operators who need one surface for:
 - transmission analysis from events to assets
 - replay and backtesting of prior decision logic
 
+<div class="lc-overview-grid">
+  <div class="lc-overview-card">
+    <h3>Live to decision</h3>
+    <p>Signals move from collection to scoring, graph context, decision support, and replay without leaving the same product surface.</p>
+  </div>
+  <div class="lc-overview-card">
+    <h3>Explainable internals</h3>
+    <p>Core layers are now visualized as interactive capability maps and architecture stacks instead of static bullets only.</p>
+  </div>
+  <div class="lc-overview-card">
+    <h3>Connected features</h3>
+    <p>Click through live monitoring, ontology, transmission, replay, and resource profiling to see how each part feeds the next.</p>
+  </div>
+</div>
+
+<DecisionLoop locale="en" />
+
+<FeatureExplorer locale="en" />
+
 ## Fork position
 
 This is an independent public research fork. It does not claim to be the official upstream distribution or hosted service.
@@ -54,6 +73,29 @@ This is an independent public research fork. It does not claim to be the officia
 - **Full**: geopolitics, conflict, infrastructure, military, macro spillover
 - **Tech**: AI, startups, cloud, cyber, supply-chain and ecosystem monitoring
 - **Finance**: cross-asset, macro, central-bank, transmission, replay, and investment workflows
+
+## Explore the system visually
+
+<div class="lc-link-panel-grid">
+  <div class="lc-link-panel">
+    <h3>Understand the workflow</h3>
+    <p>Use the interactive decision loop above to see what enters and exits each operating stage.</p>
+    <ul>
+      <li>From feed ingestion to entity normalization</li>
+      <li>From credibility and regime scoring to transmission</li>
+      <li>From idea generation to replay-driven priors</li>
+    </ul>
+  </div>
+  <div class="lc-link-panel">
+    <h3>Understand the architecture</h3>
+    <p>Open the architecture page for a clickable runtime topology that shows where each subsystem runs and what it owns.</p>
+    <ul>
+      <li><a href="/architecture">Open architecture map</a></li>
+      <li><a href="/features/">Browse feature map</a></li>
+      <li><a href="/ai-backtesting/">Read AI and backtesting notes</a></li>
+    </ul>
+  </div>
+</div>
 
 ## Public docs policy
 

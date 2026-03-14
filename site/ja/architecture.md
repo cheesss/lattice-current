@@ -12,6 +12,12 @@ owner: core
 
 # アーキテクチャ
 
+<p class="lc-section-caption">
+下のアーキテクチャスタックはインタラクティブです。レイヤーをクリックすると、実行境界、主要ノード、主なフロー、関連文書をまとめて確認できます。
+</p>
+
+<SystemTopology locale="ja" />
+
 ## 主なサブシステム
 
 - フロントエンド app shell とパネルシステム

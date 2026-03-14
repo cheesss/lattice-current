@@ -1,6 +1,7 @@
 node_modules/
 .idea/
 dist/
+site/.vitepress/.temp/
 .DS_Store
 *.log
 .env

@@ -12,6 +12,12 @@ owner: core
 
 # Features
 
+<p class="lc-section-caption">
+Each capability below is clickable. Use it to trace what the feature does, where it appears in the product, and which neighboring systems it depends on.
+</p>
+
+<FeatureExplorer locale="en" />
+
 ## Capability groups
 
 - [Live Intelligence](/features/live-intelligence)

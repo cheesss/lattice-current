@@ -12,6 +12,12 @@ owner: core
 
 # 아키텍처
 
+<p class="lc-section-caption">
+아래 아키텍처 스택은 인터랙티브합니다. 레이어를 클릭하면 실행 경계, 핵심 노드, 주요 흐름, 관련 문서를 함께 볼 수 있습니다.
+</p>
+
+<SystemTopology locale="ko" />
+
 ## 주요 서브시스템
 
 - 프론트엔드 앱 셸과 패널 시스템
