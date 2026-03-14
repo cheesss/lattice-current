@@ -1,7 +1,6 @@
 node_modules/
 .idea/
 dist/
-site/.vitepress/.temp/
 .DS_Store
 *.log
 .env
@@ -60,4 +59,7 @@ certs/
 data/historical/
 *.docx
 upath-*.tgz
-!upath-1.2.0.tgz
+third_party/
+site/.vitepress/.temp/
+site/.vitepress/cache/
+site/.vitepress/dist/

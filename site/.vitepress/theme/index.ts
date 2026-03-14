@@ -6,6 +6,7 @@ import FeatureExplorer from './components/FeatureExplorer.vue';
 import CapabilityConstellation from './components/CapabilityConstellation.vue';
 import ScrollSignalStory from './components/ScrollSignalStory.vue';
 import SystemTopology from './components/SystemTopology.vue';
+import AudienceWorkbench from './components/AudienceWorkbench.vue';
 
 const theme: Theme = {
   ...DefaultTheme,
@@ -16,6 +17,7 @@ const theme: Theme = {
     app.component('CapabilityConstellation', CapabilityConstellation);
     app.component('ScrollSignalStory', ScrollSignalStory);
     app.component('SystemTopology', SystemTopology);
+    app.component('AudienceWorkbench', AudienceWorkbench);
   }
 };
 

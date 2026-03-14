@@ -64,7 +64,10 @@
     "desktop:package": "node scripts/desktop-package.mjs",
     "docs:dev": "vitepress dev site",
     "docs:build": "vitepress build site",
-    "docs:preview": "vitepress preview site"
+    "docs:preview": "vitepress preview site",
+    "public:sync": "node scripts/sync-public-repo.mjs",
+    "public:sync:dry": "node scripts/sync-public-repo.mjs --dry-run",
+    "branding:social": "node scripts/generate-social-preview.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",

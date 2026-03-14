@@ -45,6 +45,21 @@ Lattice Current is built for operators who need one surface for:
 - transmission analysis from events to assets
 - replay and backtesting of prior decision logic
 
+<div class="lc-home-signalbar">
+  <div class="lc-home-signalbar-item">
+    <span>Operating modes</span>
+    <strong>Full / Tech / Finance</strong>
+  </div>
+  <div class="lc-home-signalbar-item">
+    <span>Core loop</span>
+    <strong>Signal -> Score -> Connect -> Replay</strong>
+  </div>
+  <div class="lc-home-signalbar-item">
+    <span>Public surfaces</span>
+    <strong>Docs, replay, architecture, API</strong>
+  </div>
+</div>
+
 <div class="lc-overview-grid">
   <div class="lc-overview-card">
     <h3>Live to decision</h3>
@@ -60,7 +75,34 @@ Lattice Current is built for operators who need one surface for:
   </div>
 </div>
 
+<div class="lc-home-section-grid">
+  <div class="lc-home-section-card">
+    <h3>What you can understand here</h3>
+    <p>The public site is designed to explain not only what the product does, but how collection, scoring, graph context, AI reasoning, replay, and runtime resource use fit together.</p>
+    <ul>
+      <li>how live signals become decision-support objects</li>
+      <li>how ontology and transmission layers connect evidence to assets</li>
+      <li>how replay and walk-forward runs feed back into live priors</li>
+    </ul>
+  </div>
+  <div class="lc-home-section-card alt">
+    <h3>How to navigate it</h3>
+    <p>Use the interactive blocks below as entry points. Every visual is clickable and built to move you toward deeper docs without losing context.</p>
+    <ul>
+      <li>pick a user mode first</li>
+      <li>click the decision loop to inspect inputs and outputs</li>
+      <li>open the constellation graph to see connected capabilities</li>
+    </ul>
+  </div>
+</div>
+
+<AudienceWorkbench locale="en" />
+
 <DecisionLoop locale="en" />
+
+<CapabilityConstellation locale="en" />
+
+<SystemTopology locale="en" />
 
 <ScrollSignalStory locale="en" />
 
@@ -78,24 +120,30 @@ This is an independent public research fork. It does not claim to be the officia
 
 ## Explore the system visually
 
-<div class="lc-link-panel-grid">
-  <div class="lc-link-panel">
-    <h3>Understand the workflow</h3>
-    <p>Use the interactive decision loop above to see what enters and exits each operating stage.</p>
-    <ul>
-      <li>From feed ingestion to entity normalization</li>
-      <li>From credibility and regime scoring to transmission</li>
-      <li>From idea generation to replay-driven priors</li>
-    </ul>
+<div class="lc-home-route-grid">
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Operational path</span>
+    <h3>Live monitoring -> transmission</h3>
+    <p>Start with live intelligence, then pivot into the transmission model when a theme begins to spill into sectors or assets.</p>
+    <a href="/features/live-intelligence">Open live intelligence docs</a>
   </div>
-  <div class="lc-link-panel">
-    <h3>Understand the architecture</h3>
-    <p>Open the architecture page for a clickable runtime topology that shows where each subsystem runs and what it owns.</p>
-    <ul>
-      <li><a href="/architecture">Open architecture map</a></li>
-      <li><a href="/features/">Browse feature map</a></li>
-      <li><a href="/ai-backtesting/">Read AI and backtesting notes</a></li>
-    </ul>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Research path</span>
+    <h3>Ontology -> AI analysis</h3>
+    <p>Use graph state and evidence-first AI notes to understand what a cluster actually means before acting on it.</p>
+    <a href="/ai-backtesting/">Open AI and backtesting docs</a>
+  </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Validation path</span>
+    <h3>Replay -> backtest -> priors</h3>
+    <p>Historical replay and walk-forward runs measure whether decision logic survives point-in-time conditions.</p>
+    <a href="/features/investment-replay">Open investment and replay docs</a>
+  </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Builder path</span>
+    <h3>Architecture -> API -> public sync</h3>
+    <p>Developers can trace runtime layers, public interfaces, and the internal-to-public publication workflow.</p>
+    <a href="/architecture">Open architecture docs</a>
   </div>
 </div>
 
@@ -103,6 +151,16 @@ This is an independent public research fork. It does not claim to be the officia
 
 <div class="policy-callout">
 Public docs intentionally describe product behavior, architecture, and algorithms while omitting or sanitizing sensitive operating details, private feeds, credentials, and internal-only workflows.
+</div>
+
+<div class="lc-home-cta-slab">
+  <h2>Use this site as a live system map, not only a README</h2>
+  <p>The strongest path is to move between the interactive home visuals, the feature map, and the architecture topology. The docs are organized so operators, researchers, macro users, and builders can all start from a different surface and still land on the same underlying model.</p>
+  <div class="lc-link-row">
+    <a class="lc-link-pill" href="/features/">Browse features</a>
+    <a class="lc-link-pill" href="/architecture">Open topology</a>
+    <a class="lc-link-pill" href="/ai-backtesting/">Review replay logic</a>
+  </div>
 </div>
 
 ## Start here

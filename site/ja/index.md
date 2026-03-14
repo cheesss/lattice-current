@@ -45,6 +45,21 @@ Lattice Current は、次のものを1つの面で扱いたい利用者向けの
 - 事象から資産への伝播分析
 - 過去の意思決定ロジックのリプレイとバックテスト
 
+<div class="lc-home-signalbar">
+  <div class="lc-home-signalbar-item">
+    <span>運用モード</span>
+    <strong>Full / Tech / Finance</strong>
+  </div>
+  <div class="lc-home-signalbar-item">
+    <span>コアループ</span>
+    <strong>Signal -> Score -> Connect -> Replay</strong>
+  </div>
+  <div class="lc-home-signalbar-item">
+    <span>公開面</span>
+    <strong>ドキュメント、リプレイ、アーキテクチャ、API</strong>
+  </div>
+</div>
+
 <div class="lc-overview-grid">
   <div class="lc-overview-card">
     <h3>ライブから意思決定まで</h3>
@@ -60,7 +75,34 @@ Lattice Current は、次のものを1つの面で扱いたい利用者向けの
   </div>
 </div>
 
+<div class="lc-home-section-grid">
+  <div class="lc-home-section-card">
+    <h3>このサイトで理解できること</h3>
+    <p>この公開サイトは機能紹介だけでなく、収集、スコア化、グラフ文脈、AI 推論、リプレイ、ランタイム資源利用がどう噛み合うかを説明するよう設計されています。</p>
+    <ul>
+      <li>ライブシグナルがどう意思決定支援オブジェクトになるか</li>
+      <li>オントロジーと伝播層がどう証拠を資産へ結びつけるか</li>
+      <li>リプレイとウォークフォワードがどう live prior に戻るか</li>
+    </ul>
+  </div>
+  <div class="lc-home-section-card alt">
+    <h3>どう探索すると良いか</h3>
+    <p>下のインタラクティブブロックを入口として使ってください。各ビジュアルはクリック可能で、文脈を失わずに深い文書へ進めるよう構成しています。</p>
+    <ul>
+      <li>まず利用モードを選ぶ</li>
+      <li>意思決定ループを押して入力と出力を見る</li>
+      <li>クモの巣グラフで機能間の接続を把握する</li>
+    </ul>
+  </div>
+</div>
+
+<AudienceWorkbench locale="ja" />
+
 <DecisionLoop locale="ja" />
+
+<CapabilityConstellation locale="ja" />
+
+<SystemTopology locale="ja" />
 
 <ScrollSignalStory locale="ja" />
 
@@ -78,24 +120,30 @@ Lattice Current は、次のものを1つの面で扱いたい利用者向けの
 
 ## ビジュアルで構造を理解する
 
-<div class="lc-link-panel-grid">
-  <div class="lc-link-panel">
-    <h3>運用フローを理解する</h3>
-    <p>上の意思決定ループをクリックすると、各段階の入力と出力をすぐに確認できます。</p>
-    <ul>
-      <li>フィード収集からエンティティ正規化まで</li>
-      <li>credibility と regime スコアから伝播エンジンまで</li>
-      <li>アイデア生成からリプレイ駆動の prior 更新まで</li>
-    </ul>
+<div class="lc-home-route-grid">
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">運用経路</span>
+    <h3>ライブ監視 -> 伝播</h3>
+    <p>ライブインテリジェンスから始めて、テーマがセクターや資産へ波及し始めたら伝播モデルへ移動してください。</p>
+    <a href="/ja/features/live-intelligence">ライブインテリジェンス文書を開く</a>
   </div>
-  <div class="lc-link-panel">
-    <h3>アーキテクチャを理解する</h3>
-    <p>アーキテクチャページには、各サブシステムがどこで動き何を担当するかを示すクリック型トポロジーがあります。</p>
-    <ul>
-      <li><a href="/ja/architecture">アーキテクチャマップを開く</a></li>
-      <li><a href="/ja/features/">機能マップを見る</a></li>
-      <li><a href="/ja/ai-backtesting/">AI・バックテスト文書を読む</a></li>
-    </ul>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">研究経路</span>
+    <h3>オントロジー -> AI 分析</h3>
+    <p>グラフ状態と証拠ベース AI 文書を組み合わせて、クラスタが実際に何を意味するのかを把握します。</p>
+    <a href="/ja/ai-backtesting/">AI・バックテスト文書を開く</a>
+  </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">検証経路</span>
+    <h3>リプレイ -> バックテスト -> prior</h3>
+    <p>ヒストリカルリプレイとウォークフォワードで、意思決定ロジックが point-in-time 条件でも有効かを確認します。</p>
+    <a href="/ja/features/investment-replay">投資・リプレイ文書を開く</a>
+  </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">ビルダー経路</span>
+    <h3>アーキテクチャ -> API -> 公開同期</h3>
+    <p>開発者はランタイム層、公開インターフェース、内部 -> 公開の配布フローをこの経路で追えます。</p>
+    <a href="/ja/architecture">アーキテクチャ文書を開く</a>
   </div>
 </div>
 
@@ -103,6 +151,16 @@ Lattice Current は、次のものを1つの面で扱いたい利用者向けの
 
 <div class="policy-callout">
 公開ドキュメントは製品動作、アーキテクチャ、アルゴリズムを説明しますが、機微な運用詳細、非公開フィード、資格情報、内部専用ワークフローは省略またはサニタイズします。
+</div>
+
+<div class="lc-home-cta-slab">
+  <h2>このサイトを README ではなくシステムマップとして使ってください</h2>
+  <p>最も良い使い方は、ホームのインタラクティブビジュアル、機能マップ、アーキテクチャトポロジーを往復しながら読むことです。運用者、研究者、マクロ利用者、ビルダーが別々の入口から始めても、同じ内部モデルへ到達できるように設計しています。</p>
+  <div class="lc-link-row">
+    <a class="lc-link-pill" href="/ja/features/">機能を見る</a>
+    <a class="lc-link-pill" href="/ja/architecture">トポロジーを開く</a>
+    <a class="lc-link-pill" href="/ja/ai-backtesting/">リプレイロジックを見る</a>
+  </div>
 </div>
 
 ## ここから始める

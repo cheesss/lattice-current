@@ -203,7 +203,7 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/lattice-current/favicon.svg' }],
     ['meta', { property: 'og:title', content: 'Lattice Current' }],
     ['meta', { property: 'og:description', content: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.' }],
-    ['meta', { property: 'og:image', content: 'https://cheesss.github.io/lattice-current/images/hero/social-card.svg' }]
+    ['meta', { property: 'og:image', content: 'https://cheesss.github.io/lattice-current/images/hero/lattice-current-social-preview.png' }]
   ],
   locales: {
     root: {

@@ -862,7 +862,7 @@ const Footer = () => (
       </div>
       <div className="flex gap-6">
         <a href="https://x.com/eliehabib" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">X</a>
-        <a href="https://github.com/cheesss/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
+        <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
         <a href="https://www.wired.me/story/the-music-streaming-ceo-who-built-a-global-war-map" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">{t('footer.wiredArticle')}</a>
       </div>
     </div>
@@ -1032,7 +1032,7 @@ const EnterprisePage = () => (
         <div className="flex gap-6">
           <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ''; }} className="hover:text-wm-text transition-colors">{t('nav.pro')}</a>
           <a href="https://x.com/eliehabib" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">X</a>
-          <a href="https://github.com/cheesss/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
+          <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noreferrer" className="hover:text-wm-text transition-colors">GitHub</a>
         </div>
       </div>
     </footer>

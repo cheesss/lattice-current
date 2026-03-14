@@ -5,6 +5,7 @@
   --lc-surface-1: rgba(9, 17, 31, 0.78);
   --lc-surface-2: rgba(15, 23, 42, 0.72);
   --lc-border-1: rgba(148, 163, 184, 0.18);
+  --lc-border-2: rgba(251, 191, 36, 0.16);
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(120deg, #9fd9ff 0%, #ffe1a3 45%, #ef7a6a 100%);
   --vp-home-hero-image-background-image: radial-gradient(circle at center, rgba(70, 160, 216, 0.35), rgba(17, 24, 39, 0.05));
@@ -37,6 +38,10 @@
 
 .VPHero {
   position: relative;
+}
+
+.VPHero .tagline {
+  max-width: 620px;
 }
 
 .VPHero::after {
@@ -118,6 +123,37 @@
   margin: 0;
 }
 
+.lc-home-signalbar {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 10px 0 24px;
+}
+
+.lc-home-signalbar-item {
+  border: 1px solid var(--lc-border-1);
+  border-radius: 18px;
+  padding: 16px 18px;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(10, 19, 34, 0.84), rgba(16, 25, 43, 0.82));
+  box-shadow: 0 16px 38px rgba(2, 6, 23, 0.16);
+}
+
+.lc-home-signalbar-item strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.lc-home-signalbar-item span {
+  font-size: 12px;
+  color: var(--vp-c-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .lc-link-panel-grid {
   display: grid;
   gap: 16px;
@@ -151,6 +187,109 @@
   margin-top: 6px;
 }
 
+.lc-home-section-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1.15fr 0.85fr;
+  margin: 22px 0 28px;
+}
+
+.lc-home-section-card {
+  border: 1px solid var(--lc-border-1);
+  border-radius: 22px;
+  padding: 22px;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(9, 17, 31, 0.88), rgba(15, 23, 42, 0.88));
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.16);
+}
+
+.lc-home-section-card.alt {
+  border-color: var(--lc-border-2);
+  background:
+    radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(9, 17, 31, 0.88), rgba(15, 23, 42, 0.88));
+}
+
+.lc-home-section-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.lc-home-section-card ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.lc-home-section-card li + li {
+  margin-top: 6px;
+}
+
+.lc-home-route-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 22px 0 30px;
+}
+
+.lc-home-route-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lc-border-1);
+  border-radius: 20px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(10, 19, 34, 0.86), rgba(16, 25, 43, 0.82));
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.16);
+}
+
+.lc-home-route-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(96, 165, 250, 0.34);
+  box-shadow: 0 22px 54px rgba(2, 6, 23, 0.2);
+}
+
+.lc-home-route-card .lc-route-kicker {
+  display: inline-flex;
+  margin-bottom: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8fd1ff;
+}
+
+.lc-home-route-card h3 {
+  margin: 0 0 10px;
+}
+
+.lc-home-route-card p {
+  margin: 0 0 14px;
+}
+
+.lc-home-route-card a {
+  font-weight: 600;
+}
+
+.lc-home-cta-slab {
+  position: relative;
+  margin: 28px 0 20px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 26px;
+  overflow: hidden;
+  padding: 26px;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(96, 165, 250, 0.16), transparent 28%),
+    radial-gradient(circle at 80% 70%, rgba(251, 191, 36, 0.14), transparent 24%),
+    linear-gradient(135deg, rgba(7, 15, 28, 0.92), rgba(16, 25, 43, 0.92));
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.22);
+}
+
+.lc-home-cta-slab h2 {
+  margin-top: 0;
+}
+
 .lc-section-caption {
   margin: 10px 0 18px;
   color: var(--vp-c-text-2);
@@ -169,5 +308,11 @@
 @media (max-width: 640px) {
   .VPHero.has-image .container {
     gap: 24px;
+  }
+}
+
+@media (max-width: 860px) {
+  .lc-home-section-grid {
+    grid-template-columns: 1fr;
   }
 }

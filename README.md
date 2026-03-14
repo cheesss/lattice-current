@@ -63,6 +63,8 @@ npm run typecheck
 npm run build
 npm run docs:dev
 npm run docs:build
+npm run public:sync:dry
+npm run public:sync
 ```
 
 ## Documentation
@@ -72,6 +74,7 @@ npm run docs:build
 - Algorithms: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 - AI and intelligence: [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md)
 - Investment usage: [docs/investment-usage-playbook.md](docs/investment-usage-playbook.md)
+- Public sync workflow: [docs/public-sync.md](docs/public-sync.md)
 
 ## Branding and Lineage
 
@@ -104,3 +107,17 @@ If a change affects user-facing behavior, public APIs, product capabilities, or 
 - an update/release note
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution expectations.
+
+## Public Repo Sync
+
+The internal workspace syncs into the public repository clone at `../worldmonitor-public` with:
+
+```bash
+npm run public:sync
+```
+
+Use the dry run first when release changes touch docs, public assets, or publication policy:
+
+```bash
+npm run public:sync:dry
+```
