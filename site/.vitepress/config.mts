@@ -1,5 +1,197 @@
 import { defineConfig } from 'vitepress';
 
+type LocaleLabels = {
+  home: string;
+  gettingStarted: string;
+  variants: string;
+  features: string;
+  aiBacktesting: string;
+  algorithms: string;
+  architecture: string;
+  api: string;
+  updates: string;
+  legal: string;
+  featuresOverview: string;
+  liveIntelligence: string;
+  investmentReplay: string;
+  legalOverview: string;
+  licensing: string;
+  updatesOverview: string;
+  docs: string;
+  footerMessage: string;
+  docsLaunch: string;
+};
+
+function pathFor(locale: '' | 'ko' | 'ja', route: string): string {
+  const normalized = route.startsWith('/') ? route : `/${route}`;
+  return locale ? `/${locale}${normalized}` : normalized;
+}
+
+function createNav(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
+  return [
+    { text: labels.home, link: pathFor(locale, '/') },
+    { text: labels.gettingStarted, link: pathFor(locale, '/getting-started') },
+    { text: labels.variants, link: pathFor(locale, '/variants') },
+    { text: labels.features, link: pathFor(locale, '/features/') },
+    { text: labels.aiBacktesting, link: pathFor(locale, '/ai-backtesting/') },
+    { text: labels.algorithms, link: pathFor(locale, '/algorithms') },
+    { text: labels.architecture, link: pathFor(locale, '/architecture') },
+    { text: labels.api, link: pathFor(locale, '/api') },
+    { text: labels.updates, link: pathFor(locale, '/updates/') },
+    { text: labels.legal, link: pathFor(locale, '/legal/') }
+  ];
+}
+
+function createSidebar(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
+  const base = locale ? `/${locale}` : '';
+  return {
+    [`${base}/features/`]: [
+      {
+        text: labels.features,
+        items: [
+          { text: labels.featuresOverview, link: pathFor(locale, '/features/') },
+          { text: labels.liveIntelligence, link: pathFor(locale, '/features/live-intelligence') },
+          { text: labels.investmentReplay, link: pathFor(locale, '/features/investment-replay') }
+        ]
+      }
+    ],
+    [`${base}/ai-backtesting/`]: [
+      {
+        text: labels.aiBacktesting,
+        items: [
+          { text: labels.featuresOverview, link: pathFor(locale, '/ai-backtesting/') }
+        ]
+      }
+    ],
+    [`${base}/updates/`]: [
+      {
+        text: labels.updates,
+        items: [
+          { text: labels.updatesOverview, link: pathFor(locale, '/updates/') },
+          { text: labels.docsLaunch, link: pathFor(locale, '/updates/2026-03-docs-launch') }
+        ]
+      }
+    ],
+    [`${base}/legal/`]: [
+      {
+        text: labels.legal,
+        items: [
+          { text: labels.legalOverview, link: pathFor(locale, '/legal/') },
+          { text: labels.licensing, link: pathFor(locale, '/legal/licensing') }
+        ]
+      }
+    ],
+    [`${base}/`]: [
+      {
+        text: labels.docs,
+        items: [
+          { text: labels.gettingStarted, link: pathFor(locale, '/getting-started') },
+          { text: labels.variants, link: pathFor(locale, '/variants') },
+          { text: labels.features, link: pathFor(locale, '/features/') },
+          { text: labels.aiBacktesting, link: pathFor(locale, '/ai-backtesting/') },
+          { text: labels.algorithms, link: pathFor(locale, '/algorithms') },
+          { text: labels.architecture, link: pathFor(locale, '/architecture') },
+          { text: labels.api, link: pathFor(locale, '/api') },
+          { text: labels.updates, link: pathFor(locale, '/updates/') },
+          { text: labels.legal, link: pathFor(locale, '/legal/') }
+        ]
+      }
+    ]
+  };
+}
+
+function createThemeConfig(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
+  return {
+    logo: '/favicon.svg',
+    search: {
+      provider: 'local' as const
+    },
+    nav: createNav(locale, labels),
+    sidebar: createSidebar(locale, labels),
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/cheesss/lattice-current' }
+    ],
+    outline: {
+      level: [2, 3]
+    },
+    docFooter: {
+      prev: locale === 'ko' ? 'ÀÌÀü' : locale === 'ja' ? 'îñªØ' : 'Previous',
+      next: locale === 'ko' ? '´ÙÀ½' : locale === 'ja' ? 'ó­ªØ' : 'Next'
+    },
+    lastUpdatedText: locale === 'ko' ? '¸¶Áö¸· ¾÷µ¥ÀÌÆ®' : locale === 'ja' ? 'õÌðûÌÚãæ' : 'Last updated',
+    footer: {
+      message: labels.footerMessage,
+      copyright: 'Copyright 2024-2026 Elie Habib'
+    }
+  };
+}
+
+const en: LocaleLabels = {
+  home: 'Home',
+  gettingStarted: 'Getting Started',
+  variants: 'Variants',
+  features: 'Features',
+  aiBacktesting: 'AI & Backtesting',
+  algorithms: 'Algorithms',
+  architecture: 'Architecture',
+  api: 'API',
+  updates: 'Updates',
+  legal: 'Legal',
+  featuresOverview: 'Overview',
+  liveIntelligence: 'Live Intelligence',
+  investmentReplay: 'Investment & Replay',
+  legalOverview: 'Overview',
+  licensing: 'Licensing & Content',
+  updatesOverview: 'Overview',
+  docs: 'Docs',
+  footerMessage: 'Code licensed under AGPL-3.0-only. Public docs and media follow separate content policies.',
+  docsLaunch: '2026-03 Docs Launch'
+};
+
+const ko: LocaleLabels = {
+  home: 'È¨',
+  gettingStarted: '½ÃÀÛÇÏ±â',
+  variants: 'º¯Çü',
+  features: '±â´É',
+  aiBacktesting: 'AI ¡¤ ¹éÅ×½ºÆ®',
+  algorithms: '¾Ë°í¸®Áò',
+  architecture: '¾ÆÅ°ÅØÃ³',
+  api: 'API',
+  updates: '¾÷µ¥ÀÌÆ®',
+  legal: '¹ýÀû °íÁö',
+  featuresOverview: '°³¿ä',
+  liveIntelligence: '½Ç½Ã°£ ÀÎÅÚ¸®Àü½º',
+  investmentReplay: 'ÅõÀÚ ¡¤ ¸®ÇÃ·¹ÀÌ',
+  legalOverview: '°³¿ä',
+  licensing: '¶óÀÌ¼±½º ¡¤ ÄÜÅÙÃ÷',
+  updatesOverview: '°³¿ä',
+  docs: '¹®¼­',
+  footerMessage: 'ÄÚµå´Â AGPL-3.0-only·Î Á¦°øµÇ¸ç, °ø°³ ¹®¼­¿Í ¹Ìµð¾î´Â º°µµ ÄÜÅÙÃ÷ Á¤Ã¥À» µû¸¨´Ï´Ù.',
+  docsLaunch: '2026-03 ¹®¼­ »çÀÌÆ® °ø°³'
+};
+
+const ja: LocaleLabels = {
+  home: '«Û?«à',
+  gettingStarted: 'ËÒã·«¬«¤«É',
+  variants: '«Ð«ê«¢«ó«È',
+  features: 'Ñ¦Òö',
+  aiBacktesting: 'AI?«Ð«Ã«¯«Æ«¹«È',
+  algorithms: '«¢«ë«´«ê«º«à',
+  architecture: '«¢?«­«Æ«¯«Á«ã',
+  api: 'API',
+  updates: 'ÌÚãæ',
+  legal: 'ÛöÙâ',
+  featuresOverview: '?é©',
+  liveIntelligence: '«é«¤«Ö«¤«ó«Æ«ê«¸«§«ó«¹',
+  investmentReplay: '÷áíÀ?«ê«×«ì«¤',
+  legalOverview: '?é©',
+  licensing: '«é«¤«»«ó«¹?«³«ó«Æ«ó«Ä',
+  updatesOverview: '?é©',
+  docs: '«É«­«å«á«ó«È',
+  footerMessage: '«³?«ÉªÏ AGPL-3.0-only ªÇð«Íêªµªì¡¢ÍëËÒ«É«­«å«á«ó«ÈªÈ«á«Ç«£«¢ªËªÏÜ¬ªÎ«³«ó«Æ«ó«ÄÛ°öÜª¬îêéÄªµªìªÞª¹¡£',
+  docsLaunch: '2026-03 «É«­«å«á«ó«ÈÍëËÒ'
+};
+
 export default defineConfig({
   title: 'Lattice Current',
   description: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.',
@@ -13,85 +205,29 @@ export default defineConfig({
     ['meta', { property: 'og:description', content: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.' }],
     ['meta', { property: 'og:image', content: 'https://cheesss.github.io/lattice-current/images/hero/social-card.svg' }]
   ],
-  themeConfig: {
-    logo: '/favicon.svg',
-    search: {
-      provider: 'local'
+  locales: {
+    root: {
+      label: 'English',
+      lang: 'en-US',
+      title: 'Lattice Current',
+      description: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.',
+      themeConfig: createThemeConfig('', en)
     },
-    nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Getting Started', link: '/getting-started' },
-      { text: 'Variants', link: '/variants' },
-      { text: 'Features', link: '/features/' },
-      { text: 'AI & Backtesting', link: '/ai-backtesting/' },
-      { text: 'Algorithms', link: '/algorithms' },
-      { text: 'Architecture', link: '/architecture' },
-      { text: 'API', link: '/api' },
-      { text: 'Updates', link: '/updates/' },
-      { text: 'Legal', link: '/legal/' }
-    ],
-    sidebar: {
-      '/features/': [
-        {
-          text: 'Features',
-          items: [
-            { text: 'Overview', link: '/features/' },
-            { text: 'Live Intelligence', link: '/features/live-intelligence' },
-            { text: 'Investment & Replay', link: '/features/investment-replay' }
-          ]
-        }
-      ],
-      '/ai-backtesting/': [
-        {
-          text: 'AI & Backtesting',
-          items: [
-            { text: 'Overview', link: '/ai-backtesting/' }
-          ]
-        }
-      ],
-      '/updates/': [
-        {
-          text: 'Updates',
-          items: [
-            { text: 'Overview', link: '/updates/' },
-            { text: '2026-03 Docs Launch', link: '/updates/2026-03-docs-launch' }
-          ]
-        }
-      ],
-      '/legal/': [
-        {
-          text: 'Legal',
-          items: [
-            { text: 'Overview', link: '/legal/' },
-            { text: 'Licensing & Content', link: '/legal/licensing' }
-          ]
-        }
-      ],
-      '/': [
-        {
-          text: 'Docs',
-          items: [
-            { text: 'Getting Started', link: '/getting-started' },
-            { text: 'Variants', link: '/variants' },
-            { text: 'Features', link: '/features/' },
-            { text: 'AI & Backtesting', link: '/ai-backtesting/' },
-            { text: 'Algorithms', link: '/algorithms' },
-            { text: 'Architecture', link: '/architecture' },
-            { text: 'API', link: '/api' },
-            { text: 'Updates', link: '/updates/' },
-            { text: 'Legal', link: '/legal/' },
-            { text: 'Feature Page Template', link: '/templates/feature-template' },
-            { text: 'Update Template', link: '/templates/update-template' }
-          ]
-        }
-      ]
+    ko: {
+      label: 'ÇÑ±¹¾î',
+      lang: 'ko-KR',
+      link: '/ko/',
+      title: 'Lattice Current',
+      description: '½Ç½Ã°£ ±Û·Î¹ú ÀÎÅÚ¸®Àü½º, AI º¸Á¶ ºÐ¼®, È÷½ºÅä¸®ÄÃ ¸®ÇÃ·¹ÀÌ, ¹éÅ×½ºÆ® ¹®¼­.',
+      themeConfig: createThemeConfig('ko', ko)
     },
-    socialLinks: [
-      { icon: 'github', link: 'https://github.com/cheesss/lattice-current' }
-    ],
-    footer: {
-      message: 'Code licensed under AGPL-3.0-only. Public docs and media follow separate content policies.',
-      copyright: 'Copyright 2024-2026 Elie Habib'
+    ja: {
+      label: 'ìíÜâåÞ',
+      lang: 'ja-JP',
+      link: '/ja/',
+      title: 'Lattice Current',
+      description: '«ê«¢«ë«¿«¤«à?«¤«ó«Æ«ê«¸«§«ó«¹¡¢AI ÜÍð¾ÝÂà°¡¢«Ò«¹«È«ê«««ë?«ê«×«ì«¤¡¢«Ð«Ã«¯«Æ«¹«ÈªÎ«É«­«å«á«ó«È¡£',
+      themeConfig: createThemeConfig('ja', ja)
     }
   }
 });
