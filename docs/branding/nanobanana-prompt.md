@@ -2,9 +2,9 @@
 
 ## GitHub Hero / Social Preview Prompt
 
-Create a premium GitHub hero image for an open-source project called "World Monitor".
+Create a premium GitHub hero image for an open-source project called "Lattice Current".
 
-World Monitor is a real-time geopolitical and market intelligence platform that combines global OSINT, live news monitoring, AI-assisted analysis, ontology graphs, event-to-market transmission modeling, historical replay, and backtesting.
+Lattice Current is a real-time geopolitical and market intelligence platform that combines global OSINT, live news monitoring, AI-assisted analysis, ontology graphs, event-to-market transmission modeling, historical replay, and backtesting.
 
 Visual style:
 A cinematic but credible intelligence command center, not sci-fi fantasy.
@@ -27,7 +27,7 @@ deep navy, graphite, steel, muted cyan, amber, restrained red alerts.
 
 Composition:
 clean center-weighted layout with enough negative space for GitHub header crop.
-If text appears, keep it minimal and legible: "World Monitor".
+If text appears, keep it minimal and legible: "Lattice Current".
 
 Aspect ratio:
 16:9.

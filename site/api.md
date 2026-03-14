@@ -12,12 +12,12 @@ owner: core
 
 # API
 
-World Monitor exposes multiple typed service domains. Public API docs in this repository are maintained as OpenAPI artifacts.
+Lattice Current exposes multiple typed service domains. Public API docs in this repository are maintained as OpenAPI artifacts.
 
 ## Main references
 
-- [API docs directory](https://github.com/cheesss/worldmonitor/tree/main/docs/api)
-- [Adding endpoints guide](https://github.com/cheesss/worldmonitor/blob/main/docs/ADDING_ENDPOINTS.md)
+- [API docs directory](https://github.com/cheesss/lattice-current/tree/main/docs/api)
+- [Adding endpoints guide](https://github.com/cheesss/lattice-current/blob/main/docs/ADDING_ENDPOINTS.md)
 
 ## Service families
 

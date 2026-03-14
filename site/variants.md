@@ -12,7 +12,7 @@ owner: core
 
 # Variants
 
-World Monitor is one repository with multiple product surfaces.
+Lattice Current is one repository with multiple product surfaces.
 
 | Variant | Focus | Typical user |
 | --- | --- | --- |

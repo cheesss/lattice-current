@@ -1,14 +1,14 @@
-# World Monitor
+# Lattice Current
 
-Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting from a single TypeScript codebase.
+Independent public research fork for real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-24292f?logo=github)](https://cheesss.github.io/worldmonitor/)
+[![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-24292f?logo=github)](https://cheesss.github.io/lattice-current/)
 
 ## What It Is
 
-World Monitor is a multi-variant intelligence platform that combines:
+Lattice Current is a public research fork of a multi-variant intelligence platform that combines:
 
 - live global news and OSINT collection
 - AI-assisted summaries, deduction, and Q&A
@@ -23,12 +23,12 @@ The same repository powers multiple variants:
 - `tech`: AI, startups, cloud, cyber, technology ecosystems
 - `finance`: markets, macro, central banks, commodities, cross-asset analysis
 
-## Live Surfaces
+## Public Surfaces
 
-- Main app: `https://worldmonitor.app`
-- Tech variant: `https://tech.worldmonitor.app`
-- Finance variant: `https://finance.worldmonitor.app`
-- GitHub Pages docs: `https://cheesss.github.io/worldmonitor/`
+- Repository: `https://github.com/cheesss/lattice-current`
+- GitHub Pages docs: `https://cheesss.github.io/lattice-current/`
+
+No official hosted application deployment is represented by this fork. If you want a live surface, deploy your own instance from this repository.
 
 ## Highlights
 
@@ -72,6 +72,12 @@ npm run docs:build
 - Algorithms: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 - AI and intelligence: [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md)
 - Investment usage: [docs/investment-usage-playbook.md](docs/investment-usage-playbook.md)
+
+## Branding and Lineage
+
+This repository is branded as `Lattice Current`.
+
+Some deep technical documents and internal code identifiers still reference legacy `worldmonitor` names because they describe inherited code structure, storage keys, proto package paths, or upstream lineage. Those identifiers are not the public product name of this fork.
 
 ## Licensing and Content Policy
 

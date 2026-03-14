@@ -15,10 +15,10 @@ owner: core
 ## Core policies
 
 - [Licensing & Content](/legal/licensing)
-- [Copyright](https://github.com/cheesss/worldmonitor/blob/main/COPYRIGHT.md)
-- [Content Policy](https://github.com/cheesss/worldmonitor/blob/main/CONTENT_POLICY.md)
-- [Third-Party Notices](https://github.com/cheesss/worldmonitor/blob/main/THIRD_PARTY_NOTICES.md)
-- [Trademarks](https://github.com/cheesss/worldmonitor/blob/main/TRADEMARKS.md)
+- [Copyright](https://github.com/cheesss/lattice-current/blob/main/COPYRIGHT.md)
+- [Content Policy](https://github.com/cheesss/lattice-current/blob/main/CONTENT_POLICY.md)
+- [Third-Party Notices](https://github.com/cheesss/lattice-current/blob/main/THIRD_PARTY_NOTICES.md)
+- [Trademarks](https://github.com/cheesss/lattice-current/blob/main/TRADEMARKS.md)
 
 ## Public rule of thumb
 

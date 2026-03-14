@@ -19,6 +19,6 @@ owner: core
 
 ## Deep references
 
-- [Architecture deep dive](https://github.com/cheesss/worldmonitor/blob/main/docs/ARCHITECTURE.md)
-- [Data sources reference](https://github.com/cheesss/worldmonitor/blob/main/docs/DATA_SOURCES.md)
-- [Desktop runtime guide](https://github.com/cheesss/worldmonitor/blob/main/docs/DESKTOP_APP.md)
+- [Architecture deep dive](https://github.com/cheesss/lattice-current/blob/main/docs/ARCHITECTURE.md)
+- [Data sources reference](https://github.com/cheesss/lattice-current/blob/main/docs/DATA_SOURCES.md)
+- [Desktop runtime guide](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)

@@ -25,13 +25,14 @@ owner: core
 
 ## Brand and identity
 
-- The project name may be used factually
-- Forks should not imply they are the official distribution
+- This fork is publicly branded as `Lattice Current`
+- Forks should not imply they are the official distribution of any upstream project
+- Legacy `worldmonitor` identifiers may still appear in inherited technical material as implementation or lineage references
 
 ## Policy references
 
-- [LICENSE](https://github.com/cheesss/worldmonitor/blob/main/LICENSE)
-- [COPYRIGHT.md](https://github.com/cheesss/worldmonitor/blob/main/COPYRIGHT.md)
-- [CONTENT_POLICY.md](https://github.com/cheesss/worldmonitor/blob/main/CONTENT_POLICY.md)
-- [THIRD_PARTY_NOTICES.md](https://github.com/cheesss/worldmonitor/blob/main/THIRD_PARTY_NOTICES.md)
-- [TRADEMARKS.md](https://github.com/cheesss/worldmonitor/blob/main/TRADEMARKS.md)
+- [LICENSE](https://github.com/cheesss/lattice-current/blob/main/LICENSE)
+- [COPYRIGHT.md](https://github.com/cheesss/lattice-current/blob/main/COPYRIGHT.md)
+- [CONTENT_POLICY.md](https://github.com/cheesss/lattice-current/blob/main/CONTENT_POLICY.md)
+- [THIRD_PARTY_NOTICES.md](https://github.com/cheesss/lattice-current/blob/main/THIRD_PARTY_NOTICES.md)
+- [TRADEMARKS.md](https://github.com/cheesss/lattice-current/blob/main/TRADEMARKS.md)

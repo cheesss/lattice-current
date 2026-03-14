@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-World Monitor relies on a mix of open-source libraries, public datasets, maps, and external information providers.
+Lattice Current relies on a mix of open-source libraries, public datasets, maps, and external information providers.
 
 ## Software Libraries
 
@@ -30,7 +30,7 @@ Use of those providers remains subject to their attribution and licensing requir
 
 ## External Data and Content
 
-World Monitor may integrate or reference data from:
+Lattice Current may integrate or reference data from:
 
 - public RSS feeds
 - public market and macroeconomic providers

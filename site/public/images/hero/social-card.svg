@@ -11,6 +11,6 @@
   <rect x="720" y="307" width="214" height="18" rx="9" fill="#32527E"/>
   <rect x="720" y="358" width="144" height="82" rx="14" fill="#162539"/>
   <rect x="880" y="358" width="140" height="82" rx="14" fill="#162539"/>
-  <text x="720" y="121" fill="#E9F2FF" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700">World Monitor</text>
+  <text x="720" y="121" fill="#E9F2FF" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700">Lattice Current</text>
   <text x="720" y="206" fill="#8AB4D8" font-family="Segoe UI, Arial, sans-serif" font-size="24">Real-time intelligence, AI analysis, replay, and backtesting</text>
 </svg>

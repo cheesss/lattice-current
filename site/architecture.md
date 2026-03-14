@@ -22,10 +22,10 @@ owner: core
 
 ## Reference docs
 
-- [Architecture deep dive](https://github.com/cheesss/worldmonitor/blob/main/docs/ARCHITECTURE.md)
-- [Desktop runtime](https://github.com/cheesss/worldmonitor/blob/main/docs/DESKTOP_APP.md)
-- [Historical data sources](https://github.com/cheesss/worldmonitor/blob/main/docs/historical-data-sources.md)
-- [Intelligence server schema](https://github.com/cheesss/worldmonitor/blob/main/docs/intelligence-server-schema.sql)
+- [Architecture deep dive](https://github.com/cheesss/lattice-current/blob/main/docs/ARCHITECTURE.md)
+- [Desktop runtime](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)
+- [Historical data sources](https://github.com/cheesss/lattice-current/blob/main/docs/historical-data-sources.md)
+- [Intelligence server schema](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
 
 ## Public boundary
 

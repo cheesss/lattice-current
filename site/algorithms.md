@@ -12,7 +12,7 @@ owner: core
 
 # Algorithms
 
-World Monitor blends deterministic scoring, online priors, graph logic, and replay-based evaluation.
+Lattice Current blends deterministic scoring, online priors, graph logic, and replay-based evaluation.
 
 ## Major groups
 
@@ -25,8 +25,8 @@ World Monitor blends deterministic scoring, online priors, graph logic, and repl
 
 ## Primary references
 
-- [Algorithms reference](https://github.com/cheesss/worldmonitor/blob/main/docs/ALGORITHMS.md)
-- [AI intelligence reference](https://github.com/cheesss/worldmonitor/blob/main/docs/AI_INTELLIGENCE.md)
+- [Algorithms reference](https://github.com/cheesss/lattice-current/blob/main/docs/ALGORITHMS.md)
+- [AI intelligence reference](https://github.com/cheesss/lattice-current/blob/main/docs/AI_INTELLIGENCE.md)
 - [AI & Backtesting](/ai-backtesting/)
 
 ## Public note

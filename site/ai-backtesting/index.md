@@ -16,10 +16,10 @@ This section groups the project documents that explain how AI, investment logic,
 
 ## Core artifacts
 
-- [AI and backtesting integration analysis](https://github.com/cheesss/worldmonitor/blob/main/docs/ai_backtest_analysis.md)
-- [Improvement plan: 60 concrete areas](https://github.com/cheesss/worldmonitor/blob/main/docs/improvement_plan_60_points.md)
-- [UX and visualization improvements](https://github.com/cheesss/worldmonitor/blob/main/docs/ux_visualization_improvements.md)
-- [Investment usage playbook](https://github.com/cheesss/worldmonitor/blob/main/docs/investment-usage-playbook.md)
+- [AI and backtesting integration analysis](https://github.com/cheesss/lattice-current/blob/main/docs/ai_backtest_analysis.md)
+- [Improvement plan: 60 concrete areas](https://github.com/cheesss/lattice-current/blob/main/docs/improvement_plan_60_points.md)
+- [UX and visualization improvements](https://github.com/cheesss/lattice-current/blob/main/docs/ux_visualization_improvements.md)
+- [Investment usage playbook](https://github.com/cheesss/lattice-current/blob/main/docs/investment-usage-playbook.md)
 
 ## Integrated flow
 

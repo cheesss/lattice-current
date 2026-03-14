@@ -1,17 +1,17 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
-  title: 'World Monitor',
+  title: 'Lattice Current',
   description: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.',
   lang: 'en-US',
-  base: '/worldmonitor/',
+  base: '/lattice-current/',
   cleanUrls: true,
   lastUpdated: true,
   head: [
     ['link', { rel: 'icon', href: '/favicon.svg' }],
-    ['meta', { property: 'og:title', content: 'World Monitor' }],
+    ['meta', { property: 'og:title', content: 'Lattice Current' }],
     ['meta', { property: 'og:description', content: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.' }],
-    ['meta', { property: 'og:image', content: 'https://cheesss.github.io/worldmonitor/images/hero/social-card.svg' }]
+    ['meta', { property: 'og:image', content: 'https://cheesss.github.io/lattice-current/images/hero/social-card.svg' }]
   ],
   themeConfig: {
     logo: '/favicon.svg',
@@ -87,7 +87,7 @@ export default defineConfig({
       ]
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/cheesss/worldmonitor' }
+      { icon: 'github', link: 'https://github.com/cheesss/lattice-current' }
     ],
     footer: {
       message: 'Code licensed under AGPL-3.0-only. Public docs and media follow separate content policies.',

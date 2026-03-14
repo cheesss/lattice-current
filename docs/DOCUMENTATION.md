@@ -2,7 +2,7 @@
 
 AI-powered real-time global intelligence dashboard aggregating news, markets, geopolitical data, and infrastructure monitoring into a unified situation awareness interface.
 
-[Public docs site: koala73.github.io/worldmonitor](https://cheesss.github.io/worldmonitor/) | [Repository: github.com/koala73/worldmonitor](https://github.com/cheesss/worldmonitor)
+[Public docs site: koala73.github.io/worldmonitor](https://cheesss.github.io/lattice-current/) | [Repository: github.com/koala73/worldmonitor](https://github.com/cheesss/lattice-current)
 [Live Demo: worldmonitor.app](https://worldmonitor.app) | [Tech Variant: tech.worldmonitor.app](https://tech.worldmonitor.app) | [Finance Variant: finance.worldmonitor.app](https://finance.worldmonitor.app) | [Happy Variant: happy.worldmonitor.app](https://happy.worldmonitor.app)
 
 ## Documentation Index
@@ -3315,7 +3315,7 @@ const header = `World Monitor v${__APP_VERSION__}`;
 
 ```bash
 # Clone the repository
-git clone https://github.com/cheesss/worldmonitor.git
+git clone https://github.com/cheesss/lattice-current.git
 cd worldmonitor
 
 # Install everything (buf, sebuf plugins, npm deps, proto deps)
@@ -4031,7 +4031,7 @@ See **[docs/ADDING_ENDPOINTS.md](ADDING_ENDPOINTS.md)** for the complete guide c
 **Adding a New Data Layer**
 
 1. Define the proto contract and generate code (see [ADDING_ENDPOINTS.md](ADDING_ENDPOINTS.md))
-2. Implement the handler in `server/worldmonitor/{domain}/v1/`
+2. Implement the handler in `server/lattice-current/{domain}/v1/`
 3. Create the frontend service wrapper in `src/services/`
 4. Add layer toggle in `src/components/Map.ts`
 5. Add rendering logic for map markers/overlays

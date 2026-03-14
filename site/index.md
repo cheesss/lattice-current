@@ -1,6 +1,6 @@
 ---
 layout: home
-title: World Monitor
+title: Lattice Current
 summary: Real-time global intelligence, AI-assisted analysis, ontology graphs, and historical replay from one codebase.
 status: stable
 variants:
@@ -10,12 +10,12 @@ variants:
 updated: 2026-03-15
 owner: core
 hero:
-  name: World Monitor
+  name: Lattice Current
   text: Real-time intelligence with AI, ontology graphs, and backtesting
-  tagline: A multi-variant platform for live monitoring, event-to-market analysis, and replay-driven decision support.
+  tagline: An independent public research fork for live monitoring, event-to-market analysis, and replay-driven decision support.
   image:
     src: /images/hero/worldmonitor-hero.jpg
-    alt: World Monitor sanitized hero image
+    alt: Lattice Current sanitized hero image
   actions:
     - theme: brand
       text: Get Started
@@ -25,7 +25,7 @@ hero:
       link: /architecture
     - theme: alt
       text: GitHub Repo
-      link: https://github.com/cheesss/worldmonitor
+      link: https://github.com/cheesss/lattice-current
 features:
   - title: Multi-variant intelligence workspace
     details: Full, tech, and finance variants share one codebase while exposing different panels, feeds, and workflows.
@@ -37,13 +37,17 @@ features:
 
 ## Why this exists
 
-World Monitor is built for operators who need one surface for:
+Lattice Current is built for operators who need one surface for:
 
 - live geopolitical and market monitoring
 - evidence-first AI assistance
 - graph and ontology exploration
 - transmission analysis from events to assets
 - replay and backtesting of prior decision logic
+
+## Fork position
+
+This is an independent public research fork. It does not claim to be the official upstream distribution or hosted service.
 
 ## Variants
 

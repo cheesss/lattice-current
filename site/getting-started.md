@@ -44,6 +44,12 @@ npm run docs:build
 - `docs/`: deep technical docs and reference material
 - `site/`: GitHub Pages docs site
 
+## Branding note
+
+This public fork is branded as `Lattice Current`.
+
+Some internal identifiers still use legacy `worldmonitor` names in code paths, package names, localStorage keys, proto packages, or docs that describe inherited structure. Those identifiers are implementation details, not the public brand of this repository.
+
 ## Read next
 
 - [Variants](/variants)
