@@ -1,0 +1,1819 @@
+
+import { createReadStream } from 'node:fs';
+import { mkdir, open, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import readline from 'node:readline';
+import streamJsonPackage from 'stream-json';
+import pickPackage from 'stream-json/filters/Pick';
+import streamArrayPackage from 'stream-json/streamers/StreamArray';
+import type { ClusteredEvent, MarketData, NewsItem } from '@/types';
+import type { HistoricalReplayFrame } from '../historical-intelligence';
+
+const { parser: createJsonParser } = streamJsonPackage as { parser: () => NodeJS.ReadWriteStream };
+const { pick } = pickPackage as { pick: (options: { filter: string }) => NodeJS.ReadWriteStream };
+const { streamArray } = streamArrayPackage as { streamArray: () => NodeJS.ReadWriteStream };
+
+type DuckDbConnection = {
+  run: (sql: string, params?: Record<string, unknown>) => Promise<unknown>;
+  runAndReadAll: (
+    sql: string,
+    params?: Record<string, unknown>,
+  ) => Promise<{ getRowObjectsJS: () => Record<string, unknown>[] }>;
+};
+
+type HistoricalRawKind = 'news' | 'market';
+
+export interface HistoricalRawReplayRecord {
+  id: string;
+  datasetId: string;
+  provider: string;
+  sourceKind: 'rss' | 'api' | 'playwright' | 'manual';
+  sourceId: string;
+  itemKind: HistoricalRawKind;
+  validTimeStart: string;
+  validTimeEnd: string | null;
+  transactionTime: string;
+  knowledgeBoundary: string;
+  headline: string | null;
+  link: string | null;
+  symbol: string | null;
+  region: string | null;
+  price: number | null;
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+}
+
+export interface HistoricalBackfillOptions {
+  datasetId?: string;
+  provider?: string;
+  dbPath?: string;
+  chunkSize?: number;
+  bucketHours?: number;
+  newsLookbackHours?: number;
+  warmupFrameCount?: number;
+  warmupUntil?: string;
+  sourceVersion?: string | null;
+}
+
+export interface HistoricalBackfillResult {
+  datasetId: string;
+  provider: string;
+  dbPath: string;
+  rawRecordCount: number;
+  frameCount: number;
+  warmupFrameCount: number;
+  bucketHours: number;
+  firstValidTime: string | null;
+  lastValidTime: string | null;
+  firstTransactionTime: string | null;
+  lastTransactionTime: string | null;
+}
+
+export interface HistoricalDatasetSummary {
+  datasetId: string;
+  provider: string;
+  sourceVersion: string | null;
+  importedAt: string;
+  rawRecordCount: number;
+  frameCount: number;
+  warmupFrameCount: number;
+  bucketHours: number;
+  firstValidTime: string | null;
+  lastValidTime: string | null;
+  firstTransactionTime: string | null;
+  lastTransactionTime: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface HistoricalFrameLoadOptions {
+  dbPath?: string;
+  datasetId?: string;
+  includeWarmup?: boolean;
+  maxFrames?: number;
+  startTransactionTime?: string;
+  endTransactionTime?: string;
+  knowledgeBoundaryCeiling?: string;
+}
+
+interface MaterializedFrameRow {
+  id: string;
+  datasetId: string;
+  bucketHours: number;
+  bucketStart: string;
+  bucketEnd: string;
+  validTimeStart: string;
+  validTimeEnd: string | null;
+  transactionTime: string;
+  knowledgeBoundary: string;
+  warmup: boolean;
+  payloadJson: string;
+  newsCount: number;
+  clusterCount: number;
+  marketCount: number;
+}
+
+export interface HistoricalReplayFrameArchiveRow extends MaterializedFrameRow {
+  payload: HistoricalReplayFrame;
+}
+
+export interface HistoricalRawRecordLoadOptions {
+  dbPath?: string;
+  datasetId?: string;
+  limit?: number;
+  offset?: number;
+  startTransactionTime?: string;
+  endTransactionTime?: string;
+  knowledgeBoundaryCeiling?: string;
+}
+
+export interface HistoricalReplayFrameRowLoadOptions {
+  dbPath?: string;
+  datasetId?: string;
+  includeWarmup?: boolean;
+  limit?: number;
+  offset?: number;
+  startTransactionTime?: string;
+  endTransactionTime?: string;
+  knowledgeBoundaryCeiling?: string;
+}
+
+const DEFAULT_DB_PATH = path.resolve('data', 'historical', 'intelligence-history.duckdb');
+const DEFAULT_BUCKET_HOURS = 6;
+const DEFAULT_NEWS_LOOKBACK_HOURS = 24;
+const DEFAULT_CHUNK_SIZE = 500;
+
+let duckDbModulePromise: Promise<typeof import('@duckdb/node-api')> | null = null;
+const connectionCache = new Map<string, Promise<DuckDbConnection>>();
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function slugify(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'dataset';
+}
+
+function stableId(parts: Array<string | number | null | undefined>): string {
+  return parts
+    .map((part) => String(part ?? '').trim())
+    .filter(Boolean)
+    .join('::')
+    .slice(0, 240);
+}
+
+function minIso(current: string | null, candidate: string | null): string | null {
+  if (!candidate) return current;
+  if (!current) return candidate;
+  return asTs(candidate) < asTs(current) ? candidate : current;
+}
+
+function maxIso(current: string | null, candidate: string | null): string | null {
+  if (!candidate) return current;
+  if (!current) return candidate;
+  return asTs(candidate) > asTs(current) ? candidate : current;
+}
+
+function toIso(value: unknown, fallback?: string): string {
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    const asNumber = /^\d{10,13}$/.test(trimmed) ? Number(trimmed) : null;
+    if (asNumber && Number.isFinite(asNumber)) {
+      const scaled = trimmed.length === 13 ? asNumber : asNumber * 1000;
+      return new Date(scaled).toISOString();
+    }
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const scaled = value > 1e12 ? value : value * 1000;
+    return new Date(scaled).toISOString();
+  }
+  if (fallback) return fallback;
+  return new Date(0).toISOString();
+}
+
+function asTs(value: string | null | undefined): number {
+  if (!value) return 0;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.replace(/,/g, ''));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function normalizeTitle(value: unknown, fallback: string): string {
+  const text = String(value || '').trim();
+  return text || fallback;
+}
+
+function defaultDatasetId(provider: string): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `${slugify(provider)}-${stamp}`;
+}
+
+function newsSourceName(record: HistoricalRawReplayRecord): string {
+  const source = String(record.metadata.sourceName || record.sourceId || record.provider).trim();
+  return source || record.provider;
+}
+
+async function loadDuckDbModule(): Promise<typeof import('@duckdb/node-api')> {
+  if (!duckDbModulePromise) {
+    duckDbModulePromise = import('@duckdb/node-api');
+  }
+  return duckDbModulePromise;
+}
+
+async function ensureHistoricalReplayArchive(dbPath: string): Promise<DuckDbConnection> {
+  const normalized = path.resolve(dbPath || DEFAULT_DB_PATH);
+  const cached = connectionCache.get(normalized);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    await mkdir(path.dirname(normalized), { recursive: true });
+    const duckdb = await loadDuckDbModule();
+    const instance = await duckdb.DuckDBInstance.fromCache(normalized);
+    const connection = await instance.connect();
+    await connection.run(`
+      CREATE TABLE IF NOT EXISTS historical_raw_items (
+        id VARCHAR PRIMARY KEY,
+        dataset_id VARCHAR,
+        provider VARCHAR,
+        source_kind VARCHAR,
+        source_id VARCHAR,
+        item_kind VARCHAR,
+        valid_time_start VARCHAR,
+        valid_time_end VARCHAR,
+        transaction_time VARCHAR,
+        knowledge_boundary VARCHAR,
+        headline VARCHAR,
+        link VARCHAR,
+        symbol VARCHAR,
+        region VARCHAR,
+        price DOUBLE,
+        payload_json VARCHAR,
+        metadata_json VARCHAR
+      )
+    `);
+    await connection.run(`
+      CREATE TABLE IF NOT EXISTS historical_replay_frames (
+        id VARCHAR PRIMARY KEY,
+        dataset_id VARCHAR,
+        bucket_hours INTEGER,
+        bucket_start VARCHAR,
+        bucket_end VARCHAR,
+        valid_time_start VARCHAR,
+        valid_time_end VARCHAR,
+        transaction_time VARCHAR,
+        knowledge_boundary VARCHAR,
+        warmup BOOLEAN,
+        news_count INTEGER,
+        cluster_count INTEGER,
+        market_count INTEGER,
+        payload_json VARCHAR
+      )
+    `);
+    await connection.run(`
+      CREATE TABLE IF NOT EXISTS historical_datasets (
+        dataset_id VARCHAR PRIMARY KEY,
+        provider VARCHAR,
+        source_version VARCHAR,
+        imported_at VARCHAR,
+        raw_record_count INTEGER,
+        frame_count INTEGER,
+        warmup_frame_count INTEGER,
+        bucket_hours INTEGER,
+        first_valid_time VARCHAR,
+        last_valid_time VARCHAR,
+        first_transaction_time VARCHAR,
+        last_transaction_time VARCHAR,
+        metadata_json VARCHAR
+      )
+    `);
+    return connection as DuckDbConnection;
+  })().catch((error) => {
+    connectionCache.delete(normalized);
+    throw error;
+  });
+
+  connectionCache.set(normalized, promise);
+  return promise;
+}
+
+function parseRawRow(row: Record<string, unknown>): HistoricalRawReplayRecord {
+  return {
+    id: String(row.id || ''),
+    datasetId: String(row.dataset_id || ''),
+    provider: String(row.provider || ''),
+    sourceKind: String(row.source_kind || 'api') as HistoricalRawReplayRecord['sourceKind'],
+    sourceId: String(row.source_id || ''),
+    itemKind: String(row.item_kind || 'news') as HistoricalRawKind,
+    validTimeStart: String(row.valid_time_start || new Date(0).toISOString()),
+    validTimeEnd: row.valid_time_end ? String(row.valid_time_end) : null,
+    transactionTime: String(row.transaction_time || new Date(0).toISOString()),
+    knowledgeBoundary: String(row.knowledge_boundary || row.transaction_time || new Date(0).toISOString()),
+    headline: row.headline ? String(row.headline) : null,
+    link: row.link ? String(row.link) : null,
+    symbol: row.symbol ? String(row.symbol) : null,
+    region: row.region ? String(row.region) : null,
+    price: typeof row.price === 'number' ? row.price : toNumber(row.price),
+    payload:
+      typeof row.payload_json === 'string' && row.payload_json
+        ? (JSON.parse(row.payload_json) as Record<string, unknown>)
+        : {},
+    metadata:
+      typeof row.metadata_json === 'string' && row.metadata_json
+        ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
+        : {},
+  };
+}
+
+function parseFrameRow(row: Record<string, unknown>): HistoricalReplayFrameArchiveRow {
+  const payload = reviveFrame(String(row.payload_json || '{}'));
+  return {
+    id: String(row.id || ''),
+    datasetId: String(row.dataset_id || ''),
+    bucketHours: Number(row.bucket_hours || DEFAULT_BUCKET_HOURS),
+    bucketStart: String(row.bucket_start || payload.timestamp || new Date(0).toISOString()),
+    bucketEnd: String(row.bucket_end || payload.timestamp || new Date(0).toISOString()),
+    validTimeStart: String(row.valid_time_start || payload.validTimeStart || payload.timestamp || new Date(0).toISOString()),
+    validTimeEnd: row.valid_time_end ? String(row.valid_time_end) : payload.validTimeEnd ?? null,
+    transactionTime: String(row.transaction_time || payload.transactionTime || payload.timestamp || new Date(0).toISOString()),
+    knowledgeBoundary: String(row.knowledge_boundary || payload.knowledgeBoundary || payload.timestamp || new Date(0).toISOString()),
+    warmup: Boolean(row.warmup),
+    payloadJson: String(row.payload_json || '{}'),
+    newsCount: Number(row.news_count || 0),
+    clusterCount: Number(row.cluster_count || 0),
+    marketCount: Number(row.market_count || 0),
+    payload,
+  };
+}
+
+async function readJsonPreamble(filePath: string, maxBytes = 131_072): Promise<string> {
+  const handle = await open(filePath, 'r');
+  try {
+    const buffer = Buffer.allocUnsafe(maxBytes);
+    const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
+    return buffer.subarray(0, bytesRead).toString('utf8');
+  } finally {
+    await handle.close();
+  }
+}
+
+function extractJsonString(preamble: string, keys: string[]): string | null {
+  for (const key of keys) {
+    const match = preamble.match(new RegExp(`"${key}"\\s*:\\s*"([^"]+)"`, 'i'));
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+interface StreamTransformContext {
+  datasetId: string;
+  provider: string;
+  sourceVersion: string | null;
+  fetchedAt: string;
+  requestId: string | null;
+  seriesId: string | null;
+}
+
+type StreamJsonToken = {
+  name?: string;
+  value?: unknown;
+};
+
+function buildCoingeckoRecord(
+  point: unknown,
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord | null {
+  if (!Array.isArray(point)) return null;
+  const validTimeStart = toIso(point[0], context.fetchedAt);
+  const assetId = String(context.requestId || context.datasetId || 'coingecko').trim();
+  return {
+    id: stableId([context.datasetId, context.provider, assetId, validTimeStart, index]),
+    datasetId: context.datasetId,
+    provider: context.provider,
+    sourceKind: 'api',
+    sourceId: `coingecko:${assetId}`,
+    itemKind: 'market',
+    validTimeStart,
+    validTimeEnd: null,
+    transactionTime: context.fetchedAt,
+    knowledgeBoundary: context.fetchedAt,
+    headline: `${assetId.toUpperCase()} price`,
+    link: null,
+    symbol: assetId.toUpperCase(),
+    region: null,
+    price: toNumber(point[1]),
+    payload: {
+      price: point[1],
+      provider: context.provider,
+    },
+    metadata: {
+      provider: context.provider,
+      requestId: assetId,
+      sourceVersion: context.sourceVersion,
+    },
+  };
+}
+
+function buildFredObservationRecord(
+  row: Record<string, unknown>,
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord {
+  const seriesId = String(context.seriesId || context.requestId || context.datasetId || 'FRED').trim();
+  const validTimeStart = toIso(row.date || row.observation_date || context.fetchedAt, context.fetchedAt);
+  const transactionTime = toIso(
+    row.realtime_start || row.realtimeStart || row.fetchedAt || context.fetchedAt,
+    context.fetchedAt,
+  );
+  return {
+    id: stableId([context.datasetId, context.provider, seriesId, validTimeStart, index]),
+    datasetId: context.datasetId,
+    provider: context.provider,
+    sourceKind: 'api',
+    sourceId: `${context.provider}:${seriesId}`,
+    itemKind: 'market',
+    validTimeStart,
+    validTimeEnd: null,
+    transactionTime,
+    knowledgeBoundary: transactionTime,
+    headline: `${seriesId} observation`,
+    link: null,
+    symbol: seriesId.toUpperCase(),
+    region: null,
+    price: toNumber(row.value || row.observed_value),
+    payload: {
+      ...row,
+      provider: context.provider,
+    },
+    metadata: {
+      provider: context.provider,
+      seriesId,
+      sourceVersion: context.sourceVersion,
+    },
+  };
+}
+
+function buildGdeltArticleRecord(
+  article: Record<string, unknown>,
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord {
+  const validTimeStart = toIso(
+    article.seendate || article.date || article.published || context.fetchedAt,
+    context.fetchedAt,
+  );
+  const transactionTime = toIso(article.seendate || context.fetchedAt, context.fetchedAt);
+  const title = normalizeTitle(article.title || article.title_translated, 'GDELT article');
+  const link =
+    typeof article.url === 'string'
+      ? article.url
+      : typeof article.link === 'string'
+        ? article.link
+        : null;
+  return {
+    id: stableId([context.datasetId, context.provider, link || title, validTimeStart, index]),
+    datasetId: context.datasetId,
+    provider: context.provider,
+    sourceKind: 'api',
+    sourceId: 'gdelt-doc',
+    itemKind: 'news',
+    validTimeStart,
+    validTimeEnd: null,
+    transactionTime,
+    knowledgeBoundary: transactionTime,
+    headline: title,
+    link,
+    symbol: null,
+    region: typeof article.sourcecountry === 'string' ? article.sourcecountry : null,
+    price: null,
+    payload: article,
+    metadata: {
+      sourceName: article.domain || 'GDELT',
+      sourceTier: 3,
+      language: article.language || null,
+      sourceVersion: context.sourceVersion,
+    },
+  };
+}
+
+function buildAcledRecord(
+  row: Record<string, unknown>,
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord {
+  const validTimeStart = toIso(row.event_date || row.timestamp || context.fetchedAt, context.fetchedAt);
+  const transactionTime = toIso(row.timestamp || context.fetchedAt, context.fetchedAt);
+  const headline = normalizeTitle(
+    row.notes || row.sub_event_type || row.event_type,
+    'ACLED event',
+  );
+  return {
+    id: stableId([
+      context.datasetId,
+      context.provider,
+      typeof row.event_id_cnty === 'string' || typeof row.event_id_cnty === 'number'
+        ? row.event_id_cnty
+        : headline,
+      validTimeStart,
+      index,
+    ]),
+    datasetId: context.datasetId,
+    provider: context.provider,
+    sourceKind: 'api',
+    sourceId: 'acled',
+    itemKind: 'news',
+    validTimeStart,
+    validTimeEnd: null,
+    transactionTime,
+    knowledgeBoundary: transactionTime,
+    headline,
+    link: null,
+    symbol: null,
+    region:
+      typeof row.country === 'string'
+        ? row.country
+        : typeof row.region === 'string'
+          ? row.region
+          : null,
+    price: null,
+    payload: row,
+    metadata: {
+      sourceName: 'ACLED',
+      sourceTier: 2,
+      sourceVersion: context.sourceVersion,
+    },
+  };
+}
+
+function buildGenericRowRecord(
+  row: Record<string, unknown>,
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord {
+  const validTimeStart = toIso(
+    row.validTimeStart || row.publishedAt || row.timestamp || context.fetchedAt,
+    context.fetchedAt,
+  );
+  const transactionTime = toIso(
+    row.transactionTime || row.discoveredAt || row.crawledAt || context.fetchedAt,
+    context.fetchedAt,
+  );
+  const headline = normalizeTitle(row.headline || row.title, `${context.provider} item`);
+  return {
+    id: stableId([
+      context.datasetId,
+      context.provider,
+      typeof row.id === 'string' || typeof row.id === 'number' ? row.id : headline,
+      validTimeStart,
+      index,
+    ]),
+    datasetId: context.datasetId,
+    provider: context.provider,
+    sourceKind: 'api',
+    sourceId: String(row.sourceId || context.provider),
+    itemKind: toNumber(row.price) !== null ? 'market' : 'news',
+    validTimeStart,
+    validTimeEnd: null,
+    transactionTime,
+    knowledgeBoundary: transactionTime,
+    headline,
+    link: typeof row.link === 'string' ? row.link : null,
+    symbol: typeof row.symbol === 'string' ? row.symbol : null,
+    region: typeof row.region === 'string' ? row.region : null,
+    price: toNumber(row.price),
+    payload: row,
+    metadata: {
+      sourceName: row.sourceName || context.provider,
+      sourceVersion: context.sourceVersion,
+    },
+  };
+}
+
+function buildGenericTupleRecord(
+  row: unknown[],
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord | null {
+  if (row.length < 2) return null;
+  const validTimeStart = toIso(row[0], context.fetchedAt);
+  const numericValue = toNumber(row[1]);
+  if (numericValue === null) return null;
+  const symbol = String(context.requestId || context.seriesId || context.datasetId || context.provider)
+    .trim()
+    .toUpperCase();
+  return {
+    id: stableId([context.datasetId, context.provider, symbol, validTimeStart, index]),
+    datasetId: context.datasetId,
+    provider: context.provider,
+    sourceKind: 'api',
+    sourceId: `${context.provider}:${symbol}`,
+    itemKind: 'market',
+    validTimeStart,
+    validTimeEnd: null,
+    transactionTime: context.fetchedAt,
+    knowledgeBoundary: context.fetchedAt,
+    headline: `${symbol} point`,
+    link: null,
+    symbol,
+    region: null,
+    price: numericValue,
+    payload: {
+      point: row,
+      provider: context.provider,
+    },
+    metadata: {
+      sourceName: context.provider,
+      sourceVersion: context.sourceVersion,
+    },
+  };
+}
+
+function looksLikeGenericRecordObject(value: Record<string, unknown>): boolean {
+  const keys = Object.keys(value);
+  if (keys.length === 0) return false;
+  return keys.some((key) =>
+    [
+      'title',
+      'headline',
+      'publishedAt',
+      'timestamp',
+      'date',
+      'event_date',
+      'price',
+      'value',
+      'symbol',
+      'link',
+      'url',
+      'notes',
+      'id',
+    ].includes(key),
+  );
+}
+
+function looksLikeGenericTupleRecord(value: unknown[]): boolean {
+  return value.length >= 2 && (typeof value[0] === 'string' || toNumber(value[0]) !== null) && toNumber(value[1]) !== null;
+}
+
+function buildStreamedRecordsForProvider(
+  provider: string,
+  item: unknown,
+  index: number,
+  context: StreamTransformContext,
+): HistoricalRawReplayRecord[] {
+  if (provider === 'coingecko') {
+    const record = buildCoingeckoRecord(item, index, context);
+    return record ? [record] : [];
+  }
+  if (provider === 'fred' || provider === 'alfred') {
+    if (!item || typeof item !== 'object') return [];
+    return [buildFredObservationRecord(item as Record<string, unknown>, index, context)];
+  }
+  if (provider === 'gdelt-doc') {
+    if (!item || typeof item !== 'object') return [];
+    return [buildGdeltArticleRecord(item as Record<string, unknown>, index, context)];
+  }
+  if (provider === 'acled') {
+    if (!item || typeof item !== 'object') return [];
+    return [buildAcledRecord(item as Record<string, unknown>, index, context)];
+  }
+  if (Array.isArray(item)) {
+    const record = buildGenericTupleRecord(item, index, context);
+    return record ? [record] : [];
+  }
+  if (!item || typeof item !== 'object') return [];
+  return [buildGenericRowRecord(item as Record<string, unknown>, index, context)];
+}
+
+function candidateJsonPaths(provider: string): string[][] {
+  switch (provider) {
+    case 'coingecko':
+      return [['data', 'prices'], ['prices']];
+    case 'fred':
+    case 'alfred':
+      return [['data', 'observations', 'observations'], ['observations', 'observations'], ['data', 'observations'], ['observations']];
+    case 'gdelt-doc':
+      return [['data', 'articles'], ['articles']];
+    case 'acled':
+      return [['data', 'data'], ['data']];
+    default:
+      return [['data', 'items'], ['items'], ['data'], []];
+  }
+}
+
+async function streamJsonArrayItems(
+  filePath: string,
+  pathCandidates: string[][],
+  onItem: (value: unknown, index: number) => Promise<void> | void,
+): Promise<{ path: string[]; itemCount: number } | null> {
+  for (const candidate of pathCandidates) {
+    try {
+      const base = createReadStream(filePath).pipe(createJsonParser());
+      const stream =
+        candidate.length > 0
+          ? base.pipe(pick({ filter: candidate.join('.') })).pipe(streamArray())
+          : base.pipe(streamArray());
+      let itemCount = 0;
+      for await (const chunk of stream as AsyncIterable<{ key: number; value: unknown }>) {
+        await onItem(chunk.value, itemCount);
+        itemCount += 1;
+      }
+      if (itemCount > 0) {
+        return { path: candidate, itemCount };
+      }
+    } catch {
+      // Try the next candidate path.
+    }
+  }
+  return null;
+}
+
+async function streamGenericJsonRecords(
+  filePath: string,
+  onItem: (value: unknown, index: number) => Promise<void> | void,
+): Promise<{ itemCount: number } | null> {
+  type Container = {
+    kind: 'object' | 'array';
+    key: string | null;
+    collect: boolean;
+    isRoot: boolean;
+    value: Record<string, unknown> | unknown[];
+    currentKey: string | null;
+  };
+
+  const stream = createReadStream(filePath).pipe(createJsonParser());
+  const stack: Container[] = [];
+  let itemCount = 0;
+
+  const current = (): Container | null => stack[stack.length - 1] || null;
+
+  const attachScalar = (scalar: unknown) => {
+    const container = current();
+    if (!container) return;
+    if (container.kind === 'object') {
+      if (!container.collect || !container.currentKey) return;
+      (container.value as Record<string, unknown>)[container.currentKey] = scalar as never;
+      container.currentKey = null;
+      return;
+    }
+    if (container.collect) {
+      (container.value as unknown[]).push(scalar);
+    }
+  };
+
+  const maybeEmit = async (value: unknown, parent: Container | null) => {
+    if (parent?.kind === 'array' && !parent.collect) {
+      await onItem(value, itemCount);
+      itemCount += 1;
+      return;
+    }
+    if (!parent && value && typeof value === 'object' && !Array.isArray(value)) {
+      await onItem(value, itemCount);
+      itemCount += 1;
+    }
+  };
+
+  for await (const token of stream as AsyncIterable<StreamJsonToken>) {
+    switch (token.name) {
+      case 'startObject': {
+        const parent = current();
+        const key = parent?.kind === 'object' ? parent.currentKey : null;
+        const collect =
+          !parent
+            ? true
+            : parent.kind === 'array'
+              ? true
+              : parent.collect && !parent.isRoot;
+        stack.push({
+          kind: 'object',
+          key,
+          collect,
+          isRoot: !parent,
+          value: {},
+          currentKey: null,
+        });
+        break;
+      }
+      case 'startArray': {
+        const parent = current();
+        const key = parent?.kind === 'object' ? parent.currentKey : null;
+        const collect =
+          !parent
+            ? false
+            : parent.kind === 'array'
+              ? true
+              : parent.collect && !parent.isRoot;
+        stack.push({
+          kind: 'array',
+          key,
+          collect,
+          isRoot: !parent,
+          value: [],
+          currentKey: null,
+        });
+        break;
+      }
+      case 'keyValue': {
+        const container = current();
+        if (container?.kind === 'object') {
+          container.currentKey = String(token.value || '');
+        }
+        break;
+      }
+      case 'stringValue':
+      case 'numberValue':
+      case 'nullValue':
+      case 'trueValue':
+      case 'falseValue': {
+        attachScalar(token.value ?? null);
+        break;
+      }
+      case 'endObject':
+      case 'endArray': {
+        const finished = stack.pop();
+        if (!finished) break;
+        const parent = current();
+        const produced = finished.value;
+        if (parent?.kind === 'object' && finished.key && parent.collect) {
+          (parent.value as Record<string, unknown>)[finished.key] = produced as never;
+          parent.currentKey = null;
+        } else if (parent?.kind === 'array' && parent.collect) {
+          (parent.value as unknown[]).push(produced);
+        }
+
+        if (
+          (finished.kind === 'object' && looksLikeGenericRecordObject(produced as Record<string, unknown>))
+          || (finished.kind === 'array' && looksLikeGenericTupleRecord(produced as unknown[]))
+        ) {
+          await maybeEmit(produced, parent);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  return itemCount > 0 ? { itemCount } : null;
+}
+
+function extractObservations(payload: Record<string, unknown>): Record<string, unknown>[] {
+  if (Array.isArray(payload.observations)) {
+    return payload.observations as Record<string, unknown>[];
+  }
+  const nested = payload.observations as Record<string, unknown> | undefined;
+  if (nested && Array.isArray(nested.observations)) {
+    return nested.observations as Record<string, unknown>[];
+  }
+  return [];
+}
+
+function transformEnvelopeToRecords(
+  input: Record<string, unknown>,
+  fallbackProvider?: string,
+  datasetIdArg?: string,
+  sourceVersionArg?: string | null,
+): {
+  datasetId: string;
+  provider: string;
+  sourceVersion: string | null;
+  records: HistoricalRawReplayRecord[];
+} {
+  const provider = String(
+    input.provider ||
+      fallbackProvider ||
+      (input.envelope as Record<string, unknown> | undefined)?.provider ||
+      'historical',
+  ).trim();
+  const datasetId = String(input.datasetId || datasetIdArg || defaultDatasetId(provider));
+  const sourceVersion =
+    (typeof input.sourceVersion === 'string' && input.sourceVersion.trim()) ||
+    sourceVersionArg ||
+    null;
+  const fetchedAt = toIso(input.fetchedAt || input.importedAt || input.timestamp || nowIso());
+  const envelope = ((input.envelope as Record<string, unknown> | undefined) || input) as Record<
+    string,
+    unknown
+  >;
+  const payload = ((envelope.data as Record<string, unknown> | undefined) ||
+    (envelope.payload as Record<string, unknown> | undefined) ||
+    (input.payload as Record<string, unknown> | undefined) ||
+    envelope) as Record<string, unknown>;
+  const records: HistoricalRawReplayRecord[] = [];
+
+  const pushRecord = (record: HistoricalRawReplayRecord) => {
+    records.push({
+      ...record,
+      datasetId,
+      provider,
+      knowledgeBoundary: record.knowledgeBoundary || record.transactionTime,
+      metadata: {
+        ...record.metadata,
+        sourceVersion,
+      },
+    });
+  };
+
+  if (provider === 'coingecko') {
+    const request = ((envelope.request as Record<string, unknown> | undefined) ||
+      (input.request as Record<string, unknown> | undefined) ||
+      {}) as Record<string, unknown>;
+    const id = String(request.id || payload.id || 'coingecko').trim();
+    const prices = Array.isArray(payload.prices)
+      ? (payload.prices as Array<[number, number]>)
+      : [];
+    prices.forEach((point, index) => {
+      const validTimeStart = toIso(point?.[0], fetchedAt);
+      pushRecord({
+        id: stableId([datasetId, provider, id, validTimeStart, index]),
+        datasetId,
+        provider,
+        sourceKind: 'api',
+        sourceId: `coingecko:${id}`,
+        itemKind: 'market',
+        validTimeStart,
+        validTimeEnd: null,
+        transactionTime: fetchedAt,
+        knowledgeBoundary: fetchedAt,
+        headline: `${id.toUpperCase()} price`,
+        link: typeof payload.link === 'string' ? payload.link : null,
+        symbol: id.toUpperCase(),
+        region: null,
+        price: toNumber(point?.[1]),
+        payload: {
+          price: point?.[1],
+          provider,
+        },
+        metadata: {
+          provider,
+          requestId: id,
+        },
+      });
+    });
+  } else if (provider === 'fred' || provider === 'alfred') {
+    const request = ((envelope.request as Record<string, unknown> | undefined) ||
+      (input.request as Record<string, unknown> | undefined) ||
+      {}) as Record<string, unknown>;
+    const seriesId = String(request.seriesId || payload.seriesId || payload.id || 'FRED').trim();
+    const observations = extractObservations(payload);
+    observations.forEach((row, index) => {
+      const validTimeStart = toIso(row.date || row.observation_date || fetchedAt, fetchedAt);
+      const transactionTime = toIso(
+        row.realtime_start || row.realtimeStart || row.fetchedAt || fetchedAt,
+        fetchedAt,
+      );
+      const numericValue = toNumber(row.value || row.observed_value);
+      pushRecord({
+        id: stableId([datasetId, provider, seriesId, validTimeStart, index]),
+        datasetId,
+        provider,
+        sourceKind: 'api',
+        sourceId: `${provider}:${seriesId}`,
+        itemKind: 'market',
+        validTimeStart,
+        validTimeEnd: null,
+        transactionTime,
+        knowledgeBoundary: transactionTime,
+        headline: `${seriesId} observation`,
+        link: null,
+        symbol: seriesId.toUpperCase(),
+        region: null,
+        price: numericValue,
+        payload: {
+          ...row,
+          provider,
+        },
+        metadata: {
+          provider,
+          seriesId,
+        },
+      });
+    });
+  } else if (provider === 'gdelt-doc') {
+    const articles = Array.isArray(payload.articles)
+      ? (payload.articles as Record<string, unknown>[])
+      : [];
+    articles.forEach((article, index) => {
+      const validTimeStart = toIso(
+        article.seendate || article.date || article.published || fetchedAt,
+        fetchedAt,
+      );
+      const transactionTime = toIso(article.seendate || fetchedAt, fetchedAt);
+      const title = normalizeTitle(article.title || article.title_translated, 'GDELT article');
+      const link =
+        typeof article.url === 'string'
+          ? article.url
+          : typeof article.link === 'string'
+            ? article.link
+            : null;
+      pushRecord({
+        id: stableId([datasetId, provider, link || title, validTimeStart, index]),
+        datasetId,
+        provider,
+        sourceKind: 'api',
+        sourceId: 'gdelt-doc',
+        itemKind: 'news',
+        validTimeStart,
+        validTimeEnd: null,
+        transactionTime,
+        knowledgeBoundary: transactionTime,
+        headline: title,
+        link,
+        symbol: null,
+        region: typeof article.sourcecountry === 'string' ? article.sourcecountry : null,
+        price: null,
+        payload: article,
+        metadata: {
+          sourceName: article.domain || 'GDELT',
+          sourceTier: 3,
+          language: article.language || null,
+        },
+      });
+    });
+  } else if (provider === 'acled') {
+    const rows = Array.isArray(payload.data) ? (payload.data as Record<string, unknown>[]) : [];
+    rows.forEach((row, index) => {
+      const validTimeStart = toIso(row.event_date || row.timestamp || fetchedAt, fetchedAt);
+      const transactionTime = toIso(row.timestamp || fetchedAt, fetchedAt);
+      const headline = normalizeTitle(
+        row.notes || row.sub_event_type || row.event_type,
+        'ACLED event',
+      );
+      pushRecord({
+        id: stableId([
+          datasetId,
+          provider,
+          typeof row.event_id_cnty === 'string' || typeof row.event_id_cnty === 'number'
+            ? row.event_id_cnty
+            : headline,
+          validTimeStart,
+          index,
+        ]),
+        datasetId,
+        provider,
+        sourceKind: 'api',
+        sourceId: 'acled',
+        itemKind: 'news',
+        validTimeStart,
+        validTimeEnd: null,
+        transactionTime,
+        knowledgeBoundary: transactionTime,
+        headline,
+        link: null,
+        symbol: null,
+        region:
+          typeof row.country === 'string'
+            ? row.country
+            : typeof row.region === 'string'
+              ? row.region
+              : null,
+        price: null,
+        payload: row,
+        metadata: {
+          sourceName: 'ACLED',
+          sourceTier: 2,
+        },
+      });
+    });
+  } else {
+    const rows = Array.isArray(payload.items)
+      ? (payload.items as Record<string, unknown>[])
+      : Array.isArray(payload.data)
+        ? (payload.data as Record<string, unknown>[])
+        : Array.isArray(input.data)
+          ? (input.data as Record<string, unknown>[])
+          : [];
+    rows.forEach((row, index) => {
+      const validTimeStart = toIso(
+        row.validTimeStart || row.publishedAt || row.timestamp || fetchedAt,
+        fetchedAt,
+      );
+      const transactionTime = toIso(
+        row.transactionTime || row.discoveredAt || row.crawledAt || fetchedAt,
+        fetchedAt,
+      );
+      const headline = normalizeTitle(row.headline || row.title, `${provider} item`);
+      pushRecord({
+        id: stableId([
+          datasetId,
+          provider,
+          typeof row.id === 'string' || typeof row.id === 'number' ? row.id : headline,
+          validTimeStart,
+          index,
+        ]),
+        datasetId,
+        provider,
+        sourceKind: 'api',
+        sourceId: String(row.sourceId || provider),
+        itemKind: toNumber(row.price) !== null ? 'market' : 'news',
+        validTimeStart,
+        validTimeEnd: null,
+        transactionTime,
+        knowledgeBoundary: transactionTime,
+        headline,
+        link: typeof row.link === 'string' ? row.link : null,
+        symbol: typeof row.symbol === 'string' ? row.symbol : null,
+        region: typeof row.region === 'string' ? row.region : null,
+        price: toNumber(row.price),
+        payload: row,
+        metadata: {
+          sourceName: row.sourceName || provider,
+        },
+      });
+    });
+  }
+
+  return {
+    datasetId,
+    provider,
+    sourceVersion,
+    records,
+  };
+}
+
+async function appendRawRecordsToDuckDb(
+  records: HistoricalRawReplayRecord[],
+  dbPath: string,
+): Promise<void> {
+  if (records.length === 0) return;
+  const connection = await ensureHistoricalReplayArchive(dbPath);
+  await connection.run('BEGIN TRANSACTION');
+  try {
+    for (const record of records) {
+      await connection.run(
+        `
+        INSERT OR REPLACE INTO historical_raw_items (
+          id, dataset_id, provider, source_kind, source_id, item_kind,
+          valid_time_start, valid_time_end, transaction_time, knowledge_boundary,
+          headline, link, symbol, region, price, payload_json, metadata_json
+        ) VALUES (
+          $id, $datasetId, $provider, $sourceKind, $sourceId, $itemKind,
+          $validTimeStart, $validTimeEnd, $transactionTime, $knowledgeBoundary,
+          $headline, $link, $symbol, $region, $price, $payloadJson, $metadataJson
+        )
+      `,
+        {
+          id: record.id,
+          datasetId: record.datasetId,
+          provider: record.provider,
+          sourceKind: record.sourceKind,
+          sourceId: record.sourceId,
+          itemKind: record.itemKind,
+          validTimeStart: record.validTimeStart,
+          validTimeEnd: record.validTimeEnd,
+          transactionTime: record.transactionTime,
+          knowledgeBoundary: record.knowledgeBoundary,
+          headline: record.headline,
+          link: record.link,
+          symbol: record.symbol,
+          region: record.region,
+          price: record.price,
+          payloadJson: JSON.stringify(record.payload || {}),
+          metadataJson: JSON.stringify(record.metadata || {}),
+        },
+      );
+    }
+    await connection.run('COMMIT');
+  } catch (error) {
+    await connection.run('ROLLBACK');
+    throw error;
+  }
+}
+
+async function replaceDatasetFrames(
+  frames: MaterializedFrameRow[],
+  datasetId: string,
+  dbPath: string,
+): Promise<void> {
+  const connection = await ensureHistoricalReplayArchive(dbPath);
+  await connection.run('BEGIN TRANSACTION');
+  try {
+    await connection.run(
+      `DELETE FROM historical_replay_frames WHERE dataset_id = $datasetId`,
+      { datasetId },
+    );
+    for (const frame of frames) {
+      await connection.run(
+        `
+        INSERT OR REPLACE INTO historical_replay_frames (
+          id, dataset_id, bucket_hours, bucket_start, bucket_end,
+          valid_time_start, valid_time_end, transaction_time, knowledge_boundary,
+          warmup, news_count, cluster_count, market_count, payload_json
+        ) VALUES (
+          $id, $datasetId, $bucketHours, $bucketStart, $bucketEnd,
+          $validTimeStart, $validTimeEnd, $transactionTime, $knowledgeBoundary,
+          $warmup, $newsCount, $clusterCount, $marketCount, $payloadJson
+        )
+      `,
+        {
+          ...frame,
+        },
+      );
+    }
+    await connection.run('COMMIT');
+  } catch (error) {
+    await connection.run('ROLLBACK');
+    throw error;
+  }
+}
+
+async function upsertDatasetSummary(
+  summary: HistoricalDatasetSummary,
+  dbPath: string,
+): Promise<void> {
+  const connection = await ensureHistoricalReplayArchive(dbPath);
+  await connection.run(
+    `
+    INSERT OR REPLACE INTO historical_datasets (
+      dataset_id, provider, source_version, imported_at, raw_record_count,
+      frame_count, warmup_frame_count, bucket_hours, first_valid_time,
+      last_valid_time, first_transaction_time, last_transaction_time, metadata_json
+    ) VALUES (
+      $datasetId, $provider, $sourceVersion, $importedAt, $rawRecordCount,
+      $frameCount, $warmupFrameCount, $bucketHours, $firstValidTime,
+      $lastValidTime, $firstTransactionTime, $lastTransactionTime, $metadataJson
+    )
+  `,
+    {
+      datasetId: summary.datasetId,
+      provider: summary.provider,
+      sourceVersion: summary.sourceVersion,
+      importedAt: summary.importedAt,
+      rawRecordCount: summary.rawRecordCount,
+      frameCount: summary.frameCount,
+      warmupFrameCount: summary.warmupFrameCount,
+      bucketHours: summary.bucketHours,
+      firstValidTime: summary.firstValidTime,
+      lastValidTime: summary.lastValidTime,
+      firstTransactionTime: summary.firstTransactionTime,
+      lastTransactionTime: summary.lastTransactionTime,
+      metadataJson: JSON.stringify(summary.metadata || {}),
+    },
+  );
+}
+
+function buildNewsItem(record: HistoricalRawReplayRecord): NewsItem {
+  const payload = record.payload || {};
+  const metadata = record.metadata || {};
+  const lat = toNumber(payload.lat || payload.latitude || payload.event_latitude);
+  const lon = toNumber(payload.lon || payload.longitude || payload.event_longitude);
+  return {
+    source: newsSourceName(record),
+    title: record.headline || 'Historical item',
+    link: record.link || '',
+    pubDate: new Date(record.validTimeStart),
+    isAlert: false,
+    tier: typeof metadata.sourceTier === 'number' ? metadata.sourceTier : 4,
+    lat: lat ?? undefined,
+    lon: lon ?? undefined,
+    locationName: record.region || undefined,
+    lang: typeof metadata.language === 'string' ? metadata.language : undefined,
+  };
+}
+
+function buildSimpleClusters(newsItems: NewsItem[]): ClusteredEvent[] {
+  const groups = new Map<string, NewsItem[]>();
+  for (const item of newsItems) {
+    const key = normalizeTitle(item.title, 'untitled').toLowerCase();
+    const bucket = groups.get(key) || [];
+    bucket.push(item);
+    groups.set(key, bucket);
+  }
+
+  return Array.from(groups.entries()).flatMap(([key, items], index) => {
+    const anchor = items[0];
+    if (!anchor) return [];
+    const firstSeen = items.reduce(
+      (earliest, item) => (item.pubDate < earliest ? item.pubDate : earliest),
+      anchor.pubDate,
+    );
+    const lastUpdated = items.reduce(
+      (latest, item) => (item.pubDate > latest ? item.pubDate : latest),
+      anchor.pubDate,
+    );
+    return [{
+      id: stableId(['cluster', key, index]),
+      primaryTitle: anchor.title,
+      primarySource: anchor.source || 'Unknown',
+      primaryLink: anchor.link,
+      sourceCount: items.length,
+      topSources: Array.from(new Set(items.map((item) => item.source || 'Unknown')))
+        .slice(0, 6)
+        .map((name) => ({ name, tier: anchor.tier || 4, url: anchor.link })),
+      allItems: items,
+      firstSeen,
+      lastUpdated,
+      isAlert: items.some((item) => item.isAlert),
+      threat: undefined,
+      lat: anchor.lat,
+      lon: anchor.lon,
+      lang: anchor.lang,
+    }];
+  });
+}
+
+function serializeFrame(frame: HistoricalReplayFrame): string {
+  return JSON.stringify(frame);
+}
+
+function reviveFrame(payloadJson: string): HistoricalReplayFrame {
+  return JSON.parse(payloadJson) as HistoricalReplayFrame;
+}
+
+export async function processHistoricalDump(
+  filePath: string,
+  options: HistoricalBackfillOptions = {},
+): Promise<HistoricalBackfillResult> {
+  const chunkSize = clamp(options.chunkSize || DEFAULT_CHUNK_SIZE, 50, 5000);
+  const bucketHours = clamp(options.bucketHours || DEFAULT_BUCKET_HOURS, 1, 168);
+  const newsLookbackHours = clamp(
+    options.newsLookbackHours || DEFAULT_NEWS_LOOKBACK_HOURS,
+    bucketHours,
+    24 * 30,
+  );
+  const dbPath = options.dbPath || DEFAULT_DB_PATH;
+  const providerHint = options.provider;
+  const datasetIdHint = options.datasetId;
+
+  await ensureHistoricalReplayArchive(dbPath);
+
+  const ext = path.extname(filePath).toLowerCase();
+  let datasetId = datasetIdHint || '';
+  let provider = providerHint || 'historical';
+  let sourceVersion = options.sourceVersion || null;
+  let rawRecordCount = 0;
+  let firstValidTime: string | null = null;
+  let lastValidTime: string | null = null;
+  let firstTransactionTime: string | null = null;
+  let lastTransactionTime: string | null = null;
+
+  const flushChunk = async (records: HistoricalRawReplayRecord[]) => {
+    if (records.length === 0) return;
+    await appendRawRecordsToDuckDb(records, dbPath);
+    rawRecordCount += records.length;
+    for (const record of records) {
+      firstValidTime = minIso(firstValidTime, record.validTimeStart);
+      lastValidTime = maxIso(lastValidTime, record.validTimeStart);
+      firstTransactionTime = minIso(firstTransactionTime, record.transactionTime);
+      lastTransactionTime = maxIso(lastTransactionTime, record.transactionTime);
+    }
+  };
+
+  if (ext === '.jsonl' || ext === '.ndjson') {
+    const fileStream = createReadStream(filePath);
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    });
+    let chunk: HistoricalRawReplayRecord[] = [];
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      const transformed = transformEnvelopeToRecords(
+        parsed,
+        providerHint,
+        datasetIdHint,
+        options.sourceVersion,
+      );
+      datasetId = datasetId || transformed.datasetId;
+      provider = transformed.provider;
+      sourceVersion = transformed.sourceVersion;
+      chunk.push(...transformed.records);
+      if (chunk.length >= chunkSize) {
+        await flushChunk(chunk);
+        chunk = [];
+      }
+    }
+    await flushChunk(chunk);
+  } else {
+    let chunk: HistoricalRawReplayRecord[] = [];
+    const preamble = await readJsonPreamble(filePath);
+    provider =
+      providerHint ||
+      extractJsonString(preamble, ['provider']) ||
+      extractJsonString(preamble, ['envelope.provider']) ||
+      'historical';
+    datasetId =
+      datasetIdHint ||
+      extractJsonString(preamble, ['datasetId']) ||
+      defaultDatasetId(provider);
+    sourceVersion =
+      options.sourceVersion ||
+      extractJsonString(preamble, ['sourceVersion']) ||
+      null;
+    const context: StreamTransformContext = {
+      datasetId,
+      provider,
+      sourceVersion,
+      fetchedAt: toIso(
+        extractJsonString(preamble, ['fetchedAt', 'importedAt', 'timestamp']) || nowIso(),
+      ),
+      requestId: extractJsonString(preamble, ['id', 'request.id']),
+      seriesId: extractJsonString(preamble, ['seriesId', 'request.seriesId']),
+    };
+    const streamed = await streamJsonArrayItems(
+      filePath,
+      candidateJsonPaths(provider),
+      async (item, index) => {
+        chunk.push(...buildStreamedRecordsForProvider(provider, item, index, context));
+        if (chunk.length >= chunkSize) {
+          await flushChunk(chunk);
+          chunk = [];
+        }
+      },
+    );
+    if (streamed) {
+      await flushChunk(chunk);
+    } else {
+      const genericStreamed = await streamGenericJsonRecords(filePath, async (item, index) => {
+        chunk.push(...buildStreamedRecordsForProvider(provider, item, index, context));
+        if (chunk.length >= chunkSize) {
+          await flushChunk(chunk);
+          chunk = [];
+        }
+      });
+      if (genericStreamed) {
+        await flushChunk(chunk);
+      } else {
+        const raw = await readFile(filePath, 'utf8');
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const transformed = transformEnvelopeToRecords(
+          parsed,
+          providerHint,
+          datasetIdHint,
+          options.sourceVersion,
+        );
+        datasetId = transformed.datasetId;
+        provider = transformed.provider;
+        sourceVersion = transformed.sourceVersion;
+        for (let index = 0; index < transformed.records.length; index += chunkSize) {
+          const page = transformed.records.slice(index, index + chunkSize);
+          await flushChunk(page);
+        }
+      }
+    }
+  }
+
+  const frameRows: MaterializedFrameRow[] = [];
+  const newsLookbackMs = newsLookbackHours * 60 * 60 * 1000;
+  const bucketMs = bucketHours * 60 * 60 * 1000;
+  let maxMarketKnowledgeBoundary = 0;
+  let bucketIndex = 0;
+  let activeBucketKey: number | null = null;
+  let activeBucketRecords: HistoricalRawReplayRecord[] = [];
+  const newsWindow: HistoricalRawReplayRecord[] = [];
+  const latestMarketBySymbol = new Map<string, HistoricalRawReplayRecord>();
+
+  const finalizeActiveBucket = () => {
+    if (activeBucketKey === null || activeBucketRecords.length === 0) return;
+    const bucketStartTs = activeBucketKey;
+    const bucketEndTs = bucketStartTs + bucketMs;
+    const bucketEndIso = new Date(bucketEndTs).toISOString();
+    while (
+      newsWindow.length > 0 &&
+      asTs(newsWindow[0]?.validTimeStart) < bucketEndTs - newsLookbackMs
+    ) {
+      newsWindow.shift();
+    }
+    const visibleNews = newsWindow
+      .filter((record) => asTs(record.transactionTime) <= bucketEndTs)
+      .filter((record) => {
+        const validTs = asTs(record.validTimeStart);
+        return validTs <= bucketEndTs && validTs >= bucketEndTs - newsLookbackMs;
+      })
+      .map(buildNewsItem);
+    const clusters = buildSimpleClusters(visibleNews);
+    const markets = Array.from(latestMarketBySymbol.values()).map((record) => ({
+      symbol: record.symbol || record.headline || record.id,
+      name: record.headline || record.symbol || record.id,
+      display: record.symbol || record.headline || record.id,
+      price: record.price ?? 0,
+      change: 0,
+    })) as MarketData[];
+    const transactionTime = activeBucketRecords.reduce((latest, record) => {
+      const candidate = record.transactionTime;
+      return asTs(candidate) > asTs(latest) ? candidate : latest;
+    }, bucketEndIso);
+    const knowledgeBoundary = activeBucketRecords.reduce((latest, record) => {
+      const candidate = record.knowledgeBoundary;
+      return asTs(candidate) > asTs(latest) ? candidate : latest;
+    }, transactionTime);
+    const frameValidTimeStart = visibleNews.reduce((earliest, item) => {
+      const itemIso = item.pubDate.toISOString();
+      if (!earliest) return itemIso;
+      return asTs(itemIso) < asTs(earliest) ? itemIso : earliest;
+    }, transactionTime);
+    const warmup =
+      activeBucketRecords.some((record) => record.metadata.warmup === true) ||
+      (typeof options.warmupFrameCount === 'number' && bucketIndex < options.warmupFrameCount) ||
+      (typeof options.warmupUntil === 'string' &&
+        asTs(bucketEndIso) <= asTs(toIso(options.warmupUntil)));
+
+    const replayFrame: HistoricalReplayFrame = {
+      id: stableId([datasetId, bucketStartTs, bucketHours]),
+      timestamp: bucketEndIso,
+      validTimeStart: frameValidTimeStart,
+      validTimeEnd: bucketEndIso,
+      transactionTime,
+      knowledgeBoundary,
+      datasetId,
+      sourceVersion,
+      warmup,
+      news: visibleNews,
+      clusters,
+      markets,
+      metadata: {
+        provider,
+        bucketHours,
+        frameNewsCount: visibleNews.length,
+        frameMarketCount: markets.length,
+        maxMarketKnowledgeBoundary,
+      },
+    };
+
+    frameRows.push({
+      id: replayFrame.id || stableId([datasetId, bucketStartTs]),
+      datasetId,
+      bucketHours,
+      bucketStart: new Date(bucketStartTs).toISOString(),
+      bucketEnd: bucketEndIso,
+      validTimeStart: replayFrame.validTimeStart || bucketEndIso,
+      validTimeEnd: replayFrame.validTimeEnd || null,
+      transactionTime,
+      knowledgeBoundary,
+      warmup,
+      payloadJson: serializeFrame(replayFrame),
+      newsCount: visibleNews.length,
+      clusterCount: clusters.length,
+      marketCount: markets.length,
+    });
+
+    activeBucketRecords = [];
+    bucketIndex += 1;
+  };
+
+  let offset = 0;
+  const loadPageSize = Math.max(chunkSize * 4, 1000);
+  while (true) {
+    const page = await listHistoricalRawRecordsFromDuckDb({
+      dbPath,
+      datasetId,
+      limit: loadPageSize,
+      offset,
+    });
+    if (page.length === 0) break;
+    for (const record of page) {
+      const bucketKey = Math.floor(asTs(record.transactionTime) / bucketMs) * bucketMs;
+      if (activeBucketKey === null) {
+        activeBucketKey = bucketKey;
+      } else if (bucketKey !== activeBucketKey) {
+        finalizeActiveBucket();
+        activeBucketKey = bucketKey;
+      }
+      activeBucketRecords.push(record);
+      if (record.itemKind === 'news') {
+        newsWindow.push(record);
+      } else if (record.itemKind === 'market') {
+        const symbol = record.symbol || record.headline || record.id;
+        const current = latestMarketBySymbol.get(symbol);
+        if (!current || asTs(record.validTimeStart) >= asTs(current.validTimeStart)) {
+          latestMarketBySymbol.set(symbol, record);
+        }
+        maxMarketKnowledgeBoundary = Math.max(
+          maxMarketKnowledgeBoundary,
+          asTs(record.knowledgeBoundary),
+        );
+      }
+    }
+    offset += page.length;
+  }
+  finalizeActiveBucket();
+
+  await replaceDatasetFrames(frameRows, datasetId, dbPath);
+
+  const summary: HistoricalDatasetSummary = {
+    datasetId,
+    provider,
+    sourceVersion,
+    importedAt: nowIso(),
+    rawRecordCount,
+    frameCount: frameRows.length,
+    warmupFrameCount: frameRows.filter((frame) => frame.warmup).length,
+    bucketHours,
+    firstValidTime,
+    lastValidTime,
+    firstTransactionTime,
+    lastTransactionTime,
+    metadata: {
+      filePath,
+      newsLookbackHours,
+      maxMarketKnowledgeBoundary,
+    },
+  };
+  await upsertDatasetSummary(summary, dbPath);
+
+  return {
+    datasetId,
+    provider,
+    dbPath: path.resolve(dbPath),
+    rawRecordCount,
+    frameCount: frameRows.length,
+    warmupFrameCount: summary.warmupFrameCount,
+    bucketHours,
+    firstValidTime,
+    lastValidTime,
+    firstTransactionTime,
+    lastTransactionTime,
+  };
+}
+
+export async function listHistoricalDatasets(
+  dbPath: string = DEFAULT_DB_PATH,
+): Promise<HistoricalDatasetSummary[]> {
+  const connection = await ensureHistoricalReplayArchive(dbPath);
+  const result = await connection.runAndReadAll(`
+    SELECT *
+    FROM historical_datasets
+    ORDER BY last_transaction_time DESC NULLS LAST, imported_at DESC
+  `);
+  return result.getRowObjectsJS().map((row) => ({
+    datasetId: String(row.dataset_id || ''),
+    provider: String(row.provider || ''),
+    sourceVersion:
+      typeof row.source_version === 'string' && row.source_version.trim()
+        ? String(row.source_version)
+        : null,
+    importedAt: String(row.imported_at || nowIso()),
+    rawRecordCount: Number(row.raw_record_count || 0),
+    frameCount: Number(row.frame_count || 0),
+    warmupFrameCount: Number(row.warmup_frame_count || 0),
+    bucketHours: Number(row.bucket_hours || DEFAULT_BUCKET_HOURS),
+    firstValidTime: row.first_valid_time ? String(row.first_valid_time) : null,
+    lastValidTime: row.last_valid_time ? String(row.last_valid_time) : null,
+    firstTransactionTime: row.first_transaction_time
+      ? String(row.first_transaction_time)
+      : null,
+    lastTransactionTime: row.last_transaction_time ? String(row.last_transaction_time) : null,
+    metadata:
+      typeof row.metadata_json === 'string' && row.metadata_json
+        ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
+        : {},
+  }));
+}
+
+export async function loadHistoricalReplayFramesFromDuckDb(
+  options: HistoricalFrameLoadOptions = {},
+): Promise<HistoricalReplayFrame[]> {
+  const connection = await ensureHistoricalReplayArchive(options.dbPath || DEFAULT_DB_PATH);
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (options.datasetId) {
+    clauses.push('dataset_id = $datasetId');
+    params.datasetId = options.datasetId;
+  }
+  if (!options.includeWarmup) {
+    clauses.push('warmup = FALSE');
+  }
+  if (options.startTransactionTime) {
+    clauses.push('transaction_time >= $startTransactionTime');
+    params.startTransactionTime = toIso(options.startTransactionTime);
+  }
+  if (options.endTransactionTime) {
+    clauses.push('transaction_time <= $endTransactionTime');
+    params.endTransactionTime = toIso(options.endTransactionTime);
+  }
+  if (options.knowledgeBoundaryCeiling) {
+    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
+    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  }
+
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const limitClause =
+    typeof options.maxFrames === 'number' && options.maxFrames > 0
+      ? `LIMIT ${Math.floor(options.maxFrames)}`
+      : '';
+  const result = await connection.runAndReadAll(
+    `
+    SELECT *
+    FROM historical_replay_frames
+    ${whereClause}
+    ORDER BY transaction_time ASC, bucket_start ASC
+    ${limitClause}
+  `,
+    params,
+  );
+
+  return result.getRowObjectsJS().map((row) => reviveFrame(String(row.payload_json || '{}')));
+}
+
+export async function listHistoricalRawRecordsFromDuckDb(
+  options: HistoricalRawRecordLoadOptions = {},
+): Promise<HistoricalRawReplayRecord[]> {
+  const connection = await ensureHistoricalReplayArchive(options.dbPath || DEFAULT_DB_PATH);
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (options.datasetId) {
+    clauses.push('dataset_id = $datasetId');
+    params.datasetId = options.datasetId;
+  }
+  if (options.startTransactionTime) {
+    clauses.push('transaction_time >= $startTransactionTime');
+    params.startTransactionTime = toIso(options.startTransactionTime);
+  }
+  if (options.endTransactionTime) {
+    clauses.push('transaction_time <= $endTransactionTime');
+    params.endTransactionTime = toIso(options.endTransactionTime);
+  }
+  if (options.knowledgeBoundaryCeiling) {
+    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
+    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  }
+
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const limit =
+    typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 1000;
+  const offset =
+    typeof options.offset === 'number' && options.offset > 0 ? Math.floor(options.offset) : 0;
+
+  const result = await connection.runAndReadAll(
+    `
+    SELECT *
+    FROM historical_raw_items
+    ${whereClause}
+    ORDER BY transaction_time ASC, valid_time_start ASC, id ASC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `,
+    params,
+  );
+
+  return result.getRowObjectsJS().map(parseRawRow);
+}
+
+export async function listHistoricalReplayFrameRowsFromDuckDb(
+  options: HistoricalReplayFrameRowLoadOptions = {},
+): Promise<HistoricalReplayFrameArchiveRow[]> {
+  const connection = await ensureHistoricalReplayArchive(options.dbPath || DEFAULT_DB_PATH);
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (options.datasetId) {
+    clauses.push('dataset_id = $datasetId');
+    params.datasetId = options.datasetId;
+  }
+  if (!options.includeWarmup) {
+    clauses.push('warmup = FALSE');
+  }
+  if (options.startTransactionTime) {
+    clauses.push('transaction_time >= $startTransactionTime');
+    params.startTransactionTime = toIso(options.startTransactionTime);
+  }
+  if (options.endTransactionTime) {
+    clauses.push('transaction_time <= $endTransactionTime');
+    params.endTransactionTime = toIso(options.endTransactionTime);
+  }
+  if (options.knowledgeBoundaryCeiling) {
+    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
+    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  }
+
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const limit =
+    typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 1000;
+  const offset =
+    typeof options.offset === 'number' && options.offset > 0 ? Math.floor(options.offset) : 0;
+
+  const result = await connection.runAndReadAll(
+    `
+    SELECT *
+    FROM historical_replay_frames
+    ${whereClause}
+    ORDER BY transaction_time ASC, bucket_start ASC, id ASC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `,
+    params,
+  );
+
+  return result.getRowObjectsJS().map(parseFrameRow);
+}

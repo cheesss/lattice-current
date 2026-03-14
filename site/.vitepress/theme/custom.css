@@ -1,0 +1,38 @@
+:root {
+  --vp-c-brand-1: #46a0d8;
+  --vp-c-brand-2: #2a78ae;
+  --vp-c-brand-3: #18557d;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #9fd9ff 0%, #ffe1a3 45%, #ef7a6a 100%);
+  --vp-home-hero-image-background-image: radial-gradient(circle at center, rgba(70, 160, 216, 0.35), rgba(17, 24, 39, 0.05));
+  --vp-home-hero-image-filter: blur(42px);
+}
+
+.vp-doc a {
+  word-break: break-word;
+}
+
+.VPHero .image img {
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(9, 18, 32, 0.28);
+}
+
+.policy-callout,
+.template-callout {
+  border: 1px solid rgba(70, 160, 216, 0.22);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: rgba(70, 160, 216, 0.06);
+}
+
+.asset-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.asset-card {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  padding: 16px;
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#0B1220"/>
+  <rect x="70" y="70" width="1060" height="490" rx="32" fill="#111C31" stroke="#28466C"/>
+  <circle cx="391" cy="314" r="160" stroke="#5EC6FF" stroke-width="10" opacity="0.85"/>
+  <path d="M240 320C292 266 358 242 430 250C482 256 533 285 582 293" stroke="#FFD08A" stroke-width="12" stroke-linecap="round"/>
+  <path d="M246 247C304 201 384 183 471 193C534 200 581 223 628 257" stroke="#4DA8D8" stroke-width="12" stroke-linecap="round"/>
+  <path d="M256 397C326 360 405 352 474 365C529 375 578 402 621 434" stroke="#F17866" stroke-width="12" stroke-linecap="round"/>
+  <rect x="720" y="165" width="300" height="54" rx="12" fill="#172743"/>
+  <rect x="720" y="239" width="240" height="18" rx="9" fill="#32527E"/>
+  <rect x="720" y="273" width="276" height="18" rx="9" fill="#32527E"/>
+  <rect x="720" y="307" width="214" height="18" rx="9" fill="#32527E"/>
+  <rect x="720" y="358" width="144" height="82" rx="14" fill="#162539"/>
+  <rect x="880" y="358" width="140" height="82" rx="14" fill="#162539"/>
+  <text x="720" y="121" fill="#E9F2FF" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700">World Monitor</text>
+  <text x="720" y="206" fill="#8AB4D8" font-family="Segoe UI, Arial, sans-serif" font-size="24">Real-time intelligence, AI analysis, replay, and backtesting</text>
+</svg>
