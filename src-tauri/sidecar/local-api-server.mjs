@@ -534,6 +534,109 @@ function buildCodexDiscoveryPlannerPrompt({ origin = '', feedName = '', reason =
   ].join('\\n');
 }
 
+function normalizeCandidateExpansionProposals(rawProposals) {
+  const output = [];
+  const seen = new Set();
+  for (const proposal of Array.isArray(rawProposals) ? rawProposals : []) {
+    if (!proposal || typeof proposal !== 'object') continue;
+    const symbol = String(proposal.symbol || '').trim().toUpperCase();
+    if (!symbol || seen.has(symbol)) continue;
+    seen.add(symbol);
+    const direction = ['long', 'short', 'hedge', 'watch', 'pair'].includes(String(proposal.direction || '').trim())
+      ? String(proposal.direction).trim()
+      : 'watch';
+    const role = ['primary', 'confirm', 'hedge'].includes(String(proposal.role || '').trim())
+      ? String(proposal.role).trim()
+      : (direction === 'hedge' ? 'hedge' : 'confirm');
+    const assetKind = ['etf', 'equity', 'commodity', 'fx', 'rate', 'crypto'].includes(String(proposal.assetKind || '').trim())
+      ? String(proposal.assetKind).trim()
+      : 'equity';
+    output.push({
+      symbol,
+      assetName: String(proposal.assetName || symbol).slice(0, 140),
+      assetKind,
+      sector: String(proposal.sector || 'cross-asset').slice(0, 120),
+      commodity: proposal.commodity == null ? null : String(proposal.commodity).slice(0, 80),
+      direction,
+      role,
+      confidence: Math.max(0, Math.min(100, Number(proposal.confidence) || 60)),
+      reason: String(proposal.reason || '').slice(0, 320),
+      supportingSignals: Array.isArray(proposal.supportingSignals)
+        ? proposal.supportingSignals.map((value) => String(value).slice(0, 140)).filter(Boolean).slice(0, 8)
+        : [],
+    });
+    if (output.length >= 12) break;
+  }
+  return output;
+}
+
+function buildCodexCandidateExpansionPrompt(payload) {
+  const topMappings = Array.isArray(payload?.topMappings) ? payload.topMappings : [];
+  const watchlist = Array.isArray(payload?.watchlist) ? payload.watchlist : [];
+  const existingSymbols = Array.isArray(payload?.existingSymbols) ? payload.existingSymbols.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean) : [];
+  const themeId = String(payload?.themeId || '').trim();
+  const themeLabel = String(payload?.themeLabel || '').trim();
+  const thesis = String(payload?.thesis || '').trim();
+  const timeframe = String(payload?.timeframe || '').trim();
+  const sectors = Array.isArray(payload?.sectors) ? payload.sectors.map((value) => String(value || '').trim()).filter(Boolean) : [];
+  const commodities = Array.isArray(payload?.commodities) ? payload.commodities.map((value) => String(value || '').trim()).filter(Boolean) : [];
+  const triggers = Array.isArray(payload?.triggers) ? payload.triggers.map((value) => String(value || '').trim()).filter(Boolean) : [];
+  const invalidation = Array.isArray(payload?.invalidation) ? payload.invalidation.map((value) => String(value || '').trim()).filter(Boolean) : [];
+  const mappingLines = topMappings.slice(0, 8).map((item) => {
+    const symbol = String(item?.symbol || '').trim();
+    const name = String(item?.assetName || '').trim();
+    const sector = String(item?.sector || '').trim();
+    const direction = String(item?.direction || '').trim();
+    const role = String(item?.role || '').trim();
+    const conviction = Number(item?.conviction) || 0;
+    return `- ${symbol} | ${name} | ${sector} | ${direction} | ${role} | conviction=${conviction}`;
+  }).join('\n');
+  const watchlistLines = watchlist.slice(0, 20).map((item) => {
+    const symbol = String(item?.symbol || '').trim();
+    const name = String(item?.name || '').trim();
+    return `- ${symbol}${name ? ` | ${name}` : ''}`;
+  }).join('\n');
+
+  return [
+    'You are a candidate-expansion analyst for a macro and geopolitical investment engine.',
+    'Return strict JSON only. No markdown.',
+    'Goal: propose additional liquid symbols or ETFs that should be reviewed for this theme.',
+    'Do not repeat any symbol already in ExistingSymbols.',
+    'Prefer liquid U.S.-listed ETFs and large liquid equities unless a more direct proxy is clearly better.',
+    'Avoid illiquid microcaps, leveraged ETFs, options, or instruments without clear thematic linkage.',
+    'Schema:',
+    '{',
+    '  "proposals": [',
+    '    {',
+    '      "symbol": "string",',
+    '      "assetName": "string",',
+    '      "assetKind": "etf|equity|commodity|fx|rate|crypto",',
+    '      "sector": "string",',
+    '      "commodity": "string|null",',
+    '      "direction": "long|short|hedge|watch|pair",',
+    '      "role": "primary|confirm|hedge",',
+    '      "confidence": 0,',
+    '      "reason": "string",',
+    '      "supportingSignals": ["string"]',
+    '    }',
+    '  ]',
+    '}',
+    `ThemeId: ${themeId || '(none)'}`,
+    `ThemeLabel: ${themeLabel || '(none)'}`,
+    `Thesis: ${thesis || '(none)'}`,
+    `Timeframe: ${timeframe || '(none)'}`,
+    `Sectors: ${sectors.join(', ') || '(none)'}`,
+    `Commodities: ${commodities.join(', ') || '(none)'}`,
+    `Triggers: ${triggers.join(', ') || '(none)'}`,
+    `Invalidation: ${invalidation.join(' | ') || '(none)'}`,
+    `ExistingSymbols: ${existingSymbols.join(', ') || '(none)'}`,
+    'TopMappings:',
+    mappingLines || '(none)',
+    'UserWatchlist:',
+    watchlistLines || '(none)',
+  ].join('\n');
+}
+
 async function runCodexDiscoveryPlanner({ origin = '', feedName = '', reason = '', topicHints = [], timeoutMs = LOCAL_SOURCE_DISCOVERY_TIMEOUT_MS }) {
   if (!ENABLE_CODEX_SOURCE_DISCOVERY) return null;
   try {
@@ -3063,6 +3166,62 @@ async function dispatch(requestUrl, req, routes, context) {
     return json(result);
   }
 
+  if (requestUrl.pathname === '/api/local-codex-candidate-expansion') {
+    if (req.method !== 'POST') {
+      return json({ error: 'POST required' }, 405);
+    }
+    const body = await readBody(req);
+    if (!body) return json({ error: 'expected request body' }, 400);
+
+    let payload = null;
+    try {
+      payload = JSON.parse(body.toString());
+    } catch {
+      return json({ error: 'expected JSON body' }, 400);
+    }
+
+    try {
+      const loginStatus = await runCodexCli(['login', 'status'], { timeoutMs: 8000 });
+      const loginOutput = `${loginStatus.stdout || ''}\n${loginStatus.stderr || ''}`;
+      if (loginStatus.code !== 0 || !isCodexLoggedIn(loginOutput)) {
+        return json({ error: 'Codex CLI is not logged in' }, 412);
+      }
+
+      const prompt = buildCodexCandidateExpansionPrompt(payload);
+      let execArgs = buildCodexExecArgs(prompt, true);
+      let result = await runCodexCli(execArgs, { timeoutMs: Math.max(CODEX_TIMEOUT_MS, 90_000) });
+      if (result.code !== 0) {
+        const errText = `${result.stderr || ''}\n${result.stdout || ''}`;
+        if (/unexpected argument '--ask-for-approval'/i.test(errText)) {
+          execArgs = buildCodexExecArgs(prompt, false);
+          result = await runCodexCli(execArgs, { timeoutMs: Math.max(CODEX_TIMEOUT_MS, 90_000) });
+        }
+      }
+      if (result.timedOut) {
+        return json({ error: 'Codex CLI timed out' }, 504);
+      }
+      if (result.code !== 0) {
+        const detail = (result.stderr || result.stdout || '').trim().slice(0, 300);
+        return json({ error: 'Codex CLI execution failed', detail }, 502);
+      }
+
+      const message = parseCodexJsonOutput(result.stdout || '');
+      const parsed = safeParseJsonObject(message);
+      if (!parsed) {
+        return json({ error: 'Codex CLI returned invalid JSON' }, 502);
+      }
+
+      return json({
+        proposals: normalizeCandidateExpansionProposals(parsed.proposals || []),
+        provider: 'codex',
+        model: process.env.CODEX_MODEL?.trim() || 'codex-cli',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Codex CLI execution failed';
+      return json({ error: message }, 502);
+    }
+  }
+
   if (requestUrl.pathname === '/api/local-source-hunt') {
     if (req.method !== 'POST') {
       return json({ error: 'POST required' }, 405);
@@ -3606,6 +3765,7 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-validate-secret'
       || requestUrl.pathname === '/api/local-codex-status'
       || requestUrl.pathname === '/api/local-codex-summarize'
+      || requestUrl.pathname === '/api/local-codex-candidate-expansion'
       || requestUrl.pathname === '/api/local-source-discover'
       || requestUrl.pathname === '/api/local-source-hunt'
       || requestUrl.pathname === '/api/local-api-source-hunt'

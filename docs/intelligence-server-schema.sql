@@ -140,6 +140,69 @@ create table if not exists mapping_stats (
 );
 create index if not exists mapping_stats_theme_idx on mapping_stats (theme_id, symbol, direction);
 
+create table if not exists security_master (
+  asset_id uuid primary key default gen_random_uuid(),
+  symbol text not null unique,
+  name text not null,
+  asset_kind text not null,
+  exchange text,
+  country text,
+  currency text,
+  sector text,
+  industry text,
+  is_active boolean not null default true,
+  market_cap_usd numeric(18,2),
+  adv30_usd numeric(18,2),
+  spread_bps numeric(10,4),
+  metadata jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists asset_exposures (
+  exposure_id uuid primary key default gen_random_uuid(),
+  asset_id uuid not null references security_master(asset_id) on delete cascade,
+  exposure_type text not null,
+  exposure_target text not null,
+  score numeric(8,4) not null default 0,
+  confidence numeric(5,2) not null default 0,
+  source text not null default 'system',
+  metadata jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists asset_exposures_lookup_idx on asset_exposures (exposure_type, exposure_target, asset_id);
+
+create table if not exists candidate_reviews (
+  review_id text primary key,
+  theme_id text not null,
+  symbol text not null,
+  asset_kind text not null,
+  sector text not null,
+  commodity text,
+  direction text not null,
+  role text not null,
+  source text not null,
+  status text not null,
+  confidence numeric(5,2) not null default 0,
+  requires_market_data boolean not null default false,
+  reason text,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists candidate_reviews_theme_idx on candidate_reviews (theme_id, status, updated_at desc);
+
+create table if not exists coverage_gaps (
+  gap_id text primary key,
+  theme_id text not null,
+  region text not null,
+  severity text not null,
+  reason text not null,
+  missing_asset_kinds jsonb not null default '[]'::jsonb,
+  missing_sectors jsonb not null default '[]'::jsonb,
+  suggested_symbols jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists coverage_gaps_theme_idx on coverage_gaps (theme_id, severity, updated_at desc);
+
 create table if not exists backtest_runs (
   backtest_run_id uuid primary key default gen_random_uuid(),
   label text not null,

@@ -18544,6 +18544,80 @@ body.has-critical-banner .panels-grid {
   color: #d8ebff;
 }
 
+.investment-subcard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.investment-coverage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.investment-coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.investment-coverage-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(128, 178, 255, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(14, 21, 34, 0.92), rgba(8, 13, 22, 0.82));
+}
+
+.investment-coverage-stat b {
+  font-size: 20px;
+  color: #f5f8ff;
+}
+
+.investment-coverage-note {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(214, 224, 240, 0.78);
+}
+
+.investment-policy-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.investment-policy-note {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(214, 224, 240, 0.84);
+}
+
+.backtest-lab-btn.selected {
+  border-color: rgba(121, 192, 255, 0.64);
+  box-shadow: 0 0 0 1px rgba(121, 192, 255, 0.2);
+}
+
+.investment-review-row.accepted td {
+  color: #7ee0b3;
+}
+
+.investment-review-row.rejected td {
+  color: rgba(214, 224, 240, 0.58);
+}
+
+.investment-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .investment-idea-list {
   display: grid;
   gap: 12px;
@@ -18720,6 +18794,11 @@ body.has-critical-banner .panels-grid {
 .backtest-lab-btn {
   padding: 8px 12px;
   cursor: pointer;
+}
+
+.backtest-lab-btn.secondary {
+  background: rgba(20, 28, 43, 0.78);
+  color: rgba(220, 231, 245, 0.78);
 }
 
 .backtest-lab-link {

@@ -32,6 +32,9 @@ owner: core
 - 사이징 및 false-positive 가드레일
 - replay / walk-forward 실행 요약
 - Backtest Lab 시각화와 의사결정 비교
+- coverage-aware universe 요약, review queue, gap 추적
+- 승인된 동적 후보가 다음 refresh와 이후 백테스트에 참여
+- manual / guarded-auto / full-auto universe policy 모드
 
 ## 주요 UI 표면
 
@@ -39,6 +42,7 @@ owner: core
 - Auto Investment Ideas
 - Backtest Lab
 - Transmission Sankey / Network
+- Coverage-aware universe review queue
 
 ## 관련 알고리즘
 
@@ -47,6 +51,10 @@ owner: core
 - Kalman 스타일 adaptive weighting
 - Hawkes intensity, transfer entropy, bandits
 - historical replay와 warm-up handling
+- coverage-aware candidate retrieval
+- core + approved expansion 자산을 함께 보는 deterministic ranking
+- Codex-assisted candidate expansion review queue
+- guarded auto-approval + probation + auto-demotion
 
 ## 한계
 

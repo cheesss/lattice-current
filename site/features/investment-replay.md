@@ -32,6 +32,9 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - sizing and false-positive guardrails
 - replay and walk-forward run summaries
 - backtest lab visuals and decision comparisons
+- coverage-aware universe summary, review queue, and gap tracking
+- approved dynamic candidates that join the next refresh and subsequent backtests
+- universe policy modes for manual, guarded auto-approval, and full auto-approval
 
 ## Key UI surfaces
 
@@ -39,6 +42,7 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - Auto Investment Ideas
 - Backtest Lab
 - Transmission Sankey / Network
+- Coverage-aware universe review queue
 
 ## Algorithms involved
 
@@ -47,6 +51,10 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - Kalman-style adaptive weighting
 - Hawkes intensity, transfer entropy, bandits
 - historical replay and warm-up handling
+- coverage-aware candidate retrieval
+- deterministic ranking over core plus approved expansion assets
+- Codex-assisted candidate expansion as a reviewed queue, not an execution path
+- guarded auto-approval with probation and auto-demotion
 
 ## Limits
 

@@ -1,5 +1,12 @@
 import { Panel } from './Panel';
-import type { DirectAssetMapping, InvestmentIntelligenceSnapshot } from '@/services/investment-intelligence';
+import {
+  getInvestmentIntelligenceSnapshot,
+  requestCodexCandidateExpansion,
+  setCandidateExpansionReviewStatus,
+  setUniverseExpansionPolicyMode,
+  type DirectAssetMapping,
+  type InvestmentIntelligenceSnapshot,
+} from '@/services/investment-intelligence';
 import type { MarketRegimeState } from '@/services/math-models/regime-model';
 import {
   clearInvestmentFocusContext,
@@ -256,6 +263,26 @@ export class InvestmentWorkflowPanel extends Panel {
       }
       if (action === 'focus-theme') {
         setInvestmentFocusContext({ themeId: actionEl.dataset.themeId || null });
+        return;
+      }
+      if (action === 'approve-review' && actionEl.dataset.reviewId) {
+        void this.handleReviewStatus(actionEl.dataset.reviewId, 'accepted');
+        return;
+      }
+      if (action === 'reject-review' && actionEl.dataset.reviewId) {
+        void this.handleReviewStatus(actionEl.dataset.reviewId, 'rejected');
+        return;
+      }
+      if (action === 'reopen-review' && actionEl.dataset.reviewId) {
+        void this.handleReviewStatus(actionEl.dataset.reviewId, 'open');
+        return;
+      }
+      if (action === 'ask-codex' && actionEl.dataset.themeId) {
+        void this.handleCodexReview(actionEl.dataset.themeId);
+        return;
+      }
+      if (action === 'set-policy-mode' && actionEl.dataset.mode) {
+        void this.handlePolicyMode(actionEl.dataset.mode as 'manual' | 'guarded-auto' | 'full-auto');
       }
     });
   }
@@ -271,6 +298,32 @@ export class InvestmentWorkflowPanel extends Panel {
     this.renderPanel();
   }
 
+  private async handleReviewStatus(
+    reviewId: string,
+    status: 'accepted' | 'rejected' | 'open',
+  ): Promise<void> {
+    await setCandidateExpansionReviewStatus(reviewId, status);
+    this.snapshot = await getInvestmentIntelligenceSnapshot();
+    this.renderPanel();
+  }
+
+  private async handleCodexReview(themeId: string): Promise<void> {
+    try {
+      await requestCodexCandidateExpansion(themeId);
+      this.snapshot = await getInvestmentIntelligenceSnapshot();
+      this.renderPanel();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Codex candidate expansion failed';
+      this.showError(message);
+    }
+  }
+
+  private async handlePolicyMode(mode: 'manual' | 'guarded-auto' | 'full-auto'): Promise<void> {
+    await setUniverseExpansionPolicyMode(mode);
+    this.snapshot = await getInvestmentIntelligenceSnapshot();
+    this.renderPanel();
+  }
+
   private renderPanel(): void {
     const snapshot = this.snapshot;
     if (!snapshot) {
@@ -282,6 +335,14 @@ export class InvestmentWorkflowPanel extends Panel {
     const falsePositive = snapshot.falsePositive;
     const themeOptions = buildThemeOptions(snapshot);
     const regionOptions = buildRegionOptions(snapshot);
+    const coverageGaps = snapshot.coverageGaps.filter((gap) =>
+      (!this.focus.themeId || gap.themeId === this.focus.themeId)
+      && (!this.focus.region || gap.region === this.focus.region),
+    );
+    const candidateReviews = snapshot.candidateReviews.filter((review) =>
+      !this.focus.themeId || review.themeId === this.focus.themeId,
+    );
+    const activeThemeForCodex = this.focus.themeId || filtered.mappings[0]?.themeId || snapshot.directMappings[0]?.themeId || '';
 
     const workflow = snapshot.workflow.map((step) => `
       <div class="investment-workflow-step ${workflowTone(step.status)}">
@@ -349,6 +410,65 @@ export class InvestmentWorkflowPanel extends Panel {
       </tr>
     `).join('');
 
+    const coverageStats = `
+      <div class="investment-coverage-grid">
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Catalog</span><b>${snapshot.universeCoverage.totalCatalogAssets}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Direct mappings</span><b>${snapshot.universeCoverage.directMappingCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Approved expansions</span><b>${snapshot.universeCoverage.dynamicApprovedCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Open reviews</span><b>${snapshot.universeCoverage.openReviewCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Coverage gaps</span><b>${snapshot.universeCoverage.gapCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Themes with gaps</span><b>${snapshot.universeCoverage.uncoveredThemeCount}</b></div>
+      </div>
+    `;
+    const policy = snapshot.universePolicy;
+    const policyControls = `
+      <div class="investment-policy-toolbar">
+        <button type="button" class="backtest-lab-btn${policy.mode === 'manual' ? ' selected' : ''}" data-action="set-policy-mode" data-mode="manual">Manual</button>
+        <button type="button" class="backtest-lab-btn${policy.mode === 'guarded-auto' ? ' selected' : ''}" data-action="set-policy-mode" data-mode="guarded-auto">Guarded Auto</button>
+        <button type="button" class="backtest-lab-btn${policy.mode === 'full-auto' ? ' selected' : ''}" data-action="set-policy-mode" data-mode="full-auto">Full Auto</button>
+      </div>
+      <div class="investment-policy-note">
+        Codex auto-add mode is <b>${escapeHtml(policy.mode)}</b>. Threshold=${policy.minCodexConfidence}, max auto approvals per theme=${policy.maxAutoApprovalsPerTheme}, probation=${policy.probationCycles} active cycles, auto-demote after ${policy.autoDemoteMisses} misses.
+      </div>
+    `;
+
+    const gapRows = coverageGaps.slice(0, 10).map((gap) => `
+      <tr class="${gap.severity}">
+        <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(gap.themeId)}">${escapeHtml(gap.themeLabel)}</button></td>
+        <td>${escapeHtml(gap.region)}</td>
+        <td>${escapeHtml(gap.severity.toUpperCase())}</td>
+        <td>${escapeHtml(gap.missingAssetKinds.join(', ') || '-')}</td>
+        <td>${escapeHtml(gap.missingSectors.join(', ') || '-')}</td>
+        <td>${escapeHtml(gap.suggestedSymbols.join(', ') || '-')}</td>
+      </tr>
+    `).join('');
+
+    const reviewRows = candidateReviews.slice(0, 12).map((review) => {
+      const actions = review.status === 'open'
+        ? `
+          <button type="button" class="backtest-lab-btn" data-action="approve-review" data-review-id="${escapeHtml(review.id)}">Approve</button>
+          <button type="button" class="backtest-lab-btn secondary" data-action="reject-review" data-review-id="${escapeHtml(review.id)}">Reject</button>
+        `
+        : `
+          <button type="button" class="backtest-lab-btn secondary" data-action="reopen-review" data-review-id="${escapeHtml(review.id)}">Reopen</button>
+        `;
+      return `
+        <tr class="investment-review-row ${escapeHtml(review.status)}">
+          <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(review.themeId)}">${escapeHtml(review.themeLabel)}</button></td>
+          <td>${escapeHtml(review.symbol)}</td>
+          <td>${escapeHtml(review.sector)}</td>
+          <td>${escapeHtml(review.direction.toUpperCase())}</td>
+          <td>${review.confidence}</td>
+          <td>${escapeHtml(review.source.toUpperCase())}</td>
+          <td>${review.autoApproved ? escapeHtml((review.autoApprovalMode || 'auto').toUpperCase()) : '-'}</td>
+          <td>${escapeHtml(review.probationStatus.toUpperCase())}</td>
+          <td>${review.requiresMarketData ? 'yes' : 'no'}</td>
+          <td>${escapeHtml(review.status.toUpperCase())}</td>
+          <td class="investment-review-actions">${actions}</td>
+        </tr>
+      `;
+    }).join('');
+
     const summary = snapshot.summaryLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
     const focusBadge = this.focus.themeId || this.focus.region
       ? `<div class="investment-focus-badge">Focus: ${escapeHtml(this.focus.themeId || 'all themes')} ${this.focus.region ? `| ${escapeHtml(this.focus.region)}` : ''}</div>`
@@ -390,6 +510,15 @@ export class InvestmentWorkflowPanel extends Panel {
           <h4>Workflow Summary</h4>
           <ul>${summary}</ul>
         </div>
+        <section class="investment-subcard investment-coverage-card">
+          <div class="investment-subcard-head">
+            <h4>Coverage-aware Universe</h4>
+            ${activeThemeForCodex ? `<button type="button" class="backtest-lab-btn" data-action="ask-codex" data-theme-id="${escapeHtml(activeThemeForCodex)}">Ask Codex For Candidates</button>` : ''}
+          </div>
+          ${policyControls}
+          ${coverageStats}
+          <div class="investment-coverage-note">Approved expansions become active on the next intelligence refresh, then flow into idea generation, tracking, and replay/backtest evaluation.</div>
+        </section>
         <div class="investment-grid-two">
           <section class="investment-subcard">
             <h4>Direct Event -> Asset Map</h4>
@@ -429,6 +558,25 @@ export class InvestmentWorkflowPanel extends Panel {
             <tbody>${backtestRows || '<tr><td colspan="5">No backtest rows yet</td></tr>'}</tbody>
           </table>
         </section>
+        <div class="investment-grid-two">
+          <section class="investment-subcard">
+            <h4>Coverage Gaps</h4>
+            <table class="investment-table">
+              <thead><tr><th>Theme</th><th>Region</th><th>Severity</th><th>Missing kinds</th><th>Missing sectors</th><th>Suggestions</th></tr></thead>
+              <tbody>${gapRows || '<tr><td colspan="6">No coverage gaps in current focus</td></tr>'}</tbody>
+            </table>
+          </section>
+          <section class="investment-subcard">
+            <div class="investment-subcard-head">
+              <h4>Candidate Expansion Review Queue</h4>
+              <span class="investment-mini-label">${candidateReviews.length} items</span>
+            </div>
+            <table class="investment-table">
+              <thead><tr><th>Theme</th><th>Symbol</th><th>Sector</th><th>Dir</th><th>Conf</th><th>Source</th><th>Auto</th><th>Probation</th><th>Needs market</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>${reviewRows || '<tr><td colspan="11">No candidate reviews in current focus</td></tr>'}</tbody>
+            </table>
+          </section>
+        </div>
       </div>
     `);
   }

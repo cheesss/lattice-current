@@ -132,6 +132,7 @@ export interface HistoricalReplayRun {
   sourceProfiles: SourceCredibilityProfile[];
   mappingStats: MappingPerformanceStats[];
   banditStates?: InvestmentLearningState['banditStates'];
+  candidateReviews?: InvestmentLearningState['candidateReviews'];
   workflow: InvestmentIntelligenceSnapshot['workflow'];
   summaryLines: string[];
   windows?: WalkForwardWindow[];
@@ -542,6 +543,7 @@ async function executeReplay(args: {
       sourceProfiles,
       mappingStats,
       banditStates: finalSnapshot.banditStates,
+      candidateReviews: finalSnapshot.candidateReviews,
       workflow: finalSnapshot.snapshot?.workflow ?? [],
       summaryLines: buildSummaryLines(frames.length, warmupFramesApplied, ideaRuns, forwardReturns, sourceProfiles, mappingStats, checkpoints, args.windows),
       windows: args.windows,
@@ -699,6 +701,7 @@ export async function runWalkForwardBacktest(
         investmentLearning: {
           mappingStats: trainRun.mappingStats,
           banditStates: trainRun.banditStates ?? [],
+          candidateReviews: trainRun.candidateReviews ?? [],
         } satisfies Partial<InvestmentLearningState>,
       };
 

@@ -10,11 +10,13 @@ import { createBanditArmState, scoreBanditArm, updateBanditArm } from './math-mo
 import { regimeMultiplierForTheme } from './math-models/regime-model';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { logSourceOpsEvent } from './source-ops-log';
+import { getMarketWatchlistEntries } from './market-watchlist';
 
 export type InvestmentAssetKind = 'etf' | 'equity' | 'commodity' | 'fx' | 'rate' | 'crypto';
 export type InvestmentDirection = 'long' | 'short' | 'hedge' | 'watch' | 'pair';
 export type InvestmentBias = 'benefit' | 'pressure' | 'mixed';
 export type WorkflowStatus = 'ready' | 'watch' | 'blocked';
+export type UniverseExpansionMode = 'manual' | 'guarded-auto' | 'full-auto';
 
 export interface InvestmentWorkflowStep {
   id: string;
@@ -228,6 +230,65 @@ export interface FalsePositiveStats {
   reasons: FalsePositiveReasonStat[];
 }
 
+export interface UniverseCoverageGap {
+  id: string;
+  themeId: string;
+  themeLabel: string;
+  region: string;
+  severity: 'watch' | 'elevated' | 'critical';
+  reason: string;
+  missingAssetKinds: InvestmentAssetKind[];
+  missingSectors: string[];
+  suggestedSymbols: string[];
+}
+
+export interface CandidateExpansionReview {
+  id: string;
+  themeId: string;
+  themeLabel: string;
+  symbol: string;
+  assetName: string;
+  assetKind: InvestmentAssetKind;
+  sector: string;
+  commodity: string | null;
+  direction: InvestmentDirection;
+  role: 'primary' | 'confirm' | 'hedge';
+  confidence: number;
+  source: 'heuristic' | 'watchlist' | 'market' | 'codex';
+  status: 'open' | 'accepted' | 'rejected';
+  reason: string;
+  supportingSignals: string[];
+  requiresMarketData: boolean;
+  autoApproved: boolean;
+  autoApprovalMode?: UniverseExpansionMode | null;
+  acceptedAt?: string | null;
+  probationStatus: 'n/a' | 'active' | 'graduated' | 'demoted';
+  probationCycles: number;
+  probationHits: number;
+  probationMisses: number;
+  lastUpdatedAt: string;
+}
+
+export interface UniverseExpansionPolicy {
+  mode: UniverseExpansionMode;
+  minCodexConfidence: number;
+  maxAutoApprovalsPerTheme: number;
+  requireMarketData: boolean;
+  probationCycles: number;
+  autoDemoteMisses: number;
+}
+
+export interface UniverseCoverageSummary {
+  totalCatalogAssets: number;
+  activeAssetKinds: InvestmentAssetKind[];
+  activeSectors: string[];
+  directMappingCount: number;
+  dynamicApprovedCount: number;
+  openReviewCount: number;
+  gapCount: number;
+  uncoveredThemeCount: number;
+}
+
 export interface InvestmentIntelligenceSnapshot {
   generatedAt: string;
   regime?: MarketRegimeState | null;
@@ -241,6 +302,10 @@ export interface InvestmentIntelligenceSnapshot {
   ideaCards: InvestmentIdeaCard[];
   trackedIdeas: TrackedIdeaState[];
   falsePositive: FalsePositiveStats;
+  universePolicy: UniverseExpansionPolicy;
+  universeCoverage: UniverseCoverageSummary;
+  coverageGaps: UniverseCoverageGap[];
+  candidateReviews: CandidateExpansionReview[];
   summaryLines: string[];
 }
 
@@ -283,6 +348,14 @@ interface PersistedBanditStateStore {
   states: BanditArmState[];
 }
 
+interface PersistedCandidateReviewStore {
+  reviews: CandidateExpansionReview[];
+}
+
+interface PersistedUniversePolicyStore {
+  policy: UniverseExpansionPolicy;
+}
+
 export interface InvestmentLearningState {
   snapshot: InvestmentIntelligenceSnapshot | null;
   history: InvestmentHistoryEntry[];
@@ -290,6 +363,7 @@ export interface InvestmentLearningState {
   marketHistory: MarketHistoryPoint[];
   mappingStats: MappingPerformanceStats[];
   banditStates: BanditArmState[];
+  candidateReviews: CandidateExpansionReview[];
 }
 
 interface EventCandidate {
@@ -320,6 +394,13 @@ interface ThemeAssetDefinition {
   role: 'primary' | 'confirm' | 'hedge';
 }
 
+interface UniverseAssetDefinition extends ThemeAssetDefinition {
+  aliases?: string[];
+  themeIds: string[];
+  liquidityTier: 'core' | 'high' | 'medium';
+  regionBias?: string[];
+}
+
 interface ThemeRule {
   id: string;
   label: string;
@@ -339,6 +420,8 @@ const TRACKED_IDEAS_KEY = 'investment-intelligence-tracked-ideas:v1';
 const MARKET_HISTORY_KEY = 'investment-intelligence-market-history:v1';
 const MAPPING_STATS_KEY = 'investment-intelligence-mapping-stats:v1';
 const BANDIT_STATE_KEY = 'investment-intelligence-bandit-states:v1';
+const CANDIDATE_REVIEWS_KEY = 'investment-intelligence-candidate-reviews:v1';
+const UNIVERSE_POLICY_KEY = 'investment-intelligence-universe-policy:v1';
 const MAX_HISTORY = 240;
 const MAX_MAPPINGS = 72;
 const MAX_IDEAS = 10;
@@ -347,9 +430,19 @@ const MAX_TRACKED_IDEAS = 260;
 const MAX_MARKET_HISTORY_POINTS = 12_000;
 const MAX_MAPPING_STATS = 900;
 const MAX_BANDIT_STATES = 1_400;
+const MAX_CANDIDATE_REVIEWS = 480;
 const MAPPING_POSTERIOR_DECAY = 0.995;
 const RETURN_EMA_ALPHA = 0.18;
 const BANDIT_DIMENSION = 8;
+
+const DEFAULT_UNIVERSE_EXPANSION_POLICY: UniverseExpansionPolicy = {
+  mode: 'guarded-auto',
+  minCodexConfidence: 78,
+  maxAutoApprovalsPerTheme: 2,
+  requireMarketData: true,
+  probationCycles: 4,
+  autoDemoteMisses: 3,
+};
 
 const ARCHIVE_RE = /\barchive\b|\bin 2011\b|\b15 years after\b|\bfrom the .* archive\b|\banniversary\b/i;
 const SPORTS_RE = /\b(baseball|mlb|world cup|paralymp|football team|chef|concert|athletics|pokemon|samurai champloo)\b/i;
@@ -511,6 +604,40 @@ const THEME_RULES: ThemeRule[] = [
   },
 ];
 
+const UNIVERSE_ASSET_CATALOG: UniverseAssetDefinition[] = [
+  { symbol: 'MPC', name: 'Marathon Petroleum', assetKind: 'equity', sector: 'energy', commodity: 'crude oil', direction: 'long', role: 'confirm', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['refining', 'refiner', 'marathon petroleum'] },
+  { symbol: 'VLO', name: 'Valero Energy', assetKind: 'equity', sector: 'energy', commodity: 'crude oil', direction: 'long', role: 'confirm', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['refining', 'refiner', 'valero'] },
+  { symbol: 'COP', name: 'ConocoPhillips', assetKind: 'equity', sector: 'energy', commodity: 'crude oil', direction: 'long', role: 'confirm', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['upstream', 'conocophillips'] },
+  { symbol: 'OXY', name: 'Occidental Petroleum', assetKind: 'equity', sector: 'energy', commodity: 'crude oil', direction: 'long', role: 'confirm', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['permian', 'occidental'] },
+  { symbol: 'SLB', name: 'Schlumberger', assetKind: 'equity', sector: 'energy services', commodity: 'crude oil', direction: 'long', role: 'confirm', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['oil services', 'schlumberger'] },
+  { symbol: 'FRO', name: 'Frontline', assetKind: 'equity', sector: 'shipping', commodity: 'crude oil', direction: 'long', role: 'hedge', themeIds: ['middle-east-energy-shock'], liquidityTier: 'medium', aliases: ['tanker', 'tankers', 'frontline'] },
+  { symbol: 'TNK', name: 'Teekay Tankers', assetKind: 'equity', sector: 'shipping', commodity: 'crude oil', direction: 'long', role: 'hedge', themeIds: ['middle-east-energy-shock'], liquidityTier: 'medium', aliases: ['tanker', 'teekay'] },
+  { symbol: 'STNG', name: 'Scorpio Tankers', assetKind: 'equity', sector: 'shipping', commodity: 'crude oil', direction: 'long', role: 'hedge', themeIds: ['middle-east-energy-shock'], liquidityTier: 'medium', aliases: ['tanker', 'shipping', 'scorpio'] },
+  { symbol: 'DAL', name: 'Delta Air Lines', assetKind: 'equity', sector: 'airlines', direction: 'short', role: 'hedge', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['delta', 'airline fuel'] },
+  { symbol: 'UAL', name: 'United Airlines', assetKind: 'equity', sector: 'airlines', direction: 'short', role: 'hedge', themeIds: ['middle-east-energy-shock'], liquidityTier: 'high', aliases: ['united airlines', 'airline fuel'] },
+  { symbol: 'GD', name: 'General Dynamics', assetKind: 'equity', sector: 'defense', direction: 'long', role: 'confirm', themeIds: ['defense-escalation'], liquidityTier: 'high', aliases: ['general dynamics', 'munitions'] },
+  { symbol: 'HII', name: 'Huntington Ingalls', assetKind: 'equity', sector: 'defense', direction: 'long', role: 'confirm', themeIds: ['defense-escalation'], liquidityTier: 'medium', aliases: ['shipbuilding', 'naval'] },
+  { symbol: 'LHX', name: 'L3Harris Technologies', assetKind: 'equity', sector: 'surveillance', direction: 'long', role: 'confirm', themeIds: ['defense-escalation'], liquidityTier: 'high', aliases: ['surveillance', 'signals intelligence'] },
+  { symbol: 'AVAV', name: 'AeroVironment', assetKind: 'equity', sector: 'surveillance', direction: 'long', role: 'confirm', themeIds: ['defense-escalation'], liquidityTier: 'medium', aliases: ['drone', 'loitering munition'] },
+  { symbol: 'KTOS', name: 'Kratos Defense', assetKind: 'equity', sector: 'defense', direction: 'long', role: 'confirm', themeIds: ['defense-escalation'], liquidityTier: 'medium', aliases: ['drone', 'defense tech'] },
+  { symbol: 'AVGO', name: 'Broadcom', assetKind: 'equity', sector: 'semiconductors', direction: 'long', role: 'confirm', themeIds: ['semiconductor-export-risk'], liquidityTier: 'high', aliases: ['broadcom', 'networking silicon'] },
+  { symbol: 'MU', name: 'Micron Technology', assetKind: 'equity', sector: 'semiconductors', direction: 'long', role: 'confirm', themeIds: ['semiconductor-export-risk'], liquidityTier: 'high', aliases: ['memory chips', 'micron'] },
+  { symbol: 'ASML', name: 'ASML Holding', assetKind: 'equity', sector: 'semiconductors', direction: 'watch', role: 'confirm', themeIds: ['semiconductor-export-risk'], liquidityTier: 'high', aliases: ['lithography', 'asml'] },
+  { symbol: 'AMAT', name: 'Applied Materials', assetKind: 'equity', sector: 'semiconductors', direction: 'long', role: 'confirm', themeIds: ['semiconductor-export-risk'], liquidityTier: 'high', aliases: ['wafer fab equipment', 'applied materials'] },
+  { symbol: 'KLAC', name: 'KLA', assetKind: 'equity', sector: 'semiconductors', direction: 'long', role: 'confirm', themeIds: ['semiconductor-export-risk'], liquidityTier: 'medium', aliases: ['process control', 'kla'] },
+  { symbol: 'BG', name: 'Bunge Global', assetKind: 'equity', sector: 'agriculture inputs', direction: 'long', role: 'confirm', themeIds: ['fertilizer-and-urea'], liquidityTier: 'high', aliases: ['grain trader', 'fertilizer trade'] },
+  { symbol: 'ADM', name: 'Archer-Daniels-Midland', assetKind: 'equity', sector: 'agriculture inputs', direction: 'long', role: 'confirm', themeIds: ['fertilizer-and-urea'], liquidityTier: 'high', aliases: ['grain', 'ag inputs'] },
+  { symbol: 'ICL', name: 'ICL Group', assetKind: 'equity', sector: 'fertilizers', commodity: 'potash', direction: 'long', role: 'confirm', themeIds: ['fertilizer-and-urea'], liquidityTier: 'medium', aliases: ['potash', 'fertilizers'] },
+  { symbol: 'FTNT', name: 'Fortinet', assetKind: 'equity', sector: 'cybersecurity', direction: 'long', role: 'confirm', themeIds: ['cyber-infrastructure'], liquidityTier: 'high', aliases: ['fortinet', 'network security'] },
+  { symbol: 'ZS', name: 'Zscaler', assetKind: 'equity', sector: 'cybersecurity', direction: 'long', role: 'confirm', themeIds: ['cyber-infrastructure'], liquidityTier: 'high', aliases: ['zero trust', 'zscaler'] },
+  { symbol: 'NET', name: 'Cloudflare', assetKind: 'equity', sector: 'network infrastructure', direction: 'long', role: 'confirm', themeIds: ['cyber-infrastructure'], liquidityTier: 'high', aliases: ['cloudflare', 'edge security'] },
+  { symbol: 'PLTR', name: 'Palantir', assetKind: 'equity', sector: 'cybersecurity', direction: 'watch', role: 'confirm', themeIds: ['cyber-infrastructure', 'defense-escalation'], liquidityTier: 'high', aliases: ['palantir', 'defense software'] },
+  { symbol: 'IAU', name: 'iShares Gold Trust', assetKind: 'etf', sector: 'gold', commodity: 'gold', direction: 'long', role: 'confirm', themeIds: ['safe-haven-repricing'], liquidityTier: 'high', aliases: ['gold trust'] },
+  { symbol: 'UUP', name: 'Invesco DB US Dollar Index Bullish Fund', assetKind: 'etf', sector: 'fx', direction: 'hedge', role: 'hedge', themeIds: ['safe-haven-repricing'], liquidityTier: 'medium', aliases: ['dollar index', 'usd strength'] },
+  { symbol: 'SHY', name: 'iShares 1-3 Year Treasury Bond ETF', assetKind: 'etf', sector: 'rates', direction: 'hedge', role: 'confirm', themeIds: ['safe-haven-repricing'], liquidityTier: 'high', aliases: ['short treasury'] },
+  { symbol: 'GOVT', name: 'iShares U.S. Treasury Bond ETF', assetKind: 'etf', sector: 'rates', direction: 'hedge', role: 'confirm', themeIds: ['safe-haven-repricing'], liquidityTier: 'high', aliases: ['treasury bond'] },
+];
+
 let loaded = false;
 let currentSnapshot: InvestmentIntelligenceSnapshot | null = null;
 let currentHistory: InvestmentHistoryEntry[] = [];
@@ -519,6 +646,8 @@ let marketHistory: MarketHistoryPoint[] = [];
 let marketHistoryKeys = new Set<string>();
 let mappingStats = new Map<string, MappingPerformanceStats>();
 let banditStates = new Map<string, BanditArmState>();
+let candidateReviews = new Map<string, CandidateExpansionReview>();
+let universeExpansionPolicy: UniverseExpansionPolicy = { ...DEFAULT_UNIVERSE_EXPANSION_POLICY };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -539,6 +668,101 @@ function average(values: number[]): number {
 
 function titleId(value: string): string {
   return normalize(value).replace(/\s+/g, '-').slice(0, 120);
+}
+
+function themeAssetKey(asset: Pick<ThemeAssetDefinition, 'symbol' | 'direction' | 'role'>): string {
+  return `${normalize(asset.symbol)}::${asset.direction}::${asset.role}`;
+}
+
+function candidateReviewId(themeId: string, symbol: string, direction: InvestmentDirection, role: ThemeAssetDefinition['role']): string {
+  return `${normalize(themeId)}::${normalize(symbol)}::${direction}::${role}`;
+}
+
+function dedupeThemeAssets(assets: ThemeAssetDefinition[]): ThemeAssetDefinition[] {
+  const seen = new Set<string>();
+  const output: ThemeAssetDefinition[] = [];
+  for (const asset of assets) {
+    const key = themeAssetKey(asset);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(asset);
+  }
+  return output;
+}
+
+function reviewToThemeAsset(review: CandidateExpansionReview): ThemeAssetDefinition {
+  return {
+    symbol: review.symbol,
+    name: review.assetName,
+    assetKind: review.assetKind,
+    sector: review.sector,
+    commodity: review.commodity || undefined,
+    direction: review.direction,
+    role: review.role,
+  };
+}
+
+function normalizeCandidateReview(review: CandidateExpansionReview): CandidateExpansionReview {
+  return {
+    ...review,
+    supportingSignals: Array.isArray(review.supportingSignals) ? review.supportingSignals.slice(0, 8) : [],
+    source: review.source || 'heuristic',
+    status: review.status || 'open',
+    autoApproved: Boolean(review.autoApproved),
+    autoApprovalMode: review.autoApprovalMode || null,
+    acceptedAt: review.acceptedAt || null,
+    probationStatus: review.probationStatus || (review.autoApproved ? 'active' : 'n/a'),
+    probationCycles: Number.isFinite(review.probationCycles) ? review.probationCycles : 0,
+    probationHits: Number.isFinite(review.probationHits) ? review.probationHits : 0,
+    probationMisses: Number.isFinite(review.probationMisses) ? review.probationMisses : 0,
+    lastUpdatedAt: review.lastUpdatedAt || nowIso(),
+  };
+}
+
+function normalizeUniverseExpansionPolicy(policy?: Partial<UniverseExpansionPolicy> | null): UniverseExpansionPolicy {
+  return {
+    mode: policy?.mode === 'manual' || policy?.mode === 'guarded-auto' || policy?.mode === 'full-auto'
+      ? policy.mode
+      : DEFAULT_UNIVERSE_EXPANSION_POLICY.mode,
+    minCodexConfidence: clamp(Number(policy?.minCodexConfidence) || DEFAULT_UNIVERSE_EXPANSION_POLICY.minCodexConfidence, 40, 95),
+    maxAutoApprovalsPerTheme: clamp(Math.round(Number(policy?.maxAutoApprovalsPerTheme) || DEFAULT_UNIVERSE_EXPANSION_POLICY.maxAutoApprovalsPerTheme), 1, 6),
+    requireMarketData: typeof policy?.requireMarketData === 'boolean' ? policy.requireMarketData : DEFAULT_UNIVERSE_EXPANSION_POLICY.requireMarketData,
+    probationCycles: clamp(Math.round(Number(policy?.probationCycles) || DEFAULT_UNIVERSE_EXPANSION_POLICY.probationCycles), 1, 12),
+    autoDemoteMisses: clamp(Math.round(Number(policy?.autoDemoteMisses) || DEFAULT_UNIVERSE_EXPANSION_POLICY.autoDemoteMisses), 1, 12),
+  };
+}
+
+function normalizeUniverseCoverageSummary(summary?: Partial<UniverseCoverageSummary> | null): UniverseCoverageSummary {
+  return {
+    totalCatalogAssets: Number(summary?.totalCatalogAssets) || 0,
+    activeAssetKinds: Array.isArray(summary?.activeAssetKinds) ? summary!.activeAssetKinds.slice() : [],
+    activeSectors: Array.isArray(summary?.activeSectors) ? summary!.activeSectors.slice() : [],
+    directMappingCount: Number(summary?.directMappingCount) || 0,
+    dynamicApprovedCount: Number(summary?.dynamicApprovedCount) || 0,
+    openReviewCount: Number(summary?.openReviewCount) || 0,
+    gapCount: Number(summary?.gapCount) || 0,
+    uncoveredThemeCount: Number(summary?.uncoveredThemeCount) || 0,
+  };
+}
+
+function normalizeInvestmentSnapshot(snapshot: InvestmentIntelligenceSnapshot | null | undefined): InvestmentIntelligenceSnapshot | null {
+  if (!snapshot) return null;
+  return {
+    ...snapshot,
+    universePolicy: normalizeUniverseExpansionPolicy(snapshot.universePolicy),
+    universeCoverage: normalizeUniverseCoverageSummary(snapshot.universeCoverage),
+    coverageGaps: Array.isArray(snapshot.coverageGaps)
+      ? snapshot.coverageGaps.map((gap) => ({
+        ...gap,
+        missingAssetKinds: Array.isArray(gap.missingAssetKinds) ? gap.missingAssetKinds.slice() : [],
+        missingSectors: Array.isArray(gap.missingSectors) ? gap.missingSectors.slice() : [],
+        suggestedSymbols: Array.isArray(gap.suggestedSymbols) ? gap.suggestedSymbols.slice() : [],
+      }))
+      : [],
+    candidateReviews: Array.isArray(snapshot.candidateReviews)
+      ? snapshot.candidateReviews.map((review) => normalizeCandidateReview(review))
+      : [],
+  };
 }
 
 function uniqueId(prefix: string): string {
@@ -627,7 +851,7 @@ async function ensureLoaded(): Promise<void> {
   loaded = true;
   try {
     const snapshotCached = await getPersistentCache<PersistedSnapshotStore>(SNAPSHOT_KEY);
-    currentSnapshot = snapshotCached?.data?.snapshot ?? null;
+    currentSnapshot = normalizeInvestmentSnapshot(snapshotCached?.data?.snapshot ?? null);
   } catch (error) {
     console.warn('[investment-intelligence] snapshot load failed', error);
   }
@@ -662,6 +886,21 @@ async function ensureLoaded(): Promise<void> {
   } catch (error) {
     console.warn('[investment-intelligence] bandit state load failed', error);
   }
+  try {
+    const reviewCached = await getPersistentCache<PersistedCandidateReviewStore>(CANDIDATE_REVIEWS_KEY);
+    candidateReviews = new Map((reviewCached?.data?.reviews ?? []).map((entry) => {
+      const normalized = normalizeCandidateReview(entry);
+      return [normalized.id, normalized] as const;
+    }));
+  } catch (error) {
+    console.warn('[investment-intelligence] candidate review load failed', error);
+  }
+  try {
+    const policyCached = await getPersistentCache<PersistedUniversePolicyStore>(UNIVERSE_POLICY_KEY);
+    universeExpansionPolicy = normalizeUniverseExpansionPolicy(policyCached?.data?.policy);
+  } catch (error) {
+    console.warn('[investment-intelligence] universe policy load failed', error);
+  }
 }
 
 async function persist(): Promise<void> {
@@ -678,6 +917,14 @@ async function persist(): Promise<void> {
     states: Array.from(banditStates.values())
       .sort((a, b) => Date.parse(b.lastUpdatedAt) - Date.parse(a.lastUpdatedAt) || b.pulls - a.pulls)
       .slice(0, MAX_BANDIT_STATES),
+  });
+  await setPersistentCache(CANDIDATE_REVIEWS_KEY, {
+    reviews: Array.from(candidateReviews.values())
+      .sort((a, b) => Date.parse(b.lastUpdatedAt) - Date.parse(a.lastUpdatedAt))
+      .slice(0, MAX_CANDIDATE_REVIEWS),
+  });
+  await setPersistentCache(UNIVERSE_POLICY_KEY, {
+    policy: universeExpansionPolicy,
   });
 }
 
@@ -855,7 +1102,7 @@ function findMatchingThemes(candidate: EventCandidate): ThemeRule[] {
   const matches = THEME_RULES.filter((rule) => rule.triggers.some((trigger) => candidate.text.includes(trigger)));
   if (matches.length > 0) return matches;
   if (candidate.matchedSymbols.length > 0 && candidate.marketStress >= 0.55) {
-    return THEME_RULES.filter((rule) => rule.assets.some((asset) => candidate.matchedSymbols.includes(asset.symbol)));
+    return THEME_RULES.filter((rule) => candidate.matchedSymbols.some((symbol) => themeHasAssetSymbol(rule, symbol)));
   }
   return [];
 }
@@ -961,6 +1208,315 @@ function getBanditState(themeId: string, symbol: string, direction: InvestmentDi
   return banditStates.get(banditArmId(themeId, symbol, direction)) || createBanditArmState(banditArmId(themeId, symbol, direction), BANDIT_DIMENSION);
 }
 
+function getThemeRule(themeId: string): ThemeRule | null {
+  return THEME_RULES.find((theme) => theme.id === themeId) || null;
+}
+
+function getEffectiveThemeAssets(theme: ThemeRule): ThemeAssetDefinition[] {
+  const accepted = Array.from(candidateReviews.values())
+    .filter((review) => review.themeId === theme.id && review.status === 'accepted')
+    .map(reviewToThemeAsset);
+  return dedupeThemeAssets([...theme.assets, ...accepted]);
+}
+
+function themeHasAssetSymbol(theme: ThemeRule, symbol: string): boolean {
+  const normalizedSymbol = normalize(symbol);
+  return getEffectiveThemeAssets(theme).some((asset) => normalize(asset.symbol) === normalizedSymbol);
+}
+
+function buildWatchlistLookup(): Map<string, { symbol: string; name?: string }> {
+  const lookup = new Map<string, { symbol: string; name?: string }>();
+  for (const entry of getMarketWatchlistEntries()) {
+    lookup.set(normalize(entry.symbol), { symbol: entry.symbol, name: entry.name });
+  }
+  return lookup;
+}
+
+function scoreExpansionCandidate(args: {
+  candidate: EventCandidate;
+  theme: ThemeRule;
+  asset: UniverseAssetDefinition;
+  inWatchlist: boolean;
+  hasMarketData: boolean;
+}): number {
+  const aliasBoost = (args.asset.aliases || []).some((alias) => args.candidate.text.includes(normalize(alias))) ? 10 : 0;
+  const commodityBoost = args.asset.commodity && args.theme.commodities.includes(args.asset.commodity) ? 5 : 0;
+  const watchlistBoost = args.inWatchlist ? 8 : 0;
+  const marketBoost = args.hasMarketData ? 6 : 0;
+  const liquidityBoost = args.asset.liquidityTier === 'core' ? 8 : args.asset.liquidityTier === 'high' ? 5 : 2;
+  return clamp(
+    Math.round(
+      36
+      + args.candidate.credibility * 0.2
+      + args.candidate.corroboration * 0.12
+      + args.candidate.marketStress * 18
+      + args.candidate.aftershockIntensity * 12
+      + aliasBoost
+      + commodityBoost
+      + watchlistBoost
+      + marketBoost
+      + liquidityBoost,
+    ),
+    28,
+    96,
+  );
+}
+
+function buildCandidateExpansionReviews(args: {
+  candidates: EventCandidate[];
+  markets: MarketData[];
+}): CandidateExpansionReview[] {
+  const marketMap = marketMoveMap(args.markets);
+  const watchlistLookup = buildWatchlistLookup();
+  const nextReviews = new Map<string, CandidateExpansionReview>();
+
+  for (const candidate of args.candidates) {
+    const themes = findMatchingThemes(candidate);
+    for (const theme of themes) {
+      const effectiveAssets = new Set(getEffectiveThemeAssets(theme).map(themeAssetKey));
+      const themeCatalog = UNIVERSE_ASSET_CATALOG.filter((asset) => asset.themeIds.includes(theme.id));
+
+      for (const asset of themeCatalog) {
+        if (effectiveAssets.has(themeAssetKey(asset))) continue;
+        const reviewId = candidateReviewId(theme.id, asset.symbol, asset.direction, asset.role);
+        const previous = candidateReviews.get(reviewId);
+        const inWatchlist = watchlistLookup.has(normalize(asset.symbol));
+        const hasMarketData = marketMap.has(asset.symbol);
+        const confidence = scoreExpansionCandidate({ candidate, theme, asset, inWatchlist, hasMarketData });
+        const supportingSignals = [
+          candidate.title,
+          `Theme=${theme.label}`,
+          `Credibility=${candidate.credibility}`,
+          `Corroboration=${candidate.corroboration}`,
+          `Stress=${candidate.marketStress.toFixed(2)}`,
+          `Aftershock=${candidate.aftershockIntensity.toFixed(2)}`,
+          ...(asset.aliases || []).filter((alias) => candidate.text.includes(normalize(alias))).map((alias) => `Alias=${alias}`),
+          ...(inWatchlist ? ['User watchlist overlap'] : []),
+          ...(hasMarketData ? ['Live market data available'] : ['No live market data yet']),
+        ].slice(0, 7);
+
+        const review: CandidateExpansionReview = {
+          id: reviewId,
+          themeId: theme.id,
+          themeLabel: theme.label,
+          symbol: asset.symbol,
+          assetName: inWatchlist ? (watchlistLookup.get(normalize(asset.symbol))?.name || asset.name) : asset.name,
+          assetKind: asset.assetKind,
+          sector: asset.sector,
+          commodity: asset.commodity || null,
+          direction: asset.direction,
+          role: asset.role,
+          confidence,
+          source: previous?.source || (inWatchlist ? 'watchlist' : 'heuristic'),
+          status: previous?.status || 'open',
+          reason: previous?.reason || `${asset.name} extends ${theme.label} coverage into ${asset.sector}${asset.commodity ? ` / ${asset.commodity}` : ''}.`,
+          supportingSignals: previous?.supportingSignals?.length ? previous.supportingSignals.slice(0, 8) : supportingSignals,
+          requiresMarketData: !hasMarketData,
+          autoApproved: previous?.autoApproved || false,
+          autoApprovalMode: previous?.autoApprovalMode || null,
+          acceptedAt: previous?.acceptedAt || null,
+          probationStatus: previous?.probationStatus || 'n/a',
+          probationCycles: previous?.probationCycles || 0,
+          probationHits: previous?.probationHits || 0,
+          probationMisses: previous?.probationMisses || 0,
+          lastUpdatedAt: nowIso(),
+        };
+        const existing = nextReviews.get(reviewId);
+        if (!existing || existing.confidence < review.confidence) {
+          nextReviews.set(reviewId, review);
+        }
+      }
+    }
+  }
+
+  for (const existing of candidateReviews.values()) {
+    if (!nextReviews.has(existing.id)) nextReviews.set(existing.id, existing);
+  }
+
+  return Array.from(nextReviews.values())
+    .sort((a, b) => {
+      const statusRank = (value: CandidateExpansionReview['status']): number => (value === 'open' ? 0 : value === 'accepted' ? 1 : 2);
+      return statusRank(a.status) - statusRank(b.status)
+        || b.confidence - a.confidence
+        || Date.parse(b.lastUpdatedAt) - Date.parse(a.lastUpdatedAt);
+    })
+    .slice(0, MAX_CANDIDATE_REVIEWS);
+}
+
+function countAutoApprovedByTheme(reviews: CandidateExpansionReview[], themeId: string): number {
+  return reviews.filter((review) => review.themeId === themeId && review.status === 'accepted' && review.autoApproved).length;
+}
+
+function shouldAutoApproveReview(review: CandidateExpansionReview, policy: UniverseExpansionPolicy, allReviews: CandidateExpansionReview[]): boolean {
+  if (review.status !== 'open') return false;
+  if (policy.mode === 'manual') return false;
+  if (countAutoApprovedByTheme(allReviews, review.themeId) >= policy.maxAutoApprovalsPerTheme) return false;
+  if (policy.requireMarketData && review.requiresMarketData) return false;
+  if (policy.mode === 'guarded-auto') {
+    return review.source === 'codex' && review.confidence >= policy.minCodexConfidence;
+  }
+  return review.confidence >= Math.max(52, policy.minCodexConfidence - 16);
+}
+
+function applyUniverseExpansionPolicy(reviews: CandidateExpansionReview[], policy: UniverseExpansionPolicy): CandidateExpansionReview[] {
+  const output = reviews.map((review) => ({ ...review }));
+  for (let index = 0; index < output.length; index += 1) {
+    const review = output[index]!;
+    if (!shouldAutoApproveReview(review, policy, output)) continue;
+    const acceptedAt = nowIso();
+    output[index] = {
+      ...review,
+      status: 'accepted',
+      autoApproved: true,
+      autoApprovalMode: policy.mode,
+      acceptedAt,
+      probationStatus: 'active',
+      probationCycles: 0,
+      probationHits: 0,
+      probationMisses: 0,
+      reason: `${review.reason} Auto-approved by ${policy.mode} policy.`,
+      lastUpdatedAt: acceptedAt,
+    };
+  }
+  return output;
+}
+
+function evaluateCandidateReviewProbation(args: {
+  reviews: CandidateExpansionReview[];
+  activeCandidates: EventCandidate[];
+  mappings: DirectAssetMapping[];
+  backtests: EventBacktestRow[];
+  policy: UniverseExpansionPolicy;
+}): CandidateExpansionReview[] {
+  const activeThemeIds = new Set(args.activeCandidates.flatMap((candidate) => findMatchingThemes(candidate).map((theme) => theme.id)));
+  return args.reviews.map((review) => {
+    if (review.status !== 'accepted' || !review.autoApproved) return review;
+    if (!activeThemeIds.has(review.themeId)) return review;
+
+    const hasMapping = args.mappings.some((mapping) =>
+      mapping.themeId === review.themeId
+      && normalize(mapping.symbol) === normalize(review.symbol)
+      && mapping.direction === review.direction,
+    );
+    const hasBacktest = args.backtests.some((row) =>
+      row.themeId === review.themeId
+      && normalize(row.symbol) === normalize(review.symbol)
+      && row.direction === review.direction,
+    );
+    const hit = hasMapping || hasBacktest;
+    const nextCycles = review.probationCycles + 1;
+    const nextHits = review.probationHits + (hit ? 1 : 0);
+    const nextMisses = review.probationMisses + (hit ? 0 : 1);
+    const next: CandidateExpansionReview = {
+      ...review,
+      probationCycles: nextCycles,
+      probationHits: nextHits,
+      probationMisses: nextMisses,
+      lastUpdatedAt: nowIso(),
+    };
+
+    if (!hit && nextMisses >= args.policy.autoDemoteMisses) {
+      return {
+        ...next,
+        status: 'open',
+        autoApproved: false,
+        probationStatus: 'demoted',
+        autoApprovalMode: review.autoApprovalMode || args.policy.mode,
+        reason: `${review.reason} Auto-demoted after ${nextMisses} probation misses.`,
+      };
+    }
+    if (hit && nextCycles >= args.policy.probationCycles) {
+      return {
+        ...next,
+        probationStatus: 'graduated',
+      };
+    }
+    return {
+      ...next,
+      probationStatus: 'active',
+    };
+  });
+}
+
+function buildCoverageGaps(args: {
+  candidates: EventCandidate[];
+  reviews: CandidateExpansionReview[];
+}): UniverseCoverageGap[] {
+  const gaps = new Map<string, UniverseCoverageGap>();
+
+  for (const candidate of args.candidates) {
+    const themes = findMatchingThemes(candidate);
+    for (const theme of themes) {
+      const effectiveAssets = getEffectiveThemeAssets(theme);
+      const effectiveKinds = new Set<InvestmentAssetKind>(effectiveAssets.map((asset) => asset.assetKind));
+      const effectiveSectors = new Set<string>(effectiveAssets.map((asset) => asset.sector));
+      const catalogAssets = UNIVERSE_ASSET_CATALOG.filter((asset) => asset.themeIds.includes(theme.id));
+      const availableKinds = new Set<InvestmentAssetKind>([...theme.assets, ...catalogAssets].map((asset) => asset.assetKind));
+      const availableSectors = new Set<string>([...theme.sectors, ...catalogAssets.map((asset) => asset.sector)]);
+      const missingAssetKinds = Array.from(availableKinds).filter((kind) => !effectiveKinds.has(kind));
+      const missingSectors = Array.from(availableSectors).filter((sector) => !effectiveSectors.has(sector));
+      const suggestedSymbols = args.reviews
+        .filter((review) => review.themeId === theme.id && review.status === 'open')
+        .map((review) => review.symbol)
+        .slice(0, 5);
+
+      if (!missingAssetKinds.length && !missingSectors.length && effectiveAssets.length >= Math.min(3, theme.assets.length)) {
+        continue;
+      }
+
+      const severity: UniverseCoverageGap['severity'] =
+        effectiveAssets.length < 2 || missingAssetKinds.length >= 2 || missingSectors.length >= 2
+          ? 'critical'
+          : missingAssetKinds.length > 0 || missingSectors.length > 0
+            ? 'elevated'
+            : 'watch';
+
+      gaps.set(`${theme.id}::${candidate.region}`, {
+        id: `${theme.id}::${candidate.region}`,
+        themeId: theme.id,
+        themeLabel: theme.label,
+        region: candidate.region,
+        severity,
+        reason: `${theme.label} lacks full cross-sector coverage for ${candidate.region}.`,
+        missingAssetKinds,
+        missingSectors,
+        suggestedSymbols,
+      });
+    }
+  }
+
+  return Array.from(gaps.values())
+    .sort((a, b) => {
+      const severityRank = (value: UniverseCoverageGap['severity']): number => (value === 'critical' ? 0 : value === 'elevated' ? 1 : 2);
+      return severityRank(a.severity) - severityRank(b.severity) || a.themeLabel.localeCompare(b.themeLabel);
+    })
+    .slice(0, 24);
+}
+
+function buildUniverseCoverageSummary(args: {
+  candidates: EventCandidate[];
+  mappings: DirectAssetMapping[];
+  reviews: CandidateExpansionReview[];
+  gaps: UniverseCoverageGap[];
+}): UniverseCoverageSummary {
+  const activeThemeIds = Array.from(new Set(args.candidates.flatMap((candidate) => findMatchingThemes(candidate).map((theme) => theme.id))));
+  const activeAssets = dedupeThemeAssets(activeThemeIds.flatMap((themeId) => {
+    const theme = getThemeRule(themeId);
+    return theme ? getEffectiveThemeAssets(theme) : [];
+  }));
+
+  return {
+    totalCatalogAssets: UNIVERSE_ASSET_CATALOG.length,
+    activeAssetKinds: Array.from(new Set(activeAssets.map((asset) => asset.assetKind))).sort(),
+    activeSectors: Array.from(new Set(activeAssets.map((asset) => asset.sector))).sort(),
+    directMappingCount: args.mappings.length,
+    dynamicApprovedCount: args.reviews.filter((review) => review.status === 'accepted').length,
+    openReviewCount: args.reviews.filter((review) => review.status === 'open').length,
+    gapCount: args.gaps.length,
+    uncoveredThemeCount: Array.from(new Set(args.gaps.map((gap) => gap.themeId))).length,
+  };
+}
+
 function updateMappingStatEma(previous: number, nextValue: number): number {
   return Number(((1 - RETURN_EMA_ALPHA) * previous + RETURN_EMA_ALPHA * nextValue).toFixed(2));
 }
@@ -1036,7 +1592,7 @@ function buildDirectMappings(args: {
     if (!themes.length) continue;
 
     for (const theme of themes) {
-      for (const asset of theme.assets) {
+      for (const asset of getEffectiveThemeAssets(theme)) {
         const market = marketMap.get(asset.symbol);
         const marketMovePct = market?.change ?? null;
         const learned = getMappingStats(theme.id, asset.symbol, asset.direction);
@@ -1867,9 +2423,19 @@ export async function recomputeInvestmentIntelligence(args: {
   const baseIdeaCards = buildIdeaCards(mappings, analogs);
   const tracked = updateMappingPerformanceStats(updateTrackedIdeas(baseIdeaCards, args.markets, timestamp));
   const backtests = buildEventBacktests(tracked);
+  const reviews = evaluateCandidateReviewProbation({
+    reviews: applyUniverseExpansionPolicy(buildCandidateExpansionReviews({ candidates: kept, markets: args.markets }), universeExpansionPolicy),
+    activeCandidates: kept,
+    mappings,
+    backtests,
+    policy: universeExpansionPolicy,
+  });
+  candidateReviews = new Map(reviews.map((review) => [review.id, review] as const));
   const sensitivity = buildSensitivityRows(mappings, backtests, tracked);
   const ideaCards = enrichIdeaCards(baseIdeaCards, tracked, backtests);
   const workflow = buildWorkflow({ falsePositive, mappings, ideaCards, analogs, sensitivity, trackedIdeas: tracked, backtests });
+  const coverageGaps = buildCoverageGaps({ candidates: kept, reviews });
+  const universeCoverage = buildUniverseCoverageSummary({ candidates: kept, mappings, reviews, gaps: coverageGaps });
   const topThemes = Array.from(new Set(ideaCards.map((card) => card.title))).slice(0, 8);
   const openTracked = tracked.filter((idea) => idea.status === 'open').length;
   const closedTracked = tracked.filter((idea) => idea.status === 'closed').length;
@@ -1888,10 +2454,16 @@ export async function recomputeInvestmentIntelligence(args: {
     ideaCards,
     trackedIdeas: tracked,
     falsePositive,
+    universePolicy: universeExpansionPolicy,
+    universeCoverage,
+    coverageGaps,
+    candidateReviews: reviews,
     summaryLines: [
       `${ideaCards.length} idea cards generated across ${sensitivity.length} sector channels.`,
       `${mappings.length} direct stock or ETF mappings survived ${falsePositive.rejected} false-positive rejects.`,
       `${backtests.length} price-based backtest rows, ${openTracked} open tracked ideas, ${closedTracked} closed samples, and ${learnedMappings} learned mapping priors available.`,
+      `${universeCoverage.dynamicApprovedCount} approved expansion candidates, ${universeCoverage.openReviewCount} open review items, and ${universeCoverage.gapCount} current coverage gaps tracked.`,
+      `Universe policy=${universeExpansionPolicy.mode} threshold=${universeExpansionPolicy.minCodexConfidence} requireMarketData=${universeExpansionPolicy.requireMarketData ? 'yes' : 'no'}.`,
       `${analogs.length} analog checkpoints and ${workflow.filter((step) => step.status === 'ready').length} ready workflow stages available.`,
       `Regime=${args.transmission?.regime?.label || 'unknown'} confidence=${args.transmission?.regime?.confidence ?? 0}.`,
     ],
@@ -1914,6 +2486,213 @@ export async function recomputeInvestmentIntelligence(args: {
 export async function getInvestmentIntelligenceSnapshot(): Promise<InvestmentIntelligenceSnapshot | null> {
   await ensureLoaded();
   return currentSnapshot;
+}
+
+export async function getUniverseExpansionPolicy(): Promise<UniverseExpansionPolicy> {
+  await ensureLoaded();
+  return { ...universeExpansionPolicy };
+}
+
+export async function setUniverseExpansionPolicyMode(mode: UniverseExpansionMode): Promise<UniverseExpansionPolicy> {
+  await ensureLoaded();
+  universeExpansionPolicy = normalizeUniverseExpansionPolicy({
+    ...universeExpansionPolicy,
+    mode,
+  });
+  if (currentSnapshot) {
+    currentSnapshot = {
+      ...currentSnapshot,
+      universePolicy: { ...universeExpansionPolicy },
+    };
+  }
+  await persist();
+  return { ...universeExpansionPolicy };
+}
+
+function syncSnapshotReviewState(): void {
+  if (!currentSnapshot) return;
+  const reviews = Array.from(candidateReviews.values())
+    .sort((a, b) => {
+      const statusRank = (value: CandidateExpansionReview['status']): number => (value === 'open' ? 0 : value === 'accepted' ? 1 : 2);
+      return statusRank(a.status) - statusRank(b.status)
+        || b.confidence - a.confidence
+        || Date.parse(b.lastUpdatedAt) - Date.parse(a.lastUpdatedAt);
+    })
+    .slice(0, MAX_CANDIDATE_REVIEWS);
+  currentSnapshot = {
+    ...currentSnapshot,
+    universePolicy: { ...universeExpansionPolicy },
+    candidateReviews: reviews,
+    universeCoverage: {
+      ...currentSnapshot.universeCoverage,
+      dynamicApprovedCount: reviews.filter((review) => review.status === 'accepted').length,
+      openReviewCount: reviews.filter((review) => review.status === 'open').length,
+    },
+    summaryLines: [
+      ...currentSnapshot.summaryLines.filter((line) =>
+        !/^\d+ approved expansion candidates, /i.test(line)
+        && !/^Universe policy=/i.test(line),
+      ),
+      `${reviews.filter((review) => review.status === 'accepted').length} approved expansion candidates, ${reviews.filter((review) => review.status === 'open').length} open review items, and ${currentSnapshot.coverageGaps.length} current coverage gaps tracked.`,
+      `Universe policy=${universeExpansionPolicy.mode} threshold=${universeExpansionPolicy.minCodexConfidence} requireMarketData=${universeExpansionPolicy.requireMarketData ? 'yes' : 'no'}.`,
+    ],
+  };
+}
+
+export async function listCandidateExpansionReviews(limit = 48): Promise<CandidateExpansionReview[]> {
+  await ensureLoaded();
+  return Array.from(candidateReviews.values())
+    .sort((a, b) => {
+      const statusRank = (value: CandidateExpansionReview['status']): number => (value === 'open' ? 0 : value === 'accepted' ? 1 : 2);
+      return statusRank(a.status) - statusRank(b.status)
+        || b.confidence - a.confidence
+        || Date.parse(b.lastUpdatedAt) - Date.parse(a.lastUpdatedAt);
+    })
+    .slice(0, Math.max(1, limit))
+    .map((review) => ({ ...review, supportingSignals: review.supportingSignals.slice() }));
+}
+
+export async function setCandidateExpansionReviewStatus(
+  reviewId: string,
+  status: CandidateExpansionReview['status'],
+): Promise<CandidateExpansionReview | null> {
+  await ensureLoaded();
+  const existing = candidateReviews.get(reviewId);
+  if (!existing) return null;
+  const next: CandidateExpansionReview = {
+    ...existing,
+    status,
+    autoApproved: status === 'accepted' ? false : existing.autoApproved,
+    autoApprovalMode: status === 'accepted' ? null : existing.autoApprovalMode,
+    acceptedAt: status === 'accepted' ? nowIso() : existing.acceptedAt || null,
+    probationStatus: status === 'accepted' ? 'n/a' : existing.probationStatus,
+    probationCycles: status === 'accepted' ? 0 : existing.probationCycles,
+    probationHits: status === 'accepted' ? 0 : existing.probationHits,
+    probationMisses: status === 'accepted' ? 0 : existing.probationMisses,
+    lastUpdatedAt: nowIso(),
+  };
+  candidateReviews.set(reviewId, next);
+  syncSnapshotReviewState();
+  await persist();
+  return { ...next, supportingSignals: next.supportingSignals.slice() };
+}
+
+interface LocalCodexCandidateProposal {
+  symbol: string;
+  assetName?: string;
+  assetKind?: InvestmentAssetKind;
+  sector?: string;
+  commodity?: string | null;
+  direction?: InvestmentDirection;
+  role?: ThemeAssetDefinition['role'];
+  confidence?: number;
+  reason?: string;
+  supportingSignals?: string[];
+}
+
+interface LocalCodexCandidateExpansionResponse {
+  proposals?: LocalCodexCandidateProposal[];
+}
+
+export async function requestCodexCandidateExpansion(themeId: string): Promise<CandidateExpansionReview[]> {
+  await ensureLoaded();
+  const theme = getThemeRule(themeId);
+  if (!theme || !currentSnapshot) return [];
+
+  const themeMappings = currentSnapshot.directMappings
+    .filter((mapping) => mapping.themeId === themeId)
+    .slice(0, 8)
+    .map((mapping) => ({
+      symbol: mapping.symbol,
+      assetName: mapping.assetName,
+      assetKind: mapping.assetKind,
+      sector: mapping.sector,
+      commodity: mapping.commodity,
+      direction: mapping.direction,
+      role: mapping.role,
+      conviction: mapping.conviction,
+      falsePositiveRisk: mapping.falsePositiveRisk,
+      transferEntropy: mapping.transferEntropy ?? 0,
+    }));
+  const watchlist = getMarketWatchlistEntries().slice(0, 20);
+  const response = await fetch('/api/local-codex-candidate-expansion', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      themeId: theme.id,
+      themeLabel: theme.label,
+      thesis: theme.thesis,
+      timeframe: theme.timeframe,
+      triggers: theme.triggers.slice(0, 12),
+      sectors: theme.sectors,
+      commodities: theme.commodities,
+      invalidation: theme.invalidation,
+      topMappings: themeMappings,
+      watchlist,
+      existingSymbols: getEffectiveThemeAssets(theme).map((asset) => asset.symbol),
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Codex candidate expansion failed: ${response.status}`);
+  }
+  const payload = await response.json() as LocalCodexCandidateExpansionResponse;
+  const proposals = Array.isArray(payload.proposals) ? payload.proposals : [];
+  const existingAssets = new Set(getEffectiveThemeAssets(theme).map(themeAssetKey));
+  const inserted: CandidateExpansionReview[] = [];
+
+  for (const proposal of proposals.slice(0, 10)) {
+    const symbol = String(proposal.symbol || '').trim().toUpperCase();
+    if (!symbol) continue;
+    const direction = proposal.direction || 'watch';
+    const role = proposal.role || (direction === 'hedge' ? 'hedge' : 'confirm');
+    const assetKind = proposal.assetKind || 'equity';
+    const asset: ThemeAssetDefinition = {
+      symbol,
+      name: String(proposal.assetName || symbol).trim() || symbol,
+      assetKind,
+      sector: String(proposal.sector || theme.sectors[0] || 'cross-asset').trim() || 'cross-asset',
+      commodity: proposal.commodity || undefined,
+      direction,
+      role,
+    };
+    if (existingAssets.has(themeAssetKey(asset))) continue;
+    const reviewId = candidateReviewId(theme.id, symbol, direction, role);
+    const previous = candidateReviews.get(reviewId);
+    const next: CandidateExpansionReview = {
+      id: reviewId,
+      themeId: theme.id,
+      themeLabel: theme.label,
+      symbol,
+      assetName: asset.name,
+      assetKind,
+      sector: asset.sector,
+      commodity: proposal.commodity || null,
+      direction,
+      role,
+      confidence: clamp(Math.round(Number(proposal.confidence) || 62), 25, 95),
+      source: 'codex',
+      status: previous?.status || 'open',
+      reason: String(proposal.reason || `Codex proposed ${symbol} as an additional ${theme.label} candidate.`).slice(0, 280),
+      supportingSignals: Array.isArray(proposal.supportingSignals)
+        ? proposal.supportingSignals.map((signal) => String(signal).slice(0, 140)).filter(Boolean).slice(0, 8)
+        : [`Theme=${theme.label}`, 'Codex review proposal'],
+      requiresMarketData: !currentSnapshot.directMappings.some((mapping) => mapping.symbol === symbol),
+      autoApproved: previous?.autoApproved || false,
+      autoApprovalMode: previous?.autoApprovalMode || null,
+      acceptedAt: previous?.acceptedAt || null,
+      probationStatus: previous?.probationStatus || 'n/a',
+      probationCycles: previous?.probationCycles || 0,
+      probationHits: previous?.probationHits || 0,
+      probationMisses: previous?.probationMisses || 0,
+      lastUpdatedAt: nowIso(),
+    };
+    candidateReviews.set(reviewId, next);
+    inserted.push({ ...next, supportingSignals: next.supportingSignals.slice() });
+  }
+
+  syncSnapshotReviewState();
+  await persist();
+  return inserted;
 }
 
 export async function listMappingPerformanceStats(limit = 160): Promise<MappingPerformanceStats[]> {
@@ -1956,6 +2735,22 @@ export async function exportInvestmentLearningState(): Promise<InvestmentLearnin
         ...currentSnapshot.falsePositive,
         reasons: currentSnapshot.falsePositive.reasons.map((reason) => ({ ...reason })),
       },
+      universePolicy: { ...currentSnapshot.universePolicy },
+      universeCoverage: {
+        ...currentSnapshot.universeCoverage,
+        activeAssetKinds: currentSnapshot.universeCoverage.activeAssetKinds.slice(),
+        activeSectors: currentSnapshot.universeCoverage.activeSectors.slice(),
+      },
+      coverageGaps: currentSnapshot.coverageGaps.map((gap) => ({
+        ...gap,
+        missingAssetKinds: gap.missingAssetKinds.slice(),
+        missingSectors: gap.missingSectors.slice(),
+        suggestedSymbols: gap.suggestedSymbols.slice(),
+      })),
+      candidateReviews: currentSnapshot.candidateReviews.map((review) => ({
+        ...review,
+        supportingSignals: review.supportingSignals.slice(),
+      })),
       summaryLines: currentSnapshot.summaryLines.slice(),
     } : null,
     history: currentHistory.map((entry) => ({ ...entry, themes: entry.themes.slice(), regions: entry.regions.slice(), symbols: entry.symbols.slice() })),
@@ -1973,12 +2768,18 @@ export async function exportInvestmentLearningState(): Promise<InvestmentLearnin
       matrixA: entry.matrixA.map((row) => row.slice()),
       vectorB: entry.vectorB.slice(),
     })),
+    candidateReviews: Array.from(candidateReviews.values()).map((review) => ({
+      ...review,
+      supportingSignals: review.supportingSignals.slice(),
+    })),
   };
 }
 
 export async function resetInvestmentLearningState(seed?: Partial<InvestmentLearningState>): Promise<void> {
   await ensureLoaded();
   currentSnapshot = seed?.snapshot ?? null;
+  currentSnapshot = normalizeInvestmentSnapshot(currentSnapshot);
+  universeExpansionPolicy = normalizeUniverseExpansionPolicy(currentSnapshot?.universePolicy || universeExpansionPolicy);
   currentHistory = (seed?.history ?? []).map((entry) => ({
     ...entry,
     themes: entry.themes.slice(),
@@ -2000,5 +2801,9 @@ export async function resetInvestmentLearningState(seed?: Partial<InvestmentLear
     matrixA: entry.matrixA.map((row) => row.slice()),
     vectorB: entry.vectorB.slice(),
   }] as const));
+  candidateReviews = new Map((seed?.candidateReviews ?? []).map((review) => {
+    const normalized = normalizeCandidateReview(review);
+    return [normalized.id, normalized] as const;
+  }));
   await persist();
 }

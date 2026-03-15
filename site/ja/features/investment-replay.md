@@ -32,6 +32,9 @@ owner: core
 - サイズ調整と false-positive ガードレール
 - replay / walk-forward 実行サマリー
 - Backtest Lab の可視化と意思決定比較
+- coverage-aware universe の要約、review queue、gap 追跡
+- 承認された動的候補が次の refresh とその後のバックテストに参加
+- manual / guarded-auto / full-auto の universe policy モード
 
 ## 主な UI 面
 
@@ -39,6 +42,7 @@ owner: core
 - Auto Investment Ideas
 - Backtest Lab
 - Transmission Sankey / Network
+- Coverage-aware universe review queue
 
 ## 関連アルゴリズム
 
@@ -47,6 +51,10 @@ owner: core
 - Kalman スタイル adaptive weighting
 - Hawkes intensity, transfer entropy, bandits
 - historical replay と warm-up handling
+- coverage-aware candidate retrieval
+- core と approved expansion 資産を合わせて評価する deterministic ranking
+- Codex-assisted candidate expansion review queue
+- guarded auto-approval と probation / auto-demotion
 
 ## 制限
 

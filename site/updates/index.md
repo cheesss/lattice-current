@@ -12,4 +12,5 @@ owner: core
 
 # Updates
 
+- [2026-03: Coverage-aware universe and candidate expansion review](/updates/2026-03-coverage-aware-universe)
 - [2026-03: GitHub Pages docs launch and publication policy](/updates/2026-03-docs-launch)

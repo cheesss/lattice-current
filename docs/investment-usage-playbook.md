@@ -54,6 +54,35 @@ This system is not an auto-trader. Use it as a structured decision-support termi
   - Stress Test
   - Size
   - Monitor
+- The workflow now also surfaces:
+  - coverage-aware universe status
+  - current theme/region coverage gaps
+  - candidate expansion review queue
+  - Codex-assisted candidate proposals
+  - universe policy mode: `manual`, `guarded-auto`, `full-auto`
+
+### Coverage-aware universe and candidate expansion
+
+- The engine now distinguishes between:
+  - core universe assets
+  - approved dynamic expansions
+  - open review candidates
+- Approved candidates do not hot-patch the current idea list immediately.
+- They become active on the next intelligence refresh, then participate in:
+  - direct event-to-asset mappings
+  - idea cards
+  - tracked ideas
+  - replay / walk-forward backtests
+- Default recommendation:
+  - `guarded-auto`
+  - Codex proposals can auto-approve only when the confidence threshold is met and market data exists
+- `full-auto` exists, but it should be treated as an aggressive research mode rather than a default production mode
+- Use the queue like this:
+  1. Find a coverage gap.
+  2. Review proposed candidates.
+  3. Approve only liquid, understandable instruments.
+  4. Re-run or wait for the next intelligence refresh.
+  5. Check whether the new candidate actually improves backtest rows.
 
 ### Auto Investment Ideas
 
@@ -101,7 +130,10 @@ This system is not an auto-trader. Use it as a structured decision-support termi
 - Mapping stats improve only as closed ideas accumulate.
 - Source posterior still uses proxy truth, not perfect ground-truth labeling.
 - Historical walk-forward is implemented, but historical backfill/import is not complete yet.
-- Regime-aware weighting is not implemented yet.
+- Dynamic universe coverage reduces blind spots, but it still cannot guarantee perfect asset-class coverage.
+- Codex-assisted candidate expansion is a review loop, not an auto-execution path.
+- Approved expansions only become live on the next refresh, so they should be treated as queued universe changes.
+- Auto-approved candidates now run through a probation window and can be auto-demoted if they repeatedly fail to produce useful mappings.
 
 ## Recommended next operating step
 
