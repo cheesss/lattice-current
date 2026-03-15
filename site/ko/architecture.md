@@ -13,7 +13,7 @@ owner: core
 # 아키텍처
 
 <p class="lc-section-caption">
-아래 아키텍처 스택은 인터랙티브합니다. 레이어를 클릭하면 실행 경계, 핵심 노드, 주요 흐름, 관련 문서를 함께 볼 수 있습니다.
+아래 아키텍처 스택은 인터랙티브합니다. 레이어를 클릭하면 실행 경계뿐 아니라 소유 노드, 책임, 상태 경계, 보안 경계까지 함께 볼 수 있습니다.
 </p>
 
 <ScrollSignalStory locale="ko" />
@@ -34,6 +34,7 @@ owner: core
 - [데스크톱 런타임](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)
 - [과거 데이터 소스](https://github.com/cheesss/lattice-current/blob/main/docs/historical-data-sources.md)
 - [인텔리전스 서버 스키마](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
+- [서비스 서버 준비 계획](https://github.com/cheesss/lattice-current/blob/main/docs/service-server-plan.md)
 
 ## 공개 경계
 

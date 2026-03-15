@@ -13,7 +13,7 @@ owner: core
 # Architecture
 
 <p class="lc-section-caption">
-The architecture stack below is interactive. Click a layer to see its runtime boundary, the major nodes it owns, the flows it serves, and the docs that explain it in more depth.
+The architecture stack below is interactive. Click a layer to inspect its runtime boundary, owned nodes, responsibilities, state boundary, and security boundary.
 </p>
 
 <ScrollSignalStory locale="en" />
@@ -34,6 +34,7 @@ The architecture stack below is interactive. Click a layer to see its runtime bo
 - [Desktop runtime](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)
 - [Historical data sources](https://github.com/cheesss/lattice-current/blob/main/docs/historical-data-sources.md)
 - [Intelligence server schema](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
+- [Service server plan](https://github.com/cheesss/lattice-current/blob/main/docs/service-server-plan.md)
 
 ## Public boundary
 

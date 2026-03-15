@@ -13,7 +13,7 @@ owner: core
 # アーキテクチャ
 
 <p class="lc-section-caption">
-下のアーキテクチャスタックはインタラクティブです。レイヤーをクリックすると、実行境界、主要ノード、主なフロー、関連文書をまとめて確認できます。
+下のアーキテクチャスタックはインタラクティブです。レイヤーをクリックすると、実行境界だけでなく所有ノード、責務、状態境界、セキュリティ境界まで確認できます。
 </p>
 
 <ScrollSignalStory locale="ja" />
@@ -34,6 +34,7 @@ owner: core
 - [デスクトップ runtime](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)
 - [過去データソース](https://github.com/cheesss/lattice-current/blob/main/docs/historical-data-sources.md)
 - [インテリジェンスサーバースキーマ](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
+- [サービス公開準備計画](https://github.com/cheesss/lattice-current/blob/main/docs/service-server-plan.md)
 
 ## 公開境界
 
