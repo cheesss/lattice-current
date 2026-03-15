@@ -8,6 +8,7 @@ import ScrollSignalStory from './components/ScrollSignalStory.vue';
 import SystemTopology from './components/SystemTopology.vue';
 import AudienceWorkbench from './components/AudienceWorkbench.vue';
 import InteractivePlayground from './components/InteractivePlayground.vue';
+import OperationsConsoleDemo from './components/OperationsConsoleDemo.vue';
 
 const theme: Theme = {
   ...DefaultTheme,
@@ -20,6 +21,7 @@ const theme: Theme = {
     app.component('SystemTopology', SystemTopology);
     app.component('AudienceWorkbench', AudienceWorkbench);
     app.component('InteractivePlayground', InteractivePlayground);
+    app.component('OperationsConsoleDemo', OperationsConsoleDemo);
   }
 };
 

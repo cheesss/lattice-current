@@ -13,10 +13,8 @@ owner: core
 # 기능
 
 <p class="lc-section-caption">
-이 페이지는 플레이그라운드 다음 단계입니다. 긴 설명 대신 capability map과 연결 구조를 빠르게 파악하도록 구성했습니다.
+이 페이지는 플레이그라운드 다음 단계입니다. 전체 콘솔 데모를 반복하지 않고 capability map과 연결 구조를 빠르게 파악하도록 구성했습니다.
 </p>
-
-<InteractivePlayground locale="ko" />
 
 <CapabilityConstellation locale="ko" />
 

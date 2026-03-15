@@ -13,10 +13,8 @@ owner: core
 # Features
 
 <p class="lc-section-caption">
-Use this page after the playground. It maps capabilities to neighboring systems and deeper docs without forcing you through long static descriptions.
+Use this page after the playground. It maps capabilities to neighboring systems and deeper docs without repeating the full console demo.
 </p>
-
-<InteractivePlayground locale="en" />
 
 <CapabilityConstellation locale="en" />
 

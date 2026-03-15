@@ -13,10 +13,8 @@ owner: core
 # 機能
 
 <p class="lc-section-caption">
-このページは Playground の次の段階です。長い説明よりも capability map と接続関係を短く追える構成にしています。
+このページは Playground の次の段階です。console demo を繰り返さず、capability map と接続関係を短く追える構成にしています。
 </p>
-
-<InteractivePlayground locale="ja" />
 
 <CapabilityConstellation locale="ja" />
 

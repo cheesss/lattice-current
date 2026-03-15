@@ -38,14 +38,9 @@ features:
     details: Historical replay, walk-forward validation, and investment idea tracking turn live monitoring into testable workflows.
 ---
 
-## Start with the shortest path
+## Start here
 
-If you only want one fast way in:
-
-1. Open the interactive playground.
-2. Click a mock live event.
-3. Follow its transmission path.
-4. Compare it against a replay case.
+If you only make one click, open the operations console below. It is the shortest route to understanding what this product does.
 
 <div class="lc-home-signalbar">
   <div class="lc-home-signalbar-item">
@@ -57,46 +52,12 @@ If you only want one fast way in:
     <strong>Signal -> Score -> Connect -> Replay</strong>
   </div>
   <div class="lc-home-signalbar-item">
-    <span>Public surfaces</span>
-    <strong>Docs, replay, architecture, API</strong>
+    <span>Best entry</span>
+    <strong>Map -> Hub -> Replay -> Scenario</strong>
   </div>
 </div>
 
-<div class="lc-overview-grid">
-  <div class="lc-overview-card">
-    <h3>Use the product model</h3>
-    <p>Click through a synthetic operator workflow instead of reading static paragraphs first.</p>
-  </div>
-  <div class="lc-overview-card">
-    <h3>See the internals</h3>
-    <p>Architecture, ontology, replay, and storage layers are exposed as interactive maps and drilldowns.</p>
-  </div>
-  <div class="lc-overview-card">
-    <h3>Move deeper only when needed</h3>
-    <p>Start with the playground, then open features, architecture, or AI/backtesting references as needed.</p>
-  </div>
-</div>
-
-<div class="lc-home-section-grid">
-  <div class="lc-home-section-card">
-    <h3>Best first click</h3>
-    <p>The playground is now the main entry point for new visitors. It simulates live feed review, transmission mapping, replay analysis, and macro what-if controls with safe mock data.</p>
-  </div>
-  <div class="lc-home-section-card alt">
-    <h3>Then branch out</h3>
-    <p>Use Features for capability overviews, Architecture for runtime ownership, and AI & Backtesting for model and replay logic.</p>
-  </div>
-</div>
-
-<InteractivePlayground locale="en" />
-
-<AudienceWorkbench locale="en" />
-
-<DecisionLoop locale="en" />
-
-<CapabilityConstellation locale="en" />
-
-<SystemTopology locale="en" />
+<OperationsConsoleDemo locale="en" />
 
 ## Fork position
 
@@ -108,38 +69,26 @@ This is an independent public research fork. It does not claim to be the officia
 - **Tech**: AI, startups, cloud, cyber, supply-chain and ecosystem monitoring
 - **Finance**: cross-asset, macro, central-bank, transmission, replay, and investment workflows
 
-## Explore the system visually
+## Explore only what you need
 
 <div class="lc-home-route-grid">
   <div class="lc-home-route-card">
     <span class="lc-route-kicker">Hands-on path</span>
-    <h3>Playground -> features</h3>
-    <p>Try the mock interface first, then move into feature docs once you know which path matters to you.</p>
+    <h3>Operations console -> features</h3>
+    <p>Start with the clickable map and hub stack, then move into feature docs only after you know which surface matters.</p>
     <a href="/playground">Open playground</a>
   </div>
   <div class="lc-home-route-card">
-    <span class="lc-route-kicker">Operational path</span>
-    <h3>Live monitoring -> transmission</h3>
-    <p>Start with live intelligence, then pivot into the transmission model when a theme begins to spill into sectors or assets.</p>
-    <a href="/features/live-intelligence">Open live intelligence docs</a>
-  </div>
-  <div class="lc-home-route-card">
-    <span class="lc-route-kicker">Research path</span>
-    <h3>Ontology -> AI analysis</h3>
-    <p>Use graph state and evidence-first AI notes to understand what a cluster actually means before acting on it.</p>
-    <a href="/ai-backtesting/">Open AI and backtesting docs</a>
-  </div>
-  <div class="lc-home-route-card">
-    <span class="lc-route-kicker">Validation path</span>
-    <h3>Replay -> backtest -> priors</h3>
-    <p>Historical replay and walk-forward runs measure whether decision logic survives point-in-time conditions.</p>
-    <a href="/features/investment-replay">Open investment and replay docs</a>
-  </div>
-  <div class="lc-home-route-card">
-    <span class="lc-route-kicker">Builder path</span>
-    <h3>Architecture -> API -> public sync</h3>
-    <p>Developers can trace runtime layers, public interfaces, and the internal-to-public publication workflow.</p>
+    <span class="lc-route-kicker">System path</span>
+    <h3>Architecture -> runtime ownership</h3>
+    <p>Open the topology only when you need to know where a layer runs, what it owns, and how storage and replay fit together.</p>
     <a href="/architecture">Open architecture docs</a>
+  </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Model path</span>
+    <h3>AI and backtesting</h3>
+    <p>Use the model and replay docs when you need the reasoning behind the scores, priors, and validation loop.</p>
+    <a href="/ai-backtesting/">Open AI and backtesting docs</a>
   </div>
 </div>
 
@@ -147,17 +96,6 @@ This is an independent public research fork. It does not claim to be the officia
 
 <div class="policy-callout">
 Public docs intentionally describe product behavior, architecture, and algorithms while omitting or sanitizing sensitive operating details, private feeds, credentials, and internal-only workflows.
-</div>
-
-<div class="lc-home-cta-slab">
-  <h2>Use this site as a live system map, not only a README</h2>
-  <p>The shortest route is now: playground first, feature map second, architecture topology third. Deeper reference pages remain available when you need implementation detail.</p>
-  <div class="lc-link-row">
-    <a class="lc-link-pill" href="/playground">Open playground</a>
-    <a class="lc-link-pill" href="/features/">Browse features</a>
-    <a class="lc-link-pill" href="/architecture">Open topology</a>
-    <a class="lc-link-pill" href="/ai-backtesting/">Review replay logic</a>
-  </div>
 </div>
 
 ## Start here

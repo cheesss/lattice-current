@@ -1,6 +1,6 @@
 ﻿---
-title: Playground
-summary: Interactive mock console for live flows, transmission, replay, and what-if scenarios.
+title: Operations Console
+summary: Click through a realistic mock map, hub stack, replay flow, and scenario console.
 status: beta
 variants:
   - full
@@ -10,20 +10,20 @@ updated: 2026-03-15
 owner: core
 ---
 
-# Playground
+# Operations Console
 
 <p class="lc-section-caption">
-This page is intentionally hands-on. Everything below runs on mock data so visitors can click through product behavior without needing a live backend.
+This page is intentionally hands-on. Everything below runs on mock data so visitors can click a realistic mission map, switch internal hubs, open replay steps, and move scenario controls without needing a live backend.
 </p>
 
-<InteractivePlayground locale="en" />
+<OperationsConsoleDemo locale="en" />
 
 ## What this demonstrates
 
-- live event selection and operator summary
-- event-to-theme-to-asset transmission inspection
-- replay-style decision review
-- scenario sliders for macro posture changes
+- 2D regional map with clickable hotspots and layer toggles
+- country relations, regional guidance, and recent event cards
+- hub switching across analysis, Codex, ontology, backtest, and resource views
+- replay steps and scenario controls that change the same region's posture
 
 ## Limits
 

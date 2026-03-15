@@ -40,10 +40,7 @@ features:
 
 ## 가장 빠른 시작 경로
 
-1. 플레이그라운드를 연다.
-2. 가상 실시간 이벤트를 하나 선택한다.
-3. 전이 경로를 따라간다.
-4. 리플레이 사례와 비교한다.
+설명을 길게 읽기보다 아래 오퍼레이션 콘솔을 먼저 눌러보는 것이 가장 빠릅니다.
 
 <div class="lc-home-signalbar">
   <div class="lc-home-signalbar-item">
@@ -55,46 +52,12 @@ features:
     <strong>Signal -> Score -> Connect -> Replay</strong>
   </div>
   <div class="lc-home-signalbar-item">
-    <span>공개 표면</span>
-    <strong>문서, 리플레이, 아키텍처, API</strong>
+    <span>첫 진입</span>
+    <strong>지도 -> 허브 -> 리플레이 -> 시나리오</strong>
   </div>
 </div>
 
-<div class="lc-overview-grid">
-  <div class="lc-overview-card">
-    <h3>라이브에서 의사결정까지</h3>
-    <p>신호는 수집, 점수화, 그래프 컨텍스트, 의사결정 지원, 리플레이까지 하나의 제품 표면 안에서 이어집니다.</p>
-  </div>
-  <div class="lc-overview-card">
-    <h3>설명 가능한 내부 구조</h3>
-    <p>핵심 계층을 정적인 문단이 아니라 클릭형 기능 맵과 아키텍처 스택으로 바로 이해할 수 있게 했습니다.</p>
-  </div>
-  <div class="lc-overview-card">
-    <h3>연결된 기능 탐색</h3>
-    <p>실시간 인텔리전스, 온톨로지, 전이, 리플레이, 리소스 프로파일링이 서로 어떻게 이어지는지 클릭하면서 볼 수 있습니다.</p>
-  </div>
-</div>
-
-<div class="lc-home-section-grid">
-  <div class="lc-home-section-card">
-    <h3>첫 진입점</h3>
-    <p>새 방문자는 먼저 플레이그라운드에서 가상 데이터 기반 operator workflow를 눌러보는 것이 가장 좋습니다.</p>
-  </div>
-  <div class="lc-home-section-card alt">
-    <h3>그 다음 경로</h3>
-    <p>기능 페이지에서 capability를 보고, 아키텍처에서 런타임 소유권을 보고, AI · 백테스트에서 내부 로직을 확인하면 됩니다.</p>
-  </div>
-</div>
-
-<InteractivePlayground locale="ko" />
-
-<AudienceWorkbench locale="ko" />
-
-<DecisionLoop locale="ko" />
-
-<CapabilityConstellation locale="ko" />
-
-<SystemTopology locale="ko" />
+<OperationsConsoleDemo locale="ko" />
 
 ## 포크 위치
 
@@ -106,38 +69,26 @@ features:
 - **Tech**: AI, 스타트업, 클라우드, 사이버, 공급망 및 생태계 모니터링
 - **Finance**: 크로스애셋, 매크로, 중앙은행, 전이 분석, 리플레이, 투자 워크플로우
 
-## 시각적으로 구조 파악하기
+## 필요한 경로만 바로 열기
 
 <div class="lc-home-route-grid">
   <div class="lc-home-route-card">
     <span class="lc-route-kicker">체험 경로</span>
-    <h3>플레이그라운드 -> 기능</h3>
-    <p>먼저 가상 인터페이스를 눌러보고, 그 다음 필요한 capability 문서로 들어가세요.</p>
+    <h3>오퍼레이션 콘솔 -> 기능</h3>
+    <p>클릭형 지도와 허브를 먼저 체험한 뒤, 필요한 capability 문서만 들어가면 됩니다.</p>
     <a href="/ko/playground">플레이그라운드 열기</a>
   </div>
   <div class="lc-home-route-card">
-    <span class="lc-route-kicker">운영 경로</span>
-    <h3>실시간 모니터링 -> 전이</h3>
-    <p>실시간 인텔리전스에서 시작해 테마가 섹터나 자산으로 번지기 시작하면 전이 모델로 바로 이동하세요.</p>
-    <a href="/ko/features/live-intelligence">실시간 인텔리전스 문서 열기</a>
-  </div>
-  <div class="lc-home-route-card">
-    <span class="lc-route-kicker">리서치 경로</span>
-    <h3>온톨로지 -> AI 분석</h3>
-    <p>그래프 상태와 근거 중심 AI 문서를 함께 보며 클러스터가 실제로 무엇을 의미하는지 파악합니다.</p>
-    <a href="/ko/ai-backtesting/">AI · 백테스트 문서 열기</a>
-  </div>
-  <div class="lc-home-route-card">
-    <span class="lc-route-kicker">검증 경로</span>
-    <h3>리플레이 -> 백테스트 -> prior</h3>
-    <p>히스토리컬 리플레이와 워크포워드 실행을 통해 의사결정 로직이 point-in-time 조건에서도 살아남는지 확인합니다.</p>
-    <a href="/ko/features/investment-replay">투자 · 리플레이 문서 열기</a>
-  </div>
-  <div class="lc-home-route-card">
-    <span class="lc-route-kicker">빌더 경로</span>
-    <h3>아키텍처 -> API -> 공개 동기화</h3>
-    <p>개발자는 런타임 계층, 공개 인터페이스, 내부 -> 공개 배포 흐름을 이 경로로 파악할 수 있습니다.</p>
+    <span class="lc-route-kicker">시스템 경로</span>
+    <h3>아키텍처 -> 런타임 소유권</h3>
+    <p>어떤 계층이 어디서 돌고, 무엇을 저장하며, 리플레이와 스토리지가 어떻게 이어지는지 볼 때만 토폴로지를 열면 됩니다.</p>
     <a href="/ko/architecture">아키텍처 문서 열기</a>
+  </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">모델 경로</span>
+    <h3>AI · 백테스트</h3>
+    <p>점수, prior, 검증 흐름의 근거가 필요할 때만 AI · 백테스트 문서로 내려가면 됩니다.</p>
+    <a href="/ko/ai-backtesting/">AI · 백테스트 문서 열기</a>
   </div>
 </div>
 
@@ -145,17 +96,6 @@ features:
 
 <div class="policy-callout">
 공개 문서는 제품 동작, 아키텍처, 알고리즘을 설명하지만 민감한 운영 세부, 비공개 피드, 자격 증명, 내부 전용 워크플로우는 제외하거나 정제합니다.
-</div>
-
-<div class="lc-home-cta-slab">
-  <h2>이 사이트를 README가 아니라 시스템 맵처럼 사용하세요</h2>
-  <p>가장 짧은 경로는 이제 플레이그라운드 -> 기능 맵 -> 아키텍처 토폴로지 순서입니다. 더 깊은 설명은 필요할 때만 내려가면 됩니다.</p>
-  <div class="lc-link-row">
-    <a class="lc-link-pill" href="/ko/playground">플레이그라운드 열기</a>
-    <a class="lc-link-pill" href="/ko/features/">기능 둘러보기</a>
-    <a class="lc-link-pill" href="/ko/architecture">토폴로지 열기</a>
-    <a class="lc-link-pill" href="/ko/ai-backtesting/">리플레이 로직 보기</a>
-  </div>
 </div>
 
 ## 여기서 시작
