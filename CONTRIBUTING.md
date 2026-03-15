@@ -151,6 +151,16 @@ See [API Dependencies](docs/DOCUMENTATION.md#api-dependencies) for the full list
    - add or update at least one feature page or update note in the docs site
    - keep README and public docs consistent for public-facing changes
 
+### Docs are part of the feature
+
+Any change that affects behavior, UX, architecture, algorithms, storage, replay or backtest behavior, or public policy must include matching updates to the docs site (`site/`) and/or reference docs (`docs/`).
+
+Minimum expectation:
+- update the relevant docs page
+- run `npm run docs:build`
+- for public-facing changes, run `npm run public:sync`
+- for significant changes, add or update an entry under `site/updates/`
+
 ### PR Title Convention
 
 Use a descriptive title that summarizes the change:
