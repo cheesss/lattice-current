@@ -23,6 +23,30 @@
   word-break: break-word;
 }
 
+.vp-doc p,
+.vp-doc li {
+  line-height: 1.8;
+}
+
+.vp-doc h1 + p,
+.vp-doc h2 + p {
+  max-width: 72ch;
+}
+
+.VPDoc .content {
+  font-size: 16px;
+}
+
+.VPDoc.has-sidebar .content-container,
+.VPDoc:not(.has-sidebar) .content-container {
+  max-width: 860px;
+}
+
+.vp-doc h2,
+.vp-doc h3 {
+  letter-spacing: -0.02em;
+}
+
 .VPHero .image img {
   border-radius: 18px;
   box-shadow: 0 24px 64px rgba(9, 18, 32, 0.28);
@@ -270,6 +294,12 @@
 
 .lc-home-route-card a {
   font-weight: 600;
+}
+
+.lc-playground-note {
+  margin: 14px 0 0;
+  color: var(--vp-c-text-2);
+  font-size: 14px;
 }
 
 .lc-home-cta-slab {

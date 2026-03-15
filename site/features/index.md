@@ -1,4 +1,4 @@
----
+﻿---
 title: Features
 summary: Product capability index across live monitoring, analysis, and replay.
 status: stable
@@ -13,8 +13,10 @@ owner: core
 # Features
 
 <p class="lc-section-caption">
-Each capability below is clickable. Use it to trace what the feature does, where it appears in the product, and which neighboring systems it depends on.
+Use this page after the playground. It maps capabilities to neighboring systems and deeper docs without forcing you through long static descriptions.
 </p>
+
+<InteractivePlayground locale="en" />
 
 <CapabilityConstellation locale="en" />
 
@@ -24,6 +26,7 @@ Each capability below is clickable. Use it to trace what the feature does, where
 
 - [Live Intelligence](/features/live-intelligence)
 - [Investment & Replay](/features/investment-replay)
+- [Interactive Playground](../playground)
 
 ## Deep references
 

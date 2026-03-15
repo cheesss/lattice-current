@@ -13,8 +13,10 @@ owner: core
 # 機能
 
 <p class="lc-section-caption">
-下の機能はすべてクリックできます。各機能が何を行い、製品のどこに現れ、どの周辺システムに接続するかをすぐに追えます。
+このページは Playground の次の段階です。長い説明よりも capability map と接続関係を短く追える構成にしています。
 </p>
+
+<InteractivePlayground locale="ja" />
 
 <CapabilityConstellation locale="ja" />
 
@@ -33,6 +35,7 @@ owner: core
 
 - [ライブインテリジェンス](/ja/features/live-intelligence)
 - [投資・リプレイ](/ja/features/investment-replay)
+- [Playground](../playground)
 
 ## 追加リファレンス
 

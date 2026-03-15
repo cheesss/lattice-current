@@ -13,8 +13,10 @@ owner: core
 # 기능
 
 <p class="lc-section-caption">
-아래 기능은 모두 클릭할 수 있습니다. 각 기능이 무엇을 하고, 제품 어디에 나타나며, 어떤 주변 시스템과 연결되는지 바로 추적할 수 있습니다.
+이 페이지는 플레이그라운드 다음 단계입니다. 긴 설명 대신 capability map과 연결 구조를 빠르게 파악하도록 구성했습니다.
 </p>
+
+<InteractivePlayground locale="ko" />
 
 <CapabilityConstellation locale="ko" />
 
@@ -33,6 +35,7 @@ owner: core
 
 - [실시간 인텔리전스](/ko/features/live-intelligence)
 - [투자 · 리플레이](/ko/features/investment-replay)
+- [플레이그라운드](../playground)
 
 ## 추가 레퍼런스
 

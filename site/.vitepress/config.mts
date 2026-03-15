@@ -4,6 +4,7 @@ type LocaleLabels = {
   home: string;
   gettingStarted: string;
   variants: string;
+  playground: string;
   features: string;
   aiBacktesting: string;
   algorithms: string;
@@ -14,6 +15,7 @@ type LocaleLabels = {
   featuresOverview: string;
   liveIntelligence: string;
   investmentReplay: string;
+  interactiveDemo: string;
   legalOverview: string;
   licensing: string;
   updatesOverview: string;
@@ -32,6 +34,7 @@ function createNav(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
     { text: labels.home, link: pathFor(locale, '/') },
     { text: labels.gettingStarted, link: pathFor(locale, '/getting-started') },
     { text: labels.variants, link: pathFor(locale, '/variants') },
+    { text: labels.playground, link: pathFor(locale, '/playground') },
     { text: labels.features, link: pathFor(locale, '/features/') },
     { text: labels.aiBacktesting, link: pathFor(locale, '/ai-backtesting/') },
     { text: labels.algorithms, link: pathFor(locale, '/algorithms') },
@@ -52,6 +55,14 @@ function createSidebar(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
           { text: labels.featuresOverview, link: pathFor(locale, '/features/') },
           { text: labels.liveIntelligence, link: pathFor(locale, '/features/live-intelligence') },
           { text: labels.investmentReplay, link: pathFor(locale, '/features/investment-replay') }
+        ]
+      }
+    ],
+    [`${base}/playground`]: [
+      {
+        text: labels.playground,
+        items: [
+          { text: labels.interactiveDemo, link: pathFor(locale, '/playground') }
         ]
       }
     ],
@@ -87,6 +98,7 @@ function createSidebar(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
         items: [
           { text: labels.gettingStarted, link: pathFor(locale, '/getting-started') },
           { text: labels.variants, link: pathFor(locale, '/variants') },
+          { text: labels.playground, link: pathFor(locale, '/playground') },
           { text: labels.features, link: pathFor(locale, '/features/') },
           { text: labels.aiBacktesting, link: pathFor(locale, '/ai-backtesting/') },
           { text: labels.algorithms, link: pathFor(locale, '/algorithms') },
@@ -130,6 +142,7 @@ const en: LocaleLabels = {
   home: 'Home',
   gettingStarted: 'Getting Started',
   variants: 'Variants',
+  playground: 'Playground',
   features: 'Features',
   aiBacktesting: 'AI & Backtesting',
   algorithms: 'Algorithms',
@@ -140,6 +153,7 @@ const en: LocaleLabels = {
   featuresOverview: 'Overview',
   liveIntelligence: 'Live Intelligence',
   investmentReplay: 'Investment & Replay',
+  interactiveDemo: 'Interactive Demo',
   legalOverview: 'Overview',
   licensing: 'Licensing & Content',
   updatesOverview: 'Overview',
@@ -152,6 +166,7 @@ const ko: LocaleLabels = {
   home: '홈',
   gettingStarted: '시작하기',
   variants: '변형',
+  playground: '플레이그라운드',
   features: '기능',
   aiBacktesting: 'AI · 백테스트',
   algorithms: '알고리즘',
@@ -162,6 +177,7 @@ const ko: LocaleLabels = {
   featuresOverview: '개요',
   liveIntelligence: '실시간 인텔리전스',
   investmentReplay: '투자 · 리플레이',
+  interactiveDemo: '인터랙티브 데모',
   legalOverview: '개요',
   licensing: '라이선스 · 콘텐츠',
   updatesOverview: '개요',
@@ -174,6 +190,7 @@ const ja: LocaleLabels = {
   home: 'ホーム',
   gettingStarted: '開始ガイド',
   variants: 'バリアント',
+  playground: 'Playground',
   features: '機能',
   aiBacktesting: 'AI・バックテスト',
   algorithms: 'アルゴリズム',
@@ -184,6 +201,7 @@ const ja: LocaleLabels = {
   featuresOverview: '概要',
   liveIntelligence: 'ライブインテリジェンス',
   investmentReplay: '投資・リプレイ',
+  interactiveDemo: 'Interactive Demo',
   legalOverview: '概要',
   licensing: 'ライセンス・コンテンツ',
   updatesOverview: '概要',

@@ -1,4 +1,4 @@
----
+﻿---
 layout: home
 title: Lattice Current
 summary: Real-time global intelligence, AI-assisted analysis, ontology graphs, and historical replay from one codebase.
@@ -24,6 +24,9 @@ hero:
       text: Architecture
       link: /architecture
     - theme: alt
+      text: Playground
+      link: /playground
+    - theme: alt
       text: GitHub Repo
       link: https://github.com/cheesss/lattice-current
 features:
@@ -35,15 +38,14 @@ features:
     details: Historical replay, walk-forward validation, and investment idea tracking turn live monitoring into testable workflows.
 ---
 
-## Why this exists
+## Start with the shortest path
 
-Lattice Current is built for operators who need one surface for:
+If you only want one fast way in:
 
-- live geopolitical and market monitoring
-- evidence-first AI assistance
-- graph and ontology exploration
-- transmission analysis from events to assets
-- replay and backtesting of prior decision logic
+1. Open the interactive playground.
+2. Click a mock live event.
+3. Follow its transmission path.
+4. Compare it against a replay case.
 
 <div class="lc-home-signalbar">
   <div class="lc-home-signalbar-item">
@@ -62,39 +64,31 @@ Lattice Current is built for operators who need one surface for:
 
 <div class="lc-overview-grid">
   <div class="lc-overview-card">
-    <h3>Live to decision</h3>
-    <p>Signals move from collection to scoring, graph context, decision support, and replay without leaving the same product surface.</p>
+    <h3>Use the product model</h3>
+    <p>Click through a synthetic operator workflow instead of reading static paragraphs first.</p>
   </div>
   <div class="lc-overview-card">
-    <h3>Explainable internals</h3>
-    <p>Core layers are now visualized as interactive capability maps and architecture stacks instead of static bullets only.</p>
+    <h3>See the internals</h3>
+    <p>Architecture, ontology, replay, and storage layers are exposed as interactive maps and drilldowns.</p>
   </div>
   <div class="lc-overview-card">
-    <h3>Connected features</h3>
-    <p>Click through live monitoring, ontology, transmission, replay, and resource profiling to see how each part feeds the next.</p>
+    <h3>Move deeper only when needed</h3>
+    <p>Start with the playground, then open features, architecture, or AI/backtesting references as needed.</p>
   </div>
 </div>
 
 <div class="lc-home-section-grid">
   <div class="lc-home-section-card">
-    <h3>What you can understand here</h3>
-    <p>The public site is designed to explain not only what the product does, but how collection, scoring, graph context, AI reasoning, replay, and runtime resource use fit together.</p>
-    <ul>
-      <li>how live signals become decision-support objects</li>
-      <li>how ontology and transmission layers connect evidence to assets</li>
-      <li>how replay and walk-forward runs feed back into live priors</li>
-    </ul>
+    <h3>Best first click</h3>
+    <p>The playground is now the main entry point for new visitors. It simulates live feed review, transmission mapping, replay analysis, and macro what-if controls with safe mock data.</p>
   </div>
   <div class="lc-home-section-card alt">
-    <h3>How to navigate it</h3>
-    <p>Use the interactive blocks below as entry points. Every visual is clickable and built to move you toward deeper docs without losing context.</p>
-    <ul>
-      <li>pick a user mode first</li>
-      <li>click the decision loop to inspect inputs and outputs</li>
-      <li>open the constellation graph to see connected capabilities</li>
-    </ul>
+    <h3>Then branch out</h3>
+    <p>Use Features for capability overviews, Architecture for runtime ownership, and AI & Backtesting for model and replay logic.</p>
   </div>
 </div>
+
+<InteractivePlayground locale="en" />
 
 <AudienceWorkbench locale="en" />
 
@@ -103,10 +97,6 @@ Lattice Current is built for operators who need one surface for:
 <CapabilityConstellation locale="en" />
 
 <SystemTopology locale="en" />
-
-<ScrollSignalStory locale="en" />
-
-<FeatureExplorer locale="en" />
 
 ## Fork position
 
@@ -121,6 +111,12 @@ This is an independent public research fork. It does not claim to be the officia
 ## Explore the system visually
 
 <div class="lc-home-route-grid">
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Hands-on path</span>
+    <h3>Playground -> features</h3>
+    <p>Try the mock interface first, then move into feature docs once you know which path matters to you.</p>
+    <a href="/playground">Open playground</a>
+  </div>
   <div class="lc-home-route-card">
     <span class="lc-route-kicker">Operational path</span>
     <h3>Live monitoring -> transmission</h3>
@@ -155,8 +151,9 @@ Public docs intentionally describe product behavior, architecture, and algorithm
 
 <div class="lc-home-cta-slab">
   <h2>Use this site as a live system map, not only a README</h2>
-  <p>The strongest path is to move between the interactive home visuals, the feature map, and the architecture topology. The docs are organized so operators, researchers, macro users, and builders can all start from a different surface and still land on the same underlying model.</p>
+  <p>The shortest route is now: playground first, feature map second, architecture topology third. Deeper reference pages remain available when you need implementation detail.</p>
   <div class="lc-link-row">
+    <a class="lc-link-pill" href="/playground">Open playground</a>
     <a class="lc-link-pill" href="/features/">Browse features</a>
     <a class="lc-link-pill" href="/architecture">Open topology</a>
     <a class="lc-link-pill" href="/ai-backtesting/">Review replay logic</a>
