@@ -92,6 +92,12 @@ This is an independent public research fork. It does not claim to be the officia
     <p>Use the model and replay docs when you need the reasoning behind the scores, priors, and validation loop.</p>
     <a href="/ai-backtesting/">Open AI and backtesting docs</a>
   </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Visual path</span>
+    <h3>Showcase globe</h3>
+    <p>Open the heavier read-only 3D globe when you want a product-like map with textured earth, arcs, lanes, and a richer side panel.</p>
+    <a href="/showcase/globe">Open globe showcase</a>
+  </div>
 </div>
 
 ## Public docs policy

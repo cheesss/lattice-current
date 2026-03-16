@@ -92,6 +92,12 @@ features:
     <p>점수, prior, 검증 흐름의 근거가 필요할 때만 AI · 백테스트 문서로 내려가면 됩니다.</p>
     <a href="/ko/ai-backtesting/">AI · 백테스트 문서 열기</a>
   </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">시각 경로</span>
+    <h3>글로브 쇼케이스</h3>
+    <p>텍스처 지구, 아크, 경로, 더 풍부한 패널까지 포함한 제품형 3D 지구본은 별도 showcase 페이지에서 읽기 전용으로 확인할 수 있습니다.</p>
+    <a href="/ko/showcase/globe">글로브 쇼케이스 열기</a>
+  </div>
 </div>
 
 ## 공개 문서 원칙

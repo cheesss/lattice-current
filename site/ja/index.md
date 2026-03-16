@@ -92,6 +92,12 @@ features:
     <p>スコア、prior、validation loop の理由が必要な時だけ model docs に進む構成です。</p>
     <a href="/ja/ai-backtesting/">AI・バックテスト文書を開く</a>
   </div>
+  <div class="lc-home-route-card">
+    <span class="lc-route-kicker">Visual path</span>
+    <h3>Globe showcase</h3>
+    <p>textured earth、arc、route、より密な side panel を含む product-like 3D globe は別の showcase page で read-only 体験できます。</p>
+    <a href="/ja/showcase/globe">Open globe showcase</a>
+  </div>
 </div>
 
 ## 公開ドキュメント方針

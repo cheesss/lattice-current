@@ -12,6 +12,7 @@ owner: core
 
 # Updates
 
+- [2026-03: App-grade globe showcase added](/updates/2026-03-app-grade-globe-showcase)
 - [2026-03: Interactive globe added to the docs home](/updates/2026-03-interactive-globe-home)
 - [2026-03: Autonomous source acceptance and candidate expansion](/updates/2026-03-autonomous-ops-tightening)
 - [2026-03: Automation and theme discovery](/updates/2026-03-automation-theme-discovery)
