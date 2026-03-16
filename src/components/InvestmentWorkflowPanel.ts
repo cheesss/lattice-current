@@ -30,6 +30,13 @@ function sensitivityTone(value: number): string {
   return 'normal';
 }
 
+function autonomyTone(action: string): string {
+  if (action === 'deploy') return 'ready';
+  if (action === 'shadow') return 'watch';
+  if (action === 'watch') return 'watch';
+  return 'blocked';
+}
+
 function formatPct(value: number | null | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -363,7 +370,8 @@ export class InvestmentWorkflowPanel extends Panel {
         <td>${escapeHtml(row.direction.toUpperCase())}</td>
         <td>${row.conviction}</td>
         <td>${row.falsePositiveRisk}</td>
-        <td>${(row.transferEntropy ?? 0).toFixed(2)}</td>
+        <td>${row.calibratedConfidence}</td>
+        <td><span class="investment-action-chip ${autonomyTone(row.autonomyAction)}">${escapeHtml(row.autonomyAction.toUpperCase())}</span></td>
       </tr>
     `).join('');
 
@@ -407,6 +415,17 @@ export class InvestmentWorkflowPanel extends Panel {
         <td>${row.sampleSize}</td>
         <td>${row.hitRate}%</td>
         <td>${formatPct(row.avgReturnPct)}</td>
+      </tr>
+    `).join('');
+    const autonomyRows = filtered.ideaCards.slice(0, 8).map((card) => `
+      <tr class="investment-review-row ${autonomyTone(card.autonomyAction)}">
+        <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(card.themeId)}">${escapeHtml(card.title)}</button></td>
+        <td><span class="investment-action-chip ${autonomyTone(card.autonomyAction)}">${escapeHtml(card.autonomyAction.toUpperCase())}</span></td>
+        <td>${card.calibratedConfidence}</td>
+        <td>${card.realityScore}</td>
+        <td>${card.recentEvidenceScore}</td>
+        <td>${card.sizePct}%</td>
+        <td>${escapeHtml(card.autonomyReasons.join(' | ') || '-')}</td>
       </tr>
     `).join('');
 
@@ -470,6 +489,22 @@ export class InvestmentWorkflowPanel extends Panel {
     }).join('');
 
     const summary = snapshot.summaryLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+    const autonomyStats = `
+      <div class="investment-coverage-grid">
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Shadow mode</span><b>${snapshot.autonomy.shadowMode ? 'ON' : 'OFF'}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Rollback</span><b>${escapeHtml(snapshot.autonomy.rollbackLevel.toUpperCase())}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Deploy</span><b>${snapshot.autonomy.deployCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Shadow</span><b>${snapshot.autonomy.shadowCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Watch</span><b>${snapshot.autonomy.watchCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Abstain</span><b>${snapshot.autonomy.abstainCount}</b></div>
+      </div>
+      <div class="investment-policy-note">
+        Recent shadow hit-rate <b>${snapshot.autonomy.recentHitRate}%</b>, avg <b>${formatPct(snapshot.autonomy.recentAvgReturnPct)}</b>, drawdown <b>${formatPct(-Math.abs(snapshot.autonomy.recentDrawdownPct))}</b>, stale ideas <b>${snapshot.autonomy.staleIdeaCount}</b>.
+      </div>
+      <div class="investment-policy-note">
+        Reality blocks <b>${snapshot.autonomy.realityBlockedCount}</b> mappings and weak recent evidence flags <b>${snapshot.autonomy.recentEvidenceWeakCount}</b>. ${escapeHtml(snapshot.autonomy.notes.join(' '))}
+      </div>
+    `;
     const focusBadge = this.focus.themeId || this.focus.region
       ? `<div class="investment-focus-badge">Focus: ${escapeHtml(this.focus.themeId || 'all themes')} ${this.focus.region ? `| ${escapeHtml(this.focus.region)}` : ''}</div>`
       : '<div class="investment-focus-badge muted">Focus: global</div>';
@@ -519,12 +554,23 @@ export class InvestmentWorkflowPanel extends Panel {
           ${coverageStats}
           <div class="investment-coverage-note">Approved expansions become active on the next intelligence refresh, then flow into idea generation, tracking, and replay/backtest evaluation.</div>
         </section>
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>Constrained Autonomy</h4>
+            <span class="investment-mini-label">${filtered.ideaCards.length} cards</span>
+          </div>
+          ${autonomyStats}
+          <table class="investment-table">
+            <thead><tr><th>Idea</th><th>Action</th><th>Cal</th><th>Reality</th><th>Recent</th><th>Size</th><th>Why</th></tr></thead>
+            <tbody>${autonomyRows || '<tr><td colspan="7">No autonomy-scored ideas in current focus</td></tr>'}</tbody>
+          </table>
+        </section>
         <div class="investment-grid-two">
           <section class="investment-subcard">
             <h4>Direct Event -> Asset Map</h4>
             <table class="investment-table">
-              <thead><tr><th>Event</th><th>Asset</th><th>Dir</th><th>Conv</th><th>FP</th><th>TE</th></tr></thead>
-              <tbody>${mappingRows || '<tr><td colspan="6">No direct mappings</td></tr>'}</tbody>
+              <thead><tr><th>Event</th><th>Asset</th><th>Dir</th><th>Conv</th><th>FP</th><th>Cal</th><th>Action</th></tr></thead>
+              <tbody>${mappingRows || '<tr><td colspan="7">No direct mappings</td></tr>'}</tbody>
             </table>
           </section>
           <section class="investment-subcard">

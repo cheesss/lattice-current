@@ -30,8 +30,11 @@ Run historical fetch, import, replay, walk-forward, source acceptance, candidate
 14. Ask Codex for candidate expansion on top coverage gaps after scoring, diversity caps, and cooldown checks
 15. Auto-accept only if universe policy score, sector caps, and asset-kind caps pass
 16. Re-run replay if new accepted candidates changed the active universe
-17. Release lock
-18. Apply retention to artifacts and scheduler history
+17. Apply cross-corroboration, recency decay, and execution-reality constraints inside the investment snapshot
+18. Downgrade ideas into `shadow`, `watch`, or `abstain` if calibrated confidence is not strong enough
+19. Keep rollback armed if the recent shadow book deteriorates
+20. Release lock
+21. Apply retention to artifacts and scheduler history
 
 ## Commands
 
@@ -162,3 +165,20 @@ Weak cards can be suppressed when they combine:
 - weak analog or backtest support
 
 This reduces the need for manual idea filtering in the dashboard.
+
+## Constrained autonomy guardrails
+
+The unattended loop now also depends on live-decision guardrails, not only discovery loops.
+
+Those guardrails include:
+
+- cross-source contradiction penalties
+- rumor / hedge-language penalties
+- time-decay on old mapping priors
+- recent-evidence floors before live deployment
+- execution-reality penalties for spread, slippage, liquidity, and market session state
+- calibrated confidence bands
+- action gating into `deploy`, `shadow`, `watch`, or `abstain`
+- shadow-book rollback when recent tracked samples deteriorate
+
+This means the unattended loop can still widen or discover ideas, but it is more willing to stand down or remain in shadow mode when recent evidence is weak.

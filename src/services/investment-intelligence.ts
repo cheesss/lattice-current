@@ -4,10 +4,18 @@ import type { SourceCredibilityProfile } from './source-credibility';
 import type { ScheduledReport } from './scheduled-reports';
 import type { MarketRegimeState } from './math-models/regime-model';
 import type { BanditArmState } from './math-models/contextual-bandit';
+import type { AutonomyAction, ConfidenceBand, RollbackLevel } from './autonomy-constraints';
 import { computeHawkesIntensity } from './math-models/hawkes-process';
 import { estimateTransferEntropy } from './math-models/transfer-entropy';
 import { createBanditArmState, scoreBanditArm, updateBanditArm } from './math-models/contextual-bandit';
 import { regimeMultiplierForTheme } from './math-models/regime-model';
+import {
+  assessCrossCorroboration,
+  assessExecutionReality,
+  assessRecency,
+  buildShadowControlState,
+  calibrateDecision,
+} from './autonomy-constraints';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { logSourceOpsEvent } from './source-ops-log';
 import { getMarketWatchlistEntries } from './market-watchlist';
@@ -53,6 +61,20 @@ export interface DirectAssetMapping {
   banditMean?: number;
   banditUncertainty?: number;
   corroboration: number;
+  sourceDiversity: number;
+  corroborationQuality: number;
+  contradictionPenalty: number;
+  rumorPenalty: number;
+  recentEvidenceScore: number;
+  timeDecayWeight: number;
+  stalePenalty: number;
+  realityScore: number;
+  executionPenaltyPct: number;
+  sessionState: 'always-on' | 'open' | 'extended' | 'closed';
+  tradableNow: boolean;
+  calibratedConfidence: number;
+  autonomyAction: AutonomyAction;
+  autonomyReasons: string[];
   reasons: string[];
   transmissionPath: string[];
   tags: string[];
@@ -106,6 +128,9 @@ export interface InvestmentIdeaSymbol {
   role: 'primary' | 'confirm' | 'hedge';
   direction: InvestmentDirection;
   sector?: string;
+  assetKind?: InvestmentAssetKind;
+  liquidityScore?: number | null;
+  realityScore?: number | null;
   contextVector?: number[];
   banditScore?: number | null;
 }
@@ -120,6 +145,13 @@ export interface InvestmentIdeaCard {
   sizePct: number;
   timeframe: string;
   thesis: string;
+  calibratedConfidence: number;
+  confidenceBand: ConfidenceBand;
+  autonomyAction: AutonomyAction;
+  autonomyReasons: string[];
+  realityScore: number;
+  timeDecayWeight: number;
+  recentEvidenceScore: number;
   symbols: InvestmentIdeaSymbol[];
   triggers: string[];
   invalidation: string[];
@@ -292,6 +324,23 @@ export interface UniverseCoverageSummary {
   uncoveredThemeCount: number;
 }
 
+export interface AutonomyControlState {
+  shadowMode: boolean;
+  rollbackLevel: RollbackLevel;
+  recentSampleCount: number;
+  recentHitRate: number;
+  recentAvgReturnPct: number;
+  recentDrawdownPct: number;
+  staleIdeaCount: number;
+  deployCount: number;
+  shadowCount: number;
+  watchCount: number;
+  abstainCount: number;
+  realityBlockedCount: number;
+  recentEvidenceWeakCount: number;
+  notes: string[];
+}
+
 export interface InvestmentIntelligenceSnapshot {
   generatedAt: string;
   regime?: MarketRegimeState | null;
@@ -309,6 +358,7 @@ export interface InvestmentIntelligenceSnapshot {
   universeCoverage: UniverseCoverageSummary;
   coverageGaps: UniverseCoverageGap[];
   candidateReviews: CandidateExpansionReview[];
+  autonomy: AutonomyControlState;
   summaryLines: string[];
 }
 
@@ -379,6 +429,10 @@ interface EventCandidate {
   isAlert: boolean;
   credibility: number;
   corroboration: number;
+  sourceDiversity: number;
+  corroborationQuality: number;
+  contradictionPenalty: number;
+  rumorPenalty: number;
   marketStress: number;
   aftershockIntensity: number;
   regimeId: string | null;
@@ -824,10 +878,73 @@ function normalizeUniverseCoverageSummary(summary?: Partial<UniverseCoverageSumm
   };
 }
 
+function normalizeDirectAssetMapping(mapping: DirectAssetMapping): DirectAssetMapping {
+  return {
+    ...mapping,
+    sourceDiversity: Number(mapping.sourceDiversity) || 0,
+    corroborationQuality: Number(mapping.corroborationQuality) || Number(mapping.corroboration) || 0,
+    contradictionPenalty: Number(mapping.contradictionPenalty) || 0,
+    rumorPenalty: Number(mapping.rumorPenalty) || 0,
+    recentEvidenceScore: Number(mapping.recentEvidenceScore) || 0,
+    timeDecayWeight: Number(mapping.timeDecayWeight) || 0,
+    stalePenalty: Number(mapping.stalePenalty) || 0,
+    realityScore: Number(mapping.realityScore) || 0,
+    executionPenaltyPct: Number(mapping.executionPenaltyPct) || 0,
+    sessionState: mapping.sessionState || 'closed',
+    tradableNow: typeof mapping.tradableNow === 'boolean' ? mapping.tradableNow : false,
+    calibratedConfidence: Number(mapping.calibratedConfidence) || Number(mapping.conviction) || 0,
+    autonomyAction: mapping.autonomyAction || 'watch',
+    autonomyReasons: Array.isArray(mapping.autonomyReasons) ? mapping.autonomyReasons.slice(0, 6) : [],
+  };
+}
+
+function normalizeInvestmentIdeaCard(card: InvestmentIdeaCard): InvestmentIdeaCard {
+  return {
+    ...card,
+    calibratedConfidence: Number(card.calibratedConfidence) || Number(card.conviction) || 0,
+    confidenceBand: card.confidenceBand || 'guarded',
+    autonomyAction: card.autonomyAction || (card.direction === 'watch' ? 'watch' : 'shadow'),
+    autonomyReasons: Array.isArray(card.autonomyReasons) ? card.autonomyReasons.slice(0, 6) : [],
+    realityScore: Number(card.realityScore) || 0,
+    timeDecayWeight: Number(card.timeDecayWeight) || 0,
+    recentEvidenceScore: Number(card.recentEvidenceScore) || 0,
+    symbols: Array.isArray(card.symbols) ? card.symbols.map((symbol) => ({
+      ...symbol,
+      liquidityScore: typeof symbol.liquidityScore === 'number' ? symbol.liquidityScore : null,
+      realityScore: typeof symbol.realityScore === 'number' ? symbol.realityScore : null,
+    })) : [],
+  };
+}
+
+function normalizeAutonomyControlState(state?: Partial<AutonomyControlState> | null): AutonomyControlState {
+  return {
+    shadowMode: Boolean(state?.shadowMode),
+    rollbackLevel: state?.rollbackLevel === 'armed' || state?.rollbackLevel === 'watch' ? state.rollbackLevel : 'normal',
+    recentSampleCount: Number(state?.recentSampleCount) || 0,
+    recentHitRate: Number(state?.recentHitRate) || 0,
+    recentAvgReturnPct: Number(state?.recentAvgReturnPct) || 0,
+    recentDrawdownPct: Number(state?.recentDrawdownPct) || 0,
+    staleIdeaCount: Number(state?.staleIdeaCount) || 0,
+    deployCount: Number(state?.deployCount) || 0,
+    shadowCount: Number(state?.shadowCount) || 0,
+    watchCount: Number(state?.watchCount) || 0,
+    abstainCount: Number(state?.abstainCount) || 0,
+    realityBlockedCount: Number(state?.realityBlockedCount) || 0,
+    recentEvidenceWeakCount: Number(state?.recentEvidenceWeakCount) || 0,
+    notes: Array.isArray(state?.notes) ? state!.notes.slice(0, 8) : [],
+  };
+}
+
 function normalizeInvestmentSnapshot(snapshot: InvestmentIntelligenceSnapshot | null | undefined): InvestmentIntelligenceSnapshot | null {
   if (!snapshot) return null;
   return {
     ...snapshot,
+    directMappings: Array.isArray(snapshot.directMappings)
+      ? snapshot.directMappings.map((mapping) => normalizeDirectAssetMapping(mapping))
+      : [],
+    ideaCards: Array.isArray(snapshot.ideaCards)
+      ? snapshot.ideaCards.map((card) => normalizeInvestmentIdeaCard(card))
+      : [],
     universePolicy: normalizeUniverseExpansionPolicy(snapshot.universePolicy),
     universeCoverage: normalizeUniverseCoverageSummary(snapshot.universeCoverage),
     coverageGaps: Array.isArray(snapshot.coverageGaps)
@@ -841,6 +958,7 @@ function normalizeInvestmentSnapshot(snapshot: InvestmentIntelligenceSnapshot | 
     candidateReviews: Array.isArray(snapshot.candidateReviews)
       ? snapshot.candidateReviews.map((review) => normalizeCandidateReview(review))
       : [],
+    autonomy: normalizeAutonomyControlState(snapshot.autonomy),
   };
 }
 
@@ -1129,6 +1247,20 @@ function buildEventCandidates(args: {
     const profile = findSourceCredibility(credibilityMap, cluster.primarySource || '');
     const credibility = profile?.credibilityScore ?? 55;
     const corroboration = profile?.corroborationScore ?? Math.min(88, 22 + cluster.sourceCount * 11);
+    const corroborationAssessment = assessCrossCorroboration({
+      primaryTitle: title,
+      titles: cluster.allItems.map((item) => item.title),
+      sources: [
+        cluster.primarySource || '',
+        ...cluster.allItems.map((item) => item.source),
+        ...cluster.topSources.map((item) => item.name),
+      ],
+      baseCredibility: credibility,
+      baseCorroboration: corroboration,
+      feedHealthScore: profile?.feedHealthScore ?? null,
+      truthAgreementScore: profile?.truthAgreementScore ?? null,
+      relationConfidence: cluster.relations?.confidenceScore ?? null,
+    });
     const transmissionInfo = transmissionByTitle.get(normalize(title));
     const marketStress = transmissionInfo?.stress ?? 0;
     const aftershockIntensity = aftershockByCluster.get(cluster.id || titleId(title)) ?? 0;
@@ -1157,12 +1289,19 @@ function buildEventCandidates(args: {
       isAlert: cluster.isAlert,
       credibility,
       corroboration,
+      sourceDiversity: corroborationAssessment.sourceDiversity,
+      corroborationQuality: corroborationAssessment.corroborationQuality,
+      contradictionPenalty: corroborationAssessment.contradictionPenalty,
+      rumorPenalty: corroborationAssessment.rumorPenalty,
       marketStress,
       aftershockIntensity,
       regimeId: regime?.id ?? null,
       regimeConfidence: regime?.confidence ?? 0,
       matchedSymbols: transmissionInfo?.symbols.slice(0, 6) ?? [],
-      reasons: transmissionInfo?.reasons.slice(0, 4) ?? [],
+      reasons: [
+        ...(transmissionInfo?.reasons.slice(0, 3) ?? []),
+        ...corroborationAssessment.notes,
+      ].slice(0, 5),
     });
   }
 
@@ -1739,6 +1878,8 @@ function buildDirectMappings(args: {
   candidates: EventCandidate[];
   markets: MarketData[];
   transmission: EventMarketTransmissionSnapshot | null;
+  timestamp: string;
+  autonomy: Pick<AutonomyControlState, 'shadowMode' | 'rollbackLevel'>;
 }): DirectAssetMapping[] {
   const marketMap = marketMoveMap(args.markets);
   const regime = args.transmission?.regime ?? null;
@@ -1756,6 +1897,11 @@ function buildDirectMappings(args: {
         const learnedWinRate = learned?.posteriorWinRate ?? 50;
         const learnedReturnPct = learned?.emaReturnPct ?? 0;
         const learnedObservations = learned?.observations ?? 0;
+        const recency = assessRecency({
+          lastUpdatedAt: learned?.lastUpdatedAt ?? null,
+          observations: learnedObservations,
+          nowIso: args.timestamp,
+        });
         const regimeMultiplier = regimeMultiplierForTheme(
           regime,
           theme.id,
@@ -1767,7 +1913,7 @@ function buildDirectMappings(args: {
         ).normalized;
         const banditContext = buildBanditContext({
           credibility: candidate.credibility,
-          corroboration: candidate.corroboration,
+          corroboration: candidate.corroborationQuality,
           marketStress: candidate.marketStress,
           aftershockIntensity: candidate.aftershockIntensity,
           regimeMultiplier,
@@ -1776,35 +1922,51 @@ function buildDirectMappings(args: {
           emaReturnPct: learnedReturnPct,
         });
         const bandit = scoreBanditArm(getBanditState(theme.id, asset.symbol, asset.direction), banditContext, 0.72);
-        const posteriorBonus = clamp(Math.round((learnedWinRate - 50) * 0.36), -12, 12);
-        const returnBonus = clamp(Math.round(learnedReturnPct * 1.4), -10, 10);
-        const sampleBonus = Math.min(8, Math.round(Math.log2(learnedObservations + 1) * 2));
+        const posteriorBonus = clamp(Math.round((learnedWinRate - 50) * 0.36 * recency.timeDecayWeight), -12, 12);
+        const returnBonus = clamp(Math.round(learnedReturnPct * 1.4 * recency.timeDecayWeight), -10, 10);
+        const sampleBonus = Math.min(8, Math.round(Math.log2(learnedObservations + 1) * 2 + recency.recentEvidenceScore * 0.04));
         const regimeBonus = clamp(Math.round((regimeMultiplier - 1) * 18), -8, 12);
         const aftershockBonus = clamp(Math.round(candidate.aftershockIntensity * 16), 0, 14);
         const entropyBonus = clamp(Math.round(transferEntropy * 16), 0, 12);
         const banditBonus = clamp(Math.round(bandit.score * 10), -10, 14);
+        const convictionBase = Math.round(
+          26
+          + candidate.sourceCount * 7
+          + (candidate.isAlert ? 10 : 0)
+          + candidate.credibility * 0.15
+          + candidate.corroborationQuality * 0.17
+          + candidate.sourceDiversity * 0.08
+          + candidate.marketStress * 22
+          + candidate.aftershockIntensity * 12
+          + (marketMovePct != null ? Math.min(12, Math.abs(marketMovePct) * 2.8) : 0),
+        );
         const conviction = clamp(
-          Math.round(
-            28
-            + candidate.sourceCount * 8
-            + (candidate.isAlert ? 10 : 0)
-            + candidate.credibility * 0.18
-            + candidate.corroboration * 0.14
-            + candidate.marketStress * 24
-            + candidate.aftershockIntensity * 12
-            + (marketMovePct != null ? Math.min(12, Math.abs(marketMovePct) * 3) : 0),
-          ) + posteriorBonus + returnBonus + sampleBonus + regimeBonus + aftershockBonus + entropyBonus + banditBonus,
+          convictionBase
+          + posteriorBonus
+          + returnBonus
+          + sampleBonus
+          + regimeBonus
+          + aftershockBonus
+          + entropyBonus
+          + banditBonus
+          - Math.round(candidate.contradictionPenalty * 0.8)
+          - Math.round(candidate.rumorPenalty * 0.55)
+          - recency.stalePenalty,
           20,
           98,
         );
         const falsePositiveRisk = clamp(
           Math.round(
-            76
-            - candidate.sourceCount * 7
-            - candidate.credibility * 0.22
-            - candidate.corroboration * 0.16
-            - candidate.marketStress * 18
+            82
+            - candidate.sourceCount * 6
+            - candidate.credibility * 0.18
+            - candidate.corroborationQuality * 0.18
+            - candidate.sourceDiversity * 0.07
+            - candidate.marketStress * 16
             - (candidate.isAlert ? 6 : 0)
+            + candidate.contradictionPenalty * 0.85
+            + candidate.rumorPenalty * 0.7
+            + recency.stalePenalty * 0.45
             - Math.max(0, posteriorBonus)
             - Math.max(0, returnBonus)
             - Math.max(0, regimeBonus)
@@ -1821,6 +1983,9 @@ function buildDirectMappings(args: {
             + candidate.marketStress * 10
             + candidate.sourceCount * 1.8
             + candidate.aftershockIntensity * 10
+            + candidate.corroborationQuality * 0.08
+            + candidate.sourceDiversity * 0.06
+            + recency.recentEvidenceScore * 0.08
             + posteriorBonus * 0.35
             + returnBonus * 0.45
             + regimeBonus * 0.8
@@ -1834,6 +1999,25 @@ function buildDirectMappings(args: {
           20,
           98,
         );
+        const reality = assessExecutionReality({
+          assetKind: asset.assetKind,
+          liquidityScore,
+          marketMovePct,
+          timestamp: args.timestamp,
+        });
+        const calibration = calibrateDecision({
+          conviction,
+          falsePositiveRisk,
+          corroborationQuality: candidate.corroborationQuality,
+          contradictionPenalty: candidate.contradictionPenalty,
+          rumorPenalty: candidate.rumorPenalty,
+          recentEvidenceScore: recency.recentEvidenceScore,
+          realityScore: reality.realityScore,
+          floorBreached: recency.floorBreached,
+          rollbackLevel: args.autonomy.rollbackLevel,
+          shadowMode: args.autonomy.shadowMode,
+          direction: asset.direction,
+        });
 
         mappings.push({
           id: `${candidate.id}:${theme.id}:${asset.symbol}`,
@@ -1862,14 +2046,32 @@ function buildDirectMappings(args: {
           banditMean: Number(bandit.mean.toFixed(4)),
           banditUncertainty: Number(bandit.uncertainty.toFixed(4)),
           corroboration: candidate.corroboration,
+          sourceDiversity: candidate.sourceDiversity,
+          corroborationQuality: candidate.corroborationQuality,
+          contradictionPenalty: candidate.contradictionPenalty,
+          rumorPenalty: candidate.rumorPenalty,
+          recentEvidenceScore: recency.recentEvidenceScore,
+          timeDecayWeight: recency.timeDecayWeight,
+          stalePenalty: recency.stalePenalty,
+          realityScore: reality.realityScore,
+          executionPenaltyPct: reality.executionPenaltyPct,
+          sessionState: reality.sessionState,
+          tradableNow: reality.tradableNow,
+          calibratedConfidence: calibration.calibratedConfidence,
+          autonomyAction: calibration.action,
+          autonomyReasons: calibration.reasons,
           reasons: [
             theme.thesis,
             ...candidate.reasons,
+            `CrossCorr=${candidate.corroborationQuality}`,
+            `Recency=${recency.recentEvidenceScore} decay=${recency.timeDecayWeight.toFixed(2)}`,
+            `Reality=${reality.realityScore} penalty=${reality.executionPenaltyPct.toFixed(2)}%`,
             `Regime=${regime?.label || candidate.regimeId || 'unknown'} x${regimeMultiplier.toFixed(2)}`,
             `Aftershock=${candidate.aftershockIntensity.toFixed(2)}`,
             `TransferEntropy=${transferEntropy.toFixed(2)}`,
             `Bandit=${bandit.score.toFixed(2)}`,
-          ].slice(0, 6),
+            ...calibration.reasons,
+          ].slice(0, 8),
           transmissionPath: [candidate.title, theme.label, `${asset.symbol} ${asset.name}`],
           tags: [...theme.sectors, ...theme.commodities, ...candidate.matchedSymbols].slice(0, 8),
         });
@@ -1878,7 +2080,7 @@ function buildDirectMappings(args: {
   }
 
   return mappings
-    .sort((a, b) => b.conviction - a.conviction || b.sensitivityScore - a.sensitivityScore)
+    .sort((a, b) => b.calibratedConfidence - a.calibratedConfidence || b.conviction - a.conviction || b.sensitivityScore - a.sensitivityScore)
     .slice(0, MAX_MAPPINGS);
 }
 
@@ -2299,9 +2501,19 @@ function scoreIdeaCardTriage(card: InvestmentIdeaCard): number {
   const analogScore = Math.min(8, card.analogRefs.length * 3);
   const backtestScore = (card.backtestHitRate != null ? Math.min(10, card.backtestHitRate * 0.14) : 0)
     + (card.backtestAvgReturnPct != null ? Math.min(8, Math.max(0, card.backtestAvgReturnPct) * 1.6) : 0);
+  const calibrationScore = card.calibratedConfidence * 0.12;
+  const realityScore = card.realityScore * 0.08;
+  const recencyScore = card.recentEvidenceScore * 0.06;
   const directionPenalty = card.direction === 'watch' ? 10 : 0;
   const lowEvidencePenalty = card.evidence.length <= 1 && card.triggers.length <= 1 ? 8 : 0;
   const veryHighFpPenalty = card.falsePositiveRisk >= 82 ? 14 : 0;
+  const autonomyPenalty = card.autonomyAction === 'abstain'
+    ? 30
+    : card.autonomyAction === 'shadow'
+      ? 12
+      : card.autonomyAction === 'watch'
+        ? 8
+        : 0;
   return clamp(
     Math.round(
       convictionScore
@@ -2311,9 +2523,13 @@ function scoreIdeaCardTriage(card: InvestmentIdeaCard): number {
       + symbolScore
       + analogScore
       + backtestScore
+      + calibrationScore
+      + realityScore
+      + recencyScore
       - directionPenalty
       - lowEvidencePenalty
-      - veryHighFpPenalty,
+      - veryHighFpPenalty
+      - autonomyPenalty
     ),
     0,
     100,
@@ -2324,9 +2540,11 @@ function autoTriageIdeaCards(ideaCards: InvestmentIdeaCard[]): { kept: Investmen
   const scored = ideaCards.map((card) => ({ card, score: scoreIdeaCardTriage(card) }))
     .sort((a, b) => b.score - a.score || b.card.conviction - a.card.conviction || a.card.falsePositiveRisk - b.card.falsePositiveRisk);
   const kept = scored.filter(({ card, score }) => {
+    if (card.autonomyAction === 'abstain') return false;
     if (card.direction !== 'watch' && score >= 44) return true;
     if (card.direction === 'watch' && score >= 56) return true;
     if ((card.backtestHitRate || 0) >= 58 && (card.backtestAvgReturnPct || 0) > 0.4) return true;
+    if (card.autonomyAction === 'shadow' && card.calibratedConfidence >= 52 && card.realityScore >= 45) return true;
     return false;
   }).map(({ card }) => card);
   if (kept.length === 0 && scored.length > 0) {
@@ -2390,13 +2608,45 @@ function buildIdeaCards(mappings: DirectAssetMapping[], analogs: HistoricalAnalo
     const avgPosterior = symbolStats.length > 0 ? average(symbolStats.map((item) => item.posteriorWinRate)) : 50;
     const avgReturn = symbolStats.length > 0 ? average(symbolStats.map((item) => item.emaReturnPct)) : 0;
     const edgeAdj = clamp(0.75 + Math.max(0, avgPosterior - 50) / 80 + Math.max(0, avgReturn) / 14, 0.55, 1.35);
-    const sizePct = clamp(rule.maxPositionPct * (conviction / 100) * (1 - falsePositiveRisk / 125) * edgeAdj, 0.15, rule.maxPositionPct);
+    const rawSizePct = clamp(rule.maxPositionPct * (conviction / 100) * (1 - falsePositiveRisk / 125) * edgeAdj, 0.15, rule.maxPositionPct);
     const lead = bucket[0]!;
     const theme = getThemeRule(lead.themeId);
     const relatedAnalogs = analogs
       .filter((analog) => analog.themes.some((item) => item === lead.themeId || item === normalize(lead.themeLabel)))
       .slice(0, 3)
       .map((analog) => analog.label);
+    const calibratedConfidence = clamp(Math.round(average(bucket.map((item) => item.calibratedConfidence))), 0, 99);
+    const realityScore = clamp(Math.round(average(bucket.map((item) => item.realityScore))), 0, 99);
+    const recentEvidenceScore = clamp(Math.round(average(bucket.map((item) => item.recentEvidenceScore))), 0, 99);
+    const timeDecayWeight = Number(average(bucket.map((item) => item.timeDecayWeight)).toFixed(4));
+    const contradictionPenalty = average(bucket.map((item) => item.contradictionPenalty));
+    const actionCounts = bucket.reduce<Record<AutonomyAction, number>>((acc, item) => {
+      acc[item.autonomyAction] += 1;
+      return acc;
+    }, { deploy: 0, shadow: 0, watch: 0, abstain: 0 });
+    const autonomyAction: AutonomyAction = actionCounts.abstain >= Math.ceil(bucket.length / 2) || calibratedConfidence < 38
+      ? 'abstain'
+      : actionCounts.shadow > 0 || calibratedConfidence < 58 || contradictionPenalty >= 12
+        ? 'shadow'
+        : actionCounts.watch > 0 || calibratedConfidence < 72
+          ? 'watch'
+          : 'deploy';
+    const confidenceBand: ConfidenceBand = calibratedConfidence >= 78
+      ? 'high'
+      : calibratedConfidence >= 62
+        ? 'building'
+        : calibratedConfidence >= 44
+          ? 'guarded'
+          : 'low';
+    const sizeCap = autonomyAction === 'deploy'
+      ? 1
+      : autonomyAction === 'shadow'
+        ? 0.35
+        : autonomyAction === 'watch'
+          ? 0.18
+          : 0;
+    const sizePct = Number((rawSizePct * sizeCap).toFixed(2));
+    const autonomyReasons = Array.from(new Set(bucket.flatMap((item) => item.autonomyReasons))).slice(0, 4);
 
     cards.push({
       id: key,
@@ -2408,6 +2658,13 @@ function buildIdeaCards(mappings: DirectAssetMapping[], analogs: HistoricalAnalo
       sizePct: Math.round(sizePct * 100) / 100,
       timeframe: theme?.timeframe || '1d-7d',
       thesis: theme?.thesis || lead.reasons[0] || 'Event-to-asset transmission detected.',
+      calibratedConfidence,
+      confidenceBand,
+      autonomyAction,
+      autonomyReasons,
+      realityScore,
+      timeDecayWeight,
+      recentEvidenceScore,
       symbols: [
         ...primary.slice(0, 3).map((item): InvestmentIdeaSymbol => ({
           symbol: item.symbol,
@@ -2415,9 +2672,12 @@ function buildIdeaCards(mappings: DirectAssetMapping[], analogs: HistoricalAnalo
           role: item.role === 'hedge' ? 'hedge' : item.role,
           direction: item.direction,
           sector: item.sector,
+          assetKind: item.assetKind,
+          liquidityScore: item.liquidityScore,
+          realityScore: item.realityScore,
           contextVector: buildBanditContext({
             credibility: item.corroboration,
-            corroboration: item.corroboration,
+            corroboration: item.corroborationQuality,
             marketStress: Math.max(0, Math.min(1, (item.marketMovePct ?? 0) / 10)),
             aftershockIntensity: item.aftershockIntensity ?? 0,
             regimeMultiplier: item.regimeMultiplier ?? 1,
@@ -2433,9 +2693,12 @@ function buildIdeaCards(mappings: DirectAssetMapping[], analogs: HistoricalAnalo
           role: 'hedge' as const,
           direction: item.direction,
           sector: item.sector,
+          assetKind: item.assetKind,
+          liquidityScore: item.liquidityScore,
+          realityScore: item.realityScore,
           contextVector: buildBanditContext({
             credibility: item.corroboration,
-            corroboration: item.corroboration,
+            corroboration: item.corroborationQuality,
             marketStress: Math.max(0, Math.min(1, (item.marketMovePct ?? 0) / 10)),
             aftershockIntensity: item.aftershockIntensity ?? 0,
             regimeMultiplier: item.regimeMultiplier ?? 1,
@@ -2540,8 +2803,9 @@ function buildWorkflow(snapshot: {
   sensitivity: SectorSensitivityRow[];
   trackedIdeas: TrackedIdeaState[];
   backtests: EventBacktestRow[];
+  autonomy: AutonomyControlState;
 }): InvestmentWorkflowStep[] {
-  const multiSourceIdeas = snapshot.mappings.filter((item) => item.corroboration >= 60).length;
+  const multiSourceIdeas = snapshot.mappings.filter((item) => item.corroborationQuality >= 60).length;
   const openTracked = snapshot.trackedIdeas.filter((idea) => idea.status === 'open').length;
   const closedTracked = snapshot.trackedIdeas.filter((idea) => idea.status === 'closed').length;
   const strongBacktests = snapshot.backtests.filter((row) => row.sampleSize >= 2 && row.hitRate >= 50).length;
@@ -2581,16 +2845,35 @@ function buildWorkflow(snapshot: {
     {
       id: 'size',
       label: 'Size',
-      status: snapshot.ideaCards.length > 0 ? 'ready' : 'blocked',
+      status: snapshot.ideaCards.some((card) => card.autonomyAction === 'deploy')
+        ? 'ready'
+        : snapshot.ideaCards.length > 0
+          ? 'watch'
+          : 'blocked',
       metric: snapshot.ideaCards.length,
-      summary: `${snapshot.ideaCards.length} auto-sized idea cards ready for trader review.`,
+      summary: `${snapshot.ideaCards.length} idea cards remain after autonomy gating and sizing constraints.`,
+    },
+    {
+      id: 'constrain',
+      label: 'Constrain',
+      status: snapshot.autonomy.abstainCount === 0 && snapshot.autonomy.realityBlockedCount <= 1
+        ? 'ready'
+        : snapshot.autonomy.abstainCount <= Math.max(2, snapshot.ideaCards.length)
+          ? 'watch'
+          : 'blocked',
+      metric: snapshot.autonomy.realityBlockedCount,
+      summary: `${snapshot.autonomy.abstainCount} ideas were stood down and ${snapshot.autonomy.realityBlockedCount} were blocked by execution reality checks.`,
     },
     {
       id: 'monitor',
-      label: 'Monitor',
-      status: openTracked >= 3 ? 'ready' : openTracked > 0 || closedTracked > 0 ? 'watch' : 'blocked',
+      label: 'Shadow',
+      status: snapshot.autonomy.rollbackLevel === 'normal'
+        ? (openTracked >= 3 ? 'ready' : openTracked > 0 || closedTracked > 0 ? 'watch' : 'blocked')
+        : snapshot.autonomy.rollbackLevel === 'watch'
+          ? 'watch'
+          : 'blocked',
       metric: openTracked,
-      summary: `${openTracked} live tracked ideas and ${closedTracked} closed samples are being monitored.`,
+      summary: `${openTracked} tracked ideas, ${closedTracked} closed samples, rollback=${snapshot.autonomy.rollbackLevel}, recent shadow hit-rate=${snapshot.autonomy.recentHitRate}%.`,
     },
   ];
 }
@@ -2616,6 +2899,7 @@ export async function recomputeInvestmentIntelligence(args: {
   await ensureLoaded();
   const timestamp = nowIso();
   appendMarketHistory(args.markets, timestamp);
+  const shadowControl = buildShadowControlState(trackedIdeas, timestamp);
 
   const { kept, falsePositive } = buildEventCandidates({
     clusters: args.clusters,
@@ -2623,7 +2907,13 @@ export async function recomputeInvestmentIntelligence(args: {
     sourceCredibility: args.sourceCredibility,
   });
 
-  const mappings = buildDirectMappings({ candidates: kept, markets: args.markets, transmission: args.transmission });
+  const mappings = buildDirectMappings({
+    candidates: kept,
+    markets: args.markets,
+    transmission: args.transmission,
+    timestamp,
+    autonomy: shadowControl,
+  });
   const preIdeaCards = buildIdeaCards(mappings, []);
   currentHistory = mergeHistory(currentHistory, parseReportHistory(args.reports));
   const analogs = buildHistoricalAnalogs({ history: currentHistory, ideaCards: preIdeaCards });
@@ -2643,7 +2933,25 @@ export async function recomputeInvestmentIntelligence(args: {
   const enrichedIdeaCards = enrichIdeaCards(baseIdeaCards, tracked, backtests);
   const ideaTriage = autoTriageIdeaCards(enrichedIdeaCards);
   const ideaCards = ideaTriage.kept;
-  const workflow = buildWorkflow({ falsePositive, mappings, ideaCards, analogs, sensitivity, trackedIdeas: tracked, backtests });
+  const autonomy = {
+    ...buildShadowControlState(tracked, timestamp),
+    deployCount: ideaCards.filter((card) => card.autonomyAction === 'deploy').length,
+    shadowCount: ideaCards.filter((card) => card.autonomyAction === 'shadow').length,
+    watchCount: ideaCards.filter((card) => card.autonomyAction === 'watch').length,
+    abstainCount: enrichedIdeaCards.filter((card) => card.autonomyAction === 'abstain').length,
+    realityBlockedCount: mappings.filter((item) => item.realityScore < 42 || !item.tradableNow).length,
+    recentEvidenceWeakCount: mappings.filter((item) => item.recentEvidenceScore < 36 || item.stalePenalty >= 12).length,
+  };
+  const workflow = buildWorkflow({
+    falsePositive,
+    mappings,
+    ideaCards,
+    analogs,
+    sensitivity,
+    trackedIdeas: tracked,
+    backtests,
+    autonomy,
+  });
   const coverageGaps = buildCoverageGaps({ candidates: kept, reviews });
   const universeCoverage = buildUniverseCoverageSummary({ candidates: kept, mappings, reviews, gaps: coverageGaps });
   const topThemes = Array.from(new Set(ideaCards.map((card) => card.title))).slice(0, 8);
@@ -2668,11 +2976,15 @@ export async function recomputeInvestmentIntelligence(args: {
     universeCoverage,
     coverageGaps,
     candidateReviews: reviews,
+    autonomy,
     summaryLines: [
       `${ideaCards.length} idea cards generated across ${sensitivity.length} sector channels.`,
       `${mappings.length} direct stock or ETF mappings survived ${falsePositive.rejected} false-positive rejects.`,
       `${backtests.length} price-based backtest rows, ${openTracked} open tracked ideas, ${closedTracked} closed samples, and ${learnedMappings} learned mapping priors available.`,
       `${ideaTriage.suppressedCount} low-quality idea cards were auto-suppressed before the operator view.`,
+      `Autonomy=${autonomy.rollbackLevel} shadow=${autonomy.shadowMode ? 'on' : 'off'} deploy=${autonomy.deployCount} shadowOnly=${autonomy.shadowCount} watch=${autonomy.watchCount} abstain=${autonomy.abstainCount}.`,
+      `Recent shadow hit-rate=${autonomy.recentHitRate}% avg=${autonomy.recentAvgReturnPct}% drawdown=${autonomy.recentDrawdownPct}% stale=${autonomy.staleIdeaCount}.`,
+      `${autonomy.realityBlockedCount} mappings failed reality gates and ${autonomy.recentEvidenceWeakCount} mappings were penalized for weak recent evidence.`,
       `${universeCoverage.dynamicApprovedCount} approved expansion candidates, ${universeCoverage.openReviewCount} open review items, and ${universeCoverage.gapCount} current coverage gaps tracked.`,
       `Universe policy=${universeExpansionPolicy.mode} scoreThreshold=${universeExpansionPolicy.minAutoApproveScore} codexFloor=${universeExpansionPolicy.minCodexConfidence} requireMarketData=${universeExpansionPolicy.requireMarketData ? 'yes' : 'no'} sectorCap=${universeExpansionPolicy.maxAutoApprovalsPerSectorPerTheme} kindCap=${universeExpansionPolicy.maxAutoApprovalsPerAssetKindPerTheme}.`,
       `${analogs.length} analog checkpoints and ${workflow.filter((step) => step.status === 'ready').length} ready workflow stages available.`,

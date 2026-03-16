@@ -5,7 +5,7 @@ status: beta
 variants:
   - finance
   - tech
-updated: 2026-03-15
+updated: 2026-03-16
 owner: core
 ---
 
@@ -40,6 +40,12 @@ owner: core
 - candidate auto-approval は composite score と sector / asset-kind cap を使う
 - 弱い theme motif と低信号 autonomous keyword を scheduler が自動で retire / reject できる
 - 弱い idea card を operator view の前に自動 suppress できる
+- ソース間の矛盾や rumor-heavy な表現を減点する cross-corroboration scoring
+- `deploy`, `shadow`, `watch`, `abstain` に分かれる calibrated autonomy action
+- 古い prior が現在の推薦を支配しないようにする time-decay と recent-evidence floor
+- spread, slippage, liquidity, session state を含む reality-aware execution check
+- 最近の shadow 成績が弱い時に保守モードへ戻す rollback signal
+- raw signed return だけでなく cost-adjusted replay summary
 
 ## 主な UI 面
 
@@ -66,10 +72,21 @@ owner: core
 - score / health / diversity cap を使う discovered feed / API source automation sweep
 - autonomous keyword lifecycle review と theme queue hygiene
 - pre-render idea-card triage と suppression
+- clustered source 間の contradiction / rumor penalty
+- confidence calibration, no-trade gate, shadow-only fallback
+- session state / spread / slippage / liquidity に基づく execution-reality penalty
+- deterministic ranking 内の recency weighting と stale-prior decay
+- operator workflow に持ち込まれる shadow-book rollback state
 
 ## 制限
 
 公開サイトはシステム動作を説明しますが、非公開の運用データや機微な市場設定は公開しません。
+
+このエンジンは以前より強い自動化と制約付き自律性を持ちますが、まだ無制限の live auto-trader ではありません。現在の性格は次に近いです。
+
+- まず意思決定支援と paper-trade 研究面
+- 次に現実コストを織り込んだ replay engine
+- 最後に policy gate と人の確認を通る execution candidate generator
 
 ## バリアント適用範囲
 

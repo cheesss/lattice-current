@@ -25,6 +25,11 @@ Runs the historical intelligence loop without daily operator intervention:
 - theme discovery queue
 - guarded Codex theme proposals
 - guarded Codex candidate expansion for coverage gaps
+- cross-corroboration checks and confidence calibration before ideas reach the operator view
+- time-decay and recent-evidence floors before stale priors can shape a live recommendation
+- reality-aware replay summaries with spread, slippage, liquidity, and session-state penalties
+- constrained autonomy outputs: `deploy`, `shadow`, `watch`, `abstain`
+- shadow-book rollback that can force the engine back into shadow mode after weak recent samples
 
 ## Why it exists
 
@@ -90,6 +95,23 @@ The investment snapshot now auto-suppresses weak idea cards before the operator 
 
 This reduces manual filtering by removing cards that combine weak conviction, weak evidence, weak transmission, and high false-positive risk.
 
+## Constrained autonomy
+
+The automation loop is no longer just "find more themes and assets". It now also self-constrains.
+
+The live investment snapshot applies:
+
+- cross-source contradiction penalties
+- rumor and hedge-language penalties
+- recency decay on old mapping priors
+- recent-evidence floors for live deployment
+- execution-reality penalties for closed sessions, weak liquidity, spread, and slippage
+- calibrated confidence scoring
+- `deploy`, `shadow`, `watch`, `abstain` action gating
+- shadow-book rollback if recent tracked ideas deteriorate
+
+This keeps the system closer to a constrained autonomous research stack than an unconstrained execution bot.
+
 ## Current policy
 
 - default mode: `guarded-auto`
@@ -124,3 +146,4 @@ node --import tsx scripts/intelligence-scheduler.mjs status
 - Codex can propose backtest themes, but it does not blindly override the scheduler policy.
 - A promoted theme still depends on market data and replay coverage.
 - Empty or disabled dataset registries do nothing by design.
+- Even with stronger automation, the stack is still policy-gated and cost-aware by design.

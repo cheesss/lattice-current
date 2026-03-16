@@ -37,3 +37,20 @@ npm run intelligence:scheduler:once
 npm run intelligence:scheduler
 node --import tsx scripts/intelligence-scheduler.mjs status
 ```
+
+## 制約付き自律性
+
+この自動化ループは、テーマや候補を増やすだけでは終わりません。
+
+投資スナップショットには次の制約も入ります。
+
+- ソース間の矛盾 penalty
+- rumor / hedge language penalty
+- 古い prior の減衰
+- recent-evidence floor
+- spread / slippage / liquidity / session-state penalty
+- calibrated confidence
+- `deploy`, `shadow`, `watch`, `abstain` action gate
+- 最近の shadow performance が悪化した時の rollback
+
+つまり現在の構造は、無制限の auto-trader よりも制約付き autonomous research stack に近いです。

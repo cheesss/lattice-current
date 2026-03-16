@@ -18598,6 +18598,36 @@ body.has-critical-banner .panels-grid {
   color: rgba(214, 224, 240, 0.84);
 }
 
+.investment-action-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 146, 196, 0.24);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(11, 19, 34, 0.9);
+}
+
+.investment-action-chip.ready {
+  color: #7ee0b3;
+  border-color: rgba(66, 205, 160, 0.34);
+}
+
+.investment-action-chip.watch {
+  color: #ffd48a;
+  border-color: rgba(232, 175, 55, 0.34);
+}
+
+.investment-action-chip.blocked {
+  color: #ffb1b1;
+  border-color: rgba(220, 87, 87, 0.34);
+}
+
 .backtest-lab-btn.selected {
   border-color: rgba(121, 192, 255, 0.64);
   box-shadow: 0 0 0 1px rgba(121, 192, 255, 0.2);

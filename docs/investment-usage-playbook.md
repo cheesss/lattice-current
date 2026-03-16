@@ -137,6 +137,19 @@ This system is not an auto-trader. Use it as a structured decision-support termi
 - Source acceptance is now mostly automated under guarded policy, but it uses composite source scoring plus category/domain caps rather than raw confidence alone.
 - Weak theme motifs and low-signal autonomous keywords are now auto-retired or auto-rejected by the unattended loop.
 - Weak idea cards are now auto-suppressed before the operator view, so the dashboard no longer depends on manual cleanup of every low-quality card.
+- The engine now applies cross-corroboration and contradiction penalties, so multi-source disagreement can reduce confidence even when the headline count looks strong.
+- The engine now applies recency decay and recent-evidence floors, so old mapping wins cannot dominate current recommendations.
+- The engine now applies constrained-autonomy actions:
+  - `deploy`
+  - `shadow`
+  - `watch`
+  - `abstain`
+- The engine now applies execution-reality penalties:
+  - spread
+  - slippage
+  - liquidity
+  - session-state / closed-market risk
+- Recent shadow-book weakness can now arm rollback and force the system into shadow mode until performance recovers.
 
 ## Unattended automation loop
 
@@ -164,6 +177,8 @@ The backtest stack can now run without daily operator clicks, but only if you wi
 10. Auto-accept only when universe thresholds pass, then replay again if the active universe changed
 11. Review keyword lifecycle and retire low-signal autonomous keywords
 12. Auto-clean weak theme queue items and suppress weak idea cards before the operator view
+13. Apply constrained-autonomy gates so weak, stale, contradictory, or low-executability ideas are downgraded to `shadow`, `watch`, or `abstain`
+14. Keep shadow-book rollback armed until recent tracked performance recovers
 
 ### What Codex does and does not do
 

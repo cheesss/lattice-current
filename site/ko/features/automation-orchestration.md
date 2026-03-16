@@ -37,3 +37,20 @@ npm run intelligence:scheduler:once
 npm run intelligence:scheduler
 node --import tsx scripts/intelligence-scheduler.mjs status
 ```
+
+## 제약된 자율성
+
+이 자동화 루프는 테마와 후보를 더 많이 찾는 데서 끝나지 않습니다.
+
+이제 투자 스냅샷은 아래 제약도 같이 적용합니다.
+
+- 소스 간 모순 패널티
+- 루머 / hedge 표현 패널티
+- 오래된 prior 감쇠
+- recent-evidence floor
+- spread / slippage / liquidity / session-state 패널티
+- calibrated confidence
+- `deploy`, `shadow`, `watch`, `abstain` action gate
+- 최근 shadow 성과가 나빠질 때 rollback
+
+즉 지금 구조는 무제한 auto-trader보다 제약된 자율 연구 스택에 더 가깝습니다.

@@ -36,6 +36,7 @@ interface EventDecisionSummary {
   direction: string;
   horizonHours: number | null;
   signedReturnPct: number | null;
+  costAdjustedSignedReturnPct: number | null;
   hit: boolean | null;
 }
 
@@ -103,6 +104,14 @@ function runAvgReturn(run: HistoricalReplayRun, horizon: number): number | null 
   return Number(average(rows.map((row) => row.signedReturnPct || 0)).toFixed(2));
 }
 
+function runCostAdjustedAvgReturn(run: HistoricalReplayRun, horizon: number): number | null {
+  const rows = run.forwardReturns.filter(
+    (row) => row.horizonHours === horizon && typeof row.costAdjustedSignedReturnPct === 'number',
+  );
+  if (rows.length === 0) return null;
+  return Number(average(rows.map((row) => row.costAdjustedSignedReturnPct || 0)).toFixed(2));
+}
+
 function renderWindowSummary(windows: WalkForwardWindow[] | undefined): string {
   if (!windows || windows.length === 0) return 'single replay window';
   return windows.map((window) => `${window.phase}:${window.frameCount}`).join(' | ');
@@ -125,7 +134,9 @@ function chooseBestRecord(records: ForwardReturnRecord[], preferredHorizon: numb
     ? preferred
     : records.filter((row) => typeof row.signedReturnPct === 'number');
   if (target.length === 0) return null;
-  return target.slice().sort((a, b) => (b.signedReturnPct || 0) - (a.signedReturnPct || 0))[0] || null;
+  return target.slice().sort((a, b) =>
+    (b.costAdjustedSignedReturnPct ?? b.signedReturnPct ?? 0) - (a.costAdjustedSignedReturnPct ?? a.signedReturnPct ?? 0),
+  )[0] || null;
 }
 
 function buildDecisionSummaries(run: HistoricalReplayRun): EventDecisionSummary[] {
@@ -146,12 +157,15 @@ function buildDecisionSummaries(run: HistoricalReplayRun): EventDecisionSummary[
         direction: best?.direction || ideaRun.direction,
         horizonHours: best?.horizonHours ?? null,
         signedReturnPct: best?.signedReturnPct ?? null,
-        hit: best && typeof best.signedReturnPct === 'number' ? best.signedReturnPct > 0 : null,
+        costAdjustedSignedReturnPct: best?.costAdjustedSignedReturnPct ?? null,
+        hit: best && typeof (best.costAdjustedSignedReturnPct ?? best.signedReturnPct) === 'number'
+          ? (best.costAdjustedSignedReturnPct ?? best.signedReturnPct ?? 0) > 0
+          : null,
       };
     })
     .sort((a, b) => {
-      const scoreA = typeof a.signedReturnPct === 'number' ? a.signedReturnPct : -999;
-      const scoreB = typeof b.signedReturnPct === 'number' ? b.signedReturnPct : -999;
+      const scoreA = typeof (a.costAdjustedSignedReturnPct ?? a.signedReturnPct) === 'number' ? (a.costAdjustedSignedReturnPct ?? a.signedReturnPct ?? -999) : -999;
+      const scoreB = typeof (b.costAdjustedSignedReturnPct ?? b.signedReturnPct) === 'number' ? (b.costAdjustedSignedReturnPct ?? b.signedReturnPct ?? -999) : -999;
       return scoreB - scoreA;
     });
 }
@@ -175,7 +189,7 @@ function buildRunRegionOptions(runs: HistoricalReplayRun[]): string[] {
 }
 
 function buildEquityCurve(decisions: EventDecisionSummary[]): string {
-  const rows = decisions.filter((decision) => typeof decision.signedReturnPct === 'number');
+  const rows = decisions.filter((decision) => typeof (decision.costAdjustedSignedReturnPct ?? decision.signedReturnPct) === 'number');
   if (!rows.length) {
     return '<div class="backtest-lab-chart-card"><div class="backtest-lab-note">Equity curve unavailable for current focus.</div></div>';
   }
@@ -186,7 +200,7 @@ function buildEquityCurve(decisions: EventDecisionSummary[]): string {
     .slice()
     .sort((a, b) => asTs(a.generatedAt) - asTs(b.generatedAt))
     .map((row, index, arr) => {
-      equity += row.signedReturnPct || 0;
+      equity += row.costAdjustedSignedReturnPct ?? row.signedReturnPct ?? 0;
       return { x: 30 + (index / Math.max(1, arr.length - 1)) * (width - 60), equity };
     });
   const minEquity = Math.min(0, ...points.map((point) => point.equity));
@@ -213,7 +227,7 @@ function buildEquityCurve(decisions: EventDecisionSummary[]): string {
 }
 
 function buildHeatmap(decisions: EventDecisionSummary[]): string {
-  const rows = decisions.filter((decision) => typeof decision.signedReturnPct === 'number');
+  const rows = decisions.filter((decision) => typeof (decision.costAdjustedSignedReturnPct ?? decision.signedReturnPct) === 'number');
   if (!rows.length) {
     return '<div class="backtest-lab-chart-card"><div class="backtest-lab-note">Decision heatmap unavailable for current focus.</div></div>';
   }
@@ -221,9 +235,10 @@ function buildHeatmap(decisions: EventDecisionSummary[]): string {
   for (const row of rows) {
     const day = row.generatedAt.slice(0, 10);
     const bucket = byDay.get(day) || { count: 0, hits: 0, total: 0 };
+    const value = row.costAdjustedSignedReturnPct ?? row.signedReturnPct ?? 0;
     bucket.count += 1;
-    if ((row.signedReturnPct || 0) > 0) bucket.hits += 1;
-    bucket.total += row.signedReturnPct || 0;
+    if (value > 0) bucket.hits += 1;
+    bucket.total += value;
     byDay.set(day, bucket);
   }
   const cells = Array.from(byDay.entries())
@@ -273,7 +288,14 @@ function buildSymbolReturnTable(run: HistoricalReplayRun, ideaRun: BacktestIdeaR
         <td>${escapeHtml(symbolState.role)}</td>
         <td>${escapeHtml(symbolState.direction.toUpperCase())}</td>
         <td>${formatMaybeNumber(symbolState.entryPrice)}</td>
-        ${horizonColumns.map((horizon) => `<td>${formatPct(byHorizon.get(horizon)?.signedReturnPct)}</td>`).join('')}
+        ${horizonColumns.map((horizon) => {
+          const record = byHorizon.get(horizon);
+          const display = record?.costAdjustedSignedReturnPct ?? record?.signedReturnPct ?? null;
+          const tooltip = record && typeof record.executionPenaltyPct === 'number'
+            ? ` title="raw ${formatPct(record.signedReturnPct)} | penalty ${record.executionPenaltyPct.toFixed(2)}% | session ${record.sessionState}"`
+            : '';
+          return `<td${tooltip}>${formatPct(display)}</td>`;
+        }).join('')}
       </tr>
     `;
   }).join('');
@@ -727,6 +749,7 @@ export class BacktestLabPanel extends Panel {
     const horizon = primaryHorizon(selectedRun);
     const runHit = runHitRate(selectedRun, horizon);
     const runAvg = runAvgReturn(selectedRun, horizon);
+    const runCostAvg = runCostAdjustedAvgReturn(selectedRun, horizon);
     const sourcePosterior = selectedRun.sourceProfiles.length > 0
       ? Math.round(average(selectedRun.sourceProfiles.map((profile) => profile.posteriorAccuracyScore)))
       : 0;
@@ -757,7 +780,7 @@ export class BacktestLabPanel extends Panel {
           <td>${escapeHtml(decision.symbol || '-')}</td>
           <td>${escapeHtml(decision.direction.toUpperCase())}</td>
           <td>${decision.horizonHours ?? 'n/a'}${decision.horizonHours ? 'h' : ''}</td>
-          <td>${formatPct(decision.signedReturnPct)}</td>
+          <td>${formatPct(decision.costAdjustedSignedReturnPct ?? decision.signedReturnPct)}</td>
           <td>${decision.conviction}</td>
           <td>${decision.falsePositiveRisk}</td>
         </tr>
@@ -823,8 +846,16 @@ export class BacktestLabPanel extends Panel {
             <span class="backtest-lab-kpi-value">${runHit ?? 'n/a'}%</span>
           </div>
           <div class="backtest-lab-kpi">
-            <span class="backtest-lab-kpi-label">Avg Return</span>
+            <span class="backtest-lab-kpi-label">Raw Avg</span>
             <span class="backtest-lab-kpi-value">${formatPct(runAvg)}</span>
+          </div>
+          <div class="backtest-lab-kpi">
+            <span class="backtest-lab-kpi-label">Cost Adj Avg</span>
+            <span class="backtest-lab-kpi-value">${formatPct(runCostAvg)}</span>
+          </div>
+          <div class="backtest-lab-kpi">
+            <span class="backtest-lab-kpi-label">Reality Gate</span>
+            <span class="backtest-lab-kpi-value">hit ${selectedRun.realitySummary.costAdjustedHitRate}% / score ${selectedRun.realitySummary.avgRealityScore}</span>
           </div>
           <div class="backtest-lab-kpi">
             <span class="backtest-lab-kpi-label">Learned Priors</span>
@@ -858,7 +889,7 @@ export class BacktestLabPanel extends Panel {
           <section class="investment-subcard">
             <h4>Best Historical Decisions</h4>
             <table class="investment-table backtest-lab-table">
-              <thead><tr><th>Event</th><th>Region</th><th>Asset</th><th>Dir</th><th>H</th><th>Return</th><th>Conv</th><th>FP</th></tr></thead>
+              <thead><tr><th>Event</th><th>Region</th><th>Asset</th><th>Dir</th><th>H</th><th>Adj Return</th><th>Conv</th><th>FP</th></tr></thead>
               <tbody>${decisionRows || '<tr><td colspan="8">No event decisions yet</td></tr>'}</tbody>
             </table>
           </section>
@@ -876,6 +907,7 @@ export class BacktestLabPanel extends Panel {
               <span>FP ${selectedIdea.falsePositiveRisk}</span>
               <span>Size ${selectedIdea.sizePct}%</span>
               <span>Best ${selectedDecision?.symbol ? `${escapeHtml(selectedDecision.symbol)} ${escapeHtml(selectedDecision.direction.toUpperCase())}` : 'n/a'} ${selectedDecision?.horizonHours ? `@ ${selectedDecision.horizonHours}h` : ''}</span>
+              <span>Adj ${formatPct(selectedDecision?.costAdjustedSignedReturnPct ?? selectedDecision?.signedReturnPct)}</span>
             </div>
             <div class="investment-idea-thesis">${escapeHtml(selectedIdea.thesis)}</div>
             <div class="investment-grid-two">

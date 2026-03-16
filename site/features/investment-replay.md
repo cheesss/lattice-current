@@ -5,7 +5,7 @@ status: beta
 variants:
   - finance
   - tech
-updated: 2026-03-15
+updated: 2026-03-16
 owner: core
 ---
 
@@ -42,6 +42,12 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - candidate auto-approval that now uses composite scoring plus sector and asset-kind caps
 - weak theme motifs and low-signal autonomous keywords that can now be auto-retired or auto-rejected
 - weak idea cards that can now be auto-suppressed before the operator view
+- cross-corroboration scoring that penalizes rumor-heavy or contradictory source clusters
+- calibrated confidence and constrained autonomy actions: `deploy`, `shadow`, `watch`, `abstain`
+- time-decay and recent-evidence floors so stale mapping priors cannot dominate current recommendations
+- reality-aware execution checks for spread, slippage, liquidity, and session state
+- shadow-book rollback signals that can force the engine back into shadow mode after weak recent performance
+- cost-adjusted replay summaries in Backtest Lab, not only raw signed returns
 
 ## Key UI surfaces
 
@@ -70,10 +76,21 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - scheduler-driven candidate expansion and replay refresh after accepted universe changes, with cooldown and per-region balancing
 - autonomous keyword lifecycle review and theme-queue hygiene
 - pre-render idea-card triage and suppression
+- cross-corroboration and contradiction penalties over clustered sources
+- confidence calibration, no-trade gating, and shadow-only fallback
+- execution-reality penalties for session state, spread, slippage, and liquidity
+- recency weighting and stale-prior decay inside deterministic ranking
+- shadow-book rollback and constrained autonomy state carried into the operator workflow
 
 ## Limits
 
 The public site documents the system behavior but not private operational data or sensitive market configurations.
+
+The engine is now closer to constrained autonomy, but it is still not a blind live auto-trader. It remains:
+
+- a decision-support and paper-trade research surface first
+- a cost-aware replay engine second
+- a human-reviewed or policy-gated execution candidate generator, not an unconstrained execution bot
 
 ## Variant coverage
 

@@ -9,6 +9,7 @@ import type {
 } from './investment-intelligence';
 import type { ScheduledReport } from './scheduled-reports';
 import type { SourceCredibilityProfile } from './source-credibility';
+import { assessExecutionReality } from './autonomy-constraints';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import {
   exportInvestmentLearningState,
@@ -49,6 +50,9 @@ export interface BacktestIdeaRunSymbol {
   role: 'primary' | 'confirm' | 'hedge';
   direction: InvestmentDirection;
   sector?: string;
+  assetKind?: 'etf' | 'equity' | 'commodity' | 'fx' | 'rate' | 'crypto';
+  liquidityScore?: number | null;
+  realityScore?: number | null;
   entryPrice: number | null;
 }
 
@@ -87,6 +91,26 @@ export interface ForwardReturnRecord {
   exitPrice: number | null;
   rawReturnPct: number | null;
   signedReturnPct: number | null;
+  costAdjustedSignedReturnPct: number | null;
+  executionPenaltyPct: number;
+  realityScore: number;
+  sessionState: 'always-on' | 'open' | 'extended' | 'closed';
+  tradableNow: boolean;
+  spreadBps: number;
+  slippageBps: number;
+  liquidityPenaltyPct: number;
+  realityNotes: string[];
+}
+
+export interface RealityAwareBacktestSummary {
+  primaryHorizonHours: number;
+  rawHitRate: number;
+  costAdjustedHitRate: number;
+  rawAvgReturnPct: number;
+  costAdjustedAvgReturnPct: number;
+  avgExecutionPenaltyPct: number;
+  avgRealityScore: number;
+  nonTradableRate: number;
 }
 
 export interface ReplayCheckpoint {
@@ -134,6 +158,7 @@ export interface HistoricalReplayRun {
   banditStates?: InvestmentLearningState['banditStates'];
   candidateReviews?: InvestmentLearningState['candidateReviews'];
   workflow: InvestmentIntelligenceSnapshot['workflow'];
+  realitySummary: RealityAwareBacktestSummary;
   summaryLines: string[];
   windows?: WalkForwardWindow[];
 }
@@ -217,12 +242,40 @@ function directionMultiplier(direction: InvestmentDirection): number {
   return 1;
 }
 
+function normalizeForwardReturnRecord(record: ForwardReturnRecord): ForwardReturnRecord {
+  return {
+    ...record,
+    costAdjustedSignedReturnPct: typeof record.costAdjustedSignedReturnPct === 'number'
+      ? record.costAdjustedSignedReturnPct
+      : record.signedReturnPct,
+    executionPenaltyPct: Number(record.executionPenaltyPct) || 0,
+    realityScore: Number(record.realityScore) || 0,
+    sessionState: record.sessionState || 'closed',
+    tradableNow: typeof record.tradableNow === 'boolean' ? record.tradableNow : false,
+    spreadBps: Number(record.spreadBps) || 0,
+    slippageBps: Number(record.slippageBps) || 0,
+    liquidityPenaltyPct: Number(record.liquidityPenaltyPct) || 0,
+    realityNotes: Array.isArray(record.realityNotes) ? record.realityNotes.slice(0, 4) : [],
+  };
+}
+
+function normalizeReplayRun(run: HistoricalReplayRun): HistoricalReplayRun {
+  const forwardReturns = Array.isArray(run.forwardReturns)
+    ? run.forwardReturns.map((record) => normalizeForwardReturnRecord(record))
+    : [];
+  return {
+    ...run,
+    forwardReturns,
+    realitySummary: run.realitySummary || buildRealitySummary(forwardReturns, 24),
+  };
+}
+
 async function ensureLoaded(): Promise<void> {
   if (loaded) return;
   loaded = true;
   try {
     const cached = await getPersistentCache<PersistedReplayRuns>(REPLAY_RUNS_KEY);
-    replayRuns = Array.isArray(cached?.data?.runs) ? cached!.data!.runs : [];
+    replayRuns = Array.isArray(cached?.data?.runs) ? cached!.data!.runs.map((run) => normalizeReplayRun(run)) : [];
   } catch (error) {
     console.warn('[historical-intelligence] load failed', error);
   }
@@ -368,6 +421,12 @@ function buildForwardReturns(
         typeof symbolState.entryPrice === 'number' && Number.isFinite(symbolState.entryPrice)
           ? symbolState.entryPrice
           : findNearestPrice(series, entryTs, 30 * 60 * 1000)?.price ?? null;
+      const reality = assessExecutionReality({
+        assetKind: symbolState.assetKind || 'equity',
+        liquidityScore: typeof symbolState.liquidityScore === 'number' ? symbolState.liquidityScore : 58,
+        marketMovePct: null,
+        timestamp: ideaRun.generatedAt,
+      });
 
       for (const horizonHours of horizonsHours) {
         const targetTs = entryTs + horizonHours * 60 * 60 * 1000;
@@ -381,6 +440,10 @@ function buildForwardReturns(
           rawReturnPct == null
             ? null
             : Number((rawReturnPct * directionMultiplier(symbolState.direction)).toFixed(2));
+        const costAdjustedSignedReturnPct =
+          signedReturnPct == null
+            ? null
+            : Number((signedReturnPct - reality.executionPenaltyPct).toFixed(2));
 
         records.push({
           id: `${ideaRun.id}:${symbolState.symbol}:${horizonHours}h`,
@@ -395,6 +458,15 @@ function buildForwardReturns(
           exitPrice,
           rawReturnPct,
           signedReturnPct,
+          costAdjustedSignedReturnPct,
+          executionPenaltyPct: reality.executionPenaltyPct,
+          realityScore: reality.realityScore,
+          sessionState: reality.sessionState,
+          tradableNow: reality.tradableNow,
+          spreadBps: reality.spreadBps,
+          slippageBps: reality.slippageBps,
+          liquidityPenaltyPct: reality.liquidityPenaltyPct,
+          realityNotes: reality.notes.slice(0, 4),
         });
       }
     }
@@ -412,14 +484,7 @@ function buildSummaryLines(
   _checkpoints: ReplayCheckpoint[],
   windows?: WalkForwardWindow[],
 ): string[] {
-  const primaryHorizon = 24;
-  const primary = forwardReturns.filter((row) => row.horizonHours === primaryHorizon && typeof row.signedReturnPct === 'number');
-  const hitRate = primary.length > 0
-    ? Math.round((primary.filter((row) => (row.signedReturnPct || 0) > 0).length / primary.length) * 100)
-    : 0;
-  const avgReturn = primary.length > 0
-    ? Number(average(primary.map((row) => row.signedReturnPct || 0)).toFixed(2))
-    : 0;
+  const reality = buildRealitySummary(forwardReturns, 24);
   const avgCredibility = sourceProfiles.length > 0
     ? Math.round(average(sourceProfiles.map((row) => row.posteriorAccuracyScore)))
     : 0;
@@ -430,12 +495,53 @@ function buildSummaryLines(
   return [
     `${frameCount} point-in-time frames processed, ${Math.max(0, frameCount - warmupFrameCount)} evaluated, ${warmupFrameCount} reserved for warm-up.`,
     `${forwardReturns.length} forward-return labels generated across ${new Set(forwardReturns.map((row) => row.symbol)).size} symbols and ${new Set(forwardReturns.map((row) => row.horizonHours)).size} horizons.`,
-    `${primaryHorizon}h primary horizon hit-rate ${hitRate}% with avg signed return ${avgReturn}%.`,
+    `${reality.primaryHorizonHours}h primary horizon raw hit-rate ${reality.rawHitRate}% / cost-adjusted hit-rate ${reality.costAdjustedHitRate}% with raw avg ${reality.rawAvgReturnPct}% and cost-adjusted avg ${reality.costAdjustedAvgReturnPct}%.`,
+    `Avg execution penalty ${reality.avgExecutionPenaltyPct}% with reality score ${reality.avgRealityScore} and non-tradable rate ${reality.nonTradableRate}%.`,
     `Learned source posterior avg ${avgCredibility} and mapping posterior avg ${avgMappingPosterior}.`,
     windows && windows.length > 0
       ? `${windows.map((window) => `${window.phase}:${window.frameCount}`).join(' | ')}`
       : 'Single replay window executed.',
   ];
+}
+
+function buildRealitySummary(
+  forwardReturns: ForwardReturnRecord[],
+  primaryHorizonHours: number,
+): RealityAwareBacktestSummary {
+  const primary = forwardReturns.filter((row) => row.horizonHours === primaryHorizonHours && typeof row.signedReturnPct === 'number');
+  const rawHitRate = primary.length > 0
+    ? Math.round((primary.filter((row) => (row.signedReturnPct || 0) > 0).length / primary.length) * 100)
+    : 0;
+  const costAdjustedRows = primary.filter((row) => typeof row.costAdjustedSignedReturnPct === 'number');
+  const costAdjustedHitRate = costAdjustedRows.length > 0
+    ? Math.round((costAdjustedRows.filter((row) => (row.costAdjustedSignedReturnPct || 0) > 0).length / costAdjustedRows.length) * 100)
+    : 0;
+  const rawAvgReturnPct = primary.length > 0
+    ? Number(average(primary.map((row) => row.signedReturnPct || 0)).toFixed(2))
+    : 0;
+  const costAdjustedAvgReturnPct = costAdjustedRows.length > 0
+    ? Number(average(costAdjustedRows.map((row) => row.costAdjustedSignedReturnPct || 0)).toFixed(2))
+    : 0;
+  const avgExecutionPenaltyPct = primary.length > 0
+    ? Number(average(primary.map((row) => row.executionPenaltyPct || 0)).toFixed(2))
+    : 0;
+  const avgRealityScore = primary.length > 0
+    ? Math.round(average(primary.map((row) => row.realityScore || 0)))
+    : 0;
+  const nonTradableRate = primary.length > 0
+    ? Math.round((primary.filter((row) => !row.tradableNow).length / primary.length) * 100)
+    : 0;
+
+  return {
+    primaryHorizonHours,
+    rawHitRate,
+    costAdjustedHitRate,
+    rawAvgReturnPct,
+    costAdjustedAvgReturnPct,
+    avgExecutionPenaltyPct,
+    avgRealityScore,
+    nonTradableRate,
+  };
 }
 
 async function executeReplay(args: {
@@ -523,6 +629,7 @@ async function executeReplay(args: {
     const sourceProfiles = await exportSourceCredibilityState();
     const priceSeries = buildPriceSeries(frames);
     const forwardReturns = buildForwardReturns(runId, ideaRuns, priceSeries, args.horizonsHours);
+    const realitySummary = buildRealitySummary(forwardReturns, 24);
     const finalSnapshot = await exportInvestmentLearningState();
 
     const run: HistoricalReplayRun = {
@@ -545,6 +652,7 @@ async function executeReplay(args: {
       banditStates: finalSnapshot.banditStates,
       candidateReviews: finalSnapshot.candidateReviews,
       workflow: finalSnapshot.snapshot?.workflow ?? [],
+      realitySummary,
       summaryLines: buildSummaryLines(frames.length, warmupFramesApplied, ideaRuns, forwardReturns, sourceProfiles, mappingStats, checkpoints, args.windows),
       windows: args.windows,
     };
