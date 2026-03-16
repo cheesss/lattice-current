@@ -57,6 +57,8 @@ features:
   </div>
 </div>
 
+<InteractiveGlobeHero locale="ja" />
+
 <OperationsConsoleDemo locale="ja" />
 
 ## フォークとしての位置づけ
@@ -108,4 +110,5 @@ features:
 
 ## 最新更新
 
+- [2026-03: ホームにインタラクティブグローブを追加](/ja/updates/2026-03-interactive-globe-home)
 - [2026-03: ドキュメントサイト公開と公開ポリシー整理](/ja/updates/2026-03-docs-launch)

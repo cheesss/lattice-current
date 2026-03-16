@@ -57,6 +57,8 @@ features:
   </div>
 </div>
 
+<InteractiveGlobeHero locale="ko" />
+
 <OperationsConsoleDemo locale="ko" />
 
 ## 포크 위치
@@ -108,4 +110,5 @@ features:
 
 ## 최신 업데이트
 
+- [2026-03: 문서 홈에 인터랙티브 지구본 추가](/ko/updates/2026-03-interactive-globe-home)
 - [2026-03: 문서 사이트 공개와 공개 정책 정리](/ko/updates/2026-03-docs-launch)

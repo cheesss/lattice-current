@@ -57,6 +57,8 @@ If you only make one click, open the operations console below. It is the shortes
   </div>
 </div>
 
+<InteractiveGlobeHero locale="en" />
+
 <OperationsConsoleDemo locale="en" />
 
 ## Fork position
@@ -108,4 +110,5 @@ Public docs intentionally describe product behavior, architecture, and algorithm
 
 ## Latest update
 
+- [2026-03: Interactive globe added to the docs home](/updates/2026-03-interactive-globe-home)
 - [2026-03: GitHub Pages docs launch and publication policy](/updates/2026-03-docs-launch)
