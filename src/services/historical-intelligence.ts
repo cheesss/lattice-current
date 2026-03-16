@@ -598,6 +598,7 @@ async function executeReplay(args: {
         transmission: frame.transmission ?? null,
         sourceCredibility: sourceProfiles,
         reports: frame.reports ?? [],
+        keywordGraph: null,
       });
 
       checkpoints.push({

@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import type { HistoricalBackfillOptions, HistoricalFrameLoadOptions } from '../importer/historical-stream-worker';
 import { loadHistoricalReplayFramesFromDuckDb, processHistoricalDump } from '../importer/historical-stream-worker';
 import type { HistoricalReplayOptions, HistoricalReplayRun, WalkForwardBacktestOptions } from '../historical-intelligence';
-import { runHistoricalReplay, runWalkForwardBacktest } from '../historical-intelligence';
+import { listHistoricalReplayRuns, runHistoricalReplay, runWalkForwardBacktest } from '../historical-intelligence';
 import {
   listBaseInvestmentThemes,
   getInvestmentIntelligenceSnapshot,
@@ -18,8 +18,23 @@ import {
   type CodexThemeProposal,
   type ThemeDiscoveryQueueItem,
 } from '../theme-discovery';
+import {
+  type DatasetProposal,
+  type DatasetDiscoveryPolicy,
+  type DatasetDiscoveryThemeInput,
+  autoRegisterDatasetProposals,
+  normalizeDatasetDiscoveryPolicy,
+  proposeDatasetsForThemes,
+} from '../dataset-discovery';
+import {
+  type ExperimentRegistrySnapshot,
+  getExperimentRegistrySnapshot,
+  hydrateExperimentRegistry,
+  runSelfTuningCycle,
+} from '../experiment-registry';
 import { isLowSignalKeywordTerm, reviewKeywordRegistryLifecycle } from '../keyword-registry';
 import { proposeCandidatesWithCodex } from './codex-candidate-proposer';
+import { proposeDatasetsWithCodex } from './codex-dataset-proposer';
 import { proposeThemeWithCodex } from './codex-theme-proposer';
 import {
   normalizeSourceAutomationPolicy,
@@ -28,7 +43,7 @@ import {
 } from './source-automation';
 
 type HistoricalProvider = 'fred' | 'alfred' | 'gdelt-doc' | 'coingecko' | 'acled';
-type AutomationJobKind = 'fetch' | 'import' | 'replay' | 'walk-forward' | 'theme-discovery' | 'theme-proposer' | 'candidate-expansion' | 'source-automation' | 'keyword-lifecycle' | 'retention';
+type AutomationJobKind = 'fetch' | 'import' | 'replay' | 'walk-forward' | 'theme-discovery' | 'theme-proposer' | 'candidate-expansion' | 'source-automation' | 'keyword-lifecycle' | 'dataset-discovery' | 'self-tuning' | 'retention';
 type ThemeAutomationMode = 'manual' | 'guarded-auto' | 'full-auto';
 type GapSeverity = 'watch' | 'elevated' | 'critical';
 
@@ -72,6 +87,17 @@ export interface CandidateAutomationPolicy {
   maxThemesPerRegionPerCycle: number;
 }
 
+export interface DatasetAutomationPolicy extends DatasetDiscoveryPolicy {
+  enabled: boolean;
+  everyMinutes: number;
+  codexTopThemesPerCycle: number;
+}
+
+export interface ExperimentAutomationPolicy {
+  enabled: boolean;
+  everyMinutes: number;
+}
+
 export interface IntelligenceAutomationRegistry {
   version: number;
   defaults: {
@@ -95,6 +121,8 @@ export interface IntelligenceAutomationRegistry {
   themeAutomation: ThemeAutomationPolicy;
   sourceAutomation: SourceAutomationPolicy;
   candidateAutomation: CandidateAutomationPolicy;
+  datasetAutomation: DatasetAutomationPolicy;
+  experimentAutomation: ExperimentAutomationPolicy;
   datasets: IntelligenceDatasetRegistryEntry[];
 }
 
@@ -135,11 +163,15 @@ export interface IntelligenceAutomationState {
   updatedAt: string;
   lastCandidateExpansionAt?: string | null;
   lastKeywordLifecycleAt?: string | null;
+  lastDatasetDiscoveryAt?: string | null;
+  lastSelfTuningAt?: string | null;
   candidateThemeHistory?: Record<string, string>;
   datasets: Record<string, DatasetAutomationState>;
   runs: AutomationRunRecord[];
   themeQueue: ThemeDiscoveryQueueItem[];
   promotedThemes: PromotedThemeState[];
+  datasetProposals: DatasetProposal[];
+  experimentRegistry: ExperimentRegistrySnapshot | null;
 }
 
 export interface IntelligenceAutomationCycleResult {
@@ -150,6 +182,8 @@ export interface IntelligenceAutomationCycleResult {
   replayRuns: Array<{ datasetId: string; runId: string; mode: 'replay' | 'walk-forward'; ideaCount: number }>;
   promotedThemes: string[];
   candidateThemes: string[];
+  registeredDatasets: string[];
+  tuningAction: 'idle' | 'observe' | 'promote' | 'rollback';
   sourceAutomation: Awaited<ReturnType<typeof runSourceAutomationSweep>>;
   queueOpenCount: number;
 }
@@ -169,6 +203,11 @@ function sleep(ms: number): Promise<void> {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function average(values: number[]): number {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function slugify(value: string): string {
@@ -238,6 +277,23 @@ function createDefaultRegistry(): IntelligenceAutomationRegistry {
       themeCooldownHours: 12,
       maxThemesPerRegionPerCycle: 1,
     },
+    datasetAutomation: {
+      enabled: true,
+      everyMinutes: 360,
+      codexTopThemesPerCycle: 2,
+      ...normalizeDatasetDiscoveryPolicy({
+        mode: 'guarded-auto',
+        minProposalScore: 60,
+        autoRegisterScore: 74,
+        autoEnableScore: 88,
+        maxRegistrationsPerCycle: 2,
+        maxEnabledDatasets: 12,
+      }),
+    },
+    experimentAutomation: {
+      enabled: true,
+      everyMinutes: 180,
+    },
     datasets: [],
   };
 }
@@ -248,11 +304,15 @@ function defaultState(): IntelligenceAutomationState {
     updatedAt: nowIso(),
     lastCandidateExpansionAt: null,
     lastKeywordLifecycleAt: null,
+    lastDatasetDiscoveryAt: null,
+    lastSelfTuningAt: null,
     candidateThemeHistory: {},
     datasets: {},
     runs: [],
     themeQueue: [],
     promotedThemes: [],
+    datasetProposals: [],
+    experimentRegistry: getExperimentRegistrySnapshot(),
   };
 }
 
@@ -289,6 +349,16 @@ function normalizeRegistry(raw?: Partial<IntelligenceAutomationRegistry> | null)
       themeCooldownHours: Math.max(1, Math.min(168, Number(raw?.candidateAutomation?.themeCooldownHours) || fallback.candidateAutomation.themeCooldownHours)),
       maxThemesPerRegionPerCycle: Math.max(1, Math.min(4, Number(raw?.candidateAutomation?.maxThemesPerRegionPerCycle) || fallback.candidateAutomation.maxThemesPerRegionPerCycle)),
     },
+    datasetAutomation: {
+      enabled: typeof raw?.datasetAutomation?.enabled === 'boolean' ? raw.datasetAutomation.enabled : fallback.datasetAutomation.enabled,
+      everyMinutes: Math.max(30, Number(raw?.datasetAutomation?.everyMinutes) || fallback.datasetAutomation.everyMinutes),
+      codexTopThemesPerCycle: Math.max(0, Math.min(4, Number(raw?.datasetAutomation?.codexTopThemesPerCycle) || fallback.datasetAutomation.codexTopThemesPerCycle)),
+      ...normalizeDatasetDiscoveryPolicy(raw?.datasetAutomation),
+    },
+    experimentAutomation: {
+      enabled: typeof raw?.experimentAutomation?.enabled === 'boolean' ? raw.experimentAutomation.enabled : fallback.experimentAutomation.enabled,
+      everyMinutes: Math.max(15, Number(raw?.experimentAutomation?.everyMinutes) || fallback.experimentAutomation.everyMinutes),
+    },
     datasets: Array.isArray(raw?.datasets)
       ? raw!.datasets!.map((dataset) => ({
         id: String(dataset.id || '').trim(),
@@ -313,6 +383,8 @@ function normalizeState(raw?: Partial<IntelligenceAutomationState> | null): Inte
     updatedAt: String(raw?.updatedAt || fallback.updatedAt),
     lastCandidateExpansionAt: raw?.lastCandidateExpansionAt || null,
     lastKeywordLifecycleAt: raw?.lastKeywordLifecycleAt || null,
+    lastDatasetDiscoveryAt: raw?.lastDatasetDiscoveryAt || null,
+    lastSelfTuningAt: raw?.lastSelfTuningAt || null,
     candidateThemeHistory: raw?.candidateThemeHistory && typeof raw.candidateThemeHistory === 'object'
       ? Object.fromEntries(Object.entries(raw.candidateThemeHistory).map(([key, value]) => [key, String(value || '')]))
       : {},
@@ -335,6 +407,8 @@ function normalizeState(raw?: Partial<IntelligenceAutomationState> | null): Inte
     runs: Array.isArray(raw?.runs) ? raw!.runs!.slice(-MAX_RUN_RECORDS) : [],
     themeQueue: Array.isArray(raw?.themeQueue) ? raw!.themeQueue! : [],
     promotedThemes: Array.isArray(raw?.promotedThemes) ? raw!.promotedThemes! : [],
+    datasetProposals: Array.isArray(raw?.datasetProposals) ? raw!.datasetProposals! : [],
+    experimentRegistry: raw?.experimentRegistry ? hydrateExperimentRegistry(raw.experimentRegistry) : getExperimentRegistrySnapshot(),
   };
 }
 
@@ -360,6 +434,10 @@ export async function loadAutomationRegistry(registryPath = DEFAULT_REGISTRY_PAT
     return created;
   }
   return normalizeRegistry(existing);
+}
+
+async function saveAutomationRegistry(registry: IntelligenceAutomationRegistry, registryPath = DEFAULT_REGISTRY_PATH): Promise<void> {
+  await writeJsonFile(registryPath, registry);
 }
 
 export async function loadAutomationState(statePath = DEFAULT_STATE_PATH): Promise<IntelligenceAutomationState> {
@@ -696,6 +774,125 @@ function themeQueuePriorityScore(queueItem: ThemeDiscoveryQueueItem): number {
   ), 0, 100);
 }
 
+function buildDatasetThemeInput(snapshot: NonNullable<Awaited<ReturnType<typeof getInvestmentIntelligenceSnapshot>>>, themeId: string): DatasetDiscoveryThemeInput | null {
+  const theme = getInvestmentThemeDefinition(themeId);
+  const mappedRows = snapshot.directMappings.filter((row) => row.themeId === themeId);
+  const gaps = snapshot.coverageGaps.filter((gap) => gap.themeId === themeId);
+  const label = theme?.label || mappedRows[0]?.themeLabel || themeId;
+  if (!label) return null;
+  return {
+    themeId,
+    label,
+    triggers: theme?.triggers.slice(0, 8) || [],
+    sectors: Array.from(new Set([
+      ...(theme?.sectors || []),
+      ...mappedRows.map((row) => row.sector),
+      ...gaps.flatMap((gap) => gap.missingSectors),
+    ])).filter(Boolean).slice(0, 8),
+    commodities: Array.from(new Set([
+      ...(theme?.commodities || []),
+      ...mappedRows.map((row) => row.commodity || '').filter(Boolean),
+    ])).slice(0, 6),
+    supportingHeadlines: Array.from(new Set(mappedRows.map((row) => row.eventTitle))).slice(0, 4),
+    suggestedSymbols: Array.from(new Set([
+      ...mappedRows.map((row) => row.symbol),
+      ...gaps.flatMap((gap) => gap.suggestedSymbols),
+    ])).slice(0, 8),
+    priority: Math.round(
+      Math.min(
+        95,
+        Math.max(
+          35,
+          average(mappedRows.map((row) => row.calibratedConfidence || row.conviction || 0))
+          + gaps.length * 4
+          + Math.min(10, snapshot.hiddenCandidates.filter((item) => item.themeId === themeId).length * 2),
+        ),
+      ),
+    ),
+  };
+}
+
+async function runDatasetDiscoverySweep(args: {
+  registry: IntelligenceAutomationRegistry;
+  state: IntelligenceAutomationState;
+  registryPath?: string;
+}): Promise<{ proposals: DatasetProposal[]; registered: DatasetProposal[] }> {
+  if (!args.registry.datasetAutomation.enabled) {
+    return { proposals: [], registered: [] };
+  }
+  if (!shouldRunEvery(args.state.lastDatasetDiscoveryAt, args.registry.datasetAutomation.everyMinutes)) {
+    return { proposals: args.state.datasetProposals.slice(0, 24), registered: [] };
+  }
+  const snapshot = await getInvestmentIntelligenceSnapshot();
+  if (!snapshot) {
+    args.state.lastDatasetDiscoveryAt = nowIso();
+    return { proposals: [], registered: [] };
+  }
+
+  const rankedThemeIds = Array.from(new Set([
+    ...snapshot.ideaCards.map((card) => card.themeId),
+    ...snapshot.coverageGaps.map((gap) => gap.themeId),
+  ])).slice(0, 8);
+  const themeInputs = rankedThemeIds
+    .map((themeId) => buildDatasetThemeInput(snapshot, themeId))
+    .filter((value): value is DatasetDiscoveryThemeInput => Boolean(value));
+
+  const heuristicProposals = proposeDatasetsForThemes({
+    themes: themeInputs,
+    existingDatasets: args.registry.datasets,
+    policy: args.registry.datasetAutomation,
+  });
+
+  const merged = new Map<string, DatasetProposal>();
+  for (const proposal of [...(snapshot.datasetAutonomy?.proposals || []), ...heuristicProposals]) {
+    const existing = merged.get(proposal.id);
+    if (!existing || existing.proposalScore < proposal.proposalScore) merged.set(proposal.id, proposal);
+  }
+
+  for (const themeInput of themeInputs.slice(0, args.registry.datasetAutomation.codexTopThemesPerCycle)) {
+    const codexProposals = await proposeDatasetsWithCodex(themeInput).catch(() => null);
+    for (const proposal of codexProposals || []) {
+      const existing = merged.get(proposal.id);
+      if (!existing || existing.proposalScore < proposal.proposalScore) {
+        merged.set(proposal.id, {
+          ...proposal,
+          autoRegister: false,
+          autoEnable: false,
+        });
+      }
+    }
+  }
+
+  const proposals = Array.from(merged.values())
+    .sort((a, b) => b.proposalScore - a.proposalScore || b.confidence - a.confidence || a.label.localeCompare(b.label))
+    .slice(0, 24);
+  const autoRegistration = autoRegisterDatasetProposals({
+    registryDatasets: args.registry.datasets,
+    proposals,
+    policy: args.registry.datasetAutomation,
+  });
+  args.registry.datasets = autoRegistration.datasets.map((dataset) => ({ ...dataset }));
+  args.state.datasetProposals = proposals;
+  args.state.lastDatasetDiscoveryAt = nowIso();
+  if (autoRegistration.registered.length > 0) {
+    await saveAutomationRegistry(args.registry, args.registryPath || DEFAULT_REGISTRY_PATH);
+  }
+  appendRun(args.state, {
+    id: `global:dataset-discovery:${args.state.lastDatasetDiscoveryAt}`,
+    datasetId: null,
+    kind: 'dataset-discovery',
+    status: 'ok',
+    startedAt: args.state.lastDatasetDiscoveryAt,
+    completedAt: nowIso(),
+    attempts: 1,
+    detail: `dataset proposals=${proposals.length} registered=${autoRegistration.registered.length}`,
+  });
+  return {
+    proposals,
+    registered: autoRegistration.registered,
+  };
+}
+
 async function runCandidateExpansionSweep(args: {
   registry: IntelligenceAutomationRegistry;
   state: IntelligenceAutomationState;
@@ -778,11 +975,14 @@ export async function runIntelligenceAutomationCycle(args: {
   const registry = await loadAutomationRegistry(args.registryPath);
   const state = await loadAutomationState(args.statePath);
   applyPromotedThemes(state);
+  if (state.experimentRegistry) hydrateExperimentRegistry(state.experimentRegistry);
 
   const touchedDatasets = new Set<string>();
   const replayRuns: IntelligenceAutomationCycleResult['replayRuns'] = [];
+  const replayRunDetails: HistoricalReplayRun[] = [];
   const promotedThemes: string[] = [];
   const candidateThemes: string[] = [];
+  const registeredDatasets: string[] = [];
   const enabledDatasets = registry.datasets.filter((dataset) => dataset.enabled);
   const nowMs = Date.now();
 
@@ -864,6 +1064,7 @@ export async function runIntelligenceAutomationCycle(args: {
           return replayRun;
         }, state);
         replayRuns.push(toReplaySummary(dataset.id, run));
+        replayRunDetails.push(run);
 
         if (shouldRunEvery(datasetState.lastThemeDiscoveryAt, schedule.themeDiscoveryEveryMinutes, nowMs)) {
           const knownThemes = [...listBaseInvestmentThemes(), ...state.promotedThemes.map((entry) => entry.theme)];
@@ -902,6 +1103,7 @@ export async function runIntelligenceAutomationCycle(args: {
           return walkForwardRun;
         }, state);
         replayRuns.push(toReplaySummary(dataset.id, run));
+        replayRunDetails.push(run);
       }
       datasetState.consecutiveFailures = 0;
       datasetState.lastError = null;
@@ -999,6 +1201,7 @@ export async function runIntelligenceAutomationCycle(args: {
         return replayRun;
       }, state);
       replayRuns.push(toReplaySummary(datasetId, rerun));
+      replayRunDetails.push(rerun);
       replayTriggeredByTheme.add(datasetId);
     }
   }
@@ -1028,7 +1231,38 @@ export async function runIntelligenceAutomationCycle(args: {
         return replayRun;
       }, state);
       replayRuns.push(toReplaySummary(dataset.id, rerun));
+      replayRunDetails.push(rerun);
     }
+  }
+
+  const datasetDiscovery = await runDatasetDiscoverySweep({
+    registry,
+    state,
+    registryPath: args.registryPath,
+  });
+  registeredDatasets.push(...datasetDiscovery.registered.map((item) => item.id));
+
+  let tuningAction: IntelligenceAutomationCycleResult['tuningAction'] = 'idle';
+  if (registry.experimentAutomation.enabled && shouldRunEvery(state.lastSelfTuningAt, registry.experimentAutomation.everyMinutes)) {
+    const latestSnapshot = await getInvestmentIntelligenceSnapshot();
+    const fallbackRuns = replayRunDetails.length > 0 ? replayRunDetails : await listHistoricalReplayRuns(6);
+    const tuned = runSelfTuningCycle({
+      snapshot: latestSnapshot,
+      replayRuns: fallbackRuns,
+    });
+    state.experimentRegistry = tuned;
+    state.lastSelfTuningAt = nowIso();
+    tuningAction = tuned.history[tuned.history.length - 1]?.action || 'observe';
+    appendRun(state, {
+      id: `global:self-tuning:${state.lastSelfTuningAt}`,
+      datasetId: null,
+      kind: 'self-tuning',
+      status: 'ok',
+      startedAt: state.lastSelfTuningAt,
+      completedAt: nowIso(),
+      attempts: 1,
+      detail: `score=${tuned.lastScore.toFixed(1)} action=${tuningAction}`,
+    });
   }
 
   for (const dataset of enabledDatasets) {
@@ -1046,6 +1280,8 @@ export async function runIntelligenceAutomationCycle(args: {
     replayRuns,
     promotedThemes,
     candidateThemes,
+    registeredDatasets,
+    tuningAction,
     sourceAutomation,
     queueOpenCount: state.themeQueue.filter((item) => item.status === 'open').length,
   };

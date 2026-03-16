@@ -27,7 +27,11 @@ The architecture stack below is interactive. Click a layer to inspect its runtim
 - desktop sidecar and local APIs
 - historical replay and archive services
 - unattended dataset registry and scheduler worker for fetch/import/replay cadence
+- guarded dataset discovery and auto-registration for missing historical coverage
 - theme discovery queue and guarded Codex theme proposer
+- experiment registry and guarded self-tuning weight profiles
+- graph-propagation services for hidden candidate discovery
+- macro kill-switch, hedge overlay, and explainable attribution over live decisions
 - generated service contracts and OpenAPI surfaces
 
 ## Reference docs

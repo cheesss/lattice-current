@@ -40,6 +40,7 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - source registry candidates that can now auto-approve and auto-activate under guarded score and diversity policy
 - coverage-gap candidate expansion that can now be requested by the scheduler instead of only by button clicks
 - candidate auto-approval that now uses composite scoring plus sector and asset-kind caps
+- repeated uncovered theme pressure that can now propose and guard-register missing historical datasets
 - weak theme motifs and low-signal autonomous keywords that can now be auto-retired or auto-rejected
 - weak idea cards that can now be auto-suppressed before the operator view
 - cross-corroboration scoring that penalizes rumor-heavy or contradictory source clusters
@@ -47,6 +48,10 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - time-decay and recent-evidence floors so stale mapping priors cannot dominate current recommendations
 - reality-aware execution checks for spread, slippage, liquidity, and session state
 - shadow-book rollback signals that can force the engine back into shadow mode after weak recent performance
+- macro kill-switch and hedge overlay that can override attractive micro themes
+- hidden graph-propagated candidates that can surface second-order transmission plays
+- explainable attribution that splits corroboration, graph, beta, macro, and reality penalties
+- self-tuning experiment history and active weight profile summaries
 - cost-adjusted replay summaries in Backtest Lab, not only raw signed returns
 
 ## Key UI surfaces
@@ -81,6 +86,11 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - execution-reality penalties for session state, spread, slippage, and liquidity
 - recency weighting and stale-prior decay inside deterministic ranking
 - shadow-book rollback and constrained autonomy state carried into the operator workflow
+- guarded dataset discovery and auto-registration for replay-safe historical coverage expansion
+- experiment registry and self-tuning weight promotion / rollback
+- graph-driven hidden candidate propagation beyond direct trigger keywords
+- macro risk overlay with kill-switch, hedge bias, and exposure caps
+- explainable attribution over corroboration, graph support, beta, macro pressure, and penalties
 
 ## Limits
 
@@ -91,6 +101,20 @@ The engine is now closer to constrained autonomy, but it is still not a blind li
 - a decision-support and paper-trade research surface first
 - a cost-aware replay engine second
 - a human-reviewed or policy-gated execution candidate generator, not an unconstrained execution bot
+
+## What changed in practice
+
+The replay stack no longer behaves like a static "theme scorecard" only.
+
+It can now:
+
+- widen its historical dataset registry when the current research surface is too narrow
+- tune its own weight profile through guarded experiments
+- discover hidden candidates through graph propagation
+- apply top-down macro kill-switch logic before attractive micro trades survive
+- explain whether an idea was driven by corroborated event evidence, graph support, generic beta, or penalty-heavy noise
+
+This means the system is still constrained, but it is noticeably less dependent on manual queue curation than earlier versions.
 
 ## Variant coverage
 

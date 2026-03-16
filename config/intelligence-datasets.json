@@ -57,6 +57,22 @@
     "themeCooldownHours": 12,
     "maxThemesPerRegionPerCycle": 1
   },
+  "datasetAutomation": {
+    "enabled": true,
+    "mode": "guarded-auto",
+    "everyMinutes": 360,
+    "codexTopThemesPerCycle": 2,
+    "minProposalScore": 60,
+    "autoRegisterScore": 74,
+    "autoEnableScore": 88,
+    "maxRegistrationsPerCycle": 2,
+    "maxEnabledDatasets": 12,
+    "allowProviders": ["fred", "alfred", "gdelt-doc", "coingecko", "acled"]
+  },
+  "experimentAutomation": {
+    "enabled": true,
+    "everyMinutes": 180
+  },
   "datasets": [
     {
       "id": "coingecko-btc-core",

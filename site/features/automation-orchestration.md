@@ -25,11 +25,16 @@ Runs the historical intelligence loop without daily operator intervention:
 - theme discovery queue
 - guarded Codex theme proposals
 - guarded Codex candidate expansion for coverage gaps
+- guarded Codex dataset proposals and auto-registration for missing historical coverage
+- self-tuning weight experiments with promotion and rollback tracking
+- graph-driven hidden candidate discovery from relationship propagation
 - cross-corroboration checks and confidence calibration before ideas reach the operator view
 - time-decay and recent-evidence floors before stale priors can shape a live recommendation
 - reality-aware replay summaries with spread, slippage, liquidity, and session-state penalties
+- macro risk overlay with kill switch, net-exposure caps, and hedge bias
 - constrained autonomy outputs: `deploy`, `shadow`, `watch`, `abstain`
 - shadow-book rollback that can force the engine back into shadow mode after weak recent samples
+- explainable attribution that shows what part of the score came from corroboration, graph propagation, beta, macro pressure, or reality penalties
 
 ## Why it exists
 
@@ -49,7 +54,11 @@ Backtests are only useful when they run on a fixed schedule against a known data
 10. Ask Codex for theme proposals only for high-signal queue items
 11. Auto-promote only when guarded thresholds, overlap ceiling, and promotion score pass
 12. Ask Codex for candidate expansion only on top scored coverage gaps that clear cooldown and region-balance rules
-13. Re-run replay when accepted candidates changed the active universe
+13. Propose missing historical datasets for repeated uncovered theme pressure
+14. Guard-register only replay-safe dataset proposals into the registry
+15. Run self-tuning over recent replay and walk-forward outcomes
+16. Promote or roll back weight profiles through the experiment registry
+17. Re-run replay when accepted candidates or newly imported datasets changed the active universe
 
 ## Theme discovery
 
@@ -89,6 +98,45 @@ Those proposals are:
 - immediately re-evaluated against the current universe policy using score, sector balance, and asset-kind balance
 - replayed again if any candidate is auto-accepted
 
+## Dataset autonomy
+
+The worker can now widen the historical research surface instead of only working inside a static registry.
+
+It does that by:
+
+- reading repeated theme pressure from replay and coverage gaps
+- proposing missing historical datasets
+- optionally asking Codex for a dataset template
+- scoring overlap, cost, and replay safety
+- guard-registering only the proposals that clear policy gates
+
+This is still constrained autonomy. The system can widen its historical coverage, but it does not blindly register every interesting idea as a new dataset.
+
+## Self-tuning and experiment registry
+
+The automation loop now also keeps a small experiment registry.
+
+That registry tracks:
+
+- the active weight profile
+- candidate profiles
+- replay and walk-forward performance snapshots
+- promote / observe / rollback decisions
+
+This gives the system a limited self-correction loop instead of leaving every heuristic coefficient frozen forever.
+
+## Graph-driven propagation
+
+The automation stack no longer depends only on direct event keywords.
+
+It can now:
+
+- traverse entity and relation paths
+- score second-order or hidden candidates
+- surface non-obvious assets for later review or replay inclusion
+
+This is how the system starts moving from simple keyword mapping toward relationship-aware propagation.
+
 ## Idea triage
 
 The investment snapshot now auto-suppresses weak idea cards before the operator sees them.
@@ -109,6 +157,12 @@ The live investment snapshot applies:
 - calibrated confidence scoring
 - `deploy`, `shadow`, `watch`, `abstain` action gating
 - shadow-book rollback if recent tracked ideas deteriorate
+
+It now also applies:
+
+- macro kill-switch and top-down hedge bias
+- graph-propagation support before hidden candidates are surfaced
+- explainable attribution so the operator can inspect why an idea survived the gates
 
 This keeps the system closer to a constrained autonomous research stack than an unconstrained execution bot.
 

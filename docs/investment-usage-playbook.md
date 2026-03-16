@@ -60,6 +60,11 @@ This system is not an auto-trader. Use it as a structured decision-support termi
   - candidate expansion review queue
   - Codex-assisted candidate proposals
   - universe policy mode: `manual`, `guarded-auto`, `full-auto`
+  - macro kill-switch and hedge overlay
+  - explainable attribution for idea cards and direct mappings
+  - self-tuning experiment history and active weight profile
+  - dataset autonomy summary and guarded auto-registration proposals
+  - hidden graph-discovered candidates that did not come from direct trigger keywords
 
 ### Coverage-aware universe and candidate expansion
 
@@ -83,6 +88,71 @@ This system is not an auto-trader. Use it as a structured decision-support termi
   3. Approve only liquid, understandable instruments.
   4. Re-run or wait for the next intelligence refresh.
   5. Check whether the new candidate actually improves backtest rows.
+
+### Macro kill switch and hedge overlay
+
+- Use this before treating any idea as deployable.
+- Read:
+  - macro state
+  - risk gauge
+  - top-down action
+  - net and gross exposure caps
+  - hedge bias list
+  - kill-switch note
+- Interpret it this way:
+  - `risk-on`: directional ideas can still compete on their own merits
+  - `balanced`: directional ideas are allowed, but sizing is capped
+  - `risk-off`: non-hedge ideas should usually stay in `shadow`
+  - `kill-switch`: net directional deployment should be treated as blocked
+
+### Explainable attribution
+
+- Use this when an idea looks attractive but you need to know why.
+- The system now breaks the score into:
+  - corroboration
+  - contradiction and rumor penalties
+  - graph-propagation support
+  - regime and beta pressure
+  - stale-prior decay
+  - reality penalties such as spread, slippage, liquidity, and session state
+  - macro overlay pressure
+- If the breakdown is mostly penalties or generic beta, do not treat the idea as a differentiated event trade.
+
+### Self-tuning experiments
+
+- The active weight profile is no longer only a fixed heuristic bundle.
+- The system now keeps an experiment registry that can:
+  - observe candidate profiles
+  - promote better profiles
+  - roll back weak profiles
+- Use this section to check:
+  - whether the active profile was recently promoted
+  - whether rollback is armed
+  - whether recent replay improvements came from real signal or only from a more aggressive weight set
+
+### Dataset autonomy
+
+- The system can now propose missing historical datasets when live replay keeps surfacing the same uncovered theme pressure.
+- This is guarded, not blind expansion.
+- Treat dataset auto-registration as:
+  - a way to widen historical coverage
+  - not a guarantee that the new dataset is immediately useful
+- After a new dataset registers:
+  1. Wait for the scheduler to fetch and import it.
+  2. Check whether replay and walk-forward actually improve.
+  3. If not, keep the proposal observed rather than trusting it as permanent coverage.
+
+### Hidden graph candidates
+
+- These are asset candidates discovered through relationship propagation, not only direct keywords.
+- Use them to inspect second-order and third-order transmission paths.
+- Good use:
+  - hidden suppliers
+  - downstream customers
+  - logistics chokepoint proxies
+  - financing and hedge instruments
+- Bad use:
+  - deploying them just because they are novel
 
 ### Auto Investment Ideas
 
@@ -150,6 +220,10 @@ This system is not an auto-trader. Use it as a structured decision-support termi
   - liquidity
   - session-state / closed-market risk
 - Recent shadow-book weakness can now arm rollback and force the system into shadow mode until performance recovers.
+- Macro overlay can now cap exposure or force non-hedge ideas out of `deploy` entirely.
+- Explainable attribution can now show whether an idea was driven by corroborated event evidence, graph propagation, beta, or penalty-heavy noise.
+- Dataset autonomy can widen the historical registry, but auto-registration is still guarded by cost, overlap, and replay-safety checks.
+- Self-tuning can now change active weight profiles, but only through the experiment registry and rollback gate.
 
 ## Unattended automation loop
 
@@ -176,14 +250,18 @@ The backtest stack can now run without daily operator clicks, but only if you wi
 9. Ask Codex for candidate expansion on top coverage gaps
 10. Auto-accept only when universe thresholds pass, then replay again if the active universe changed
 11. Review keyword lifecycle and retire low-signal autonomous keywords
-12. Auto-clean weak theme queue items and suppress weak idea cards before the operator view
-13. Apply constrained-autonomy gates so weak, stale, contradictory, or low-executability ideas are downgraded to `shadow`, `watch`, or `abstain`
-14. Keep shadow-book rollback armed until recent tracked performance recovers
+12. Ask Codex for dataset proposals on repeated uncovered theme pressure, then guard-register only replay-safe datasets
+13. Run self-tuning over recent replay and walk-forward outcomes, then promote or roll back weight profiles through the experiment registry
+14. Auto-clean weak theme queue items and suppress weak idea cards before the operator view
+15. Apply constrained-autonomy gates so weak, stale, contradictory, or low-executability ideas are downgraded to `shadow`, `watch`, or `abstain`
+16. Apply macro kill-switch and hedge overlay so top-down collapse can override attractive micro themes
+17. Keep shadow-book rollback armed until recent tracked performance recovers
 
 ### What Codex does and does not do
 
 - Codex can now propose new backtest themes from repeated unmapped motifs.
 - Codex can also propose additional symbols for coverage gaps after replay.
+- Codex can also propose new historical datasets when repeated theme pressure is visible but the current replay registry is too narrow.
 - Codex does not blindly decide trades or override the scheduler policy.
 - In `guarded-auto`, deterministic thresholds still gate promotion:
   - promotion score

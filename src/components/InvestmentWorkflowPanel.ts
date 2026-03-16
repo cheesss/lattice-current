@@ -349,6 +349,13 @@ export class InvestmentWorkflowPanel extends Panel {
     const candidateReviews = snapshot.candidateReviews.filter((review) =>
       !this.focus.themeId || review.themeId === this.focus.themeId,
     );
+    const hiddenCandidates = snapshot.hiddenCandidates.filter((candidate) =>
+      (!this.focus.themeId || candidate.themeId === this.focus.themeId)
+      && (!this.focus.region || candidate.region === this.focus.region),
+    );
+    const datasetProposals = snapshot.datasetAutonomy.proposals.filter((proposal) =>
+      !this.focus.themeId || proposal.sourceThemeId === this.focus.themeId,
+    );
     const activeThemeForCodex = this.focus.themeId || filtered.mappings[0]?.themeId || snapshot.directMappings[0]?.themeId || '';
 
     const workflow = snapshot.workflow.map((step) => `
@@ -505,6 +512,75 @@ export class InvestmentWorkflowPanel extends Panel {
         Reality blocks <b>${snapshot.autonomy.realityBlockedCount}</b> mappings and weak recent evidence flags <b>${snapshot.autonomy.recentEvidenceWeakCount}</b>. ${escapeHtml(snapshot.autonomy.notes.join(' '))}
       </div>
     `;
+    const macroStats = `
+      <div class="investment-coverage-grid">
+        <div class="investment-coverage-stat"><span class="investment-mini-label">State</span><b>${escapeHtml(snapshot.macroOverlay.state.toUpperCase())}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Gauge</span><b>${snapshot.macroOverlay.riskGauge}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Top-down</span><b>${escapeHtml(snapshot.macroOverlay.topDownAction.toUpperCase())}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Net cap</span><b>${snapshot.macroOverlay.netExposureCapPct}%</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Gross cap</span><b>${snapshot.macroOverlay.grossExposureCapPct}%</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Kill switch</span><b>${snapshot.macroOverlay.killSwitch ? 'ON' : 'OFF'}</b></div>
+      </div>
+      <div class="investment-policy-note">${escapeHtml(snapshot.macroOverlay.notes.join(' '))}</div>
+    `;
+    const macroDriverRows = snapshot.macroOverlay.drivers.map((driver) => `
+      <tr class="${driver.tone}">
+        <td>${escapeHtml(driver.label)}</td>
+        <td>${driver.value.toFixed(2)}</td>
+        <td>${escapeHtml(driver.tone.toUpperCase())}</td>
+      </tr>
+    `).join('');
+    const hedgeRows = snapshot.macroOverlay.hedgeBias.map((hedge) => `
+      <tr>
+        <td>${escapeHtml(hedge.symbol)}</td>
+        <td>${hedge.weightPct}%</td>
+        <td>${escapeHtml(hedge.reason)}</td>
+      </tr>
+    `).join('');
+    const hiddenRows = hiddenCandidates.slice(0, 10).map((candidate) => `
+      <tr>
+        <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(candidate.themeId)}">${escapeHtml(candidate.themeLabel)}</button></td>
+        <td>${escapeHtml(candidate.symbol)}</td>
+        <td>${escapeHtml(candidate.region)}</td>
+        <td>${candidate.score}</td>
+        <td>${escapeHtml(candidate.path.join(' -> '))}</td>
+      </tr>
+    `).join('');
+    const datasetRows = datasetProposals.slice(0, 10).map((proposal) => `
+      <tr>
+        <td>${escapeHtml(proposal.label)}</td>
+        <td>${escapeHtml(proposal.provider.toUpperCase())}</td>
+        <td>${proposal.proposalScore}</td>
+        <td>${escapeHtml(proposal.pitSafety.toUpperCase())}</td>
+        <td>${proposal.autoRegister ? 'yes' : 'no'}</td>
+        <td>${proposal.autoEnable ? 'yes' : 'no'}</td>
+      </tr>
+    `).join('');
+    const experimentRows = snapshot.experimentRegistry.history.slice(-6).reverse().map((entry) => `
+      <tr>
+        <td>${escapeHtml(new Date(entry.recordedAt).toLocaleString())}</td>
+        <td>${escapeHtml(entry.action.toUpperCase())}</td>
+        <td>${entry.score.toFixed(1)}</td>
+        <td>${escapeHtml(entry.reason)}</td>
+      </tr>
+    `).join('');
+    const attributionRows = filtered.ideaCards.slice(0, 8).map((card) => `
+      <tr>
+        <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(card.themeId)}">${escapeHtml(card.title)}</button></td>
+        <td>${escapeHtml(card.attribution.primaryDriver)}</td>
+        <td>${escapeHtml(card.attribution.primaryPenalty)}</td>
+        <td>${escapeHtml(card.attribution.narrative)}</td>
+      </tr>
+    `).join('');
+    const experimentProfileNote = `
+      <div class="investment-policy-note">
+        Active self-tuning profile: corroboration x${snapshot.experimentRegistry.activeProfile.corroborationWeightMultiplier.toFixed(2)},
+        contradiction x${snapshot.experimentRegistry.activeProfile.contradictionPenaltyMultiplier.toFixed(2)},
+        recency x${snapshot.experimentRegistry.activeProfile.recencyPenaltyMultiplier.toFixed(2)},
+        reality x${snapshot.experimentRegistry.activeProfile.realityPenaltyMultiplier.toFixed(2)},
+        graph x${snapshot.experimentRegistry.activeProfile.graphPropagationWeightMultiplier.toFixed(2)}.
+      </div>
+    `;
     const focusBadge = this.focus.themeId || this.focus.region
       ? `<div class="investment-focus-badge">Focus: ${escapeHtml(this.focus.themeId || 'all themes')} ${this.focus.region ? `| ${escapeHtml(this.focus.region)}` : ''}</div>`
       : '<div class="investment-focus-badge muted">Focus: global</div>';
@@ -556,6 +632,23 @@ export class InvestmentWorkflowPanel extends Panel {
         </section>
         <section class="investment-subcard">
           <div class="investment-subcard-head">
+            <h4>Macro Kill Switch & Hedge Overlay</h4>
+            <span class="investment-mini-label">${escapeHtml(snapshot.macroOverlay.topDownAction.toUpperCase())}</span>
+          </div>
+          ${macroStats}
+          <div class="investment-grid-two">
+            <table class="investment-table">
+              <thead><tr><th>Driver</th><th>Value</th><th>Tone</th></tr></thead>
+              <tbody>${macroDriverRows || '<tr><td colspan="3">No macro drivers</td></tr>'}</tbody>
+            </table>
+            <table class="investment-table">
+              <thead><tr><th>Hedge</th><th>Weight</th><th>Reason</th></tr></thead>
+              <tbody>${hedgeRows || '<tr><td colspan="3">No hedge bias in current regime</td></tr>'}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
             <h4>Constrained Autonomy</h4>
             <span class="investment-mini-label">${filtered.ideaCards.length} cards</span>
           </div>
@@ -598,6 +691,16 @@ export class InvestmentWorkflowPanel extends Panel {
           </section>
         </div>
         <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>Explainable Attribution</h4>
+            <span class="investment-mini-label">${filtered.ideaCards.length} ideas</span>
+          </div>
+          <table class="investment-table">
+            <thead><tr><th>Idea</th><th>Primary driver</th><th>Primary penalty</th><th>Narrative</th></tr></thead>
+            <tbody>${attributionRows || '<tr><td colspan="4">No explainability rows in current focus</td></tr>'}</tbody>
+          </table>
+        </section>
+        <section class="investment-subcard">
           <h4>Price-backed Backtests</h4>
           <table class="investment-table">
             <thead><tr><th>Symbol</th><th>Dir</th><th>N</th><th>Hit</th><th>Avg Return</th></tr></thead>
@@ -606,12 +709,48 @@ export class InvestmentWorkflowPanel extends Panel {
         </section>
         <div class="investment-grid-two">
           <section class="investment-subcard">
+            <div class="investment-subcard-head">
+              <h4>Self-tuning Experiments</h4>
+              <span class="investment-mini-label">last score ${snapshot.experimentRegistry.lastScore.toFixed(1)}</span>
+            </div>
+            ${experimentProfileNote}
+            <table class="investment-table">
+              <thead><tr><th>Recorded</th><th>Action</th><th>Score</th><th>Reason</th></tr></thead>
+              <tbody>${experimentRows || '<tr><td colspan="4">No tuning history yet</td></tr>'}</tbody>
+            </table>
+          </section>
+          <section class="investment-subcard">
+            <div class="investment-subcard-head">
+              <h4>Dataset Autonomy</h4>
+              <span class="investment-mini-label">${datasetProposals.length} proposals</span>
+            </div>
+            <div class="investment-policy-note">Dataset mode is <b>${escapeHtml(snapshot.datasetAutonomy.mode)}</b>. Guarded dataset registration only promotes replay-safe proposals with score and cost controls.</div>
+            <table class="investment-table">
+              <thead><tr><th>Dataset</th><th>Provider</th><th>Score</th><th>PiT</th><th>Register</th><th>Enable</th></tr></thead>
+              <tbody>${datasetRows || '<tr><td colspan="6">No dataset proposals in current focus</td></tr>'}</tbody>
+            </table>
+          </section>
+        </div>
+        <div class="investment-grid-two">
+          <section class="investment-subcard">
             <h4>Coverage Gaps</h4>
             <table class="investment-table">
               <thead><tr><th>Theme</th><th>Region</th><th>Severity</th><th>Missing kinds</th><th>Missing sectors</th><th>Suggestions</th></tr></thead>
               <tbody>${gapRows || '<tr><td colspan="6">No coverage gaps in current focus</td></tr>'}</tbody>
             </table>
           </section>
+          <section class="investment-subcard">
+            <div class="investment-subcard-head">
+              <h4>Hidden Candidate Discovery</h4>
+              <span class="investment-mini-label">${hiddenCandidates.length} graph candidates</span>
+            </div>
+            <table class="investment-table">
+              <thead><tr><th>Theme</th><th>Symbol</th><th>Region</th><th>Score</th><th>Propagation path</th></tr></thead>
+              <tbody>${hiddenRows || '<tr><td colspan="5">No hidden graph candidates in current focus</td></tr>'}</tbody>
+            </table>
+          </section>
+        </div>
+        <div class="investment-grid-two">
           <section class="investment-subcard">
             <div class="investment-subcard-head">
               <h4>Candidate Expansion Review Queue</h4>

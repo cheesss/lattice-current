@@ -1083,6 +1083,7 @@ export class DataLoaderManager implements AppModule {
           transmission: this.ctx.intelligenceCache.eventMarketTransmission ?? null,
           sourceCredibility: this.ctx.intelligenceCache.sourceCredibility ?? [],
           reports: this.ctx.intelligenceCache.scheduledReports ?? [],
+          keywordGraph: this.ctx.intelligenceCache.keywordGraph ?? null,
         }).catch(() => null),
         (result) => ({ outputCount: result?.ideaCards?.length ?? 0 }),
       );

@@ -1,4 +1,5 @@
 import type { ClusteredEvent, MarketData, NewsItem } from '@/types';
+import { getActiveWeightProfileSync } from '../experiment-registry';
 
 export type MarketRegimeId = 'risk-on' | 'risk-off' | 'inflation-shock' | 'deflation-bust';
 
@@ -127,24 +128,25 @@ export function inferMarketRegime(args: {
   const inflationPressure = tokenPressure(texts, [/\b(inflation|oil|energy|gas|yield|rates|tariff|shipping shock)\b/]);
   const growthStress = tokenPressure(texts, [/\b(recession|slowdown|layoffs|demand slump|bankruptcy|shutdown)\b/]);
   const policyStress = tokenPressure(texts, [/\b(central bank|fed|ecb|rate cut|rate hike|treasury|bond)\b/]);
+  const weightProfile = getActiveWeightProfileSync();
 
   const scores: Record<MarketRegimeId, number> = {
     'risk-on':
       Math.max(0, -vixChange * 5)
-      + Math.max(0, equityChange * 9)
-      + Math.max(0, techChange * 11)
+      + Math.max(0, equityChange * 9 * weightProfile.riskOnAggressionMultiplier)
+      + Math.max(0, techChange * 11 * weightProfile.riskOnAggressionMultiplier)
       + Math.max(0, -growthStress * 16)
       + Math.max(0, -warIntensity * 12),
     'risk-off':
-      Math.max(0, vixChange * 7)
-      + Math.max(0, -equityChange * 10)
-      + Math.max(0, -techChange * 11)
-      + warIntensity * 22
+      Math.max(0, vixChange * 7 * weightProfile.regimeRiskOffMultiplier)
+      + Math.max(0, -equityChange * 10 * weightProfile.regimeRiskOffMultiplier)
+      + Math.max(0, -techChange * 11 * weightProfile.regimeRiskOffMultiplier)
+      + warIntensity * 22 * weightProfile.regimeRiskOffMultiplier
       + policyStress * 8,
     'inflation-shock':
-      Math.max(0, oilChange * 11)
-      + Math.max(0, gasChange * 9)
-      + inflationPressure * 24
+      Math.max(0, oilChange * 11 * weightProfile.regimeInflationMultiplier)
+      + Math.max(0, gasChange * 9 * weightProfile.regimeInflationMultiplier)
+      + inflationPressure * 24 * weightProfile.regimeInflationMultiplier
       + warIntensity * 14
       + Math.max(0, goldChange * 4),
     'deflation-bust':

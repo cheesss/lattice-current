@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Run historical fetch, import, replay, walk-forward, source acceptance, candidate expansion, and theme discovery without daily operator intervention.
+Run historical fetch, import, replay, walk-forward, source acceptance, candidate expansion, theme discovery, guarded dataset registration, self-tuning, and top-down risk control without daily operator intervention.
 
 ## Files
 
@@ -29,12 +29,18 @@ Run historical fetch, import, replay, walk-forward, source acceptance, candidate
 13. Auto-promote only if promotion score, overlap, and policy thresholds pass
 14. Ask Codex for candidate expansion on top coverage gaps after scoring, diversity caps, and cooldown checks
 15. Auto-accept only if universe policy score, sector caps, and asset-kind caps pass
-16. Re-run replay if new accepted candidates changed the active universe
-17. Apply cross-corroboration, recency decay, and execution-reality constraints inside the investment snapshot
-18. Downgrade ideas into `shadow`, `watch`, or `abstain` if calibrated confidence is not strong enough
-19. Keep rollback armed if the recent shadow book deteriorates
-20. Release lock
-21. Apply retention to artifacts and scheduler history
+16. Score replay-driven theme gaps for missing historical coverage and propose new datasets
+17. Ask Codex for dataset templates only when provider family, PiT safety, overlap, and cost checks allow it
+18. Guard-register only replay-safe dataset proposals into `config/intelligence-datasets.json`
+19. Re-run replay if new accepted candidates changed the active universe
+20. Run self-tuning against recent replay and walk-forward outcomes
+21. Promote or roll back weight profiles only when the experiment registry clears the configured thresholds
+22. Apply cross-corroboration, recency decay, graph-propagation support, and execution-reality constraints inside the investment snapshot
+23. Apply macro kill-switch and hedge overlay before any idea can remain in `deploy`
+24. Downgrade ideas into `shadow`, `watch`, or `abstain` if calibrated confidence is not strong enough
+25. Keep rollback armed if the recent shadow book deteriorates
+26. Release lock
+27. Apply retention to artifacts, scheduler history, and experiment snapshots
 
 ## Commands
 
@@ -122,6 +128,85 @@ A theme is auto-promoted only when:
 ## Important limitation
 
 Codex can propose backtest themes and candidate assets, but it is still not the final execution engine. The scheduler policy and universe policy remain the deterministic gates.
+
+## Dataset discovery and guarded registration
+
+The worker can now discover missing historical coverage from live replay outputs.
+
+It scores candidate datasets using:
+
+- theme pressure from repeated coverage gaps
+- provider family support
+- estimated historical replay utility
+- overlap against the current registry
+- point-in-time safety expectations
+- expected storage and fetch cost
+
+Codex can propose dataset templates, but registration remains guarded. A proposal is auto-registered only when:
+
+- provider family is already supported
+- overlap with the current registry is low enough
+- estimated cost stays below the policy ceiling
+- the proposal looks replay-safe for bitemporal import
+- the daily registration budget is not exhausted
+
+Auto-registration updates the registry, not the currently running replay pass. The new dataset only participates after a later scheduler cycle fetches and imports it.
+
+## Self-tuning and experiment registry
+
+The unattended loop now also keeps a small experiment registry for weight profiles.
+
+That registry stores:
+
+- the active weight profile
+- recent candidate profiles
+- replay and walk-forward performance snapshots
+- promote / observe / rollback decisions
+- reasons behind each decision
+
+Self-tuning is still policy-gated. The worker does not blindly optimize every coefficient on every run. It only promotes a new profile when:
+
+- enough recent replay or walk-forward samples exist
+- the candidate profile beats the active one on the configured composite score
+- drawdown and hit-rate floors still hold
+- the cooldown window since the last promotion has elapsed
+
+This keeps the system closer to constrained autonomy than unconstrained self-modification.
+
+## Macro risk overlay, kill switch, and hedge bias
+
+Replay and live snapshots now compute a top-down macro overlay before idea deployment.
+
+The overlay combines:
+
+- VIX stress
+- credit or liquidity proxies
+- growth and inflation regime pressure
+- yield-curve inversion pressure
+- recent drawdown behavior inside the tracked idea book
+
+The overlay can:
+
+- cap net exposure
+- cap gross exposure
+- bias the book toward defensive hedges
+- force non-hedge ideas into `shadow`, `watch`, or `abstain`
+- arm a kill switch when macro stress becomes too asymmetric
+
+## Explainable attribution
+
+Idea cards and direct mappings now carry a structured attribution breakdown.
+
+The breakdown separates:
+
+- cross-corroboration contribution
+- graph-propagation contribution
+- market beta and regime contribution
+- reality penalties such as spread, slippage, liquidity, and session state
+- time-decay and stale-prior penalties
+- macro overlay pressure
+
+This means the operator can inspect not only the final action, but why the engine believed the action or why it refused to deploy.
 
 ## Source automation
 
