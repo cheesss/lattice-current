@@ -100,6 +100,7 @@ The task name is `WorldMonitor-Intelligence-Scheduler`.
 It tries to install as `SYSTEM` on startup first.
 If that fails, it falls back to a current-user logon task.
 If task registration is blocked by policy, it writes a Startup-folder fallback command file for the current user instead.
+The wrapper reloads `.env.local` on each cycle, so newly added provider keys are picked up without changing the registry again.
 
 ## Locking
 

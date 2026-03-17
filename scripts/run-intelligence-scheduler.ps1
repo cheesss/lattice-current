@@ -41,30 +41,39 @@ function Import-SimpleEnvFile {
   }
 }
 
-Import-SimpleEnvFile -Path (Join-Path $repoRoot $EnvFile)
-Import-SimpleEnvFile -Path (Join-Path $repoRoot ".env")
-
 $nodeCommand = Get-Command node -ErrorAction Stop
 $nodePath = $nodeCommand.Source
 
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $stdoutPath = Join-Path $logRoot "scheduler-$timestamp.out.log"
 $stderrPath = Join-Path $logRoot "scheduler-$timestamp.err.log"
-
-$arguments = @("--import", "tsx", "scripts/intelligence-scheduler.mjs")
-if ($Once) {
-  $arguments += "--once"
-} else {
-  $arguments += @("--poll", "$PollMinutes")
-}
+$baseArguments = @("--import", "tsx", "scripts/intelligence-scheduler.mjs", "--once")
 if ($RegistryPath) {
-  $arguments += @("--registry", $RegistryPath)
+  $baseArguments += @("--registry", $RegistryPath)
 }
 if ($StatePath) {
-  $arguments += @("--state", $StatePath)
+  $baseArguments += @("--state", $StatePath)
 }
 
 Set-Location $repoRoot
-"[$([DateTime]::UtcNow.ToString('o'))] starting intelligence scheduler ($($arguments -join ' '))" | Out-File -FilePath $stdoutPath -Encoding utf8 -Append
 
-& $nodePath @arguments 1>> $stdoutPath 2>> $stderrPath
+function Invoke-SchedulerCycle {
+  Import-SimpleEnvFile -Path (Join-Path $repoRoot $EnvFile)
+  Import-SimpleEnvFile -Path (Join-Path $repoRoot ".env")
+  "[$([DateTime]::UtcNow.ToString('o'))] starting intelligence scheduler cycle ($($baseArguments -join ' '))" | Out-File -FilePath $stdoutPath -Encoding utf8 -Append
+  & $nodePath @baseArguments 1>> $stdoutPath 2>> $stderrPath
+}
+
+if ($Once) {
+  Invoke-SchedulerCycle
+  exit $LASTEXITCODE
+}
+
+while ($true) {
+  try {
+    Invoke-SchedulerCycle
+  } catch {
+    "[$([DateTime]::UtcNow.ToString('o'))] scheduler wrapper error: $($_.Exception.Message)" | Out-File -FilePath $stderrPath -Encoding utf8 -Append
+  }
+  Start-Sleep -Seconds ([Math]::Max(60, $PollMinutes * 60))
+}

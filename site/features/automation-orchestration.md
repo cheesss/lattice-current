@@ -132,6 +132,7 @@ Windows helper scripts are also included now:
 These wrappers load `.env.local`, write scheduler logs, and register a Windows scheduled task so the unattended loop can survive restarts without a manually opened terminal.
 
 If task registration is blocked by local policy, the installer falls back to a Startup-folder launcher for the current user.
+The wrapper reloads `.env.local` every cycle, so new provider keys are picked up without hand-editing the registry again.
 
 ## Self-tuning and experiment registry
 
