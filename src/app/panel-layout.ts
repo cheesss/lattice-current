@@ -39,6 +39,7 @@ import {
   DataQAPanel,
   SourceOpsPanel,
   CodexOpsPanel,
+  DataFlowOpsPanel,
   OntologyGraphPage,
   TransmissionSankeyPanel,
   SignalRidgelinePanel,
@@ -59,6 +60,7 @@ import { RenewableEnergyPanel } from '@/components/RenewableEnergyPanel';
 import { GivingPanel } from '@/components';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
 import { buildDataQASnapshot } from '@/services/data-qa';
+import { getFabricBackedRuntimeView } from '@/services/intelligence-fabric';
 import { signalAggregator, type RegionalConvergence } from '@/services/signal-aggregator';
 import { debounce, saveToStorage } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
@@ -69,6 +71,14 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
+import {
+  getWorkspaceDefinition,
+  getWorkspaceDefinitions,
+  LEGACY_WORKSPACE_STORAGE_KEY,
+  type WorkspaceDefinition,
+  WORKSPACE_STORAGE_KEY,
+} from '@/config/workspaces';
+import { APP_BRAND } from '@/config/brand';
 import { BETA_MODE } from '@/config/beta';
 import { t } from '@/services/i18n';
 import { getCurrentTheme } from '@/utils';
@@ -82,6 +92,21 @@ export interface PanelLayoutCallbacks {
   loadAllData: () => Promise<void>;
   updateMonitorResults: () => void;
   loadSecurityAdvisories?: () => Promise<void>;
+}
+
+function renderWorkspaceStoryCards(workspace: WorkspaceDefinition): string {
+  return workspace.flowSteps.map((step) => `
+    <article class="workspace-story-card">
+      <span class="workspace-story-label">${escapeHtml(step.label)}</span>
+      <p>${escapeHtml(step.summary)}</p>
+    </article>
+  `).join('');
+}
+
+function renderWorkspaceFocusAreas(workspace: WorkspaceDefinition): string {
+  return workspace.focusAreas
+    .map((item) => `<span class="workspace-chip workspace-focus-chip">${escapeHtml(item)}</span>`)
+    .join('');
 }
 
 export class PanelLayoutManager implements AppModule {
@@ -129,55 +154,46 @@ export class PanelLayoutManager implements AppModule {
   }
 
   renderLayout(): void {
+    const workspaceStrip = this.renderWorkspaceStrip();
     this.ctx.container.innerHTML = `
       <div class="header">
         <div class="header-left">
           <div class="variant-switcher">${(() => {
-            const local = this.ctx.isDesktopApp || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-            const vHref = (v: string, prod: string) => local || SITE_VARIANT === v ? '#' : prod;
-            const vTarget = (v: string) => !local && SITE_VARIANT !== v ? 'target="_blank" rel="noopener"' : '';
             return `
-            <a href="${vHref('full', 'https://worldmonitor.app')}"
+            <a href="#"
                class="variant-option ${SITE_VARIANT === 'full' ? 'active' : ''}"
                data-variant="full"
-               ${vTarget('full')}
-               title="${t('header.world')}${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">W</span>
-              <span class="variant-label">${t('header.world')}</span>
+               title="Geo lens${SITE_VARIANT === 'full' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">${APP_BRAND.variants.full.icon}</span>
+              <span class="variant-label">${APP_BRAND.variants.full.label}</span>
             </a>
             <span class="variant-divider"></span>
-            <a href="${vHref('tech', 'https://tech.worldmonitor.app')}"
+            <a href="#"
                class="variant-option ${SITE_VARIANT === 'tech' ? 'active' : ''}"
                data-variant="tech"
-               ${vTarget('tech')}
-               title="${t('header.tech')}${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">T</span>
-              <span class="variant-label">${t('header.tech')}</span>
+               title="Build lens${SITE_VARIANT === 'tech' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">${APP_BRAND.variants.tech.icon}</span>
+              <span class="variant-label">${APP_BRAND.variants.tech.label}</span>
             </a>
             <span class="variant-divider"></span>
-            <a href="${vHref('finance', 'https://finance.worldmonitor.app')}"
+            <a href="#"
                class="variant-option ${SITE_VARIANT === 'finance' ? 'active' : ''}"
                data-variant="finance"
-               ${vTarget('finance')}
-               title="${t('header.finance')}${SITE_VARIANT === 'finance' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">F</span>
-              <span class="variant-label">${t('header.finance')}</span>
+               title="Markets lens${SITE_VARIANT === 'finance' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">${APP_BRAND.variants.finance.icon}</span>
+              <span class="variant-label">${APP_BRAND.variants.finance.label}</span>
             </a>
-            ${SITE_VARIANT === 'happy' ? `<span class="variant-divider"></span>
-            <a href="${vHref('happy', 'https://happy.worldmonitor.app')}"
-               class="variant-option active"
+            <span class="variant-divider"></span>
+            <a href="#"
+               class="variant-option ${SITE_VARIANT === 'happy' ? 'active' : ''}"
                data-variant="happy"
-               ${vTarget('happy')}
-               title="Good News ${t('common.currentVariant')}">
-              <span class="variant-icon">G</span>
-              <span class="variant-label">Good News</span>
-            </a>` : ''}`;
+               title="Progress lens${SITE_VARIANT === 'happy' ? ` ${t('common.currentVariant')}` : ''}">
+              <span class="variant-icon">${APP_BRAND.variants.happy.icon}</span>
+              <span class="variant-label">${APP_BRAND.variants.happy.label}</span>
+            </a>`;
           })()}</div>
-          <span class="logo">MONITOR</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
-          <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
-            <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            <span class="credit-text">@eliehabib</span>
-          </a>
+          <span class="brand-lockup"><span class="logo">${APP_BRAND.mark}</span><span class="logo-subtitle">${APP_BRAND.descriptor}</span></span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
+          <span class="brand-tagline-pill">${APP_BRAND.tagline}</span>
           <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener" class="github-link" title="${t('header.viewOnGitHub')}">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           </a>
@@ -200,9 +216,6 @@ export class PanelLayoutManager implements AppModule {
         </div>
         <div class="header-right">
           <button class="search-btn" id="searchBtn"><kbd>Ctrl+K</kbd> ${t('header.search')}</button>
-          <button class="analysis-hub-btn" id="analysisHubBtn">Analysis Hub</button>
-          ${SITE_VARIANT === 'happy' ? '' : '<button class="analysis-hub-btn" id="codexHubBtn">Codex Hub</button>'}
-          ${SITE_VARIANT === 'happy' ? '' : '<button class="analysis-hub-btn" id="ontologyGraphBtn">Ontology</button>'}
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           <button class="theme-toggle-btn" id="headerThemeToggle" title="${t('header.toggleTheme')}">
             ${getCurrentTheme() === 'dark'
@@ -216,7 +229,7 @@ export class PanelLayoutManager implements AppModule {
       ${SITE_VARIANT === 'happy' ? '' : `
       <div class="terminal-tape" id="terminalTape" aria-live="polite">
         <div class="terminal-tape-left">
-          <span class="terminal-chip terminal-chip-label">LIVE FEED</span>
+          <span class="terminal-chip terminal-chip-label">${APP_BRAND.liveFeedLabel}</span>
           <span class="terminal-chip" id="terminalTapeNewsCount">NEWS 0</span>
           <span class="terminal-chip" id="terminalTapeSourceCount">SRC 0</span>
           <span class="terminal-chip terminal-chip-alert" id="terminalTapeAlertCount">ALERT 0</span>
@@ -224,11 +237,12 @@ export class PanelLayoutManager implements AppModule {
         </div>
         <div class="terminal-tape-headline" id="terminalTapeHeadline">Waiting for live headlines...</div>
       </div>`}
+      ${workspaceStrip}
       <div class="main-content">
         <div class="map-section" id="mapSection">
           <div class="panel-header">
             <div class="panel-header-left">
-              <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'happy' ? 'Good News Map' : t('panels.map')}</span>
+              <span class="panel-title">${SITE_VARIANT === 'tech' ? APP_BRAND.mapLabels.tech : SITE_VARIANT === 'finance' ? APP_BRAND.mapLabels.finance : SITE_VARIANT === 'happy' ? APP_BRAND.mapLabels.happy : APP_BRAND.mapLabels.full}</span>
             </div>
             <span class="header-clock" id="headerClock"></span>
             <button class="map-pin-btn" id="mapPinBtn" title="${t('header.pinMap')}">
@@ -246,6 +260,83 @@ export class PanelLayoutManager implements AppModule {
     `;
 
     this.createPanels();
+  }
+
+  private renderWorkspaceStrip(): string {
+    const activeWorkspace = getWorkspaceDefinition(
+      localStorage.getItem(WORKSPACE_STORAGE_KEY) || localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY),
+      SITE_VARIANT,
+    );
+    const availablePanels = new Set(Object.keys(DEFAULT_PANELS));
+    const workspaceDefs = getWorkspaceDefinitions(SITE_VARIANT).filter((workspace) => {
+      if (workspace.id === 'all') return true;
+      return workspace.panelKeys.some((key) => availablePanels.has(key));
+    });
+    const featuredLabels = activeWorkspace.featuredPanels
+      .map((key) => this.ctx.panelSettings[key]?.name ?? DEFAULT_PANELS[key]?.name ?? null)
+      .filter((value): value is string => Boolean(value))
+      .slice(0, 4);
+    const visibleCount = activeWorkspace.id === 'all'
+      ? Math.max(0, availablePanels.size - 1)
+      : activeWorkspace.panelKeys.filter((key) => availablePanels.has(key)).length;
+    const curatedCount = Math.max(
+      featuredLabels.length,
+      activeWorkspace.featuredPanels.filter((key) => availablePanels.has(key)).length,
+    );
+
+    return `
+      <div class="workspace-strip" id="workspaceStrip">
+        <div class="workspace-strip-main">
+          <div class="workspace-strip-kicker">${APP_BRAND.workspaceKicker}</div>
+          <div class="workspace-strip-copy">
+            <span class="workspace-strip-eyebrow" id="workspaceEyebrow">${escapeHtml(activeWorkspace.eyebrow)}</span>
+            <strong id="workspaceTitle">${escapeHtml(activeWorkspace.title)}</strong>
+            <span id="workspaceSummary">${escapeHtml(activeWorkspace.description)}</span>
+          </div>
+          <div class="workspace-switcher" id="workspaceSwitcher" role="tablist" aria-label="Workspace switcher">
+            ${workspaceDefs.map((workspace, index) => `
+              <button
+                class="workspace-tab${workspace.id === activeWorkspace.id ? ' active' : ''}"
+                id="workspaceTab-${workspace.id}"
+                data-workspace-target="${workspace.id}"
+                type="button"
+                role="tab"
+                aria-selected="${workspace.id === activeWorkspace.id}"
+                title="Alt+${index + 1}"
+              >${escapeHtml(workspace.label)}</button>
+            `).join('')}
+          </div>
+          <div class="workspace-story" id="workspaceStory">
+            ${renderWorkspaceStoryCards(activeWorkspace)}
+          </div>
+        </div>
+        <div class="workspace-strip-side">
+          <div class="workspace-intent">
+            <span class="workspace-intent-kicker">${escapeHtml(APP_BRAND.tagline)}</span>
+            <strong id="workspaceIntentTitle">${escapeHtml(activeWorkspace.heroTitle)}</strong>
+            <p id="workspaceIntentSummary">${escapeHtml(activeWorkspace.heroSummary)}</p>
+            <div class="workspace-intent-actions">
+              <button class="workspace-link-btn primary" type="button" data-open-hub="analysis">Open ${APP_BRAND.hubs.analysis}</button>
+              ${SITE_VARIANT === 'happy' ? '' : `<button class="workspace-link-btn" type="button" data-open-hub="codex">Open ${APP_BRAND.hubs.codex}</button>`}
+              ${SITE_VARIANT === 'happy' ? '' : `<button class="workspace-link-btn" type="button" data-open-hub="backtest">Open ${APP_BRAND.hubs.backtest}</button>`}
+              ${SITE_VARIANT === 'happy' ? '' : `<button class="workspace-link-btn" type="button" data-open-hub="ontology">Open ${APP_BRAND.hubs.ontology}</button>`}
+            </div>
+          </div>
+          <div class="workspace-strip-stats">
+            <span class="workspace-stat" id="workspaceStat">${visibleCount} modules in view · ${curatedCount} curated</span>
+            <span class="workspace-stat subtle" id="workspaceMapMode">${activeWorkspace.showMap ? 'Context map active' : 'Context map tucked away'}</span>
+          </div>
+          <div class="workspace-focus" id="workspaceFocusAreas">
+            ${renderWorkspaceFocusAreas(activeWorkspace)}
+          </div>
+          <div class="workspace-featured" id="workspaceFeatured">
+            ${featuredLabels.length > 0
+        ? featuredLabels.map((label) => `<span class="workspace-chip">${escapeHtml(label)}</span>`).join('')
+        : '<span class="workspace-chip muted">Workspace suggestions update as this surface fills in</span>'}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   renderCriticalBanner(postures: TheaterPostureSummary[]): void {
@@ -611,6 +702,7 @@ export class PanelLayoutManager implements AppModule {
 
       this.ctx.panels['source-ops'] = new SourceOpsPanel();
       this.ctx.panels['codex-ops'] = new CodexOpsPanel();
+      this.ctx.panels['dataflow-ops'] = new DataFlowOpsPanel();
 
       const techReadinessPanel = new TechReadinessPanel();
       this.ctx.panels['tech-readiness'] = techReadinessPanel;
@@ -745,28 +837,34 @@ export class PanelLayoutManager implements AppModule {
         getDataQAPanel: () => (this.ctx.panels['data-qa'] as DataQAPanel | undefined) ?? null,
         getSourceOpsPanel: () => (this.ctx.panels['source-ops'] as SourceOpsPanel | undefined) ?? null,
         getCodexOpsPanel: () => (this.ctx.panels['codex-ops'] as CodexOpsPanel | undefined) ?? null,
-        getIntelligenceArtifacts: () => ({
-          reports: this.ctx.intelligenceCache.scheduledReports ?? [],
-          transmission: this.ctx.intelligenceCache.eventMarketTransmission ?? null,
-          sourceCredibility: this.ctx.intelligenceCache.sourceCredibility ?? [],
-        }),
+        getIntelligenceArtifacts: () => {
+          const runtimeView = getFabricBackedRuntimeView(this.ctx);
+          return {
+            reports: runtimeView.intelligenceCache.scheduledReports ?? [],
+            transmission: runtimeView.intelligenceCache.eventMarketTransmission ?? null,
+            sourceCredibility: runtimeView.intelligenceCache.sourceCredibility ?? [],
+          };
+        },
       });
     }
 
     if (!this.ctx.ontologyGraphPage && SITE_VARIANT !== 'happy') {
       this.ctx.ontologyGraphPage = new OntologyGraphPage({
-        getSnapshot: () => ({
-          generatedAt: new Date(),
-          keywordGraph: this.ctx.intelligenceCache.keywordGraph ?? null,
-          ontologyGraph: this.ctx.intelligenceCache.ontologyGraph ?? null,
-          graphRagSummary: this.ctx.intelligenceCache.graphRagSummary ?? null,
-          reports: this.ctx.intelligenceCache.scheduledReports ?? [],
-          timeslices: this.ctx.intelligenceCache.graphTimeslices ?? [],
-          entities: this.ctx.intelligenceCache.ontologyEntities ?? [],
-          ledger: this.ctx.intelligenceCache.ontologyLedger ?? [],
-          replayState: this.ctx.intelligenceCache.ontologyReplayState ?? null,
-          stixBundle: this.ctx.intelligenceCache.stixBundle ?? null,
-        }),
+        getSnapshot: () => {
+          const runtimeView = getFabricBackedRuntimeView(this.ctx);
+          return {
+            generatedAt: new Date(),
+            keywordGraph: runtimeView.intelligenceCache.keywordGraph ?? null,
+            ontologyGraph: runtimeView.intelligenceCache.ontologyGraph ?? null,
+            graphRagSummary: runtimeView.intelligenceCache.graphRagSummary ?? null,
+            reports: runtimeView.intelligenceCache.scheduledReports ?? [],
+            timeslices: runtimeView.intelligenceCache.graphTimeslices ?? [],
+            entities: runtimeView.intelligenceCache.ontologyEntities ?? [],
+            ledger: runtimeView.intelligenceCache.ontologyLedger ?? [],
+            replayState: runtimeView.intelligenceCache.ontologyReplayState ?? null,
+            stixBundle: runtimeView.intelligenceCache.stixBundle ?? null,
+          };
+        },
       });
     }
 
@@ -795,6 +893,7 @@ export class PanelLayoutManager implements AppModule {
   }
 
   private buildAnalysisHubSnapshot(): AnalysisHubSnapshot {
+    const runtimeView = getFabricBackedRuntimeView(this.ctx);
     const strategicRiskPanel = this.ctx.panels['strategic-risk'] as StrategicRiskPanel | undefined;
     const ciiPanel = this.ctx.panels['cii'] as CIIPanel | undefined;
     const strategicPosturePanel = this.ctx.panels['strategic-posture'] as StrategicPosturePanel | undefined;
@@ -810,7 +909,7 @@ export class PanelLayoutManager implements AppModule {
       .sort((a, b) => b.score - a.score)
       .slice(0, 12);
 
-    const topClusters = this.ctx.latestClusters
+    const topClusters = runtimeView.latestClusters
       .slice()
       .sort((a, b) => this.getClusterImportanceScore(b) - this.getClusterImportanceScore(a))
       .slice(0, 12);
@@ -840,11 +939,11 @@ export class PanelLayoutManager implements AppModule {
       topClusters,
       topPostures,
       convergence: this.getTopConvergenceZones(),
-      reports: this.ctx.intelligenceCache.scheduledReports ?? [],
-      transmission: this.ctx.intelligenceCache.eventMarketTransmission ?? null,
-      sourceCredibility: this.ctx.intelligenceCache.sourceCredibility ?? [],
-      multiHopInferences: this.ctx.intelligenceCache.multiHopInferences ?? [],
-      investmentIntelligence: this.ctx.intelligenceCache.investmentIntelligence ?? null,
+      reports: runtimeView.intelligenceCache.scheduledReports ?? [],
+      transmission: runtimeView.intelligenceCache.eventMarketTransmission ?? null,
+      sourceCredibility: runtimeView.intelligenceCache.sourceCredibility ?? [],
+      multiHopInferences: runtimeView.intelligenceCache.multiHopInferences ?? [],
+      investmentIntelligence: runtimeView.intelligenceCache.investmentIntelligence ?? null,
     };
   }
 

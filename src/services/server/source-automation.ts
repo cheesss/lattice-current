@@ -126,17 +126,19 @@ function buildContext(discovered: DiscoveredSourceRecord[], apiSources: ApiSourc
 }
 
 function discoveredSourceBias(value: DiscoveredSourceRecord['discoveredBy']): number {
-  if (value === 'codex-playwright') return 8;
-  if (value === 'playwright') return 6;
-  if (value === 'heuristic') return 2;
-  return -4;
+  if (value === 'manual') return 0;
+  if (value === 'codex-playwright') return 0;
+  if (value === 'playwright') return 0;
+  if (value === 'heuristic') return 0;
+  return 0;
 }
 
 function apiSourceBias(value: ApiSourceRecord['discoveredBy']): number {
-  if (value === 'codex-playwright') return 8;
-  if (value === 'playwright') return 6;
-  if (value === 'heuristic') return 3;
-  return -4;
+  if (value === 'manual') return 0;
+  if (value === 'codex-playwright') return 0;
+  if (value === 'playwright') return 0;
+  if (value === 'heuristic') return 0;
+  return 0;
 }
 
 function withinCooldown(updatedAtMs: number, cooldownHours: number): boolean {

@@ -1,3 +1,5 @@
+import type { HistoricalReplayRun } from './historical-intelligence';
+
 export interface LocalCodexCliStatus {
   available: boolean;
   loggedIn: boolean;
@@ -29,7 +31,27 @@ export interface RemoteDatasetAutomationPolicy {
   autoEnableScore: number;
 }
 
+export interface RemoteAutomationDefaults {
+  dbPath: string;
+  artifactDir: string;
+  bucketHours: number;
+  warmupFrameCount: number;
+  replayWindowDays: number;
+  walkForwardWindowDays: number;
+  horizonsHours: number[];
+  fetchEveryMinutes: number;
+  replayEveryMinutes: number;
+  walkForwardLocalHour: number;
+  themeDiscoveryEveryMinutes: number;
+  keywordLifecycleEveryMinutes: number;
+  maxRetries: number;
+  retentionDays: number;
+  artifactRetentionCount: number;
+  lockTtlMinutes: number;
+}
+
 export interface RemoteAutomationRegistry {
+  defaults: RemoteAutomationDefaults;
   themeAutomation: RemoteThemeAutomationPolicy;
   datasetAutomation: RemoteDatasetAutomationPolicy;
   datasets: RemoteAutomationDatasetRegistryEntry[];
@@ -44,6 +66,7 @@ export interface RemoteAutomationDatasetState {
   nextEligibleAt?: string | null;
   consecutiveFailures: number;
   lastError?: string | null;
+  artifacts?: string[];
 }
 
 export interface RemotePromotedThemeState {
@@ -108,6 +131,20 @@ export interface RemoteAutomationState {
   lastDatasetDiscoveryAt?: string | null;
   lastKeywordLifecycleAt?: string | null;
   lastSelfTuningAt?: string | null;
+  activeCycle?: {
+    id?: string | null;
+    status?: 'idle' | 'running' | 'error';
+    startedAt?: string | null;
+    heartbeatAt?: string | null;
+    completedAt?: string | null;
+    stage?: string | null;
+    datasetId?: string | null;
+    totalDatasets?: number;
+    completedDatasets?: number;
+    touchedDatasets?: string[];
+    lastError?: string | null;
+    progressPct?: number;
+  } | null;
   datasets: Record<string, RemoteAutomationDatasetState>;
   runs: RemoteAutomationRunRecord[];
   themeQueue: RemoteThemeQueueItem[];
@@ -120,14 +157,167 @@ export interface RemoteAutomationStatusPayload {
   state: RemoteAutomationState;
 }
 
+export interface LocalAutomationOpsSnapshotPayload {
+  success?: boolean;
+  timestamp?: string;
+  runtime?: {
+    mode?: string;
+    port?: number;
+    remoteBase?: string;
+    localApiEnabled?: boolean;
+  };
+  serviceStatus?: {
+    timestamp?: string;
+    summary?: {
+      operational?: number;
+      degraded?: number;
+      outage?: number;
+      unknown?: number;
+    };
+    services?: Array<{
+      id?: string;
+      name?: string;
+      category?: string;
+      status?: string;
+      description?: string;
+    }>;
+  };
+  health?: {
+    status?: 'healthy' | 'degraded' | 'error';
+    degraded?: boolean;
+    activeCycleStatus?: 'idle' | 'running' | 'error' | null;
+    activeStage?: string | null;
+    stalled?: boolean;
+    heartbeatAgeMinutes?: number | null;
+    stallThresholdMinutes?: number;
+    enabledDatasetCount?: number;
+    datasetErrorCount?: number;
+    consecutiveFailures?: number;
+    blockerCount?: number;
+    reasons?: string[];
+  };
+  codex?: {
+    available?: boolean;
+    loggedIn?: boolean;
+    usedCodex?: boolean;
+    command?: string | null;
+    spawnBlocked?: boolean;
+    output?: string;
+  };
+  credentials?: {
+    presentKeys?: string[];
+    missingKeys?: string[];
+    requiredKeys?: string[];
+    missingRequiredKeys?: string[];
+  };
+  automation?: {
+    registry?: RemoteAutomationRegistry | null;
+    lastCycle?: {
+      id?: string;
+      datasetId?: string | null;
+      kind?: string;
+      status?: 'ok' | 'error' | 'skipped';
+      startedAt?: string;
+      completedAt?: string;
+      attempts?: number;
+      detail?: string;
+    } | null;
+    runsCount?: number;
+      state?: {
+        lastCandidateExpansionAt?: string | null;
+        lastDatasetDiscoveryAt?: string | null;
+        lastSelfTuningAt?: string | null;
+        activeCycle?: RemoteAutomationState['activeCycle'];
+        queue?: {
+          themeQueueDepth?: number;
+          openThemeQueueDepth?: number;
+          datasetProposalDepth?: number;
+        runDepth?: number;
+        nextEligibleAt?: string | null;
+      };
+      consecutiveFailures?: number;
+      lastError?: string | null;
+    };
+  };
+  blockerReasons?: string[];
+}
+
+export interface LocalRuntimeSecretsPayload {
+  ok?: boolean;
+  mirrorPath?: string;
+  secrets?: Record<string, string>;
+  sources?: Record<string, 'env' | 'mirror'>;
+}
+
+export interface LocalReplayTriggerPayload {
+  ok?: boolean;
+  error?: string;
+  run?: {
+    id?: string;
+    label?: string;
+    completedAt?: string;
+  } | null;
+  defaultsUsed?: {
+    bucketHours?: number;
+    replayWindowDays?: number;
+    warmupFrameCount?: number;
+    maxFrames?: number;
+    horizonsHours?: number[];
+  };
+}
+
+export interface LocalSchedulerTriggerPayload {
+  ok?: boolean;
+  error?: string;
+  result?: {
+    completedAt?: string;
+    touchedDatasets?: string[];
+    summary?: {
+      replayRuns?: unknown[];
+      walkForwardRuns?: unknown[];
+    };
+  } | null;
+}
+
+export interface LocalBacktestRunListItem {
+  id: string;
+  label: string;
+  mode: 'replay' | 'walk-forward';
+  startedAt: string;
+  completedAt: string;
+  frameCount: number;
+  ideaRunCount: number;
+  forwardReturnCount: number;
+}
+
 export interface CodexChecklistItem {
   label: string;
   ok: boolean;
   detail: string;
 }
 
+function localAutomationOpsSnapshotEndpoint(): string {
+  return '/api/local-automation-ops-snapshot';
+}
+
+function localRuntimeSecretsEndpoint(): string {
+  return '/api/local-runtime-secrets';
+}
+
 function automationStatusEndpoint(): string {
   return '/api/local-intelligence-automation-status';
+}
+
+function replayNowEndpoint(): string {
+  return '/api/local-intelligence-run-replay-now';
+}
+
+function schedulerNowEndpoint(): string {
+  return '/api/local-intelligence-run-scheduler-now';
+}
+
+function backtestRunsEndpoint(): string {
+  return '/api/local-intelligence-backtest-runs';
 }
 
 async function safeJson<T>(response: Response): Promise<T | null> {
@@ -176,6 +366,122 @@ export async function getLocalCodexCliStatusRemote(): Promise<LocalCodexCliStatu
       message: 'Codex status probe unavailable',
     };
   }
+}
+
+export async function getLocalAutomationOpsSnapshotRemote(): Promise<LocalAutomationOpsSnapshotPayload | null> {
+  try {
+    const response = await fetch(localAutomationOpsSnapshotEndpoint(), {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    return await safeJson<LocalAutomationOpsSnapshotPayload>(response);
+  } catch {
+    return null;
+  }
+}
+
+export async function getLocalRuntimeSecretsRemote(): Promise<LocalRuntimeSecretsPayload | null> {
+  try {
+    const response = await fetch(localRuntimeSecretsEndpoint(), {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    return await safeJson<LocalRuntimeSecretsPayload>(response);
+  } catch {
+    return null;
+  }
+}
+
+export async function startLocalReplayNowRemote(): Promise<LocalReplayTriggerPayload> {
+  const response = await fetch(replayNowEndpoint(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({}),
+  });
+  const payload = await safeJson<LocalReplayTriggerPayload>(response);
+  if (!response.ok) {
+    throw new Error(payload?.error || `Replay trigger failed (${response.status})`);
+  }
+  return payload || { ok: false, error: 'Replay trigger returned no payload' };
+}
+
+export async function startLocalSchedulerNowRemote(): Promise<LocalSchedulerTriggerPayload> {
+  const response = await fetch(schedulerNowEndpoint(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({}),
+  });
+  const payload = await safeJson<LocalSchedulerTriggerPayload>(response);
+  if (!response.ok) {
+    throw new Error(payload?.error || `Scheduler trigger failed (${response.status})`);
+  }
+  return payload || { ok: false, error: 'Scheduler trigger returned no payload' };
+}
+
+export async function listLocalBacktestRunsRemote(limit = 12): Promise<LocalBacktestRunListItem[]> {
+  try {
+    const response = await fetch(`${backtestRunsEndpoint()}?limit=${Math.max(1, Math.min(50, Math.round(limit) || 12))}`, {
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await safeJson<{ ok?: boolean; runs?: LocalBacktestRunListItem[] }>(response);
+    if (!response.ok) return [];
+    return Array.isArray(payload?.runs) ? payload!.runs! : [];
+  } catch {
+    return [];
+  }
+}
+
+function isHydratedBacktestRun(value: unknown): value is HistoricalReplayRun {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<HistoricalReplayRun>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.label === 'string'
+    && Array.isArray(candidate.horizonsHours)
+    && Array.isArray(candidate.checkpoints)
+    && Array.isArray(candidate.ideaRuns)
+    && Array.isArray(candidate.forwardReturns);
+}
+
+export async function getLocalBacktestRunRemote(runId: string): Promise<HistoricalReplayRun | null> {
+  const safeRunId = String(runId || '').trim();
+  if (!safeRunId) return null;
+  try {
+    const response = await fetch(`${backtestRunsEndpoint()}?runId=${encodeURIComponent(safeRunId)}`, {
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await safeJson<{ ok?: boolean; found?: boolean; run?: HistoricalReplayRun | null }>(response);
+    if (!response.ok || !payload?.found || !payload?.run) return null;
+    return payload.run;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadLocalBacktestRunsRemote(limit = 8): Promise<HistoricalReplayRun[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.round(limit) || 8));
+  try {
+    const response = await fetch(`${backtestRunsEndpoint()}?limit=${safeLimit}&detail=full`, {
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await safeJson<{ ok?: boolean; runs?: unknown[] }>(response);
+    if (response.ok && Array.isArray(payload?.runs)) {
+      const hydratedRuns = payload.runs.filter(isHydratedBacktestRun);
+      if (hydratedRuns.length > 0) {
+        return hydratedRuns;
+      }
+    }
+  } catch {
+    // Fall back to the legacy list + detail flow below.
+  }
+
+  const summaries = await listLocalBacktestRunsRemote(limit);
+  if (!summaries.length) return [];
+  const settledRuns = await Promise.allSettled(
+    summaries.map((summary) => getLocalBacktestRunRemote(summary.id)),
+  );
+  return settledRuns
+    .flatMap((result) => (result.status === 'fulfilled' && result.value ? [result.value] : []))
+    .filter((run): run is HistoricalReplayRun => Boolean(run));
 }
 
 export function buildCodexAutomationChecklist(

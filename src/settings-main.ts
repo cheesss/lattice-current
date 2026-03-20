@@ -29,7 +29,7 @@ import {
 import { getApiBaseUrl, getRemoteApiBaseUrl, isDesktopRuntime, resolveLocalApiPort } from '@/services/runtime';
 import { tryInvokeTauri, invokeTauri } from '@/services/tauri-bridge';
 import { escapeHtml } from '@/utils/sanitize';
-import { initI18n, t } from '@/services/i18n';
+import { getCurrentLanguage, initI18n, t } from '@/services/i18n';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { trackFeatureToggle } from '@/services/analytics';
 import { getGlintAuthToken, setGlintAuthToken, clearGlintAuthToken } from '@/services/glint';
@@ -38,6 +38,35 @@ let activeSection = 'overview';
 let settingsManager: SettingsManager;
 let _diagCleanup: (() => void) | null = null;
 const featureTestMessages = new Map<string, { tone: 'ok' | 'warn' | 'error'; message: string }>();
+
+function getAccessCopy(): {
+  accessTitle: string;
+  accessDescription: string;
+  requestTitle: string;
+  requestDescription: string;
+  requestSubmit: string;
+  divider: string;
+} {
+  const isKorean = getCurrentLanguage() === 'ko';
+  if (isKorean) {
+    return {
+      accessTitle: 'Lattice Current 접근',
+      accessDescription: '플랫폼 키를 연결하면 관리형 데이터 소스와 호스팅 인텔리전스 기능을 바로 사용할 수 있습니다.',
+      requestTitle: '접근 요청',
+      requestDescription: '아직 플랫폼 키가 없다면 이메일을 등록하세요. 접근, 호스팅 프로바이더, 관리형 런타임 기능이 열리면 먼저 알려드립니다.',
+      requestSubmit: '접근 요청',
+      divider: '또는',
+    };
+  }
+  return {
+    accessTitle: 'Lattice Current Access',
+    accessDescription: 'Connect your platform key to unlock managed data sources and hosted intelligence features.',
+    requestTitle: 'Request Access',
+    requestDescription: 'Do not have a platform key yet? Register an email and we will contact you when access, hosted providers, or managed runtime features open up.',
+    requestSubmit: 'Request Access',
+    divider: 'OR',
+  };
+}
 
 function setFeatureTestResult(featureId: string, tone: 'ok' | 'warn' | 'error', message: string): void {
   featureTestMessages.set(featureId, { tone, message });
@@ -295,6 +324,8 @@ function renderOverview(area: HTMLElement): void {
   const glintStatusText = glintToken ? 'Active' : 'Not set';
   const glintStatusClass = glintToken ? 'ok' : 'warn';
   const alreadyRegistered = localStorage.getItem('wm-waitlist-registered') === '1';
+  const accessCopy = getAccessCopy();
+  const desktop = isDesktopRuntime();
 
   const catCards = SETTINGS_CATEGORIES.map(cat => {
     const { ready: catReady, total: catTotal } = getFeatureStatusCounts(cat);
@@ -324,8 +355,8 @@ function renderOverview(area: HTMLElement): void {
 
     <div class="settings-ov-license">
       <section class="wm-section">
-        <h2 class="wm-section-title">${t('modals.settingsWindow.worldMonitor.apiKey.title')}</h2>
-        <p class="wm-section-desc">${t('modals.settingsWindow.worldMonitor.apiKey.description')}</p>
+        <h2 class="wm-section-title">${accessCopy.accessTitle}</h2>
+        <p class="wm-section-desc">${accessCopy.accessDescription}</p>
         <div class="wm-key-row">
           <div class="wm-input-wrap">
             <input type="password" class="wm-input" data-wm-key-input
@@ -351,18 +382,22 @@ function renderOverview(area: HTMLElement): void {
           </div>
           <span class="wm-badge ${glintStatusClass}">${glintStatusText}</span>
         </div>
+        ${desktop ? `
         <div class="wm-register-row" style="margin-top:10px;">
           <button type="button" class="wm-submit-btn" data-glint-login>Open Glint Login</button>
           <button type="button" class="wm-submit-btn" data-glint-sync>Sync Token from Login Window</button>
         </div>
+        ` : `
+        <p class="wm-section-desc" style="margin-top:10px;">Browser mode skips the desktop Glint helper. Paste your Glint token directly into the field above.</p>
+        `}
         <p class="wm-reg-status" data-glint-login-status></p>
       </section>
 
-      <div class="wm-divider"><span>${t('modals.settingsWindow.worldMonitor.dividerOr')}</span></div>
+      <div class="wm-divider"><span>${accessCopy.divider}</span></div>
 
       <section class="wm-section">
-        <h2 class="wm-section-title">${t('modals.settingsWindow.worldMonitor.register.title')}</h2>
-        <p class="wm-section-desc">${t('modals.settingsWindow.worldMonitor.register.description')}</p>
+        <h2 class="wm-section-title">${accessCopy.requestTitle}</h2>
+        <p class="wm-section-desc">${accessCopy.requestDescription}</p>
         ${alreadyRegistered ? `
         <p class="wm-reg-status ok">${t('modals.settingsWindow.worldMonitor.register.alreadyRegistered')}</p>
         ` : `
@@ -370,7 +405,7 @@ function renderOverview(area: HTMLElement): void {
           <input type="email" class="wm-input wm-email" data-wm-email
             placeholder="${t('modals.settingsWindow.worldMonitor.register.emailPlaceholder')}" />
           <button type="button" class="wm-submit-btn" data-wm-register>
-            ${t('modals.settingsWindow.worldMonitor.register.submitBtn')}
+            ${accessCopy.requestSubmit}
           </button>
         </div>
         <p class="wm-reg-status" data-wm-reg-status></p>
@@ -383,6 +418,7 @@ function renderOverview(area: HTMLElement): void {
 }
 
 function initOverviewListeners(area: HTMLElement): void {
+  const accessCopy = getAccessCopy();
   area.querySelector('[data-wm-toggle]')?.addEventListener('click', () => {
     const input = area.querySelector<HTMLInputElement>('[data-wm-key-input]');
     if (input) input.type = input.type === 'password' ? 'text' : 'password';
@@ -407,42 +443,44 @@ function initOverviewListeners(area: HTMLElement): void {
     }
   });
 
-  area.querySelector('[data-glint-login]')?.addEventListener('click', async () => {
-    const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
-    try {
-      await invokeTauri<void>('open_glint_login');
-      if (statusEl) {
-        statusEl.textContent = 'Glint login window opened. Sign in there, then wait 10-30s for feed sync.';
-        statusEl.className = 'wm-reg-status ok';
+  if (isDesktopRuntime()) {
+    area.querySelector('[data-glint-login]')?.addEventListener('click', async () => {
+      const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
+      try {
+        await invokeTauri<void>('open_glint_login');
+        if (statusEl) {
+          statusEl.textContent = 'Glint login window opened. Sign in there, then wait 10-30s for feed sync.';
+          statusEl.className = 'wm-reg-status ok';
+        }
+      } catch (error) {
+        if (statusEl) {
+          statusEl.textContent = `Failed to open Glint login window: ${String(error)}`;
+          statusEl.className = 'wm-reg-status error';
+        }
       }
-    } catch (error) {
-      if (statusEl) {
-        statusEl.textContent = `Failed to open Glint login window: ${String(error)}`;
-        statusEl.className = 'wm-reg-status error';
-      }
-    }
-  });
+    });
 
-  area.querySelector('[data-glint-sync]')?.addEventListener('click', async () => {
-    const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
-    try {
-      const token = await invokeTauri<string>('sync_glint_auth_token');
-      const clean = token.trim();
-      if (!clean) {
-        throw new Error('Empty token returned');
+    area.querySelector('[data-glint-sync]')?.addEventListener('click', async () => {
+      const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
+      try {
+        const token = await invokeTauri<string>('sync_glint_auth_token');
+        const clean = token.trim();
+        if (!clean) {
+          throw new Error('Empty token returned');
+        }
+        setGlintAuthToken(clean);
+        if (statusEl) {
+          statusEl.textContent = 'Glint token synced from login window.';
+          statusEl.className = 'wm-reg-status ok';
+        }
+      } catch (error) {
+        if (statusEl) {
+          statusEl.textContent = `Failed to sync token: ${String(error)}`;
+          statusEl.className = 'wm-reg-status error';
+        }
       }
-      setGlintAuthToken(clean);
-      if (statusEl) {
-        statusEl.textContent = 'Glint token synced from login window.';
-        statusEl.className = 'wm-reg-status ok';
-      }
-    } catch (error) {
-      if (statusEl) {
-        statusEl.textContent = `Failed to sync token: ${String(error)}`;
-        statusEl.className = 'wm-reg-status error';
-      }
-    }
-  });
+    });
+  }
 
   area.querySelector('[data-wm-register]')?.addEventListener('click', async () => {
     const emailInput = area.querySelector<HTMLInputElement>('[data-wm-email]');
@@ -483,7 +521,7 @@ function initOverviewListeners(area: HTMLElement): void {
       regStatus.className = 'wm-reg-status error';
     } finally {
       btn.disabled = false;
-      btn.textContent = t('modals.settingsWindow.worldMonitor.register.submitBtn');
+      btn.textContent = accessCopy.requestSubmit;
     }
   });
 
@@ -841,13 +879,19 @@ async function loadOllamaModelsIntoSelect(select: HTMLSelectElement): Promise<vo
 // ── Debug section ──
 
 function renderDebug(area: HTMLElement): void {
+  const desktop = isDesktopRuntime();
   area.innerHTML = `
     <div class="settings-section-header">
       <h2>Debug &amp; Logs</h2>
     </div>
     <div class="debug-actions">
+      ${desktop ? `
       <button id="openLogsBtn" type="button">Open Logs Folder</button>
       <button id="openSidecarLogBtn" type="button">Open API Log</button>
+      ` : `
+      <button id="openTrafficJsonBtn" type="button">Open API Traffic JSON</button>
+      <button id="downloadDiagnosticsBtn" type="button">Download Diagnostics</button>
+      `}
     </div>
     <section class="settings-diagnostics" id="diagnosticsSection">
       <header class="diag-header">
@@ -869,13 +913,36 @@ function renderDebug(area: HTMLElement): void {
     </section>
   `;
 
-  area.querySelector('#openLogsBtn')?.addEventListener('click', () => {
-    void invokeDesktopAction('open_logs_folder', t('modals.settingsWindow.openLogs'));
-  });
+  if (desktop) {
+    area.querySelector('#openLogsBtn')?.addEventListener('click', () => {
+      void invokeDesktopAction('open_logs_folder', t('modals.settingsWindow.openLogs'));
+    });
 
-  area.querySelector('#openSidecarLogBtn')?.addEventListener('click', () => {
-    void invokeDesktopAction('open_sidecar_log_file', t('modals.settingsWindow.openApiLog'));
-  });
+    area.querySelector('#openSidecarLogBtn')?.addEventListener('click', () => {
+      void invokeDesktopAction('open_sidecar_log_file', t('modals.settingsWindow.openApiLog'));
+    });
+  } else {
+    area.querySelector('#openTrafficJsonBtn')?.addEventListener('click', () => {
+      window.open('/api/local-traffic-log', '_blank', 'noopener');
+    });
+
+    area.querySelector('#downloadDiagnosticsBtn')?.addEventListener('click', async () => {
+      try {
+        const response = await diagFetch('/api/local-traffic-log');
+        const payload = await response.text();
+        const blob = new Blob([payload], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `lattice-current-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        setActionStatus('Diagnostics downloaded', 'ok');
+      } catch {
+        setActionStatus('Failed to download diagnostics', 'error');
+      }
+    });
+  }
 
   initDiagnostics();
 }

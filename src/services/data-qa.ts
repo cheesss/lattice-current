@@ -8,6 +8,7 @@ import { canUseLocalAgentEndpoints, isDesktopRuntime } from './runtime';
 import { isFeatureAvailable } from './runtime-config';
 import { calculateCII } from './country-instability';
 import { nameToCountryCode } from './country-geometry';
+import { getFabricBackedRuntimeView } from './intelligence-fabric';
 
 const MAX_NEWS_ITEMS = 2400;
 const MAX_NEWS_PER_CATEGORY = 1200;
@@ -944,7 +945,7 @@ function buildPromptHeadlines(
     contextChars += trimmed.length + 1;
   };
 
-  pushLine('ROLE: You are the in-app World Monitor geopolitical + market data analyst.');
+  pushLine('ROLE: You are the in-app Lattice Current signal analyst for geopolitics, markets, and systems.');
   pushLine(`INTERACTION_MODE: ${profile.mode}; focus=${profile.focus}; requireEvidence=${profile.requireEvidence ? 'yes' : 'no'}`);
   if (profile.regionKey && profile.regionLabel) {
     pushLine(`REGION_FOCUS: ${profile.regionLabel}`);
@@ -1391,7 +1392,7 @@ function buildPreparedQuestionContext(
 function buildCasualSnapshotAnswer(prepared: PreparedQuestionContext): DataQAAnswer {
   return {
     answer: [
-      '현재 로드된 World Monitor 데이터 기준으로 지역 상황 요약, 국가별 리스크 정리, 시장/원자재/항공·해상 이벤트 연결, 그리고 근거 링크 정리를 할 수 있습니다.',
+      '현재 로드된 Lattice Current 데이터 기준으로 지역 상황 요약, 국가별 리스크 정리, 시장/원자재/항공·해상 이벤트 연결, 그리고 근거 링크 정리를 할 수 있습니다.',
       '예를 들어 `아프리카 상황`, `중동 리스크`, `유가와 해상 교통 영향`, `최근 들어온 핵심 뉴스`처럼 물으면 바로 현재 스냅샷 기준으로 정리해 드립니다.',
     ].join('\n'),
     provider: 'snapshot',
@@ -2098,21 +2099,23 @@ function buildDeterministicFallbackAnswer(
 }
 
 export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
+  const runtimeView = getFabricBackedRuntimeView(ctx);
+  const runtimeIntelligenceCache = runtimeView.intelligenceCache;
   const enabledLayers = Object.entries(ctx.mapLayers)
     .filter(([, enabled]) => enabled)
     .map(([layer]) => layer);
 
-  const allNews = ctx.allNews
+  const allNews = runtimeView.allNews
     .slice(0, MAX_NEWS_ITEMS)
     .map(normalizeNews);
 
-  const newsByCategory = Object.entries(ctx.newsByCategory).map(([category, items]) => ({
+  const newsByCategory = Object.entries(runtimeView.newsByCategory).map(([category, items]) => ({
     category,
     total: items.length,
     items: items.slice(0, MAX_NEWS_PER_CATEGORY).map(normalizeNews),
   }));
 
-  const clusters = ctx.latestClusters.slice(0, MAX_CLUSTERS).map(cluster => ({
+  const clusters = runtimeView.latestClusters.slice(0, MAX_CLUSTERS).map(cluster => ({
     id: cluster.id,
     title: cleanText(cluster.primaryTitle, 280),
     source: cleanText(cluster.primarySource, 80),
@@ -2126,21 +2129,21 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
     evidence: (cluster.relations?.evidence ?? []).slice(0, 8).map(e => cleanText(e, 160)),
   }));
 
-  const markets = ctx.latestMarkets.slice(0, MAX_MARKETS).map(market => ({
+  const markets = runtimeView.latestMarkets.slice(0, MAX_MARKETS).map(market => ({
     symbol: cleanText(market.symbol, 40),
     name: cleanText(market.name, 120),
     price: market.price,
     change: market.change,
   }));
 
-  const predictions = ctx.latestPredictions.slice(0, MAX_PREDICTIONS).map(prediction => ({
+  const predictions = runtimeView.latestPredictions.slice(0, MAX_PREDICTIONS).map(prediction => ({
     title: cleanText(prediction.title, 220),
     yesPrice: prediction.yesPrice,
     volume: typeof prediction.volume === 'number' ? prediction.volume : null,
     url: cleanText(prediction.url || '', 260),
   }));
 
-  const outages = (ctx.intelligenceCache.outages ?? []).slice(0, MAX_INTEL_ITEMS).map(outage => ({
+  const outages = (runtimeIntelligenceCache.outages ?? []).slice(0, MAX_INTEL_ITEMS).map(outage => ({
     title: cleanText(outage.title, 220),
     country: cleanText(outage.country, 80),
     severity: outage.severity,
@@ -2149,7 +2152,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
     location: `${outage.lat.toFixed(2)},${outage.lon.toFixed(2)}`,
   }));
 
-  const protests = (ctx.intelligenceCache.protests?.events ?? []).slice(0, MAX_INTEL_ITEMS).map(protest => ({
+  const protests = (runtimeIntelligenceCache.protests?.events ?? []).slice(0, MAX_INTEL_ITEMS).map(protest => ({
     title: cleanText(protest.title, 220),
     country: cleanText(protest.country, 80),
     severity: protest.severity,
@@ -2158,14 +2161,14 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
     confidence: protest.confidence,
   }));
 
-  const earthquakes = (ctx.intelligenceCache.earthquakes ?? []).slice(0, MAX_INTEL_ITEMS).map(earthquake => ({
+  const earthquakes = (runtimeIntelligenceCache.earthquakes ?? []).slice(0, MAX_INTEL_ITEMS).map(earthquake => ({
     place: cleanText(earthquake.place, 180),
     magnitude: earthquake.magnitude,
     depth: earthquake.depthKm,
     time: toIso(earthquake.occurredAt),
   }));
 
-  const flights = (ctx.intelligenceCache.military?.flights ?? []).slice(0, MAX_INTEL_ITEMS).map(flight => ({
+  const flights = (runtimeIntelligenceCache.military?.flights ?? []).slice(0, MAX_INTEL_ITEMS).map(flight => ({
     callsign: cleanText(flight.callsign, 40),
     type: flight.aircraftType,
     operatorCountry: cleanText(flight.operatorCountry, 80),
@@ -2175,7 +2178,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
     location: `${flight.lat.toFixed(2)},${flight.lon.toFixed(2)}`,
   }));
 
-  const vessels = (ctx.intelligenceCache.military?.vessels ?? []).slice(0, MAX_INTEL_ITEMS).map(vessel => ({
+  const vessels = (runtimeIntelligenceCache.military?.vessels ?? []).slice(0, MAX_INTEL_ITEMS).map(vessel => ({
     name: cleanText(vessel.name, 80),
     type: vessel.vesselType,
     operatorCountry: cleanText(vessel.operatorCountry, 80),
@@ -2193,13 +2196,13 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
     lon: typeof monitor.lon === 'number' ? monitor.lon : null,
   }));
 
-  const usniFleet = ctx.intelligenceCache.usniFleet
+  const usniFleet = runtimeIntelligenceCache.usniFleet
     ? {
-      articleTitle: cleanText(ctx.intelligenceCache.usniFleet.articleTitle, 220),
-      articleDate: cleanText(ctx.intelligenceCache.usniFleet.articleDate, 80),
-      vessels: ctx.intelligenceCache.usniFleet.vessels.length,
-      strikeGroups: ctx.intelligenceCache.usniFleet.strikeGroups.length,
-      regions: ctx.intelligenceCache.usniFleet.regions.slice(0, 20).map(region => cleanText(region, 80)),
+      articleTitle: cleanText(runtimeIntelligenceCache.usniFleet.articleTitle, 220),
+      articleDate: cleanText(runtimeIntelligenceCache.usniFleet.articleDate, 80),
+      vessels: runtimeIntelligenceCache.usniFleet.vessels.length,
+      strikeGroups: runtimeIntelligenceCache.usniFleet.strikeGroups.length,
+      regions: runtimeIntelligenceCache.usniFleet.regions.slice(0, 20).map(region => cleanText(region, 80)),
     }
     : null;
 
@@ -2210,15 +2213,15 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
     timeRange: ctx.currentTimeRange,
     enabledLayers,
     counts: {
-      news: ctx.allNews.length,
-      clusters: ctx.latestClusters.length,
-      markets: ctx.latestMarkets.length,
-      predictions: ctx.latestPredictions.length,
-      protests: ctx.intelligenceCache.protests?.events.length ?? 0,
-      outages: ctx.intelligenceCache.outages?.length ?? 0,
-      flights: ctx.intelligenceCache.military?.flights.length ?? 0,
-      vessels: ctx.intelligenceCache.military?.vessels.length ?? 0,
-      earthquakes: ctx.intelligenceCache.earthquakes?.length ?? 0,
+      news: runtimeView.allNews.length,
+      clusters: runtimeView.latestClusters.length,
+      markets: runtimeView.latestMarkets.length,
+      predictions: runtimeView.latestPredictions.length,
+      protests: runtimeIntelligenceCache.protests?.events.length ?? 0,
+      outages: runtimeIntelligenceCache.outages?.length ?? 0,
+      flights: runtimeIntelligenceCache.military?.flights.length ?? 0,
+      vessels: runtimeIntelligenceCache.military?.vessels.length ?? 0,
+      earthquakes: runtimeIntelligenceCache.earthquakes?.length ?? 0,
       monitors: ctx.monitors.length,
     },
     monitors,
@@ -2236,8 +2239,8 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
       usniFleet,
     },
     keywordGraph: {
-      generatedAt: ctx.intelligenceCache.keywordGraph?.generatedAt ?? null,
-      nodes: (ctx.intelligenceCache.keywordGraph?.nodes ?? [])
+      generatedAt: runtimeIntelligenceCache.keywordGraph?.generatedAt ?? null,
+      nodes: (runtimeIntelligenceCache.keywordGraph?.nodes ?? [])
         .slice(0, 80)
         .map(node => ({
           term: cleanText(node.term, 80),
@@ -2245,7 +2248,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
           status: cleanText(node.status, 20),
           score: Number(node.score) || 0,
         })),
-      edges: (ctx.intelligenceCache.keywordGraph?.edges ?? [])
+      edges: (runtimeIntelligenceCache.keywordGraph?.edges ?? [])
         .slice(0, 120)
         .map(edge => ({
           source: cleanText(edge.source, 80),
@@ -2254,23 +2257,23 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
         })),
     },
     graphRag: {
-      generatedAt: ctx.intelligenceCache.graphRagSummary?.generatedAt ?? null,
-      globalThemes: (ctx.intelligenceCache.graphRagSummary?.globalThemes ?? [])
+      generatedAt: runtimeIntelligenceCache.graphRagSummary?.generatedAt ?? null,
+      globalThemes: (runtimeIntelligenceCache.graphRagSummary?.globalThemes ?? [])
         .slice(0, 24)
         .map(theme => cleanText(theme, 60)),
-      hierarchyLines: (ctx.intelligenceCache.graphRagSummary?.hierarchyLines ?? [])
+      hierarchyLines: (runtimeIntelligenceCache.graphRagSummary?.hierarchyLines ?? [])
         .slice(0, 24)
         .map(line => cleanText(line, 320)),
     },
     ontologyGraph: {
-      generatedAt: ctx.intelligenceCache.ontologyGraph?.generatedAt ?? null,
-      nodes: ctx.intelligenceCache.ontologyGraph?.nodes.length ?? 0,
-      edges: ctx.intelligenceCache.ontologyGraph?.edges.length ?? 0,
-      events: ctx.intelligenceCache.ontologyGraph?.eventNodes.length ?? 0,
-      inferred: ctx.intelligenceCache.ontologyGraph?.inferredEdges.length ?? 0,
-      violations: ctx.intelligenceCache.ontologyGraph?.violations.length ?? 0,
+      generatedAt: runtimeIntelligenceCache.ontologyGraph?.generatedAt ?? null,
+      nodes: runtimeIntelligenceCache.ontologyGraph?.nodes.length ?? 0,
+      edges: runtimeIntelligenceCache.ontologyGraph?.edges.length ?? 0,
+      events: runtimeIntelligenceCache.ontologyGraph?.eventNodes.length ?? 0,
+      inferred: runtimeIntelligenceCache.ontologyGraph?.inferredEdges.length ?? 0,
+      violations: runtimeIntelligenceCache.ontologyGraph?.violations.length ?? 0,
     },
-    multimodal: (ctx.intelligenceCache.multimodalFindings ?? [])
+    multimodal: (runtimeIntelligenceCache.multimodalFindings ?? [])
       .slice(0, 40)
       .map(finding => ({
         topic: cleanText(finding.topic, 80),
@@ -2279,7 +2282,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
         capturedAt: toIso(finding.capturedAt),
         evidence: (finding.evidence || []).slice(0, 8).map(entry => cleanText(entry, 120)),
       })),
-    sourceCredibility: (ctx.intelligenceCache.sourceCredibility ?? [])
+    sourceCredibility: (runtimeIntelligenceCache.sourceCredibility ?? [])
       .slice(0, 24)
       .map(profile => ({
         source: cleanText(profile.source, 80),
@@ -2289,7 +2292,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
         propagandaRiskScore: profile.propagandaRiskScore,
         notes: (profile.notes || []).slice(0, 4).map(note => cleanText(note, 120)),
       })),
-    transmissions: (ctx.intelligenceCache.eventMarketTransmission?.edges ?? [])
+    transmissions: (runtimeIntelligenceCache.eventMarketTransmission?.edges ?? [])
       .slice(0, 24)
       .map(edge => ({
         eventTitle: cleanText(edge.eventTitle, 180),
@@ -2298,7 +2301,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
         strength: edge.strength,
         reason: cleanText(edge.reason, 180),
       })),
-    reports: (ctx.intelligenceCache.scheduledReports ?? [])
+    reports: (runtimeIntelligenceCache.scheduledReports ?? [])
       .slice(0, 8)
       .map(report => ({
         title: cleanText(report.title, 140),
@@ -2307,7 +2310,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
         rebuttalSummary: report.rebuttalSummary ? cleanText(report.rebuttalSummary, 220) : null,
         consensusMode: report.consensusMode ?? null,
       })),
-    multiHop: (ctx.intelligenceCache.multiHopInferences ?? [])
+    multiHop: (runtimeIntelligenceCache.multiHopInferences ?? [])
       .slice(0, 16)
       .map(alert => ({
         title: cleanText(alert.title, 180),
@@ -2317,7 +2320,7 @@ export function buildDataQASnapshot(ctx: AppContext): DataQASnapshot {
         summary: cleanText(alert.summary, 260),
         chain: (alert.chain || []).slice(0, 6).map(item => cleanText(item, 80)),
       })),
-    ontology: (ctx.intelligenceCache.ontologyEntities ?? [])
+    ontology: (runtimeIntelligenceCache.ontologyEntities ?? [])
       .slice(0, 20)
       .map(entity => ({
         canonicalName: cleanText(entity.canonicalName, 100),

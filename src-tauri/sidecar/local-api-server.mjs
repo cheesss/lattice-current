@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import http, { createServer } from 'node:http';
 import https from 'node:https';
+import net from 'node:net';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { brotliCompress, gzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -107,7 +109,11 @@ const ALLOWED_ENV_KEYS = new Set([
   'AISSTREAM_API_KEY', 'VITE_WS_RELAY_URL', 'FINNHUB_API_KEY', 'NASA_FIRMS_API_KEY',
   'OLLAMA_API_URL', 'OLLAMA_MODEL', 'WORLDMONITOR_API_KEY', 'WTO_API_KEY',
   'OPENBB_API_URL', 'OPENBB_API_KEY',
+  'ACLED_EMAIL', 'ACLED_PASSWORD',
 ]);
+const DESKTOP_APP_IDENTIFIER = process.env.LOCAL_API_APP_IDENTIFIER || 'app.worldmonitor.desktop';
+const RUNTIME_SECRETS_MIRROR_FILE = 'runtime-secrets-mirror.json';
+const mirroredRuntimeSecrets = new Set();
 
 const CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const CODEX_WORKDIR = path.join(os.tmpdir(), 'worldmonitor-codex-cli');
@@ -116,10 +122,184 @@ const LOCAL_SOURCE_DISCOVERY_TIMEOUT_MS = 20_000;
 const ENABLE_PLAYWRIGHT_DISCOVERY = String(process.env.LOCAL_SOURCE_DISCOVERY_PLAYWRIGHT ?? 'true').toLowerCase() !== 'false';
 const ENABLE_CODEX_SOURCE_DISCOVERY = String(process.env.LOCAL_SOURCE_DISCOVERY_CODEX ?? 'true').toLowerCase() !== 'false';
 const INTELLIGENCE_ARCHIVE_DB = 'intelligence-archive.duckdb';
+const DUCKDB_LOCK_TTL_MINUTES = 180;
+const INTELLIGENCE_FABRIC_CACHE_KEY = 'intelligence-fabric:v1';
 
 let duckDbModulePromise = null;
 let intelligenceArchivePromise = null;
 let intelligenceArchiveVacuumTimer = null;
+let manualBacktestJobPromise = null;
+let manualBacktestBusyUntil = 0;
+
+function isPidLikelyAlive(pid) {
+  const numericPid = Number(pid);
+  if (!Number.isInteger(numericPid) || numericPid <= 0) return null;
+  try {
+    process.kill(numericPid, 0);
+    return true;
+  } catch (error) {
+    const code = error?.code;
+    if (code === 'EPERM') return true;
+    if (code === 'ESRCH') return false;
+    return null;
+  }
+}
+
+function normalizeDuckDbPath(dbPath) {
+  return path.resolve(dbPath || INTELLIGENCE_ARCHIVE_DB);
+}
+
+function getIntelligenceArchiveDbPath(context) {
+  return path.join(context?.dataDir || process.cwd(), INTELLIGENCE_ARCHIVE_DB);
+}
+
+function getDuckDbLockPath(dbPath) {
+  const normalized = normalizeDuckDbPath(dbPath);
+  const digest = createHash('sha1').update(normalized).digest('hex').slice(0, 16);
+  return path.join(path.dirname(normalized), `${path.basename(normalized)}.${digest}.lock.json`);
+}
+
+async function acquireDuckDbPathLock(dbPath, ttlMinutes = DUCKDB_LOCK_TTL_MINUTES) {
+  const normalized = normalizeDuckDbPath(dbPath);
+  const lockPath = getDuckDbLockPath(normalized);
+  await mkdir(path.dirname(lockPath), { recursive: true });
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+  const payload = JSON.stringify({
+    path: normalized,
+    pid: process.pid,
+    acquiredAt: new Date().toISOString(),
+    expiresAt,
+  }, null, 2);
+
+  const tryCreate = async () => {
+    try {
+      const handle = await open(lockPath, 'wx');
+      await handle.writeFile(payload, 'utf8');
+      await handle.close();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (!(await tryCreate())) {
+    let existing = null;
+    try {
+      existing = JSON.parse(await readFile(lockPath, 'utf8'));
+    } catch {
+      existing = null;
+    }
+    const expired = existing?.expiresAt && Date.parse(existing.expiresAt) < Date.now();
+    const ownerAlive = isPidLikelyAlive(existing?.pid);
+    if (expired || ownerAlive === false) {
+      await rm(lockPath, { force: true });
+      if (!(await tryCreate())) return null;
+    } else {
+      return null;
+    }
+  }
+
+  return async () => {
+    await rm(lockPath, { force: true });
+  };
+}
+
+function duckDbLockError(dbPath, operation) {
+  const error = new Error(`DuckDB path is locked for ${operation}: ${normalizeDuckDbPath(dbPath)}`);
+  error.code = 'DUCKDB_LOCKED';
+  return error;
+}
+
+function isDuckDbLockError(error) {
+  const message = String(error?.message || '');
+  return error?.code === 'DUCKDB_LOCKED'
+    || /DuckDB path is locked/i.test(message)
+    || /Cannot open file .*intelligence-history\.duckdb/i.test(message)
+    || /file is already open/i.test(message)
+    || /다른 프로세스가 파일을 사용 중/i.test(message);
+}
+
+function isManualBacktestBusyError(error) {
+  const message = String(error?.message || '');
+  return error?.code === 'MANUAL_BACKTEST_BUSY' || /manual backtest job is already running/i.test(message);
+}
+
+function createManualBacktestBusyError() {
+  const error = new Error('Another replay or scheduler cycle is already running or finalizing archive writes. Wait a few seconds and try again.');
+  error.code = 'MANUAL_BACKTEST_BUSY';
+  return error;
+}
+
+function isRecoverableArchiveOpenError(error) {
+  const message = String(error?.message || '');
+  return /Failure while replaying WAL file/i.test(message)
+    || /no default database set/i.test(message)
+    || /assertion failure within DuckDB/i.test(message);
+}
+
+async function backupCorruptedArchiveFiles(dbPath) {
+  const normalized = normalizeDuckDbPath(dbPath);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const candidates = [normalized, `${normalized}.wal`];
+  const moved = [];
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue;
+    const target = `${candidate}.corrupt-${timestamp}`;
+    try {
+      await rm(target, { force: true });
+    } catch {
+      // ignore stale target cleanup failures
+    }
+    try {
+      await mkdir(path.dirname(target), { recursive: true });
+      writeFileSync(target, readFileSync(candidate));
+      await rm(candidate, { force: true });
+      moved.push(target);
+    } catch {
+      // best effort backup; archive DB can be recreated even if copy fails
+      try {
+        await rm(candidate, { force: true });
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return moved;
+}
+
+async function openIntelligenceArchiveConnection(dbPath) {
+  const duckdb = await loadDuckDbModule();
+  const instance = await duckdb.DuckDBInstance.fromCache(dbPath);
+  const connection = await instance.connect();
+  await connection.run('SELECT 1');
+  return { instance, connection };
+}
+
+async function withDuckDbPathLock(dbPath, operation, task) {
+  const release = await acquireDuckDbPathLock(dbPath);
+  if (!release) {
+    throw duckDbLockError(dbPath, operation);
+  }
+  try {
+    return await task();
+  } finally {
+    await release();
+  }
+}
+
+async function withManualBacktestJobLock(task) {
+  if (manualBacktestJobPromise || manualBacktestBusyUntil > Date.now()) {
+    throw createManualBacktestBusyError();
+  }
+  manualBacktestBusyUntil = 0;
+  manualBacktestJobPromise = (async () => task())();
+  try {
+    return await manualBacktestJobPromise;
+  } finally {
+    manualBacktestJobPromise = null;
+    manualBacktestBusyUntil = 0;
+  }
+}
 
 const SAFE_CODEX_ENV_KEYS = [
   'PATH',
@@ -150,6 +330,98 @@ const SAFE_CODEX_ENV_KEYS = [
 let codexRunnerOverride = null;
 let cachedCodexCommand = null;
 
+function getDefaultDesktopAppDataDir() {
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return path.join(appData, DESKTOP_APP_IDENTIFIER);
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', DESKTOP_APP_IDENTIFIER);
+  }
+  const xdgDataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
+  return path.join(xdgDataHome, DESKTOP_APP_IDENTIFIER);
+}
+
+function resolveRuntimeSecretsMirrorPath() {
+  const explicit = String(process.env.LOCAL_API_SECRETS_MIRROR_PATH || '').trim();
+  if (explicit) return explicit;
+  return path.join(getDefaultDesktopAppDataDir(), RUNTIME_SECRETS_MIRROR_FILE);
+}
+
+function readRuntimeSecretsMirror() {
+  const mirrorPath = resolveRuntimeSecretsMirrorPath();
+  if (!existsSync(mirrorPath)) {
+    return { mirrorPath, secrets: {} };
+  }
+  try {
+    const raw = readFileSync(mirrorPath, 'utf8').replace(/^\uFEFF/, '');
+    const parsed = JSON.parse(raw);
+    const secrets = {};
+    if (parsed && typeof parsed === 'object') {
+      for (const [key, rawValue] of Object.entries(parsed)) {
+        if (!ALLOWED_ENV_KEYS.has(key)) continue;
+        const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+        if (!value) continue;
+        secrets[key] = value;
+      }
+    }
+    return { mirrorPath, secrets };
+  } catch {
+    return { mirrorPath, secrets: {} };
+  }
+}
+
+function getPersistentCacheDir(context) {
+  const baseDir = context?.resourceDir || process.cwd();
+  return path.join(baseDir, 'data', 'persistent-cache');
+}
+
+function getPersistentCacheFilePath(context, key) {
+  return path.join(getPersistentCacheDir(context), `${encodeURIComponent(String(key))}.json`);
+}
+
+function readPersistentCacheEntry(context, key) {
+  try {
+    const filePath = getPersistentCacheFilePath(context, key);
+    if (!existsSync(filePath)) return null;
+    const raw = readFileSync(filePath, 'utf8');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadMirroredRuntimeSecrets(context) {
+  const { mirrorPath, secrets } = readRuntimeSecretsMirror();
+  let loaded = 0;
+  let present = 0;
+  mirroredRuntimeSecrets.clear();
+  for (const [key, value] of Object.entries(secrets)) {
+    present += 1;
+    if (!process.env[key]) {
+      process.env[key] = value;
+      loaded += 1;
+    }
+    mirroredRuntimeSecrets.add(key);
+  }
+  if (present > 0) {
+    context.logger.log(`[local-api] runtime secrets mirror loaded ${loaded}/${present} keys from ${mirrorPath}`);
+  }
+  return { mirrorPath, present, loaded };
+}
+
+function snapshotRuntimeSecrets() {
+  const secrets = {};
+  const sources = {};
+  for (const key of ALLOWED_ENV_KEYS) {
+    const value = typeof process.env[key] === 'string' ? process.env[key].trim() : '';
+    if (!value) continue;
+    secrets[key] = value;
+    sources[key] = mirroredRuntimeSecrets.has(key) ? 'mirror' : 'env';
+  }
+  return { secrets, sources };
+}
+
 export function __setCodexRunnerForTests(fn) {
   codexRunnerOverride = (typeof fn === 'function') ? fn : null;
 }
@@ -178,11 +450,15 @@ function pushPathUnique(buffer, entry) {
   buffer.push(trimmed);
 }
 
+function isWindowsAppsAliasPath(candidate) {
+  return /[\\/]windowsapps[\\/]/i.test(String(candidate || ''));
+}
+
 async function resolveCodexCommand() {
   if (cachedCodexCommand) return cachedCodexCommand;
 
   const fromEnv = (process.env.CODEX_BIN || '').trim();
-  if (fromEnv && existsSync(fromEnv)) {
+  if (fromEnv && existsSync(fromEnv) && !isWindowsAppsAliasPath(fromEnv)) {
     cachedCodexCommand = fromEnv;
     return cachedCodexCommand;
   }
@@ -191,6 +467,11 @@ async function resolveCodexCommand() {
   const userHome = process.env.USERPROFILE || os.homedir();
   const appData = process.env.APPDATA || path.join(userHome, 'AppData', 'Roaming');
   const localAppData = process.env.LOCALAPPDATA || path.join(userHome, 'AppData', 'Local');
+  const codexHome = (process.env.CODEX_HOME || path.join(userHome, '.codex')).trim();
+
+  // Prefer the real bundled CLI binary over WindowsApps aliases.
+  pushPathUnique(candidates, path.join(codexHome, '.sandbox-bin', 'codex.exe'));
+  pushPathUnique(candidates, path.join(userHome, '.codex', '.sandbox-bin', 'codex.exe'));
 
   // Prefer native executable when available.
   pushPathUnique(candidates, path.join(localAppData, 'Programs', 'OpenAI', 'codex', 'codex.exe'));
@@ -216,7 +497,7 @@ async function resolveCodexCommand() {
   pushPathUnique(candidates, path.join(appData, 'npm', 'codex'));
 
   for (const candidate of candidates) {
-    if (existsSync(candidate)) {
+    if (existsSync(candidate) && !isWindowsAppsAliasPath(candidate)) {
       cachedCodexCommand = candidate;
       return cachedCodexCommand;
     }
@@ -487,6 +768,28 @@ function dedupeTopics(values, limit = 12) {
   return output;
 }
 
+function normalizeTopicSearchText(values) {
+  return ` ${String((values || []).join(' '))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()} `;
+}
+
+function topicTextContainsAny(values, patterns) {
+  const haystack = normalizeTopicSearchText(values);
+  for (const pattern of Array.isArray(patterns) ? patterns : []) {
+    const needle = String(pattern || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!needle) continue;
+    if (haystack.includes(` ${needle} `)) return true;
+  }
+  return false;
+}
+
 function normalizeDiscoveredSources(rawSources, fallbackName = 'Discovered') {
   const output = [];
   const seen = new Set();
@@ -710,9 +1013,21 @@ async function ensureIntelligenceArchive(context) {
     intelligenceArchivePromise = (async () => {
       mkdirSync(context.dataDir, { recursive: true });
       const dbPath = path.join(context.dataDir, INTELLIGENCE_ARCHIVE_DB);
-      const duckdb = await loadDuckDbModule();
-      const instance = await duckdb.DuckDBInstance.fromCache(dbPath);
-      const connection = await instance.connect();
+      let connectionBundle;
+      try {
+        connectionBundle = await openIntelligenceArchiveConnection(dbPath);
+      } catch (error) {
+        if (!isRecoverableArchiveOpenError(error)) {
+          throw error;
+        }
+        context.logger.warn(`[local-api] archive DB open failed; rebuilding ${dbPath}: ${String(error?.message || error)}`);
+        const moved = await backupCorruptedArchiveFiles(dbPath);
+        if (moved.length > 0) {
+          context.logger.warn(`[local-api] archived corrupted DuckDB files: ${moved.join(', ')}`);
+        }
+        connectionBundle = await openIntelligenceArchiveConnection(dbPath);
+      }
+      const { connection } = connectionBundle;
       await connection.run(`
         CREATE TABLE IF NOT EXISTS backtest_runs (
           id VARCHAR PRIMARY KEY,
@@ -812,13 +1127,15 @@ function runArchiveSummary(run) {
 }
 
 async function archiveReplayRunToDuckDb(run, context) {
-  const archive = await ensureIntelligenceArchive(context);
-  const { connection } = archive;
-  const summary = runArchiveSummary(run);
+  const dbPath = getIntelligenceArchiveDbPath(context);
+  return await withDuckDbPathLock(dbPath, 'archive-replay-run', async () => {
+    const archive = await ensureIntelligenceArchive(context);
+    const { connection } = archive;
+    const summary = runArchiveSummary(run);
 
-  await connection.run('BEGIN TRANSACTION');
-  try {
-    await connection.run(`
+    await connection.run('BEGIN TRANSACTION');
+    try {
+      await connection.run(`
       INSERT INTO backtest_runs (
         id, label, mode, started_at, completed_at, retain_learning_state, frame_count,
         checkpoint_count, idea_run_count, forward_return_count, source_profile_count,
@@ -844,8 +1161,8 @@ async function archiveReplayRunToDuckDb(run, context) {
         windows_json = EXCLUDED.windows_json,
         summary_json = EXCLUDED.summary_json,
         payload_json = EXCLUDED.payload_json
-    `, {
-      id: summary.id,
+      `, {
+        id: summary.id,
       label: summary.label,
       mode: summary.mode,
       startedAt: summary.startedAt,
@@ -860,11 +1177,11 @@ async function archiveReplayRunToDuckDb(run, context) {
       horizons: JSON.stringify(Array.isArray(run?.horizonsHours) ? run.horizonsHours : []),
       windows: JSON.stringify(Array.isArray(run?.windows) ? run.windows : []),
       summary: JSON.stringify(Array.isArray(run?.summaryLines) ? run.summaryLines : []),
-      payload: JSON.stringify(run ?? {}),
-    });
+        payload: JSON.stringify(run ?? {}),
+      });
 
-    for (const idea of (Array.isArray(run?.ideaRuns) ? run.ideaRuns : [])) {
-      await connection.run(`
+      for (const idea of (Array.isArray(run?.ideaRuns) ? run.ideaRuns : [])) {
+        await connection.run(`
         INSERT INTO idea_runs (
           id, run_id, frame_id, generated_at, title, theme_id, region, direction,
           conviction, false_positive_risk, size_pct, payload_json
@@ -900,8 +1217,8 @@ async function archiveReplayRunToDuckDb(run, context) {
       });
     }
 
-    for (const row of (Array.isArray(run?.forwardReturns) ? run.forwardReturns : [])) {
-      await connection.run(`
+      for (const row of (Array.isArray(run?.forwardReturns) ? run.forwardReturns : [])) {
+        await connection.run(`
         INSERT INTO forward_returns (
           id, run_id, idea_run_id, symbol, direction, horizon_hours, entry_timestamp,
           exit_timestamp, entry_price, exit_price, raw_return_pct, signed_return_pct, payload_json
@@ -939,50 +1256,124 @@ async function archiveReplayRunToDuckDb(run, context) {
       });
     }
 
-    await connection.run('COMMIT');
-    return {
-      ok: true,
-      dbPath: archive.dbPath,
-      summary,
-    };
-  } catch (error) {
-    try {
-      await connection.run('ROLLBACK');
-    } catch {
-      // ignore rollback failure
+      await connection.run('COMMIT');
+      try {
+        await connection.run('CHECKPOINT');
+      } catch {
+        // best-effort to shrink WAL growth after archive writes
+      }
+      return {
+        ok: true,
+        dbPath: archive.dbPath,
+        summary,
+      };
+    } catch (error) {
+      try {
+        await connection.run('ROLLBACK');
+      } catch {
+        // ignore rollback failure
+      }
+      throw error;
     }
-    throw error;
-  }
+  });
 }
 
 async function listReplayRunsFromDuckDb(limit, context) {
-  const archive = await ensureIntelligenceArchive(context);
-  const safeLimit = Math.max(1, Math.min(200, Math.round(Number(limit) || 20)));
-  const reader = await archive.connection.runAndReadAll(`
+  const dbPath = getIntelligenceArchiveDbPath(context);
+  return await withDuckDbPathLock(dbPath, 'list-backtest-runs', async () => {
+    const archive = await ensureIntelligenceArchive(context);
+    const safeLimit = Math.max(1, Math.min(200, Math.round(Number(limit) || 20)));
+    const reader = await archive.connection.runAndReadAll(`
     SELECT id, label, mode, started_at AS startedAt, completed_at AS completedAt,
            frame_count AS frameCount, idea_run_count AS ideaRunCount, forward_return_count AS forwardReturnCount
     FROM backtest_runs
     ORDER BY completed_at DESC
     LIMIT ${safeLimit}
   `);
-  return reader.getRowObjectsJS();
+    return reader.getRowObjectsJS();
+  });
+}
+
+async function listReplayRunPayloadsFromDuckDb(limit, context) {
+  const dbPath = getIntelligenceArchiveDbPath(context);
+  return await withDuckDbPathLock(dbPath, 'list-backtest-run-payloads', async () => {
+    const archive = await ensureIntelligenceArchive(context);
+    const safeLimit = Math.max(1, Math.min(200, Math.round(Number(limit) || 20)));
+    const reader = await archive.connection.runAndReadAll(`
+    SELECT payload_json AS payload
+    FROM backtest_runs
+    ORDER BY completed_at DESC
+    LIMIT ${safeLimit}
+  `);
+    return reader
+      .getRowObjectsJS()
+      .map((row) => {
+        if (!row?.payload) return null;
+        try {
+          return JSON.parse(String(row.payload));
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  });
 }
 
 async function getReplayRunFromDuckDb(runId, context) {
-  const archive = await ensureIntelligenceArchive(context);
-  const reader = await archive.connection.runAndReadAll(`
+  const dbPath = getIntelligenceArchiveDbPath(context);
+  return await withDuckDbPathLock(dbPath, 'get-backtest-run', async () => {
+    const archive = await ensureIntelligenceArchive(context);
+    const reader = await archive.connection.runAndReadAll(`
     SELECT payload_json AS payload
     FROM backtest_runs
     WHERE id = $runId
     LIMIT 1
   `, { runId: String(runId || '') });
-  const row = reader.getRowObjectsJS()[0];
-  if (!row?.payload) return null;
-  try {
-    return JSON.parse(String(row.payload));
-  } catch {
-    return null;
+    const row = reader.getRowObjectsJS()[0];
+    if (!row?.payload) return null;
+    try {
+      return JSON.parse(String(row.payload));
+    } catch {
+      return null;
+    }
+  });
+}
+
+const AUTOMATION_STATUS_CACHE_MAX_AGE_MS = 5_000;
+const automationStatusCache = new Map();
+const automationStatusInFlight = new Map();
+
+function buildAutomationStatusCacheKey(registryPath, statePath) {
+  return `${String(registryPath || '')}::${String(statePath || '')}`;
+}
+
+async function getAutomationStatusCached(context, { registryPath, statePath, timeoutMs = 60_000, forceRefresh = false } = {}) {
+  const cacheKey = buildAutomationStatusCacheKey(registryPath, statePath);
+  const now = Date.now();
+  const cached = automationStatusCache.get(cacheKey);
+  if (!forceRefresh && cached && now - cached.at <= AUTOMATION_STATUS_CACHE_MAX_AGE_MS) {
+    return cached.value;
   }
+  if (automationStatusInFlight.has(cacheKey)) {
+    return automationStatusInFlight.get(cacheKey);
+  }
+
+  const job = runIntelligenceJob(
+    'automation-status',
+    { registryPath, statePath },
+    context,
+    timeoutMs,
+  )
+    .then((result) => {
+      automationStatusCache.set(cacheKey, { at: Date.now(), value: result });
+      return result;
+    })
+    .finally(() => {
+      automationStatusInFlight.delete(cacheKey);
+    });
+
+  automationStatusInFlight.set(cacheKey, job);
+  return job;
 }
 
 async function runIntelligenceJob(action, payload, context, timeoutMs = 120_000) {
@@ -1222,7 +1613,12 @@ function pickModule(pathname, routes) {
 const moduleCache = new Map();
 const failedImports = new Set();
 const fallbackCounts = new Map();
+const fallbackLastObservedAt = new Map();
 const cloudPreferred = new Set();
+const IGNORED_MISSING_ROUTE_PATTERNS = [
+  /^\/api\/local-data-flow-ops-snapshot$/i,
+];
+const FALLBACK_HEALTH_WINDOW_MS = 15 * 60_000;
 
 const TRAFFIC_LOG_MAX = 200;
 const trafficLog = [];
@@ -1251,10 +1647,77 @@ function recordTraffic(entry) {
   }
 }
 
+function shouldBypassTokenAuth(requestUrl) {
+  return requestUrl.pathname === '/api/service-status'
+    || requestUrl.pathname === '/api/local-openbb'
+    || requestUrl.pathname === '/api/youtube-embed'
+    || requestUrl.pathname === '/api/register-interest';
+}
+
+function requireLocalApiToken(req, requestUrl, context) {
+  const expectedToken = process.env.LOCAL_API_TOKEN;
+  if (!expectedToken) return null;
+  const authHeader = req.headers.authorization || '';
+  if (authHeader === `Bearer ${expectedToken}`) return null;
+  context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
+  return json({ error: 'Unauthorized' }, 401);
+}
+
+function isPrivateRssProxyHostname(hostname) {
+  const host = String(hostname || '').trim().toLowerCase();
+  if (!host) return true;
+  if (host === 'localhost' || host === 'localhost.localdomain' || host.endsWith('.localhost')) return true;
+
+  const ipVersion = net.isIP(host);
+  if (ipVersion === 4) {
+    const parts = host.split('.').map((part) => Number(part));
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+      return true;
+    }
+    const [a, b] = parts;
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a >= 224) return true;
+    return false;
+  }
+
+  if (ipVersion === 6) {
+    if (host === '::' || host === '::1' || host.startsWith('::ffff:127.')) return true;
+    if (host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('ff')) {
+      return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function validateRssProxyTarget(feedUrl) {
+  let parsed;
+  try {
+    parsed = new URL(feedUrl);
+  } catch {
+    return 'Invalid url';
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return 'RSS proxy only allows http(s) URLs';
+  }
+  if (parsed.username || parsed.password) {
+    return 'RSS proxy blocks URLs with credentials';
+  }
+  if (isPrivateRssProxyHostname(parsed.hostname)) {
+    return 'RSS proxy blocks localhost/private targets';
+  }
+  return '';
+}
+
 function logOnce(logger, route, message) {
   const key = `${route}:${message}`;
   const count = (fallbackCounts.get(key) || 0) + 1;
   fallbackCounts.set(key, count);
+  fallbackLastObservedAt.set(key, Date.now());
   if (count === 1) {
     logger.warn(`[local-api] ${route} → ${message}`);
   } else if (count === 5 || count % 100 === 0) {
@@ -1315,15 +1778,502 @@ function isMainModule() {
 }
 
 async function handleLocalServiceStatus(context) {
+  return json(await buildLocalServiceStatusPayload(context));
+}
+
+function getOpenbbBaseUrl(context) {
+  const fromContext = typeof context.OPENBB_API_URL === 'string' ? context.OPENBB_API_URL.trim() : '';
+  return fromContext || String(process.env.OPENBB_API_URL || '').trim();
+}
+
+function normalizeOpenbbUrl(baseUrl) {
+  return String(baseUrl || '').trim().replace(/\/$/, '');
+}
+
+function flattenOpenbbPayload(payload) {
+  if (!payload || typeof payload !== 'object') return [];
+  if (Array.isArray(payload)) return payload;
+  const root = payload;
+  for (const key of ['data', 'results', 'rows', 'items']) {
+    if (Array.isArray(root[key])) return root[key];
+  }
+  return [root];
+}
+
+function firstFiniteNumber(record, fields) {
+  for (const field of fields) {
+    const value = record?.[field];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number(value.replace(/,/g, ''));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function parseOpenbbQuoteRow(symbol, payload) {
+  const records = flattenOpenbbPayload(payload);
+  const record = records[0] && typeof records[0] === 'object' ? records[0] : null;
+  if (!record) return null;
+
+  const price = firstFiniteNumber(record, ['price', 'last_price', 'lastPrice', 'close', 'close_price', 'mark', 'market_price']);
+  if (price === null) return null;
+
+  const prevClose = firstFiniteNumber(record, ['prevClose', 'previous_close', 'prev_close', 'previousClose', 'prior_close']);
+  const changeAbs = firstFiniteNumber(record, ['changeAbs', 'change_abs', 'change', 'changeAmount', 'price_change']);
+  const changePct = firstFiniteNumber(record, ['changePct', 'change_pct', 'changePercent', 'percent_change', 'pct_change']);
+  const volume = firstFiniteNumber(record, ['volume', 'vol', 'tradingVolume']);
+  const resolvedPrevClose = prevClose ?? (changeAbs !== null ? price - changeAbs : null) ?? (changePct !== null ? (price / (1 + (changePct / 100))) : null);
+  const resolvedChangeAbs = changeAbs ?? (resolvedPrevClose !== null ? price - resolvedPrevClose : 0);
+  const resolvedChangePct = changePct ?? (resolvedPrevClose && resolvedPrevClose !== 0 ? (resolvedChangeAbs / resolvedPrevClose) * 100 : 0);
+
+  return {
+    symbol,
+    price,
+    prevClose: resolvedPrevClose,
+    changePct: resolvedChangePct,
+    changeAbs: resolvedChangeAbs,
+    volume,
+  };
+}
+
+async function fetchOpenbbQuoteRow(context, symbol) {
+  const baseUrl = getOpenbbBaseUrl(context);
+  if (!baseUrl) {
+    return { ok: false, reason: 'OPENBB_API_URL is missing' };
+  }
+
+  const probeUrl = new URL('/api/v1/equity/price/quote', normalizeOpenbbUrl(baseUrl));
+  probeUrl.searchParams.set('provider', 'yfinance');
+  probeUrl.searchParams.set('symbol', symbol);
+
+  try {
+    const response = await fetchWithTimeout(probeUrl.toString(), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json', 'User-Agent': CHROME_UA },
+    }, 8_000);
+    const text = await response.text();
+    if (!response.ok) {
+      return { ok: false, reason: `OpenBB probe HTTP ${response.status}` };
+    }
+
+    let payload = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      return { ok: false, reason: 'OpenBB returned invalid JSON' };
+    }
+
+    const row = parseOpenbbQuoteRow(symbol, payload);
+    if (!row) {
+      return { ok: false, reason: 'OpenBB response did not contain a quote row' };
+    }
+
+    return { ok: true, row };
+  } catch (error) {
+    return { ok: false, reason: String(error?.message || error || 'OpenBB probe failed') };
+  }
+}
+
+async function probeOpenbbHealth(context) {
+  const baseUrl = getOpenbbBaseUrl(context);
+  if (!baseUrl) {
+    return {
+      available: false,
+      reason: 'OPENBB_API_URL is missing',
+      coverage: { commands: [] },
+    };
+  }
+
+  const quote = await fetchOpenbbQuoteRow(context, 'AAPL');
+  return {
+    available: Boolean(quote.ok),
+    reason: quote.ok ? `OpenBB reachable at ${baseUrl}` : quote.reason,
+    coverage: quote.ok ? { commands: ['/equity/price/quote'] } : { commands: [] },
+  };
+}
+
+async function buildLocalServiceStatusPayload(context) {
+  const openbb = await probeOpenbbHealth(context);
+  const routeCoverage = summarizeFallbackHealth();
+  const services = [
+    {
+      id: 'local-api',
+      name: 'Local Desktop API',
+      category: 'dev',
+      status: 'operational',
+      description: `Running on 127.0.0.1:${context.port}`,
+    },
+    {
+      id: 'openbb',
+      name: 'OpenBB API',
+      category: 'data',
+      status: openbb.available ? 'operational' : (openbb.reason ? 'degraded' : 'unknown'),
+      description: openbb.reason || 'OpenBB API unavailable',
+    },
+    {
+      id: 'local-route-coverage',
+      name: 'Local route coverage',
+      category: 'dev',
+      status: routeCoverage.missingHandlerCount > 0 ? 'degraded' : 'operational',
+      description: routeCoverage.missingHandlerCount > 0
+        ? `${routeCoverage.missingHandlerCount} missing-handler hits across ${routeCoverage.missingRouteCount} routes in the last 15m. Top: ${routeCoverage.topMissingRoutes.join(', ')}`
+        : 'No missing local handlers have been observed in the last 15m.',
+    },
+    {
+      id: 'cloud-pass-through',
+      name: 'Cloud pass-through',
+      category: 'cloud',
+      status: routeCoverage.cloudFallbackCount > 0 ? 'degraded' : 'operational',
+      description: routeCoverage.cloudFallbackCount > 0
+        ? `${routeCoverage.cloudFallbackCount} cloud fallback hits across ${routeCoverage.cloudFallbackRouteCount} routes in the last 15m. Target ${context.remoteBase}`
+        : `Fallback target ${context.remoteBase}`,
+    },
+  ];
+
+  const summary = services.reduce((acc, service) => {
+    if (service.status === 'operational') acc.operational += 1;
+    else if (service.status === 'degraded') acc.degraded += 1;
+    else if (service.status === 'outage') acc.outage += 1;
+    else acc.unknown += 1;
+    return acc;
+  }, { operational: 0, degraded: 0, outage: 0, unknown: 0 });
+
+  return {
+    success: true,
+    timestamp: new Date().toISOString(),
+    summary,
+    services,
+    local: {
+      enabled: true,
+      mode: context.mode,
+      port: context.port,
+      remoteBase: context.remoteBase,
+      routeCoverage,
+    },
+  };
+}
+
+async function buildLocalOpenbbResponse(context, requestUrl) {
+  const action = String(requestUrl.searchParams.get('action') || 'health').trim().toLowerCase();
+  const baseUrl = getOpenbbBaseUrl(context);
+
+  if (action === 'health') {
+    const probe = await probeOpenbbHealth(context);
+    return json({
+      ok: probe.available,
+      available: probe.available,
+      reason: probe.reason,
+      coverage: probe.coverage,
+    });
+  }
+
+  if (action === 'coverage') {
+    const probe = await probeOpenbbHealth(context);
+    return json({
+      ok: probe.available,
+      coverage: probe.coverage,
+      reason: probe.reason,
+    });
+  }
+
+  if (action === 'tape') {
+    const rawSymbols = String(requestUrl.searchParams.get('symbols') || '').split(',').map((item) => item.trim()).filter(Boolean);
+    const batchSize = Math.max(1, Math.min(Number(requestUrl.searchParams.get('batch_size')) || rawSymbols.length || 18, 36));
+    const symbols = Array.from(new Set(rawSymbols)).slice(0, batchSize);
+
+    if (!baseUrl) {
+      return json({
+        ok: false,
+        rows: [],
+        coverage: { commands: [] },
+        reason: 'OPENBB_API_URL is missing',
+      });
+    }
+
+    const results = await Promise.all(symbols.map(async (symbol) => {
+      const row = await fetchOpenbbQuoteRow(context, symbol);
+      return row.ok ? row.row : null;
+    }));
+    const rows = results.filter(Boolean);
+    return json({
+      ok: rows.length > 0,
+      rows,
+      coverage: rows.length > 0 ? { commands: ['/equity/price/quote'] } : { commands: [] },
+      reason: rows.length > 0 ? undefined : 'No quote rows returned',
+    });
+  }
+
+  return json({ ok: false, reason: `Unsupported OpenBB action: ${action}` }, 422);
+}
+
+function hasNonEmptyEnv(name) {
+  return typeof process.env[name] === 'string' && String(process.env[name]).trim().length > 0;
+}
+
+function summarizeEnvCredentials() {
+  const presentKeys = [];
+  const missingKeys = [];
+  for (const key of ALLOWED_ENV_KEYS) {
+    if (hasNonEmptyEnv(key)) presentKeys.push(key);
+    else missingKeys.push(key);
+  }
+  return { presentKeys, missingKeys };
+}
+
+function summarizeAutomationState(automationStatus) {
+  const registry = automationStatus?.result?.registry || automationStatus?.registry || null;
+  const state = automationStatus?.result?.state || automationStatus?.state || null;
+  const runs = Array.isArray(state?.runs) ? state.runs : [];
+  const lastCycle = runs.length > 0 ? runs[runs.length - 1] : null;
+  const lastFailedRun = [...runs].reverse().find((run) => run?.status === 'error') || null;
+  const themeQueue = Array.isArray(state?.themeQueue) ? state.themeQueue : [];
+  const datasetProposals = Array.isArray(state?.datasetProposals) ? state.datasetProposals : [];
+  const openQueueCount = themeQueue.filter((item) => item?.status === 'open').length;
+  const nextEligibleAt = Object.values(state?.datasets || {})
+    .map((dataset) => dataset?.nextEligibleAt || null)
+    .filter(Boolean)
+    .sort()[0] || null;
+
+  return {
+    registry,
+    state,
+    runs,
+    lastCycle,
+    queue: {
+      themeQueueDepth: themeQueue.length,
+      openThemeQueueDepth: openQueueCount,
+      datasetProposalDepth: datasetProposals.length,
+      runDepth: runs.length,
+      nextEligibleAt,
+    },
+  };
+}
+
+function summarizeAutomationHealth({ automationStatus, automation, blockerReasons = [] }) {
+  const enabledDatasets = Array.isArray(automation?.registry?.datasets)
+    ? automation.registry.datasets.filter((dataset) => dataset?.enabled)
+    : [];
+  const datasetStates = Object.values(automation?.state?.datasets || {});
+  const datasetErrorCount = datasetStates.filter((dataset) => String(dataset?.lastError || '').trim().length > 0).length;
+  const consecutiveFailures = datasetStates.reduce((max, dataset) => Math.max(max, Number(dataset?.consecutiveFailures) || 0), 0);
+  const activeCycle = automation?.state?.activeCycle || null;
+  const lockTtlMinutes = Math.max(15, Number(automation?.registry?.defaults?.lockTtlMinutes) || 0);
+  const stallThresholdMinutes = Math.max(15, Math.min(90, Math.round(lockTtlMinutes / 4) || 45));
+  const heartbeatAgeMinutes = activeCycle?.heartbeatAt
+    ? Math.max(0, Math.round((Date.now() - Date.parse(activeCycle.heartbeatAt)) / 60000))
+    : null;
+  const stalled = Boolean(
+    activeCycle?.status === 'running'
+    && Number.isFinite(heartbeatAgeMinutes)
+    && heartbeatAgeMinutes > stallThresholdMinutes,
+  );
+  const reasons = [
+    ...(automationStatus?.ok === false ? [String(automationStatus?.error || 'automation status failed')] : []),
+    ...(activeCycle?.status === 'error' ? [`active cycle failed during ${activeCycle?.stage || 'unknown stage'}`] : []),
+    ...(stalled ? [`active cycle heartbeat is stale (${heartbeatAgeMinutes} minutes old)`] : []),
+    ...(datasetErrorCount > 0 ? [`${datasetErrorCount} dataset${datasetErrorCount === 1 ? '' : 's'} report errors`] : []),
+    ...(consecutiveFailures > 0 ? [`max consecutive dataset failures ${consecutiveFailures}`] : []),
+    ...blockerReasons,
+  ];
+  const uniqueReasons = reasons.filter((reason, index) => reasons.indexOf(reason) === index);
+  const status = automationStatus?.ok === false || activeCycle?.status === 'error'
+    ? 'error'
+    : uniqueReasons.length > 0
+      ? 'degraded'
+      : 'healthy';
+
+  return {
+    status,
+    degraded: status !== 'healthy',
+    activeCycleStatus: activeCycle?.status || 'idle',
+    activeStage: activeCycle?.stage || null,
+    stalled,
+    heartbeatAgeMinutes,
+    stallThresholdMinutes,
+    enabledDatasetCount: enabledDatasets.length,
+    datasetErrorCount,
+    consecutiveFailures,
+    blockerCount: uniqueReasons.length,
+    reasons: uniqueReasons,
+  };
+}
+
+function summarizeCredentialBlockers({ automation, codex, env }) {
+  const blockers = [];
+  const requiredKeys = [];
+
+  const datasets = Array.isArray(automation?.registry?.datasets) ? automation.registry.datasets : [];
+  const providerSet = new Set(datasets.map((dataset) => String(dataset?.provider || '').trim().toLowerCase()).filter(Boolean));
+
+  if (providerSet.has('fred') || providerSet.has('alfred')) {
+    requiredKeys.push('FRED_API_KEY');
+    if (!hasNonEmptyEnv('FRED_API_KEY')) blockers.push('FRED_API_KEY is missing for active FRED/ALFRED datasets');
+  }
+
+  if (providerSet.has('acled')) {
+    const hasToken = hasNonEmptyEnv('ACLED_ACCESS_TOKEN');
+    const hasEmailPass = hasNonEmptyEnv('ACLED_EMAIL') && hasNonEmptyEnv('ACLED_PASSWORD');
+    if (hasToken) {
+      requiredKeys.push('ACLED_ACCESS_TOKEN');
+    } else {
+      requiredKeys.push('ACLED_ACCESS_TOKEN', 'ACLED_EMAIL', 'ACLED_PASSWORD');
+    }
+    if (!hasToken && !hasEmailPass) {
+      blockers.push('ACLED access token or ACLED email/password pair is missing for active ACLED datasets');
+    }
+  }
+
+  if (providerSet.has('yahoo-chart')) {
+    // no credential requirement
+  }
+
+  if (!codex.available) {
+    blockers.push(codex.spawnBlocked ? 'Codex CLI spawn is blocked' : 'Codex CLI is unavailable');
+  } else if (!codex.loggedIn) {
+    blockers.push('Codex CLI is not logged in');
+  }
+
+  const missingRequiredKeys = requiredKeys.filter((key, index) => requiredKeys.indexOf(key) === index)
+    .filter((key) => !env.presentKeys.includes(key));
+
+  return {
+    blockers,
+    requiredKeys: Array.from(new Set(requiredKeys)),
+    missingRequiredKeys,
+  };
+}
+
+function summarizeFallbackHealth() {
+  const cutoff = Date.now() - FALLBACK_HEALTH_WINDOW_MS;
+  const entries = Array.from(fallbackCounts.entries()).filter(([key]) => {
+    const lastObservedAt = Number(fallbackLastObservedAt.get(key) || 0);
+    return !lastObservedAt || lastObservedAt >= cutoff;
+  });
+  const missingHandlerEntries = entries.filter(([key]) => /:no local handler$/i.test(key))
+    .filter(([key]) => {
+      const route = key.replace(/:no local handler$/i, '');
+      return !IGNORED_MISSING_ROUTE_PATTERNS.some((pattern) => pattern.test(route));
+    });
+  const invalidModuleEntries = entries.filter(([key]) => /:invalid handler module$/i.test(key));
+  const cloudFallbackEntries = entries.filter(([key]) => !key.includes(':'));
+  const missingRouteSummary = missingHandlerEntries
+    .map(([key, count]) => ({
+      route: key.replace(/:no local handler$/i, ''),
+      count: Number(count) || 0,
+    }))
+    .sort((left, right) => right.count - left.count);
+  const cloudRouteSummary = cloudFallbackEntries
+    .map(([route, count]) => ({
+      route,
+      count: Number(count) || 0,
+    }))
+    .sort((left, right) => right.count - left.count);
+  return {
+    missingHandlerCount: missingHandlerEntries.reduce((sum, [, count]) => sum + (Number(count) || 0), 0),
+    missingRouteCount: missingRouteSummary.length,
+    invalidModuleCount: invalidModuleEntries.reduce((sum, [, count]) => sum + (Number(count) || 0), 0),
+    cloudFallbackCount: cloudFallbackEntries.reduce((sum, [, count]) => sum + (Number(count) || 0), 0),
+    cloudFallbackRouteCount: cloudRouteSummary.length,
+    topMissingRoutes: missingRouteSummary.slice(0, 3).map((entry) => entry.route),
+    topCloudFallbackRoutes: cloudRouteSummary.slice(0, 3).map((entry) => entry.route),
+  };
+}
+
+async function probeCodexStatus(context) {
+  try {
+    const command = await resolveCodexCommand();
+    const status = await runCodexCli(['login', 'status'], { timeoutMs: 8000 });
+    const output = `${status.stdout || ''}\n${status.stderr || ''}`.trim();
+    const spawnBlocked = /spawn\s+.*EPERM|spawn\s+.*ENOENT|ENOENT|not recognized|command not found|No such file or directory/i.test(output);
+    const loggedIn = status.code === 0 && isCodexLoggedIn(output);
+    return {
+      command,
+      code: status.code,
+      loggedIn,
+      available: !spawnBlocked,
+      usedCodex: !spawnBlocked && loggedIn,
+      spawnBlocked,
+      output: output.slice(0, 1200),
+    };
+  } catch (error) {
+    return {
+      command: null,
+      code: 1,
+      loggedIn: false,
+      available: false,
+      usedCodex: false,
+      spawnBlocked: true,
+      output: String(error?.message || error || ''),
+    };
+  }
+}
+
+async function buildAutomationOpsSnapshot(context, requestUrl) {
+  const registryPath = String(requestUrl.searchParams.get('registryPath') || '').trim() || undefined;
+  const statePath = String(requestUrl.searchParams.get('statePath') || '').trim() || undefined;
+
+  const [serviceStatus, automationStatus, codex] = await Promise.all([
+    Promise.resolve(buildLocalServiceStatusPayload(context)),
+    getAutomationStatusCached(context, { registryPath, statePath, timeoutMs: 60_000 }).catch((error) => ({
+      ok: false,
+      error: String(error?.message || 'automation status failed'),
+    })),
+    probeCodexStatus(context),
+  ]);
+
+  const automation = summarizeAutomationState(automationStatus);
+  const env = summarizeEnvCredentials();
+  const credential = summarizeCredentialBlockers({ automation, codex, env });
+  const lastFailedRun = [...automation.runs].reverse().find((run) => run?.status === 'error') || null;
+  const routeCoverage = serviceStatus?.local?.routeCoverage || summarizeFallbackHealth();
+  const blockerReasons = [
+    ...credential.blockers,
+    ...(routeCoverage.missingHandlerCount > 0
+      ? [`${routeCoverage.missingHandlerCount} local route misses observed in the last 15m; top missing routes: ${(routeCoverage.topMissingRoutes || []).join(', ') || 'unknown'}`]
+      : []),
+    ...(automationStatus?.ok === false ? [String(automationStatus?.error || 'automation status failed')] : []),
+  ];
+  const health = summarizeAutomationHealth({
+    automationStatus,
+    automation,
+    blockerReasons,
+  });
+
   return json({
     success: true,
     timestamp: new Date().toISOString(),
-    summary: { operational: 2, degraded: 0, outage: 0, unknown: 0 },
-    services: [
-      { id: 'local-api', name: 'Local Desktop API', category: 'dev', status: 'operational', description: `Running on 127.0.0.1:${context.port}` },
-      { id: 'cloud-pass-through', name: 'Cloud pass-through', category: 'cloud', status: 'operational', description: `Fallback target ${context.remoteBase}` },
-    ],
-    local: { enabled: true, mode: context.mode, port: context.port, remoteBase: context.remoteBase },
+    runtime: {
+      mode: context.mode,
+      port: context.port,
+      remoteBase: context.remoteBase,
+      localApiEnabled: true,
+    },
+    serviceStatus,
+    health,
+    codex,
+    routeCoverage,
+    credentials: {
+      ...env,
+      requiredKeys: credential.requiredKeys,
+      missingRequiredKeys: credential.missingRequiredKeys,
+    },
+    automation: {
+      registry: automation.registry,
+      lastCycle: automation.lastCycle,
+      runsCount: automation.runs.length,
+      state: {
+        lastCandidateExpansionAt: automation.state?.lastCandidateExpansionAt || null,
+        lastDatasetDiscoveryAt: automation.state?.lastDatasetDiscoveryAt || null,
+        lastSelfTuningAt: automation.state?.lastSelfTuningAt || null,
+        activeCycle: automation.state?.activeCycle || null,
+        queue: automation.queue,
+        consecutiveFailures: Object.values(automation.state?.datasets || {}).reduce((max, dataset) => Math.max(max, Number(dataset?.consecutiveFailures) || 0), 0),
+        lastError: lastFailedRun?.detail || Object.values(automation.state?.datasets || {}).map((dataset) => dataset?.lastError || '').filter(Boolean).slice(-1)[0] || null,
+      },
+    },
+    blockerReasons,
   });
 }
 
@@ -1332,6 +2282,7 @@ async function tryCloudFallback(requestUrl, req, context, reason) {
     const route = requestUrl.pathname;
     const count = (fallbackCounts.get(route) || 0) + 1;
     fallbackCounts.set(route, count);
+    fallbackLastObservedAt.set(route, Date.now());
     if (count === 1) {
       const brief = reason instanceof Error
         ? (reason.code === 'ERR_MODULE_NOT_FOUND' ? 'missing npm dependency' : reason.message)
@@ -1544,6 +2495,34 @@ function candidateToDiscoveredSource(feedName, url) {
   }
 }
 
+function decodeHtmlEntitiesLite(rawValue) {
+  return String(rawValue || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x27;|&#39;/gi, "'")
+    .replace(/&#x2f;/gi, '/')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+function unwrapDiscoveryLink(rawValue) {
+  const decoded = decodeHtmlEntitiesLite(rawValue).trim();
+  if (!decoded) return '';
+  const candidate = decoded.startsWith('//') ? `https:${decoded}` : decoded;
+  try {
+    const parsed = new URL(candidate, 'https://duckduckgo.com');
+    const redirectTarget = parsed.searchParams.get('uddg');
+    if (redirectTarget) {
+      const unwrapped = decodeURIComponent(redirectTarget);
+      return /^https?:\/\//i.test(unwrapped) ? unwrapped : '';
+    }
+    const normalized = parsed.toString();
+    return /^https?:\/\//i.test(normalized) ? normalized : '';
+  } catch {
+    return /^https?:\/\//i.test(candidate) ? candidate : '';
+  }
+}
+
 async function discoverCandidatesWithPlaywright(baseUrl, timeoutMs) {
   if (!ENABLE_PLAYWRIGHT_DISCOVERY) return [];
   let browser = null;
@@ -1577,6 +2556,66 @@ async function discoverCandidatesWithPlaywright(baseUrl, timeoutMs) {
       // Ignore browser close failures.
     }
   }
+}
+
+async function discoverSearchResultLinksWithFetch(query, timeoutMs) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+
+  const endpoints = [
+    `https://duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+    `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+  ];
+  const links = [];
+  const seen = new Set();
+  const add = (candidate) => {
+    const normalized = unwrapDiscoveryLink(candidate);
+    if (!/^https?:\/\//i.test(normalized)) return;
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    links.push(normalized);
+  };
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetchWithTimeout(endpoint, {
+        headers: {
+          'User-Agent': CHROME_UA,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      }, Math.max(6_000, Math.min(timeoutMs, 12_000)));
+      if (!response.ok) continue;
+      const html = String(await response.text() || '');
+      if (!html) continue;
+
+      for (const regex of [
+        /<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["']/gi,
+        /<a[^>]+href=["']([^"']+)["'][^>]*class=["'][^"']*result__a[^"']*["']/gi,
+        /<a[^>]+href=["']([^"']*uddg=[^"']+)["'][^>]*>/gi,
+      ]) {
+        let match = null;
+        let scanned = 0;
+        while ((match = regex.exec(html)) && scanned < 120) {
+          scanned += 1;
+          add(match[1]);
+          if (links.length >= 40) return links;
+        }
+      }
+
+      let redirectMatch = null;
+      let redirectScanned = 0;
+      const redirectRegex = /uddg=([^&"'<>]+)/gi;
+      while ((redirectMatch = redirectRegex.exec(html)) && redirectScanned < 160) {
+        redirectScanned += 1;
+        add(decodeURIComponent(String(redirectMatch[1] || '')));
+        if (links.length >= 40) return links;
+      }
+    } catch {
+      // Ignore search fetch failures and fall back to other discovery paths.
+    }
+  }
+
+  return links;
 }
 
 async function discoverSearchResultLinksWithPlaywright(query, timeoutMs) {
@@ -1619,6 +2658,27 @@ async function discoverSearchResultLinksWithPlaywright(query, timeoutMs) {
       // ignore
     }
   }
+}
+
+async function discoverSearchResultLinks(query, timeoutMs) {
+  const merged = [];
+  const seen = new Set();
+  const addAll = (values) => {
+    for (const value of Array.isArray(values) ? values : []) {
+      const normalized = unwrapDiscoveryLink(value);
+      if (!/^https?:\/\//i.test(normalized)) continue;
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      merged.push(normalized);
+      if (merged.length >= 40) break;
+    }
+  };
+
+  addAll(await discoverSearchResultLinksWithFetch(query, timeoutMs));
+  if (merged.length < 8) {
+    addAll(await discoverSearchResultLinksWithPlaywright(query, timeoutMs));
+  }
+  return merged.slice(0, 40);
 }
 
 function mergeDiscoveredSourceLists(...lists) {
@@ -1670,6 +2730,101 @@ function hostLabel(urlValue) {
   }
 }
 
+function buildSourceSearchQueries({ plannerQueries = [], topicHints = [], feedName = '', limit = 8 }) {
+  const feedLabel = String(feedName || '').trim();
+  return dedupeTopics([
+    ...plannerQueries,
+    ...topicHints,
+    ...topicHints.map((topic) => `${topic} rss`),
+    ...topicHints.map((topic) => `${topic} feed`),
+    ...topicHints.map((topic) => `${topic} atom`),
+    ...(feedLabel ? [`${feedLabel} rss feed`] : []),
+  ]).slice(0, limit);
+}
+
+function buildHeuristicApiSeedLinks(topics) {
+  const output = [];
+  const add = (url) => {
+    const normalized = String(url || '').trim();
+    if (!/^https?:\/\//i.test(normalized)) return;
+    if (output.includes(normalized)) return;
+    output.push(normalized);
+  };
+
+  add('https://api.reliefweb.int/v1/reports?appname=worldmonitor&limit=1');
+  add('https://api.gdeltproject.org/api/v2/doc/doc?query=world&mode=artlist&format=json&maxrecords=1');
+
+  if (topicTextContainsAny(topics, ['war', 'conflict', 'ukraine', 'russia', 'military', 'protest', 'riot', 'geopolitics', 'geopolitical', 'sanction', 'election'])) {
+    add('https://api.reliefweb.int/v1/reports?appname=worldmonitor&limit=1');
+    add('https://acleddata.com/api-documentation/');
+  }
+  if (topicTextContainsAny(topics, ['market', 'stock', 'bond', 'fx', 'commodity', 'crypto', 'bitcoin', 'equity', 'etf'])) {
+    add('https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=5d&interval=1d');
+    add('https://api.coingecko.com/api/v3/ping');
+    add('https://api.stlouisfed.org/fred/series?series_id=CPIAUCSL&file_type=json');
+  }
+  if (topicTextContainsAny(topics, ['energy', 'oil', 'gas', 'power', 'grid', 'electric'])) {
+    add('https://www.eia.gov/opendata/');
+  }
+  if (topicTextContainsAny(topics, ['flight', 'aviation', 'airline', 'airport', 'air traffic'])) {
+    add('https://opensky-network.org/api/states/all');
+  }
+  if (topicTextContainsAny(topics, ['ship', 'port', 'ais', 'maritime', 'vessel', 'shipping'])) {
+    add('https://api.portwatch.imf.org/');
+    add('https://aisstream.io/');
+  }
+  if (topicTextContainsAny(topics, ['cyber', 'malware', 'phishing', 'botnet', 'ransomware', 'infosec'])) {
+    add('https://urlhaus-api.abuse.ch/v1/urls/recent/');
+    add('https://otx.alienvault.com/api/v1/pulses/subscribed');
+  }
+  if (topicTextContainsAny(topics, ['ai', 'chip', 'semiconductor', 'quantum', 'robot', 'compute'])) {
+    add('https://www.worldquant.com/api/');
+  }
+
+  return output.slice(0, 18);
+}
+
+function buildHeuristicSourceSeeds(topics) {
+  const topicList = dedupeTopics(topics || []);
+  const output = [];
+  const seen = new Set();
+  const add = (name, url, confidence, reason) => {
+    const normalized = String(url || '').trim();
+    if (!/^https?:\/\//i.test(normalized)) return;
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    output.push({
+      name: String(name || 'Heuristic Source').slice(0, 120),
+      url: normalized,
+      confidence: Math.max(0, Math.min(100, Number(confidence) || 60)),
+      reason: String(reason || 'heuristic source seed').slice(0, 300),
+      topics: topicList,
+    });
+  };
+
+  add('BBC World', 'https://feeds.bbci.co.uk/news/world/rss.xml', 72, 'validated world-news RSS seed');
+  add('The Guardian World', 'https://www.theguardian.com/world/rss', 70, 'validated world-news RSS seed');
+  add('Al Jazeera', 'https://www.aljazeera.com/xml/rss/all.xml', 70, 'validated world-news RSS seed');
+
+  if (topicTextContainsAny(topicList, ['war', 'conflict', 'ukraine', 'russia', 'military', 'defense', 'sanction', 'geopolitics', 'geopolitical'])) {
+    add('Crisis Group', 'https://www.crisisgroup.org/rss', 78, 'validated conflict-analysis RSS seed');
+    add('Defense News Global', 'https://www.defensenews.com/arc/outboundfeeds/rss/category/global/?outputType=xml', 74, 'validated defense-news RSS seed');
+    add('Economist International', 'https://www.economist.com/international/rss.xml', 68, 'validated international-affairs RSS seed');
+  }
+  if (topicTextContainsAny(topicList, ['market', 'stock', 'bond', 'fx', 'commodity', 'finance'])) {
+    add('Dow Jones Markets', 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', 76, 'validated markets RSS seed');
+    add('CNBC Top News', 'https://www.cnbc.com/id/100003114/device/rss/rss.html', 68, 'validated markets/news RSS seed');
+  }
+  if (topicTextContainsAny(topicList, ['crypto', 'bitcoin'])) {
+    add('CoinDesk', 'https://www.coindesk.com/arc/outboundfeeds/rss/', 72, 'validated crypto RSS seed');
+  }
+  if (topicTextContainsAny(topicList, ['cyber', 'malware', 'phishing', 'ransomware', 'infosec'])) {
+    add('The Record', 'https://therecord.media/feed', 74, 'validated cyber-news RSS seed');
+  }
+
+  return output.slice(0, 16);
+}
+
 async function discoverSourceCandidatesComposite({
   origin,
   upstream,
@@ -1681,6 +2836,7 @@ async function discoverSourceCandidatesComposite({
   const candidateScore = new Map();
   const discoveredSourceCandidates = [];
   const networkCaptures = [];
+  const heuristicSources = buildHeuristicSourceSeeds(topicHints);
 
   const addCandidate = (candidate, boost = 0) => {
     const normalized = normalizeCandidateUrl(candidate, origin);
@@ -1691,6 +2847,9 @@ async function discoverSourceCandidatesComposite({
   };
 
   addCandidate(upstream, 12);
+  for (const source of heuristicSources) {
+    addCandidate(source.url, 18);
+  }
 
   let homepageHtml = '';
   try {
@@ -1735,14 +2894,15 @@ async function discoverSourceCandidatesComposite({
     addCandidate(candidatePath, 18);
   }
 
-  const searchQueries = dedupeTopics([
-    ...(planner?.searchQueries || []),
-    ...(topicHints || []),
-    `${feedName} rss feed`,
-  ]).slice(0, 5);
+  const searchQueries = buildSourceSearchQueries({
+    plannerQueries: planner?.searchQueries || [],
+    topicHints: topicHints || [],
+    feedName,
+    limit: 6,
+  });
 
   for (const query of searchQueries) {
-    const links = await discoverSearchResultLinksWithPlaywright(query, timeoutMs);
+    const links = await discoverSearchResultLinks(query, timeoutMs);
     for (const link of links.slice(0, 10)) {
       if (isDiscoveryNoiseDomain(link)) continue;
       if (/(rss|feed|atom|xml)/i.test(link)) addCandidate(link, 14);
@@ -1792,6 +2952,7 @@ async function discoverSourceCandidatesComposite({
 
   const discoveredSources = mergeDiscoveredSourceLists(
     planner?.discoveredSources || [],
+    heuristicSources,
     rankedSourceCandidates,
     discoveredSourceCandidates,
   );
@@ -1819,12 +2980,15 @@ async function runAutonomousSourceHunt({ topics = [], timeoutMs = LOCAL_SOURCE_D
     timeoutMs,
   });
 
-  const queryPool = dedupeTopics([
-    ...(planner?.searchQueries || []),
-    ...normalizedTopics,
-  ]).slice(0, 8);
+  const queryPool = buildSourceSearchQueries({
+    plannerQueries: planner?.searchQueries || [],
+    topicHints: normalizedTopics,
+    feedName: 'Autonomous Discovery',
+    limit: 10,
+  });
 
   const candidateScore = new Map();
+  const heuristicSources = buildHeuristicSourceSeeds(normalizedTopics);
   const addCandidate = (candidate, boost = 0) => {
     const url = String(candidate || '').trim();
     if (!/^https?:\/\//i.test(url)) return;
@@ -1836,10 +3000,13 @@ async function runAutonomousSourceHunt({ topics = [], timeoutMs = LOCAL_SOURCE_D
   for (const candidatePath of planner?.candidatePaths || []) {
     if (/^https?:\/\//i.test(candidatePath)) addCandidate(candidatePath, 18);
   }
+  for (const source of heuristicSources) {
+    addCandidate(source.url, 22);
+  }
 
-  const harvestedSources = [];
+  const harvestedSources = [...heuristicSources];
   for (const query of queryPool) {
-    const links = await discoverSearchResultLinksWithPlaywright(query, timeoutMs);
+    const links = await discoverSearchResultLinks(query, timeoutMs);
     for (const link of links.slice(0, 12)) {
       if (isDiscoveryNoiseDomain(link)) continue;
       if (/(rss|feed|atom|xml)/i.test(link)) addCandidate(link, 14);
@@ -1891,6 +3058,7 @@ async function runAutonomousSourceHunt({ topics = [], timeoutMs = LOCAL_SOURCE_D
 
   const discoveredSources = mergeDiscoveredSourceLists(
     planner?.discoveredSources || [],
+    heuristicSources,
     rankedSources,
     harvestedSources,
   );
@@ -1948,12 +3116,11 @@ function collectApiCandidatesFromHtml(html, baseUrl) {
 }
 
 function inferApiCategoryFromTopic(topics) {
-  const blob = String((topics || []).join(' ')).toLowerCase();
-  if (/(ship|port|ais|maritime)/.test(blob)) return 'supply-chain';
-  if (/(flight|aviation|air)/.test(blob)) return 'crisis';
-  if (/(stock|market|bond|fx|commodity|crypto)/.test(blob)) return 'finance';
-  if (/(energy|oil|gas|grid|power)/.test(blob)) return 'energy';
-  if (/(ai|chip|semiconductor|quantum|robot)/.test(blob)) return 'tech';
+  if (topicTextContainsAny(topics, ['ship', 'port', 'ais', 'maritime'])) return 'supply-chain';
+  if (topicTextContainsAny(topics, ['flight', 'aviation', 'airline', 'airport', 'air traffic'])) return 'crisis';
+  if (topicTextContainsAny(topics, ['stock', 'market', 'bond', 'fx', 'commodity', 'crypto'])) return 'finance';
+  if (topicTextContainsAny(topics, ['energy', 'oil', 'gas', 'grid', 'power'])) return 'energy';
+  if (topicTextContainsAny(topics, ['ai', 'chip', 'semiconductor', 'quantum', 'robot'])) return 'tech';
   return 'intel';
 }
 
@@ -2133,15 +3300,19 @@ async function runAutonomousApiSourceHunt({ topics = [], timeoutMs = LOCAL_SOURC
     ...normalizedTopics.map((topic) => `${topic} api`),
     ...normalizedTopics.map((topic) => `${topic} openapi`),
     ...normalizedTopics.map((topic) => `${topic} graphql`),
+    ...normalizedTopics.map((topic) => `${topic} developer api`),
   ]).slice(0, 10);
 
   const seedLinks = new Set();
   for (const candidatePath of planner?.candidatePaths || []) {
     if (/^https?:\/\//i.test(candidatePath)) seedLinks.add(candidatePath);
   }
+  for (const candidatePath of buildHeuristicApiSeedLinks(normalizedTopics)) {
+    seedLinks.add(candidatePath);
+  }
 
   for (const query of queryPool) {
-    const links = await discoverSearchResultLinksWithPlaywright(query, timeoutMs);
+    const links = await discoverSearchResultLinks(query, timeoutMs);
     for (const link of links.slice(0, 14)) {
       if (isDiscoveryNoiseDomain(link)) continue;
       seedLinks.add(link);
@@ -2869,6 +4040,13 @@ async function dispatch(requestUrl, req, routes, context) {
     return handleLocalServiceStatus(context);
   }
 
+  if (requestUrl.pathname === '/api/local-openbb') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    return buildLocalOpenbbResponse(context, requestUrl);
+  }
+
   // YouTube embed bridge — exempt from auth because iframe src cannot carry
   // Authorization headers.  Serves a minimal HTML page that loads the YouTube
   // IFrame Player API from a localhost origin (which YouTube accepts, unlike
@@ -2885,6 +4063,15 @@ async function dispatch(requestUrl, req, routes, context) {
     const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden}#player{width:100%;height:100%}#play-overlay{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(0,0,0,0.4)}#play-overlay svg{width:72px;height:72px;opacity:0.9;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5))}#play-overlay.hidden{display:none}</style></head><body><div id="player"></div><div id="play-overlay"><svg viewBox="0 0 68 48"><path d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="red"/><path d="M45 24L27 14v20" fill="#fff"/></svg></div><script>var tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';document.head.appendChild(tag);var player,overlay=document.getElementById('play-overlay'),started=false,parentOrigin='${origin}';function hideOverlay(){overlay.classList.add('hidden')}function onYouTubeIframeAPIReady(){player=new YT.Player('player',{videoId:'${videoId}',host:'https://www.youtube.com',playerVars:{autoplay:${autoplay},mute:${mute},playsinline:1,rel:0,controls:1,modestbranding:1,enablejsapi:1,origin:'${origin}',widget_referrer:'${origin}'},events:{onReady:function(){window.parent.postMessage({type:'yt-ready'},parentOrigin);${vq ? `if(player.setPlaybackQuality)player.setPlaybackQuality('${vq}');` : ''}if(${autoplay}===1){player.playVideo()}},onError:function(e){window.parent.postMessage({type:'yt-error',code:e.data},parentOrigin)},onStateChange:function(e){window.parent.postMessage({type:'yt-state',state:e.data},parentOrigin);if(e.data===1||e.data===3){hideOverlay();started=true}}}})}overlay.addEventListener('click',function(){if(player&&player.playVideo){player.playVideo();player.unMute();hideOverlay()}});setTimeout(function(){if(!started)overlay.classList.remove('hidden')},3000);window.addEventListener('message',function(e){if(e.origin!==parentOrigin)return;if(!player||!player.getPlayerState)return;var m=e.data;if(!m||!m.type)return;switch(m.type){case'play':player.playVideo();break;case'pause':player.pauseVideo();break;case'mute':player.mute();break;case'unmute':player.unMute();break;case'loadVideo':if(m.videoId)player.loadVideoById(m.videoId);break;case'setQuality':if(m.quality&&player.setPlaybackQuality)player.setPlaybackQuality(m.quality);break}})<\/script></body></html>`;
     return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...makeCorsHeaders(req) } });
   }
+
+  if (!shouldBypassTokenAuth(requestUrl)) {
+    const authError = requireLocalApiToken(req, requestUrl, context);
+    if (authError) {
+      return authError;
+    }
+  }
+
+  loadMirroredRuntimeSecrets(context);
 
   if (requestUrl.pathname === '/api/local-status') {
     return json({
@@ -3093,6 +4280,8 @@ async function dispatch(requestUrl, req, routes, context) {
     if (!feedUrl) return json({ error: 'Missing url parameter' }, 400);
 
     try {
+      const blockedReason = validateRssProxyTarget(feedUrl);
+      if (blockedReason) return json({ error: blockedReason }, 403);
       const parsed = new URL(feedUrl);
       const response = await fetchWithTimeout(feedUrl, {
         headers: {
@@ -3368,7 +4557,8 @@ async function dispatch(requestUrl, req, routes, context) {
         const runs = await listReplayRunsFromDuckDb(limit, context);
         return json({ ok: true, runs });
       } catch (error) {
-        return json({ ok: false, error: String(error?.message || 'archive read failed') }, 502);
+        const message = String(error?.message || 'archive read failed');
+        return json({ ok: false, error: message }, isDuckDbLockError(error) ? 423 : 502);
       }
     }
 
@@ -3396,7 +4586,8 @@ async function dispatch(requestUrl, req, routes, context) {
       const result = await archiveReplayRunToDuckDb(payload.run, context);
       return json(result);
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || 'archive write failed') }, 502);
+      const message = String(error?.message || 'archive write failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) ? 423 : 502);
     }
   }
 
@@ -3412,7 +4603,16 @@ async function dispatch(requestUrl, req, routes, context) {
         );
         return json(result, 200);
       } catch (error) {
-        return json({ ok: false, error: String(error?.message || 'dataset list failed') }, 502);
+        const message = String(error?.message || 'dataset list failed');
+        if (isDuckDbLockError(error) || isManualBacktestBusyError(error)) {
+          return json({
+            ok: false,
+            transient: true,
+            datasets: [],
+            error: createManualBacktestBusyError().message,
+          }, 200);
+        }
+        return json({ ok: false, error: message }, 502);
       }
     }
 
@@ -3457,7 +4657,8 @@ async function dispatch(requestUrl, req, routes, context) {
       }
       return json({ ...result, postgresSyncResult }, 200);
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || 'historical import failed') }, 502);
+      const message = String(error?.message || 'historical import failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) ? 423 : 502);
     }
   }
 
@@ -3475,31 +4676,37 @@ async function dispatch(requestUrl, req, routes, context) {
     }
 
     try {
-      const result = await runIntelligenceJob(
-        'run-replay',
-        {
-          frames: Array.isArray(payload?.frames) ? payload.frames : undefined,
-          frameLoadOptions: payload?.frameLoadOptions || {},
-          options: payload?.options || {},
-        },
-        context,
-        Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 10 * 60_000,
-      );
-      if (payload?.archive !== false && result?.run) {
-        await archiveReplayRunToDuckDb(result.run, context);
-      }
-      let postgresSyncResult = null;
-      if (payload?.postgresSync && payload?.pgConfig && result?.run) {
-        postgresSyncResult = await runIntelligenceJob(
-          'postgres-upsert-run',
-          { config: payload.pgConfig, run: result.run },
+      const result = await withManualBacktestJobLock(async () => {
+        const replayResult = await runIntelligenceJob(
+          'run-replay',
+          {
+            frames: Array.isArray(payload?.frames) ? payload.frames : undefined,
+            frameLoadOptions: payload?.frameLoadOptions || {},
+            options: payload?.options || {},
+          },
           context,
-          60_000,
+          Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 10 * 60_000,
         );
-      }
-      return json({ ...result, postgresSyncResult }, 200);
+        if (payload?.archive !== false && replayResult?.run) {
+          await archiveReplayRunToDuckDb(replayResult.run, context);
+        }
+        let postgresSyncResult = null;
+        if (payload?.postgresSync && payload?.pgConfig && replayResult?.run) {
+          postgresSyncResult = await runIntelligenceJob(
+            'postgres-upsert-run',
+            { config: payload.pgConfig, run: replayResult.run },
+            context,
+            60_000,
+          );
+        }
+        return { ...replayResult, postgresSyncResult };
+      });
+      return json(result, 200);
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || 'historical replay failed') }, 502);
+      const message = isDuckDbLockError(error) || isManualBacktestBusyError(error)
+        ? createManualBacktestBusyError().message
+        : String(error?.message || 'historical replay failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) || isManualBacktestBusyError(error) ? 423 : 502);
     }
   }
 
@@ -3517,34 +4724,37 @@ async function dispatch(requestUrl, req, routes, context) {
     }
 
     try {
-      const result = await runIntelligenceJob(
-        'run-walk-forward',
-        {
-          frames: Array.isArray(payload?.frames) ? payload.frames : undefined,
-          frameLoadOptions: payload?.frameLoadOptions || {},
-          options: payload?.options || {},
-        },
-        context,
-        Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 15 * 60_000,
-      );
-      if (payload?.archive !== false && result?.run) {
-        await archiveReplayRunToDuckDb(result.run, context);
-      }
-      let postgresSyncResult = null;
-      if (payload?.postgresSync && payload?.pgConfig && result?.run) {
-        postgresSyncResult = await runIntelligenceJob(
-          'postgres-upsert-run',
-          { config: payload.pgConfig, run: result.run },
+      const result = await withManualBacktestJobLock(async () => {
+        const walkForwardResult = await runIntelligenceJob(
+          'run-walk-forward',
+          {
+            frames: Array.isArray(payload?.frames) ? payload.frames : undefined,
+            frameLoadOptions: payload?.frameLoadOptions || {},
+            options: payload?.options || {},
+          },
           context,
-          60_000,
+          Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 15 * 60_000,
         );
-      }
-      return json({ ...result, postgresSyncResult }, 200);
+        if (payload?.archive !== false && walkForwardResult?.run) {
+          await archiveReplayRunToDuckDb(walkForwardResult.run, context);
+        }
+        let postgresSyncResult = null;
+        if (payload?.postgresSync && payload?.pgConfig && walkForwardResult?.run) {
+          postgresSyncResult = await runIntelligenceJob(
+            'postgres-upsert-run',
+            { config: payload.pgConfig, run: walkForwardResult.run },
+            context,
+            60_000,
+          );
+        }
+        return { ...walkForwardResult, postgresSyncResult };
+      });
+      return json(result, 200);
     } catch (error) {
-      return json(
-        { ok: false, error: String(error?.message || 'walk-forward replay failed') },
-        502,
-      );
+      const message = isDuckDbLockError(error) || isManualBacktestBusyError(error)
+        ? createManualBacktestBusyError().message
+        : String(error?.message || 'walk-forward replay failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) || isManualBacktestBusyError(error) ? 423 : 502);
     }
   }
 
@@ -3555,6 +4765,8 @@ async function dispatch(requestUrl, req, routes, context) {
     const storage = String(requestUrl.searchParams.get('storage') || 'local').trim().toLowerCase();
     const limit = Number(requestUrl.searchParams.get('limit') || 20);
     const runId = String(requestUrl.searchParams.get('runId') || '').trim();
+    const detail = String(requestUrl.searchParams.get('detail') || '').trim().toLowerCase();
+    const includeFullRuns = detail === 'full' || detail === 'runs' || requestUrl.searchParams.get('full') === '1';
     try {
       if (storage === 'postgres') {
         if (runId) {
@@ -3582,10 +4794,15 @@ async function dispatch(requestUrl, req, routes, context) {
         const run = await getReplayRunFromDuckDb(runId, context);
         return json({ ok: true, run, found: Boolean(run) }, run ? 200 : 404);
       }
+      if (includeFullRuns) {
+        const runs = await listReplayRunPayloadsFromDuckDb(limit, context);
+        return json({ ok: true, runs }, 200);
+      }
       const runs = await listReplayRunsFromDuckDb(limit, context);
       return json({ ok: true, runs }, 200);
     } catch (error) {
-      return json({ ok: false, error: String(error?.message || 'backtest read failed') }, 502);
+      const message = String(error?.message || 'backtest read failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) ? 423 : 502);
     }
   }
 
@@ -3596,15 +4813,159 @@ async function dispatch(requestUrl, req, routes, context) {
     try {
       const registryPath = String(requestUrl.searchParams.get('registryPath') || '').trim() || undefined;
       const statePath = String(requestUrl.searchParams.get('statePath') || '').trim() || undefined;
-      const result = await runIntelligenceJob(
-        'automation-status',
-        { registryPath, statePath },
-        context,
-        60_000,
-      );
+      const result = await getAutomationStatusCached(context, { registryPath, statePath, timeoutMs: 60_000 });
       return json(result, 200);
     } catch (error) {
       return json({ ok: false, error: String(error?.message || 'automation status failed') }, 502);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-automation-ops-snapshot') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    try {
+      return await buildAutomationOpsSnapshot(context, requestUrl);
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || 'automation ops snapshot failed') }, 502);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-data-flow-ops-snapshot') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    try {
+      return await buildAutomationOpsSnapshot(context, requestUrl);
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || 'data flow ops snapshot failed') }, 502);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-run-replay-now') {
+    if (req.method !== 'POST') {
+      return json({ error: 'POST required' }, 405);
+    }
+    const body = await readBody(req);
+    let payload = {};
+    if (body) {
+      try {
+        payload = JSON.parse(body.toString());
+      } catch {
+        return json({ error: 'expected JSON body' }, 400);
+      }
+    }
+
+    try {
+      const result = await withManualBacktestJobLock(async () => {
+        const automationStatus = await getAutomationStatusCached(context, { timeoutMs: 60_000 }).catch(() => null);
+        const defaults = automationStatus?.result?.registry?.defaults || {};
+        const bucketHours = Math.max(1, Number(payload?.bucketHours) || Number(defaults.bucketHours) || 6);
+        const replayWindowDays = Math.max(7, Number(payload?.replayWindowDays) || Number(defaults.replayWindowDays) || 60);
+        const warmupFrameCount = Math.max(0, Number(payload?.warmupFrameCount) || Number(defaults.warmupFrameCount) || 60);
+        const horizonsHours = Array.isArray(payload?.horizonsHours)
+          ? payload.horizonsHours.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
+          : Array.isArray(defaults.horizonsHours)
+            ? defaults.horizonsHours.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
+            : [1, 4, 24, 72, 168];
+        const maxFrames = Math.max(
+          24,
+          Number(payload?.maxFrames)
+          || Math.round((replayWindowDays * 24) / bucketHours),
+        );
+        const replayResult = await runIntelligenceJob(
+          'run-replay',
+          {
+            frameLoadOptions: {
+              includeWarmup: true,
+              latestFirst: true,
+              maxFrames,
+              ...(payload?.frameLoadOptions || {}),
+            },
+            options: {
+              label: String(payload?.label || 'Manual Hub Replay'),
+              retainLearningState: false,
+              recordAdaptation: false,
+              warmupFrameCount,
+              horizonsHours,
+              ...(payload?.options || {}),
+            },
+          },
+          context,
+          Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 10 * 60_000,
+        );
+        if (payload?.archive !== false && replayResult?.run) {
+          await archiveReplayRunToDuckDb(replayResult.run, context);
+        }
+        return {
+          ...replayResult,
+          defaultsUsed: {
+            bucketHours,
+            replayWindowDays,
+            warmupFrameCount,
+            maxFrames,
+            horizonsHours,
+          },
+        };
+      });
+      return json(result, 200);
+    } catch (error) {
+      const message = isDuckDbLockError(error) || isManualBacktestBusyError(error)
+        ? createManualBacktestBusyError().message
+        : String(error?.message || 'manual replay failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) || isManualBacktestBusyError(error) ? 423 : 502);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-run-scheduler-now') {
+    if (req.method !== 'POST') {
+      return json({ error: 'POST required' }, 405);
+    }
+    const body = await readBody(req);
+    let payload = {};
+    if (body) {
+      try {
+        payload = JSON.parse(body.toString());
+      } catch {
+        return json({ error: 'expected JSON body' }, 400);
+      }
+    }
+
+    try {
+      const result = await withManualBacktestJobLock(async () => {
+        const automationResult = await runIntelligenceJob(
+          'automation-run-cycle',
+          {
+            registryPath: typeof payload?.registryPath === 'string' ? payload.registryPath : undefined,
+            statePath: typeof payload?.statePath === 'string' ? payload.statePath : undefined,
+            manualTrigger: payload?.manualTrigger !== false,
+            forceFetch: payload?.forceFetch === true,
+            returnRunDetails: true,
+          },
+          context,
+          Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 15 * 60_000,
+        );
+        const runDetails = Array.isArray(automationResult?.result?.replayRunDetails) ? automationResult.result.replayRunDetails : [];
+        let archivedRunCount = 0;
+        for (const run of runDetails) {
+          if (!run) continue;
+          await archiveReplayRunToDuckDb(run, context);
+          archivedRunCount += 1;
+        }
+        if (automationResult?.result && 'replayRunDetails' in automationResult.result) {
+          delete automationResult.result.replayRunDetails;
+        }
+        if (automationResult?.result) {
+          automationResult.result.archivedRunCount = archivedRunCount;
+        }
+        return automationResult;
+      });
+      return json(result, 200);
+    } catch (error) {
+      const message = isDuckDbLockError(error) || isManualBacktestBusyError(error)
+        ? createManualBacktestBusyError().message
+        : String(error?.message || 'scheduler cycle failed');
+      return json({ ok: false, error: message }, isDuckDbLockError(error) || isManualBacktestBusyError(error) ? 423 : 502);
     }
   }
 
@@ -3646,15 +5007,6 @@ async function dispatch(requestUrl, req, routes, context) {
     }
   }
 
-  const expectedToken = process.env.LOCAL_API_TOKEN;
-  if (expectedToken) {
-    const authHeader = req.headers.authorization || '';
-    if (authHeader !== `Bearer ${expectedToken}`) {
-      context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
-      return json({ error: 'Unauthorized' }, 401);
-    }
-  }
-
   if (requestUrl.pathname === '/api/local-env-update') {
     if (req.method === 'POST') {
       const body = await readBody(req);
@@ -3664,9 +5016,11 @@ async function dispatch(requestUrl, req, routes, context) {
           if (typeof key === 'string' && key.length > 0 && ALLOWED_ENV_KEYS.has(key)) {
             if (value == null || value === '') {
               delete process.env[key];
+              mirroredRuntimeSecrets.delete(key);
               context.logger.log(`[local-api] env unset: ${key}`);
             } else {
               process.env[key] = String(value);
+              mirroredRuntimeSecrets.delete(key);
               context.logger.log(`[local-api] env set: ${key}`);
             }
             moduleCache.clear();
@@ -3680,6 +5034,31 @@ async function dispatch(requestUrl, req, routes, context) {
       return json({ error: 'expected { key, value }' }, 400);
     }
     return json({ error: 'POST required' }, 405);
+  }
+
+  if (requestUrl.pathname === '/api/local-runtime-secrets') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    const { mirrorPath } = readRuntimeSecretsMirror();
+    const { secrets, sources } = snapshotRuntimeSecrets();
+    return json({
+      ok: true,
+      mirrorPath,
+      secrets,
+      sources,
+    }, 200);
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-fabric-cache') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    const entry = readPersistentCacheEntry(context, INTELLIGENCE_FABRIC_CACHE_KEY);
+    if (!entry) {
+      return json({ ok: false, error: 'cache not found' }, 404);
+    }
+    return json({ ok: true, entry }, 200);
   }
 
   if (requestUrl.pathname === '/api/local-validate-secret') {
@@ -3764,6 +5143,7 @@ async function dispatch(requestUrl, req, routes, context) {
 export async function createLocalApiServer(options = {}) {
   const context = resolveConfig(options);
   loadVerboseState(context.dataDir);
+  loadMirroredRuntimeSecrets(context);
   const routes = await buildRouteTable(context.apiDir);
 
   const server = createServer(async (req, res) => {
@@ -3781,7 +5161,9 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-traffic-log'
       || requestUrl.pathname === '/api/local-debug-toggle'
       || requestUrl.pathname === '/api/local-env-update'
+      || requestUrl.pathname === '/api/local-runtime-secrets'
       || requestUrl.pathname === '/api/local-validate-secret'
+      || requestUrl.pathname === '/api/local-openbb'
       || requestUrl.pathname === '/api/local-codex-status'
       || requestUrl.pathname === '/api/local-codex-summarize'
       || requestUrl.pathname === '/api/local-codex-candidate-expansion'
@@ -3795,8 +5177,11 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-intelligence-import'
       || requestUrl.pathname === '/api/local-intelligence-replay'
       || requestUrl.pathname === '/api/local-intelligence-walk-forward'
+      || requestUrl.pathname === '/api/local-intelligence-run-replay-now'
+      || requestUrl.pathname === '/api/local-intelligence-run-scheduler-now'
       || requestUrl.pathname === '/api/local-intelligence-backtest-runs'
       || requestUrl.pathname === '/api/local-intelligence-automation-status'
+      || requestUrl.pathname === '/api/local-automation-ops-snapshot'
       || requestUrl.pathname === '/api/local-intelligence-postgres';
 
     try {
@@ -3812,7 +5197,7 @@ export async function createLocalApiServer(options = {}) {
         recordTraffic({
           timestamp: new Date().toISOString(),
           method: req.method,
-          path: requestUrl.pathname + (requestUrl.search || ''),
+          path: requestUrl.pathname,
           status: response.status,
           durationMs,
         });
@@ -3835,7 +5220,7 @@ export async function createLocalApiServer(options = {}) {
         recordTraffic({
           timestamp: new Date().toISOString(),
           method: req.method,
-          path: requestUrl.pathname + (requestUrl.search || ''),
+          path: requestUrl.pathname,
           status: 500,
           durationMs,
           error: error.message,

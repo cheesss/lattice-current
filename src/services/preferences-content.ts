@@ -11,6 +11,38 @@ import { exportSettings, importSettings, type ImportResult } from '@/utils/setti
 
 const DESKTOP_RELEASES_URL = 'https://github.com/koala73/worldmonitor/releases';
 
+const SETTINGS_LANGUAGE_META: Record<string, { label: string; flag: string }> = {
+  en: { label: 'English', flag: 'EN' },
+  bg: { label: 'Bulgarian', flag: 'BG' },
+  ar: { label: 'Arabic', flag: 'AR' },
+  cs: { label: 'Czech', flag: 'CS' },
+  zh: { label: 'Chinese', flag: 'ZH' },
+  fr: { label: 'French', flag: 'FR' },
+  de: { label: 'German', flag: 'DE' },
+  el: { label: 'Greek', flag: 'EL' },
+  es: { label: 'Spanish', flag: 'ES' },
+  it: { label: 'Italian', flag: 'IT' },
+  pl: { label: 'Polish', flag: 'PL' },
+  pt: { label: 'Portuguese', flag: 'PT' },
+  nl: { label: 'Dutch', flag: 'NL' },
+  sv: { label: 'Swedish', flag: 'SV' },
+  ru: { label: 'Russian', flag: 'RU' },
+  ja: { label: 'Japanese', flag: 'JA' },
+  ko: { label: 'Korean', flag: 'KO' },
+  ro: { label: 'Romanian', flag: 'RO' },
+  th: { label: 'Thai', flag: 'TH' },
+  tr: { label: 'Turkish', flag: 'TR' },
+  vi: { label: 'Vietnamese', flag: 'VI' },
+};
+
+function getSettingsLanguageMeta(code: string, fallbackLabel: string, fallbackFlag: string): { label: string; flag: string } {
+  const normalized = String(code || '').trim().toLowerCase();
+  return SETTINGS_LANGUAGE_META[normalized] || {
+    label: fallbackLabel || normalized.toUpperCase(),
+    flag: fallbackFlag || normalized.slice(0, 2).toUpperCase(),
+  };
+}
+
 export interface PreferencesHost {
   isDesktopApp: boolean;
   onMapProviderChange?: (provider: MapProvider) => void;
@@ -148,7 +180,8 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
   html += `<select class="unified-settings-lang-select" id="us-language">`;
   for (const lang of LANGUAGES) {
     const selected = lang.code === currentLang ? ' selected' : '';
-    html += `<option value="${lang.code}"${selected}>${lang.flag} ${escapeHtml(lang.label)}</option>`;
+    const safeMeta = getSettingsLanguageMeta(lang.code, lang.label, lang.flag);
+    html += `<option value="${lang.code}"${selected}>${safeMeta.flag} ${escapeHtml(safeMeta.label)}</option>`;
   }
   html += `</select>`;
   if (currentLang === 'vi') {

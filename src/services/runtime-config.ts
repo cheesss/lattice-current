@@ -70,11 +70,15 @@ export interface RuntimeConfig {
 }
 
 const TOGGLES_STORAGE_KEY = 'worldmonitor-runtime-feature-toggles';
+const BROWSER_SECRETS_REFRESH_MS = 60_000;
 function getSidecarEnvUpdateUrl(): string {
   return `${getApiBaseUrl()}/api/local-env-update`;
 }
 function getSidecarSecretValidateUrl(): string {
   return `${getApiBaseUrl()}/api/local-validate-secret`;
+}
+function getSidecarRuntimeSecretsUrl(): string {
+  return `${getApiBaseUrl()}/api/local-runtime-secrets`;
 }
 
 const defaultToggles: Record<RuntimeFeatureId, boolean> = {
@@ -309,10 +313,21 @@ export function validateSecret(key: RuntimeSecretKey, value: string): { valid: b
   return { valid: true };
 }
 
+interface LocalRuntimeSecretsPayload {
+  ok?: boolean;
+  secrets?: Partial<Record<RuntimeSecretKey, string>>;
+  sources?: Partial<Record<RuntimeSecretKey, 'env' | 'mirror'>>;
+}
+
 let secretsReadyResolve!: () => void;
 export const secretsReady = new Promise<void>(r => { secretsReadyResolve = r; });
+let secretsReadyResolved = false;
 
-if (!isDesktopRuntime()) secretsReadyResolve();
+function resolveSecretsReadyOnce(): void {
+  if (secretsReadyResolved) return;
+  secretsReadyResolved = true;
+  secretsReadyResolve();
+}
 
 const listeners = new Set<() => void>();
 
@@ -341,12 +356,55 @@ function seedSecretsFromEnvironment(): void {
 
 seedSecretsFromEnvironment();
 
+async function hydrateBrowserSecretsFromLocalSidecar(): Promise<void> {
+  if (isDesktopRuntime()) return;
+
+  try {
+    const response = await fetch(getSidecarRuntimeSecretsUrl(), {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(2_500),
+    });
+    if (!response.ok) return;
+    const payload = await response.json() as LocalRuntimeSecretsPayload;
+    let changed = false;
+    for (const [rawKey, rawValue] of Object.entries(payload.secrets || {})) {
+      const key = rawKey as RuntimeSecretKey;
+      const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+      if (!value) continue;
+      if (runtimeConfig.secrets[key]?.source === 'env') continue;
+      runtimeConfig.secrets[key] = {
+        value,
+        source: payload.sources?.[key] === 'env' ? 'env' : 'vault',
+      };
+      changed = true;
+    }
+    if (changed) notifyConfigChanged();
+  } catch {
+    // Browser/dev mode may run without a reachable local sidecar.
+  } finally {
+    resolveSecretsReadyOnce();
+  }
+}
+
+if (!isDesktopRuntime()) {
+  void hydrateBrowserSecretsFromLocalSidecar();
+  if (typeof window !== 'undefined') {
+    window.setInterval(() => {
+      void hydrateBrowserSecretsFromLocalSidecar();
+    }, BROWSER_SECRETS_REFRESH_MS);
+  }
+}
+
 // Listen for cross-window state updates (settings ↔ main).
 // When one window saves secrets or toggles features, the `storage` event fires in other same-origin windows.
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     if (e.key === 'wm-secrets-updated') {
-      void loadDesktopSecrets();
+      if (isDesktopRuntime()) {
+        void loadDesktopSecrets();
+      } else {
+        void hydrateBrowserSecretsFromLocalSidecar();
+      }
     } else if (e.key === TOGGLES_STORAGE_KEY && e.newValue) {
       try {
         const parsed = JSON.parse(e.newValue) as Partial<Record<RuntimeFeatureId, boolean>>;
@@ -405,26 +463,32 @@ export function setFeatureToggle(featureId: RuntimeFeatureId, enabled: boolean):
 }
 
 export async function setSecretValue(key: RuntimeSecretKey, value: string): Promise<void> {
-  if (!isDesktopRuntime()) {
-    console.warn('[runtime-config] Ignoring secret write outside desktop runtime');
-    return;
-  }
-
   const sanitized = value.trim();
-  if (sanitized) {
-    await invokeTauri<void>('set_secret', { key, value: sanitized });
-    runtimeConfig.secrets[key] = { value: sanitized, source: 'vault' };
+  if (isDesktopRuntime()) {
+    if (sanitized) {
+      await invokeTauri<void>('set_secret', { key, value: sanitized });
+      runtimeConfig.secrets[key] = { value: sanitized, source: 'vault' };
+    } else {
+      await invokeTauri<void>('delete_secret', { key });
+      delete runtimeConfig.secrets[key];
+    }
   } else {
-    await invokeTauri<void>('delete_secret', { key });
-    delete runtimeConfig.secrets[key];
+    await pushSecretToSidecar(key, sanitized || '');
+    if (sanitized) {
+      runtimeConfig.secrets[key] = { value: sanitized, source: 'vault' };
+    } else {
+      delete runtimeConfig.secrets[key];
+    }
   }
 
   // Push to sidecar so handlers pick it up immediately.
   // This is best-effort: keyring persistence is the source of truth.
-  try {
-    await pushSecretToSidecar(key, sanitized || '');
-  } catch (error) {
-    console.warn(`[runtime-config] Failed to sync ${key} to sidecar`, error);
+  if (isDesktopRuntime()) {
+    try {
+      await pushSecretToSidecar(key, sanitized || '');
+    } catch (error) {
+      console.warn(`[runtime-config] Failed to sync ${key} to sidecar`, error);
+    }
   }
 
   // Signal other windows (main ↔ settings) to reload secrets from keychain.
@@ -437,6 +501,9 @@ export async function setSecretValue(key: RuntimeSecretKey, value: string): Prom
 }
 
 async function getLocalApiToken(): Promise<string | null> {
+  if (!isDesktopRuntime()) {
+    return null;
+  }
   if (!localApiTokenPromise) {
     localApiTokenPromise = invokeTauri<string>('get_local_api_token')
       .then((token) => token.trim() || null)
@@ -488,10 +555,6 @@ export async function verifySecretWithApi(
   const localValidation = validateSecret(key, value);
   if (!localValidation.valid) {
     return { valid: false, message: localValidation.hint || 'Invalid value' };
-  }
-
-  if (!isDesktopRuntime()) {
-    return { valid: true, message: 'Saved' };
   }
 
   try {
@@ -560,6 +623,6 @@ export async function loadDesktopSecrets(): Promise<void> {
   } catch (error) {
     console.warn('[runtime-config] Failed to load desktop secrets from vault', error);
   } finally {
-    secretsReadyResolve();
+    resolveSecretsReadyOnce();
   }
 }

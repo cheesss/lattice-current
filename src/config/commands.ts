@@ -63,8 +63,9 @@ export const COMMANDS: Command[] = [
 
   // Panel navigation (matching actual DEFAULT_PANELS keys)
   { id: 'panel:live-news', keywords: ['news', 'live news', 'headlines'], label: 'Jump to Live News', icon: '\u{1F4F0}', category: 'panels' },
-  { id: 'panel:codex-hub', keywords: ['codex', 'codex hub', 'llm workspace', 'source ops', 'data qa'], label: 'Open Codex Hub', icon: '\u{1F9E0}', category: 'panels' },
-  { id: 'panel:ontology', keywords: ['ontology', 'graph', 'knowledge graph', 'entity graph'], label: 'Open Ontology Graph', icon: '\u{1F517}', category: 'panels' },
+  { id: 'panel:codex-hub', keywords: ['codex', 'research', 'research hub', 'llm workspace', 'source ops', 'data qa'], label: 'Open Research Workspace', icon: '\u{1F9E0}', category: 'panels' },
+  { id: 'panel:backtest-hub', keywords: ['backtest', 'replay', 'replay studio', 'strategy hub'], label: 'Open Replay Studio', icon: '\u{1F4CA}', category: 'panels' },
+  { id: 'panel:ontology', keywords: ['graph', 'knowledge graph', 'entity graph', 'ontology'], label: 'Open Graph Workspace', icon: '\u{1F517}', category: 'panels' },
   { id: 'panel:data-qa', keywords: ['data qa', 'llm qa', 'ask data', 'q and a'], label: 'Jump to Data Q&A', icon: '\u{1F9E0}', category: 'panels' },
   { id: 'panel:intel', keywords: ['intel', 'intel feed'], label: 'Jump to Intel Feed', icon: '\u{1F50E}', category: 'panels' },
   { id: 'panel:gdelt-intel', keywords: ['gdelt', 'intelligence feed'], label: 'Jump to Live Intelligence', icon: '\u{1F50D}', category: 'panels' },

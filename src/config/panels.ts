@@ -51,7 +51,8 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'country-exposure-matrix': { name: 'Country Exposure Matrix', enabled: true, priority: 1 },
   'investment-workflow': { name: 'Macro Investment Workflow', enabled: true, priority: 1 },
   'investment-ideas': { name: 'Auto Investment Ideas', enabled: true, priority: 1 },
-  'backtest-lab': { name: 'Backtest Lab', enabled: true, priority: 1 },
+  'dataflow-ops': { name: 'Data Flow Ops', enabled: true, priority: 1 },
+  'backtest-lab': { name: 'Replay Studio', enabled: true, priority: 1 },
   'resource-profiler': { name: 'Resource Profiler', enabled: true, priority: 2 },
   economic: { name: 'Economic Indicators', enabled: true, priority: 1 },
   'trade-policy': { name: 'Trade Policy', enabled: true, priority: 1 },
@@ -216,7 +217,8 @@ const TECH_PANELS: Record<string, PanelConfig> = {
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
   'investment-workflow': { name: 'Macro Investment Workflow', enabled: true, priority: 2 },
   'investment-ideas': { name: 'Auto Investment Ideas', enabled: true, priority: 2 },
-  'backtest-lab': { name: 'Backtest Lab', enabled: true, priority: 2 },
+  'dataflow-ops': { name: 'Data Flow Ops', enabled: true, priority: 2 },
+  'backtest-lab': { name: 'Replay Studio', enabled: true, priority: 2 },
   'resource-profiler': { name: 'Resource Profiler', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
   'transmission-sankey': { name: 'Flow Sankey', enabled: true, priority: 2 },
@@ -335,7 +337,8 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'country-exposure-matrix': { name: 'Country Exposure Matrix', enabled: true, priority: 1 },
   'investment-workflow': { name: 'Macro Investment Workflow', enabled: true, priority: 1 },
   'investment-ideas': { name: 'Auto Investment Ideas', enabled: true, priority: 1 },
-  'backtest-lab': { name: 'Backtest Lab', enabled: true, priority: 1 },
+  'dataflow-ops': { name: 'Data Flow Ops', enabled: true, priority: 1 },
+  'backtest-lab': { name: 'Replay Studio', enabled: true, priority: 1 },
   'resource-profiler': { name: 'Resource Profiler', enabled: true, priority: 2 },
   'markets-news': { name: 'Markets News', enabled: true, priority: 2 },
   forex: { name: 'Forex & Currencies', enabled: true, priority: 1 },
@@ -628,7 +631,7 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   marketsFinance: {
     labelKey: 'header.panelCatMarketsFinance',
-    panelKeys: ['commodities', 'markets', 'cross-asset-tape', 'event-impact-screener', 'country-exposure-matrix', 'investment-workflow', 'investment-ideas', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'signal-ridgeline', 'economic', 'trade-policy', 'supply-chain', 'finance', 'polymarket', 'macro-signals', 'etf-flows', 'stablecoins', 'crypto', 'heatmap'],
+      panelKeys: ['commodities', 'markets', 'cross-asset-tape', 'event-impact-screener', 'country-exposure-matrix', 'investment-workflow', 'investment-ideas', 'dataflow-ops', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'signal-ridgeline', 'economic', 'trade-policy', 'supply-chain', 'finance', 'polymarket', 'macro-signals', 'etf-flows', 'stablecoins', 'crypto', 'heatmap'],
     variants: ['full'],
   },
   topical: {
@@ -660,14 +663,14 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   },
   techMarkets: {
     labelKey: 'header.panelCatMarkets',
-    panelKeys: ['markets', 'finance', 'crypto', 'economic', 'polymarket', 'macro-signals', 'investment-workflow', 'investment-ideas', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'etf-flows', 'stablecoins', 'layoffs', 'monitors'],
+      panelKeys: ['markets', 'finance', 'crypto', 'economic', 'polymarket', 'macro-signals', 'investment-workflow', 'investment-ideas', 'dataflow-ops', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'etf-flows', 'stablecoins', 'layoffs', 'monitors'],
     variants: ['tech'],
   },
 
   // Finance variant
   finMarkets: {
     labelKey: 'header.panelCatMarkets',
-    panelKeys: ['markets', 'cross-asset-tape', 'event-impact-screener', 'country-exposure-matrix', 'investment-workflow', 'investment-ideas', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'signal-ridgeline', 'markets-news', 'heatmap', 'macro-signals', 'analysis', 'polymarket'],
+      panelKeys: ['markets', 'cross-asset-tape', 'event-impact-screener', 'country-exposure-matrix', 'investment-workflow', 'investment-ideas', 'dataflow-ops', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'signal-ridgeline', 'markets-news', 'heatmap', 'macro-signals', 'analysis', 'polymarket'],
     variants: ['finance'],
   },
   fixedIncomeFx: {

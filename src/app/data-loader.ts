@@ -136,7 +136,7 @@ import { fetchClimateAnomalies } from '@/services/climate';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
 import { isFeatureAvailable } from '@/services/runtime-config';
-import { canUseLocalAgentEndpoints, isDesktopRuntime, toRuntimeUrl } from '@/services/runtime';
+import { canUseLocalAgentEndpoints, hasLocalAgentEndpointSupport, isDesktopRuntime, toRuntimeUrl } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { getCurrentLanguage, t } from '@/services/i18n';
 import { measureResourceOperation, startResourceSpan } from '@/services/resource-telemetry';
@@ -190,6 +190,10 @@ import { fetchAllPositiveTopicIntelligence } from '@/services/gdelt-intel';
 import { fetchPositiveGeoEvents, geocodePositiveNewsItems } from '@/services/positive-events-geo';
 import { fetchKindnessData } from '@/services/kindness-data';
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
+import {
+  hydrateContextFromPersistedIntelligenceFabric,
+  persistIntelligenceFabricSnapshotFromContext,
+} from '@/services/intelligence-fabric';
 import type { GlintFeedRecord, GlintNewsLocation } from '@/services/glint';
 
 const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
@@ -303,6 +307,8 @@ export class DataLoaderManager implements AppModule {
   private apiDiscoveryInFlight = false;
   private multimodalInFlight = false;
   private advancedIntelInFlight = false;
+  private persistFabricHandle: ReturnType<typeof setTimeout> | null = null;
+  private persistFabricInFlight = false;
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
   private readonly KEYWORD_LIFECYCLE_INTERVAL_MS = 12 * 60 * 1000;
   private readonly API_DISCOVERY_INTERVAL_MS = 20 * 60 * 1000;
@@ -335,6 +341,11 @@ export class DataLoaderManager implements AppModule {
   }
 
   destroy(): void {
+    if (this.persistFabricHandle) {
+      clearTimeout(this.persistFabricHandle);
+      this.persistFabricHandle = null;
+    }
+    void this.persistIntelligenceFabric();
     this.stopGlintRealtime();
     stopSourceAutonomyLoop();
     if (this.openbbStartupRetryHandle) {
@@ -368,6 +379,74 @@ export class DataLoaderManager implements AppModule {
   private hideOpenbbFallback(): void {
     if (!isDesktopRuntime()) return;
     hideOpenbbFallbackBanner();
+  }
+
+  public async hydratePersistedIntelligenceFabric(): Promise<void> {
+    const snapshot = await hydrateContextFromPersistedIntelligenceFabric(this.ctx);
+    if (!snapshot) return;
+
+    Object.entries(this.ctx.newsByCategory).forEach(([category, items]) => {
+      this.renderNewsForCategory(category, items);
+    });
+
+    this.ctx.map?.updateHotspotActivity(this.ctx.allNews);
+    this.updateMonitorResults();
+
+    if (this.ctx.latestClusters.length > 0) {
+      const insightsPanel = this.ctx.panels['insights'] as InsightsPanel | undefined;
+      insightsPanel?.updateInsights(this.ctx.latestClusters);
+
+      const geoLocated: MapNewsLocation[] = this.ctx.latestClusters
+        .filter((cluster): cluster is typeof cluster & { lat: number; lon: number } => cluster.lat != null && cluster.lon != null)
+        .map((cluster) => ({
+          lat: cluster.lat,
+          lon: cluster.lon,
+          title: cluster.primaryTitle,
+          threatLevel: cluster.threat?.level ?? 'info',
+          timestamp: cluster.lastUpdated,
+        }));
+      if (geoLocated.length > 0) {
+        this.ctx.map?.setNewsLocations(geoLocated);
+      }
+    }
+
+    this.refreshAdvancedVisualizationPanels();
+    (this.ctx.panels['data-qa'] as DataQAPanel | undefined)?.refreshSnapshot();
+    this.ctx.analysisHubPage?.refresh();
+    void this.ctx.codexHubPage?.refresh();
+    this.ctx.ontologyGraphPage?.refresh();
+    this.callbacks.refreshOpenCountryBrief?.();
+  }
+
+  private scheduleIntelligenceFabricPersistence(): void {
+    if (this.ctx.isDestroyed) return;
+    if (this.persistFabricHandle) {
+      clearTimeout(this.persistFabricHandle);
+    }
+    this.persistFabricHandle = setTimeout(() => {
+      this.persistFabricHandle = null;
+      void this.persistIntelligenceFabric();
+    }, 800);
+  }
+
+  public async flushPersistedIntelligenceFabric(): Promise<void> {
+    if (this.persistFabricHandle) {
+      clearTimeout(this.persistFabricHandle);
+      this.persistFabricHandle = null;
+    }
+    await this.persistIntelligenceFabric();
+  }
+
+  private async persistIntelligenceFabric(): Promise<void> {
+    if (this.ctx.isDestroyed || this.persistFabricInFlight) return;
+    this.persistFabricInFlight = true;
+    try {
+      await persistIntelligenceFabricSnapshotFromContext(this.ctx);
+    } catch (error) {
+      console.warn('[data-loader] intelligence fabric persistence failed', error);
+    } finally {
+      this.persistFabricInFlight = false;
+    }
   }
 
   private async ensureOpenbbStartupHealth(): Promise<void> {
@@ -592,7 +671,7 @@ export class DataLoaderManager implements AppModule {
     ingress?: 'manual' | 'llm' | 'market' | 'playwright';
     relatedTerms?: string[];
   }>> {
-    if (!canUseLocalAgentEndpoints()) {
+    if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) {
       return [];
     }
 
@@ -830,7 +909,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   private async runApiDiscoveryCycle(force = false): Promise<void> {
-    if (!canUseLocalAgentEndpoints()) {
+    if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) {
       this.ctx.intelligenceCache.apiSources = await listApiSourceRegistry().catch(() => []);
       this.lastApiDiscoveryRunAt = Date.now();
       return;
@@ -898,7 +977,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   private async runMultimodalExtractionCycle(force = false): Promise<void> {
-    if (!canUseLocalAgentEndpoints()) return;
+    if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) return;
     if (this.multimodalInFlight) return;
     if (!force && Date.now() - this.lastMultimodalExtractionAt < this.MULTIMODAL_EXTRACTION_INTERVAL_MS) return;
     this.multimodalInFlight = true;
@@ -1084,6 +1163,7 @@ export class DataLoaderManager implements AppModule {
           sourceCredibility: this.ctx.intelligenceCache.sourceCredibility ?? [],
           reports: this.ctx.intelligenceCache.scheduledReports ?? [],
           keywordGraph: this.ctx.intelligenceCache.keywordGraph ?? null,
+          context: 'live',
         }).catch(() => null),
         (result) => ({ outputCount: result?.ideaCards?.length ?? 0 }),
       );
@@ -1091,6 +1171,7 @@ export class DataLoaderManager implements AppModule {
       console.warn('[data-loader] advanced intelligence artifacts refresh failed', error);
     } finally {
       this.advancedIntelInFlight = false;
+      this.scheduleIntelligenceFabricPersistence?.();
     }
   }
 
@@ -1356,6 +1437,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.analysisHubPage?.refresh();
       void this.ctx.codexHubPage?.refresh();
       this.ctx.ontologyGraphPage?.refresh();
+      this.scheduleIntelligenceFabricPersistence?.();
     } finally {
       loadAllSpan.end({
         outputCount: this.ctx.allNews.length + this.ctx.latestMarkets.length + this.ctx.latestPredictions.length,
@@ -1423,6 +1505,7 @@ export class DataLoaderManager implements AppModule {
       (this.ctx.panels['data-qa'] as DataQAPanel | undefined)?.refreshSnapshot();
       this.ctx.analysisHubPage?.refresh();
       void this.ctx.codexHubPage?.refresh();
+      this.scheduleIntelligenceFabricPersistence?.();
     }
   }
 
@@ -1992,6 +2075,7 @@ export class DataLoaderManager implements AppModule {
     if (this.shouldRefreshOpenbbIntel()) {
       this.refreshOpenbbIntelDebounced();
     }
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   async loadMarkets(): Promise<void> {
@@ -2007,6 +2091,7 @@ export class DataLoaderManager implements AppModule {
     }
 
     this.refreshOpenbbIntelDebounced();
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   private async loadMarketsOpenbbFirst(): Promise<boolean> {
@@ -2372,6 +2457,8 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('Polymarket', { status: 'error' });
       dataFreshness.recordError('polymarket', String(error));
       dataFreshness.recordError('predictions', String(error));
+    } finally {
+      this.scheduleIntelligenceFabricPersistence?.();
     }
   }
 
@@ -2861,6 +2948,7 @@ export class DataLoaderManager implements AppModule {
 
     (this.ctx.panels['cii'] as CIIPanel)?.refresh();
     console.log('[Intelligence] All signals loaded for CII calculation');
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   async loadOutages(): Promise<void> {
@@ -2869,6 +2957,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setOutages(outages);
       this.ctx.map?.setLayerReady('outages', outages.length > 0);
       this.ctx.statusPanel?.updateFeed('NetBlocks', { status: 'ok', itemCount: outages.length });
+      this.scheduleIntelligenceFabricPersistence?.();
       return;
     }
     try {
@@ -2885,6 +2974,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateFeed('NetBlocks', { status: 'error' });
       dataFreshness.recordError('outages', String(error));
     }
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   async loadCyberThreats(): Promise<void> {
@@ -2898,6 +2988,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setCyberThreats(this.ctx.cyberThreatsCache);
       this.ctx.map?.setLayerReady('cyberThreats', this.ctx.cyberThreatsCache.length > 0);
       this.ctx.statusPanel?.updateFeed('Cyber Threats', { status: 'ok', itemCount: this.ctx.cyberThreatsCache.length });
+      this.scheduleIntelligenceFabricPersistence?.();
       return;
     }
 
@@ -2915,6 +3006,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('Cyber Threats API', { status: 'error' });
       dataFreshness.recordError('cyber_threats', String(error));
     }
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   async loadAisSignals(): Promise<void> {
@@ -3045,6 +3137,7 @@ export class DataLoaderManager implements AppModule {
       }
       this.ctx.statusPanel?.updateApi('GDELT Doc', { status: 'ok' });
       if (protestData.sources.gdelt > 0) dataFreshness.recordUpdate('gdelt_doc', protestData.sources.gdelt);
+      this.scheduleIntelligenceFabricPersistence?.();
       return;
     }
     try {
@@ -3079,6 +3172,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('GDELT Doc', { status: 'error' });
       dataFreshness.recordError('gdelt_doc', String(error));
     }
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   async loadFlightDelays(): Promise<void> {
@@ -3095,6 +3189,8 @@ export class DataLoaderManager implements AppModule {
       this.ctx.map?.setLayerReady('flights', false);
       this.ctx.statusPanel?.updateFeed('Flights', { status: 'error', errorMessage: String(error) });
       this.ctx.statusPanel?.updateApi('FAA', { status: 'error' });
+    } finally {
+      this.scheduleIntelligenceFabricPersistence?.();
     }
   }
 
@@ -3120,6 +3216,7 @@ export class DataLoaderManager implements AppModule {
         errorMessage: militaryCount === 0 ? 'No military activity in view' : undefined,
       });
       this.ctx.statusPanel?.updateApi('OpenSky', { status: 'ok' });
+      this.scheduleIntelligenceFabricPersistence?.();
       return;
     }
     try {
@@ -3193,6 +3290,7 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('OpenSky', { status: 'error' });
       dataFreshness.recordError('opensky', String(error));
     }
+    this.scheduleIntelligenceFabricPersistence?.();
   }
 
   private async loadCachedPosturesForBanner(): Promise<void> {
@@ -3606,6 +3704,8 @@ export class DataLoaderManager implements AppModule {
       panel?.setData(result.advisories);
     } catch (error) {
       console.warn('[DataLoader] loadSecurityAdvisories failed:', error);
+    } finally {
+      this.scheduleIntelligenceFabricPersistence?.();
     }
   }
 
@@ -3640,6 +3740,8 @@ export class DataLoaderManager implements AppModule {
         status: 'error',
         errorMessage: String(error),
       });
+    } finally {
+      this.scheduleIntelligenceFabricPersistence?.();
     }
   }
 

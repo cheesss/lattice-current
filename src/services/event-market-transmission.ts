@@ -1,5 +1,6 @@
 import type { MarketData, ClusteredEvent, NewsItem } from '@/types';
 import type { KeywordGraphSnapshot } from './keyword-registry';
+import { estimateDirectionalFlowSummary, type TimedFlowPoint } from './information-flow';
 import type { KalmanState } from './math-models/kalman-filter';
 import type { MarketRegimeState } from './math-models/regime-model';
 import { inferMarketRegime, regimeMultiplierForRelation } from './math-models/regime-model';
@@ -20,6 +21,14 @@ export interface EventMarketTransmissionEdge {
   rawStrength?: number;
   kalmanStrength?: number;
   regimeMultiplier?: number;
+  informationFlowScore?: number;
+  leadLagScore?: number;
+  flowDirection?: 'source-leading' | 'target-leading' | 'neutral';
+  flowLagHours?: number;
+  sourceToTargetNmi?: number;
+  targetToSourceNmi?: number;
+  sourceToTargetTe?: number;
+  targetToSourceTe?: number;
   reason: string;
   keywords: string[];
 }
@@ -123,6 +132,45 @@ function threatBoost(item: NewsItem): number {
   return 0;
 }
 
+function toTimestamp(value: Date | string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const ts = value instanceof Date ? value.getTime() : Date.parse(String(value));
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function flowPointsFromTimestamps(timestamps: number[], value: number): TimedFlowPoint[] {
+  return timestamps
+    .filter((timestamp) => Number.isFinite(timestamp))
+    .map((timestamp, index) => ({
+      at: timestamp,
+      value,
+      weight: 1 + Math.min(2, index * 0.1),
+    }));
+}
+
+function marketFlowPoints(market: MarketData, bucketMs: number): TimedFlowPoint[] {
+  const now = Date.now();
+  const sparkline = Array.isArray(market.sparkline)
+    ? market.sparkline.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    : [];
+  if (sparkline.length > 1) {
+    const base = sparkline[0] || 1;
+    const start = now - (sparkline.length - 1) * bucketMs;
+    return sparkline.map((value, index) => ({
+      at: start + index * bucketMs,
+      value: base !== 0 ? ((value - base) / Math.abs(base)) * 100 : value,
+      weight: 1 + Math.min(1.5, Math.abs(value - base) / Math.max(1, Math.abs(base)) * 4),
+    }));
+  }
+  const change = typeof market.change === 'number' && Number.isFinite(market.change) ? market.change : 0;
+  return [{
+    at: now,
+    value: change,
+    weight: 1 + Math.min(1.2, Math.abs(change) * 0.15),
+  }];
+}
+
 function matchRule(eventText: string, marketText: string): {
   type: EventMarketTransmissionEdge['relationType'];
   strength: number;
@@ -161,6 +209,9 @@ export async function recomputeEventMarketTransmission(args: {
       title: cluster.primaryTitle,
       source: cluster.primarySource || 'cluster',
       url: cluster.primaryLink || '',
+      timeline: (cluster.allItems || [])
+        .map((item) => toTimestamp(item.pubDate))
+        .filter((value): value is number => typeof value === 'number'),
       text: normalize([
         cluster.primaryTitle,
         cluster.primarySource,
@@ -172,6 +223,7 @@ export async function recomputeEventMarketTransmission(args: {
       title: item.title,
       source: item.source,
       url: item.link,
+      timeline: [toTimestamp(item.pubDate)].filter((value): value is number => typeof value === 'number'),
       text: normalize([
         item.title,
         item.source,
@@ -204,7 +256,16 @@ export async function recomputeEventMarketTransmission(args: {
       if (!matched) continue;
       const graphBonus = matched.keywords.some((keyword) => graphHints.has(normalize(keyword))) ? 8 : 0;
       const moveBonus = Math.min(18, Math.round(Math.abs(market.change || 0) * 3));
-      const rawStrength = Math.max(1, Math.min(100, matched.strength + moveBonus + event.boost + graphBonus));
+      const flow = estimateDirectionalFlowSummary(
+        flowPointsFromTimestamps(event.timeline, Math.max(1, event.boost / Math.max(event.timeline.length, 1))),
+        marketFlowPoints(market, 24 * 60 * 60 * 1000),
+        { bucketMs: 24 * 60 * 60 * 1000, maxLag: 4, minBuckets: 6 },
+      );
+      const flowBonus = Math.max(
+        0,
+        Math.min(16, Math.round(Math.max(0, flow.flowScore - 50) * 0.12 + Math.max(0, flow.leadLagScore) * 0.05)),
+      );
+      const rawStrength = Math.max(1, Math.min(100, matched.strength + moveBonus + event.boost + graphBonus + flowBonus));
       const regimeMultiplier = regimeMultiplierForRelation(regime, matched.type);
       const measurement = Math.max(1, Math.min(100, rawStrength * regimeMultiplier));
       const kalmanState = updateKalmanState(
@@ -227,7 +288,15 @@ export async function recomputeEventMarketTransmission(args: {
         rawStrength,
         kalmanStrength: Number(kalmanState.x.toFixed(2)),
         regimeMultiplier: Number(regimeMultiplier.toFixed(3)),
-        reason: `${matched.reason} Regime=${regime.label} (${regime.confidence}) adjusted via Kalman smoothing.`,
+        informationFlowScore: Number(flow.flowScore.toFixed(2)),
+        leadLagScore: Number(flow.leadLagScore.toFixed(2)),
+        flowDirection: flow.direction,
+        flowLagHours: Number(flow.bestLagHours.toFixed(2)),
+        sourceToTargetNmi: Number(flow.sourceToTargetNmi.toFixed(4)),
+        targetToSourceNmi: Number(flow.targetToSourceNmi.toFixed(4)),
+        sourceToTargetTe: Number(flow.sourceToTargetTe.toFixed(4)),
+        targetToSourceTe: Number(flow.targetToSourceTe.toFixed(4)),
+        reason: `${matched.reason} Regime=${regime.label} (${regime.confidence}) flow=${flow.direction} lag=${flow.bestLagHours}h adjusted via Kalman smoothing.`,
         keywords: matched.keywords,
       });
     }
@@ -250,7 +319,7 @@ export async function recomputeEventMarketTransmission(args: {
     regime,
     edges: sorted,
     summaryLines: sorted.slice(0, 8).map((edge) =>
-      `${edge.eventTitle} -> ${edge.marketSymbol} (${edge.relationType}, ${edge.strength}, regime=${regime.id})`,
+      `${edge.eventTitle} -> ${edge.marketSymbol} (${edge.relationType}, ${edge.strength}, regime=${regime.id}, flow=${edge.flowDirection || 'neutral'})`,
     ),
   };
   await persist();

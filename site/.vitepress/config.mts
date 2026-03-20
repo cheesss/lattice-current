@@ -26,6 +26,7 @@ type LocaleLabels = {
   footerMessage: string;
   docsLaunch: string;
   automationUpdate: string;
+  surfaceRefresh: string;
 };
 
 function pathFor(locale: '' | 'ko' | 'ja', route: string): string {
@@ -93,6 +94,7 @@ function createSidebar(locale: '' | 'ko' | 'ja', labels: LocaleLabels) {
         text: labels.updates,
         items: [
           { text: labels.updatesOverview, link: pathFor(locale, '/updates/') },
+          { text: labels.surfaceRefresh, link: pathFor(locale, '/updates/2026-03-surface-refresh') },
           { text: labels.automationUpdate, link: pathFor(locale, '/updates/2026-03-automation-theme-discovery') },
           { text: labels.docsLaunch, link: pathFor(locale, '/updates/2026-03-docs-launch') }
         ]
@@ -179,7 +181,8 @@ const en: LocaleLabels = {
   docs: 'Docs',
   footerMessage: 'Code licensed under AGPL-3.0-only. Public docs and media follow separate content policies.',
   docsLaunch: '2026-03 Docs Launch',
-  automationUpdate: '2026-03 Automation'
+  automationUpdate: '2026-03 Automation',
+  surfaceRefresh: '2026-03 Surface Refresh'
 };
 
 const ko: LocaleLabels = {
@@ -207,7 +210,8 @@ const ko: LocaleLabels = {
   docs: '문서',
   footerMessage: '코드는 AGPL-3.0-only로 제공되며, 공개 문서와 미디어는 별도 콘텐츠 정책을 따릅니다.',
   docsLaunch: '2026-03 문서 사이트 공개',
-  automationUpdate: '2026-03 자동화'
+  automationUpdate: '2026-03 자동화',
+  surfaceRefresh: '2026-03 제품 표면 재구성'
 };
 
 const ja: LocaleLabels = {
@@ -235,7 +239,8 @@ const ja: LocaleLabels = {
   docs: 'ドキュメント',
   footerMessage: 'コードは AGPL-3.0-only で提供され、公開ドキュメントとメディアには別のコンテンツ方針が適用されます。',
   docsLaunch: '2026-03 ドキュメント公開',
-  automationUpdate: '2026-03 自動化'
+  automationUpdate: '2026-03 自動化',
+  surfaceRefresh: '2026-03 サーフェス刷新'
 };
 
 export default defineConfig({

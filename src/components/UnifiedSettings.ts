@@ -44,6 +44,38 @@ export interface UnifiedSettingsConfig {
 
 type TabId = 'general' | 'panels' | 'sources';
 
+const SETTINGS_LANGUAGE_META: Record<string, { label: string; flag: string }> = {
+  en: { label: 'English', flag: 'EN' },
+  bg: { label: 'Bulgarian', flag: 'BG' },
+  ar: { label: 'Arabic', flag: 'AR' },
+  cs: { label: 'Czech', flag: 'CS' },
+  zh: { label: 'Chinese', flag: 'ZH' },
+  fr: { label: 'French', flag: 'FR' },
+  de: { label: 'German', flag: 'DE' },
+  el: { label: 'Greek', flag: 'EL' },
+  es: { label: 'Spanish', flag: 'ES' },
+  it: { label: 'Italian', flag: 'IT' },
+  pl: { label: 'Polish', flag: 'PL' },
+  pt: { label: 'Portuguese', flag: 'PT' },
+  nl: { label: 'Dutch', flag: 'NL' },
+  sv: { label: 'Swedish', flag: 'SV' },
+  ru: { label: 'Russian', flag: 'RU' },
+  ja: { label: 'Japanese', flag: 'JA' },
+  ko: { label: 'Korean', flag: 'KO' },
+  ro: { label: 'Romanian', flag: 'RO' },
+  th: { label: 'Thai', flag: 'TH' },
+  tr: { label: 'Turkish', flag: 'TR' },
+  vi: { label: 'Vietnamese', flag: 'VI' },
+};
+
+function getSettingsLanguageMeta(code: string, fallbackLabel: string, fallbackFlag: string): { label: string; flag: string } {
+  const normalized = String(code || '').trim().toLowerCase();
+  return SETTINGS_LANGUAGE_META[normalized] || {
+    label: fallbackLabel || normalized.toUpperCase(),
+    flag: fallbackFlag || normalized.slice(0, 2).toUpperCase(),
+  };
+}
+
 export class UnifiedSettings {
   private overlay: HTMLElement;
   private config: UnifiedSettingsConfig;
@@ -396,6 +428,11 @@ export class UnifiedSettings {
     `;
 
     // Populate dynamic sections after innerHTML is set
+    const closeButton = this.overlay.querySelector<HTMLButtonElement>('.unified-settings-close');
+    if (closeButton) {
+      closeButton.textContent = '×';
+      closeButton.setAttribute('aria-label', 'Close settings');
+    }
     this.renderPanelCategoryPills();
     this.renderPanelsTab();
     this.renderRegionPills();
@@ -507,7 +544,8 @@ export class UnifiedSettings {
     html += `<select class="unified-settings-lang-select">`;
     for (const lang of LANGUAGES) {
       const selected = lang.code === currentLang ? ' selected' : '';
-      html += `<option value="${lang.code}"${selected}>${lang.flag} ${lang.label}</option>`;
+      const safeMeta = getSettingsLanguageMeta(lang.code, lang.label, lang.flag);
+      html += `<option value="${lang.code}"${selected}>${safeMeta.flag} ${safeMeta.label}</option>`;
     }
     html += `</select>`;
 

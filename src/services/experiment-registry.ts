@@ -19,6 +19,10 @@ export interface ExperimentPerformanceSnapshot {
   costAdjustedHitRate24h: number;
   rawAvgReturn24h: number;
   costAdjustedAvgReturn24h: number;
+  portfolioWeightedReturnPct: number;
+  portfolioCagrPct: number;
+  portfolioMaxDrawdownPct: number;
+  portfolioSharpe: number;
   avgExecutionPenaltyPct: number;
   recentShadowHitRate: number;
   recentShadowAvgReturnPct: number;
@@ -166,11 +170,37 @@ function readRealityMetrics(runs: HistoricalReplayRun[]): {
   };
 }
 
+function readPortfolioMetrics(runs: HistoricalReplayRun[]): {
+  portfolioWeightedReturnPct: number;
+  portfolioCagrPct: number;
+  portfolioMaxDrawdownPct: number;
+  portfolioSharpe: number;
+} {
+  const summaries = runs
+    .map((run) => run.portfolioAccounting?.summary)
+    .filter((summary): summary is NonNullable<HistoricalReplayRun['portfolioAccounting']>['summary'] => Boolean(summary));
+  if (!summaries.length) {
+    return {
+      portfolioWeightedReturnPct: 0,
+      portfolioCagrPct: 0,
+      portfolioMaxDrawdownPct: 0,
+      portfolioSharpe: 0,
+    };
+  }
+  return {
+    portfolioWeightedReturnPct: round(average(summaries.map((item) => Number(item.weightedCostAdjustedReturnPct ?? item.weightedReturnPct) || 0))),
+    portfolioCagrPct: round(average(summaries.map((item) => Number(item.cagrPct) || 0))),
+    portfolioMaxDrawdownPct: round(average(summaries.map((item) => Math.abs(Number(item.maxDrawdownPct) || 0)))),
+    portfolioSharpe: round(average(summaries.map((item) => Number(item.sharpeRatio) || 0))),
+  };
+}
+
 export function buildExperimentPerformanceSnapshot(args: {
   snapshot: InvestmentIntelligenceSnapshot | null;
   replayRuns?: HistoricalReplayRun[];
 }): ExperimentPerformanceSnapshot {
   const reality = readRealityMetrics(args.replayRuns || []);
+  const portfolio = readPortfolioMetrics(args.replayRuns || []);
   const abstains = args.snapshot?.autonomy?.abstainCount || 0;
   const directMappings = args.snapshot?.directMappings?.length || 0;
   const hiddenCandidateCount = args.snapshot?.hiddenCandidates?.length || 0;
@@ -180,6 +210,10 @@ export function buildExperimentPerformanceSnapshot(args: {
     costAdjustedHitRate24h: reality.costAdjustedHitRate24h,
     rawAvgReturn24h: reality.rawAvgReturn24h,
     costAdjustedAvgReturn24h: reality.costAdjustedAvgReturn24h,
+    portfolioWeightedReturnPct: portfolio.portfolioWeightedReturnPct,
+    portfolioCagrPct: portfolio.portfolioCagrPct,
+    portfolioMaxDrawdownPct: portfolio.portfolioMaxDrawdownPct,
+    portfolioSharpe: portfolio.portfolioSharpe,
     avgExecutionPenaltyPct: reality.avgExecutionPenaltyPct,
     recentShadowHitRate: Number(args.snapshot?.autonomy?.recentHitRate) || 0,
     recentShadowAvgReturnPct: Number(args.snapshot?.autonomy?.recentAvgReturnPct) || 0,
@@ -195,8 +229,12 @@ function scorePerformance(perf: ExperimentPerformanceSnapshot): number {
     perf.costAdjustedHitRate24h * 0.36
     + perf.recentShadowHitRate * 0.22
     + Math.max(-5, Math.min(5, perf.costAdjustedAvgReturn24h)) * 3.2
+    + Math.max(-5, Math.min(5, perf.portfolioWeightedReturnPct)) * 2.8
+    + Math.max(-6, Math.min(6, perf.portfolioCagrPct)) * 1.8
+    + Math.max(-2, Math.min(3, perf.portfolioSharpe)) * 4.2
     + Math.max(-4, Math.min(4, perf.recentShadowAvgReturnPct)) * 2.4
     - perf.avgExecutionPenaltyPct * 1.9
+    - perf.portfolioMaxDrawdownPct * 0.45
     - perf.recentDrawdownPct * 1.7
     - perf.abstainRate * 0.12
     - perf.realityBlockedRate * 0.1
@@ -229,6 +267,11 @@ function evolveProfile(profile: SelfTuningWeightProfile, perf: ExperimentPerform
   if (perf.hiddenCandidateCount >= 3 && perf.costAdjustedHitRate24h >= 52) {
     next.graphPropagationWeightMultiplier = clamp(next.graphPropagationWeightMultiplier + 0.04, 0.6, 1.6);
     reasons.push('graph propagation received a modest boost');
+  }
+  if (perf.portfolioWeightedReturnPct < 0 || perf.portfolioCagrPct < 0 || perf.portfolioMaxDrawdownPct > 8) {
+    next.riskOffExposureMultiplier = clamp(next.riskOffExposureMultiplier + 0.06, 0.6, 1.6);
+    next.riskOnAggressionMultiplier = clamp(next.riskOnAggressionMultiplier - 0.05, 0.6, 1.5);
+    reasons.push('portfolio accounting weakened, nudging the profile more defensive');
   }
   if (perf.costAdjustedAvgReturn24h < 0 && perf.rawAvgReturn24h > 0) {
     next.realityPenaltyMultiplier = clamp(next.realityPenaltyMultiplier + 0.05, 0.7, 1.8);

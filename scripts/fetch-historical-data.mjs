@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { XMLParser } from 'fast-xml-parser';
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -41,6 +43,21 @@ function optionalInt(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function buildAcledEqualityValue(fieldName, rawValue) {
+  const parts = String(rawValue ?? '')
+    .split('|')
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  if (parts.length <= 1) return parts[0] || '';
+  return parts
+    .map((value, index) => (index === 0 ? value : `${fieldName}=${value}`))
+    .join(':OR:');
+}
+
 function isoDate(value, fallback) {
   if (!value) return fallback;
   const date = new Date(String(value));
@@ -48,6 +65,80 @@ function isoDate(value, fallback) {
     throw new Error(`Invalid date: ${value}`);
   }
   return date.toISOString();
+}
+
+function chunk(items, size) {
+  const safeSize = Math.max(1, Number(size) || 1);
+  const pages = [];
+  for (let index = 0; index < items.length; index += safeSize) {
+    pages.push(items.slice(index, index + safeSize));
+  }
+  return pages;
+}
+
+function partitionDateWindows(startIso, endIso, windowDays) {
+  const safeWindowDays = Math.max(1, Number(windowDays) || 0);
+  if (!safeWindowDays || !startIso || !endIso) return [{ start: startIso || null, end: endIso || null }];
+  const startTs = new Date(startIso).getTime();
+  const endTs = new Date(endIso).getTime();
+  if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+    return [{ start: startIso || null, end: endIso || null }];
+  }
+  const windows = [];
+  let cursor = startTs;
+  while (cursor < endTs) {
+    const next = Math.min(endTs, cursor + safeWindowDays * 24 * 60 * 60 * 1000);
+    windows.push({
+      start: new Date(cursor).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z'),
+      end: new Date(next).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z'),
+    });
+    cursor = next;
+  }
+  return windows;
+}
+
+function dedupeArticles(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = String(item?.url || item?.title || item?.seendate || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const GDELT_MIN_INTERVAL_MS = Math.max(5000, optionalInt(process.env.GDELT_MIN_INTERVAL_MS, 5500));
+const GDELT_MAX_ATTEMPTS = Math.max(1, optionalInt(process.env.GDELT_MAX_ATTEMPTS, 3));
+let lastGdeltDocRequestAt = 0;
+
+function isGdeltRateLimitError(error) {
+  return /429|Too Many Requests/i.test(error instanceof Error ? error.message : String(error || ''));
+}
+
+async function waitForGdeltWindow() {
+  const elapsed = Date.now() - lastGdeltDocRequestAt;
+  const waitMs = Math.max(0, GDELT_MIN_INTERVAL_MS - elapsed);
+  if (waitMs > 0) {
+    await sleep(waitMs);
+  }
+}
+
+async function fetchGdeltJson(url) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= GDELT_MAX_ATTEMPTS; attempt += 1) {
+    await waitForGdeltWindow();
+    lastGdeltDocRequestAt = Date.now();
+    try {
+      return await fetchJson(url);
+    } catch (error) {
+      lastError = error;
+      if (!isGdeltRateLimitError(error) || attempt >= GDELT_MAX_ATTEMPTS) {
+        throw error;
+      }
+      await sleep(GDELT_MIN_INTERVAL_MS * attempt);
+    }
+  }
+  throw lastError || new Error('GDELT fetch failed');
 }
 
 async function fetchJson(url, init = {}) {
@@ -63,6 +154,71 @@ async function fetchJson(url, init = {}) {
     throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 400)}`);
   }
   return json;
+}
+
+function readCookieHeader(response) {
+  if (typeof response.headers.getSetCookie === 'function') {
+    const cookies = response.headers.getSetCookie()
+      .map((value) => String(value || '').split(';', 1)[0].trim())
+      .filter(Boolean);
+    if (cookies.length) return cookies.join('; ');
+  }
+
+  const fallback = response.headers.get('set-cookie');
+  if (!fallback) return null;
+  const firstCookie = String(fallback).split(';', 1)[0].trim();
+  return firstCookie || null;
+}
+
+async function getAcledAuthHeaders() {
+  const token = String(process.env.ACLED_ACCESS_TOKEN || '').trim();
+  if (token) {
+    return {
+      accept: 'application/json',
+      authorization: `Bearer ${token}`,
+    };
+  }
+
+  const email = String(process.env.ACLED_EMAIL || '').trim();
+  const password = String(process.env.ACLED_PASSWORD || '').trim();
+  if (!email || !password) {
+    throw new Error('ACLED_ACCESS_TOKEN is required (or set ACLED_EMAIL and ACLED_PASSWORD for cookie login)');
+  }
+
+  const response = await fetch('https://acleddata.com/user/login?_format=json', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: email,
+      pass: password,
+    }),
+  });
+
+  const text = await response.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(`ACLED cookie login failed: ${response.status} ${response.statusText}: ${text.slice(0, 400)}`);
+  }
+
+  const cookie = readCookieHeader(response);
+  if (!cookie) {
+    throw new Error('ACLED cookie login succeeded but no session cookie was returned');
+  }
+
+  return {
+    accept: 'application/json',
+    cookie,
+    ...(json?.csrf_token ? { 'x-csrf-token': String(json.csrf_token) } : {}),
+  };
 }
 
 async function fetchFred(args) {
@@ -129,19 +285,70 @@ async function fetchGdeltDoc(args) {
   const query = requireArg(args, 'query', 'Missing --query for gdelt-doc');
   const mode = String(args.mode || 'ArtList');
   const maxRecords = optionalInt(args.max, 250);
-  const params = new URLSearchParams({
-    query,
-    mode,
-    format: 'json',
-    maxrecords: String(maxRecords),
-  });
-  if (args.start) params.set('startdatetime', String(args.start));
-  if (args.end) params.set('enddatetime', String(args.end));
-  if (args.sort) params.set('sort', String(args.sort));
+  const shardTerms = String(args.query_terms || '')
+    .split(/[|\n]/)
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  const shardSize = Math.max(1, optionalInt(args.shard_size, shardTerms.length > 0 ? 3 : 0));
+  const queryShards = shardTerms.length > 0
+    ? chunk(shardTerms, shardSize).map((terms) => terms.map((term) => term.includes(' ') ? `"${term}"` : term).join(' OR '))
+    : [query];
+  const windows = partitionDateWindows(args.start ? String(args.start) : null, args.end ? String(args.end) : null, args.window_days);
+  const articles = [];
+  const partialErrors = [];
+  for (const shardQuery of queryShards) {
+    for (const window of windows) {
+      const params = new URLSearchParams({
+        query: shardQuery,
+        mode,
+        format: 'json',
+        maxrecords: String(maxRecords),
+      });
+      if (window.start) params.set('startdatetime', String(window.start));
+      if (window.end) params.set('enddatetime', String(window.end));
+      if (args.sort) params.set('sort', String(args.sort));
+      try {
+        const data = await fetchGdeltJson(`https://api.gdeltproject.org/api/v2/doc/doc?${params}`);
+        const rows = Array.isArray(data?.articles) ? data.articles : [];
+        articles.push(...rows);
+      } catch (error) {
+        partialErrors.push({
+          query: shardQuery,
+          start: window.start || null,
+          end: window.end || null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+  const dedupedArticles = dedupeArticles(articles);
+  if (dedupedArticles.length === 0 && partialErrors.length > 0) {
+    throw new Error(`GDELT fetch failed across all shards: ${partialErrors[0]?.error || 'unknown error'}`);
+  }
   return {
     provider: 'gdelt-doc',
-    request: { query, mode, maxRecords, start: args.start || null, end: args.end || null },
-    data: await fetchJson(`https://api.gdeltproject.org/api/v2/doc/doc?${params}`),
+    request: {
+      query,
+      mode,
+      maxRecords,
+      start: args.start || null,
+      end: args.end || null,
+      queryShards,
+      windowCount: windows.length,
+      partialFailureCount: partialErrors.length,
+    },
+    data: {
+      articles: dedupedArticles,
+      meta: {
+        query,
+        queryShards,
+        windows,
+        partialErrors,
+        rateLimitLossEstimate: queryShards.length * windows.length > 0
+          ? Number((partialErrors.length / (queryShards.length * windows.length)).toFixed(4))
+          : 0,
+      },
+    },
   };
 }
 
@@ -172,29 +379,153 @@ async function fetchCoingecko(args) {
 }
 
 async function fetchAcled(args) {
-  const token = process.env.ACLED_ACCESS_TOKEN;
-  if (!token) throw new Error('ACLED_ACCESS_TOKEN is required');
-  const startDate = String(args.start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const explicitWindow = Boolean(args.start || args.end);
   const endDate = String(args.end || new Date().toISOString().slice(0, 10));
-  const eventTypes = String(args.event_types || 'Battles|Explosions/Remote violence|Violence against civilians');
+  const eventTypes = buildAcledEqualityValue(
+    'event_type',
+    args.event_types || 'Battles|Explosions/Remote violence|Violence against civilians',
+  );
   const limit = optionalInt(args.limit, 500);
-  const params = new URLSearchParams({
-    event_type: eventTypes,
-    event_date: `${startDate}|${endDate}`,
-    event_date_where: 'BETWEEN',
-    limit: String(limit),
-    _format: 'json',
-  });
-  if (args.country) params.set('country', String(args.country));
-  return {
-    provider: 'acled',
-    request: { startDate, endDate, eventTypes, limit, country: args.country || null },
-    data: await fetchJson(`https://acleddata.com/api/acled/read?${params}`, {
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${token}`,
+  const headers = await getAcledAuthHeaders();
+  const attemptWindows = explicitWindow
+    ? [String(args.start)]
+    : ['180d', '365d', '540d', '730d'];
+  let lastResponse = null;
+
+  for (const windowStart of attemptWindows) {
+    const startDate = explicitWindow
+      ? String(windowStart || new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+      : new Date(Date.now() - Number.parseInt(windowStart, 10) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const params = new URLSearchParams({
+      event_type: eventTypes,
+      event_date: `${startDate}|${endDate}`,
+      event_date_where: 'BETWEEN',
+      limit: String(limit),
+      _format: 'json',
+    });
+    if (args.country) params.set('country', buildAcledEqualityValue('country', args.country));
+    const data = await fetchJson(`https://acleddata.com/api/acled/read?${params}`, {
+      headers,
+    });
+    const count = Number(data?.count || data?.total_count || (Array.isArray(data?.data) ? data.data.length : 0) || 0);
+    lastResponse = {
+      provider: 'acled',
+      request: {
+        startDate,
+        endDate,
+        eventTypes,
+        limit,
+        country: args.country || null,
+        attemptedWindows: attemptWindows,
+        fallbackApplied: !explicitWindow && windowStart !== attemptWindows[0],
       },
-    }),
+      data,
+    };
+    if (explicitWindow || count > 0) {
+      return lastResponse;
+    }
+  }
+
+  return lastResponse;
+}
+
+async function fetchYahooChart(args) {
+  const symbol = requireArg(args, 'symbol', 'Missing --symbol for yahoo-chart');
+  const range = String(args.range || '1mo');
+  const interval = String(args.interval || '1d');
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
+  const raw = await fetchJson(url, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'Mozilla/5.0',
+    },
+  });
+  const result = raw?.chart?.result?.[0];
+  const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : [];
+  const closes = Array.isArray(result?.indicators?.quote?.[0]?.close) ? result.indicators.quote[0].close : [];
+  const items = timestamps.flatMap((timestamp, index) => {
+    const price = Number(closes[index]);
+    if (!Number.isFinite(price)) return [];
+    return [{
+      id: `${symbol}:${timestamp}`,
+      sourceId: `yahoo-chart:${symbol}`,
+      sourceName: 'Yahoo Finance',
+      validTimeStart: new Date(Number(timestamp) * 1000).toISOString(),
+      symbol: symbol.toUpperCase(),
+      price,
+      headline: `${symbol.toUpperCase()} price`,
+      region: String(args.region || ''),
+      link: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`,
+    }];
+  });
+  return {
+    provider: 'yahoo-chart',
+    request: { symbol, range, interval, region: args.region || null },
+    data: { items },
+  };
+}
+
+async function fetchRssFeed(args) {
+  const url = requireArg(args, 'url', 'Missing --url for rss-feed');
+  const limit = optionalInt(args.limit, 80);
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+      'user-agent': 'Mozilla/5.0',
+    },
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 400)}`);
+  }
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    textNodeName: '#text',
+    parseTagValue: true,
+    trimValues: true,
+  });
+  const xml = parser.parse(text);
+  const rssItems = Array.isArray(xml?.rss?.channel?.item)
+    ? xml.rss.channel.item
+    : xml?.rss?.channel?.item
+      ? [xml.rss.channel.item]
+      : [];
+  const atomEntries = Array.isArray(xml?.feed?.entry)
+    ? xml.feed.entry
+    : xml?.feed?.entry
+      ? [xml.feed.entry]
+      : [];
+  const items = [...rssItems, ...atomEntries].slice(0, Math.max(1, limit)).map((item, index) => {
+    const link = typeof item?.link === 'string'
+      ? item.link
+      : typeof item?.link?.href === 'string'
+        ? item.link.href
+        : null;
+    const title = String(item?.title?.['#text'] || item?.title || item?.summary || item?.description || 'Feed item').trim();
+    const validTimeStart = isoDate(item?.pubDate || item?.published || item?.updated || item?.dc_date, new Date().toISOString());
+    return {
+      id: `${url}:${validTimeStart}:${index}`,
+      sourceId: `rss-feed:${url}`,
+      sourceName: String(args.name || xml?.rss?.channel?.title || xml?.feed?.title || url),
+      validTimeStart,
+      headline: title,
+      link,
+      region: String(args.region || ''),
+      sourceFamily: String(args.source_family || ''),
+      featureFamily: String(args.feature_family || ''),
+    };
+  });
+  return {
+    provider: 'rss-feed',
+    request: {
+      url,
+      name: args.name || null,
+      limit,
+      sourceFamily: args.source_family || null,
+      featureFamily: args.feature_family || null,
+    },
+    data: { items },
   };
 }
 
@@ -209,6 +540,10 @@ export async function fetchHistoricalEnvelope(provider, args = {}) {
       return fetchGdeltDoc(args);
     case 'coingecko':
       return fetchCoingecko(args);
+    case 'yahoo-chart':
+      return fetchYahooChart(args);
+    case 'rss-feed':
+      return fetchRssFeed(args);
     case 'acled':
       return fetchAcled(args);
     default:
@@ -240,10 +575,16 @@ async function main() {
       '  alfred     --series GDP [--realtime_start 2024-01-01] [--realtime_end 2024-12-31]',
       '  gdelt-doc  --query "iran OR hormuz" [--start YYYYMMDDhhmmss] [--end YYYYMMDDhhmmss]',
       '  coingecko  --id bitcoin [--days 365] or [--from 2024-01-01 --to 2024-12-31]',
+      '  yahoo-chart --symbol ITA [--range 6mo] [--interval 1d]',
+      '  rss-feed   --url https://example.com/feed.xml [--name "Provider"] [--limit 80]',
       '  acled      [--country Iran] [--start 2026-01-01] [--end 2026-03-01]',
       '',
       'Optional:',
       '  --out data/historical/custom.json',
+      '',
+      'ACLED auth:',
+      '  Prefer ACLED_ACCESS_TOKEN',
+      '  Or set ACLED_EMAIL and ACLED_PASSWORD for cookie login fallback',
     ].join('\n'));
     process.exit(provider ? 0 : 1);
   }
@@ -263,7 +604,10 @@ async function main() {
   }, null, 2));
 }
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+const isDirectRun = process.argv[1]
+  && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isDirectRun) {
   main().catch((error) => {
     console.error(JSON.stringify({
       ok: false,

@@ -1,6 +1,7 @@
 
 import { createReadStream } from 'node:fs';
-import { mkdir, open, readFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import readline from 'node:readline';
 import streamJsonPackage from 'stream-json';
@@ -8,10 +9,12 @@ import pickPackage from 'stream-json/filters/Pick';
 import streamArrayPackage from 'stream-json/streamers/StreamArray';
 import type { ClusteredEvent, MarketData, NewsItem } from '@/types';
 import type { HistoricalReplayFrame } from '../historical-intelligence';
+import { inferCoverageFamilies } from '../coverage-ledger';
 
 const { parser: createJsonParser } = streamJsonPackage as { parser: () => NodeJS.ReadWriteStream };
 const { pick } = pickPackage as { pick: (options: { filter: string }) => NodeJS.ReadWriteStream };
 const { streamArray } = streamArrayPackage as { streamArray: () => NodeJS.ReadWriteStream };
+const DUCKDB_LOCK_TTL_MINUTES = 180;
 
 type DuckDbConnection = {
   run: (sql: string, params?: Record<string, unknown>) => Promise<unknown>;
@@ -22,6 +25,8 @@ type DuckDbConnection = {
 };
 
 type HistoricalRawKind = 'news' | 'market';
+type HistoricalTransactionTimeMode = 'provider' | 'valid-time' | 'fetched-at';
+type HistoricalBucketTimeMode = 'transaction-time' | 'knowledge-boundary' | 'valid-time';
 
 export interface HistoricalRawReplayRecord {
   id: string;
@@ -53,6 +58,9 @@ export interface HistoricalBackfillOptions {
   warmupFrameCount?: number;
   warmupUntil?: string;
   sourceVersion?: string | null;
+  transactionTimeMode?: HistoricalTransactionTimeMode;
+  bucketTimeMode?: HistoricalBucketTimeMode;
+  sourceArtifactPaths?: string[];
 }
 
 export interface HistoricalBackfillResult {
@@ -60,6 +68,7 @@ export interface HistoricalBackfillResult {
   provider: string;
   dbPath: string;
   rawRecordCount: number;
+  currentImportRawRecordCount?: number;
   frameCount: number;
   warmupFrameCount: number;
   bucketHours: number;
@@ -90,6 +99,7 @@ export interface HistoricalFrameLoadOptions {
   datasetId?: string;
   includeWarmup?: boolean;
   maxFrames?: number;
+  latestFirst?: boolean;
   startTransactionTime?: string;
   endTransactionTime?: string;
   knowledgeBoundaryCeiling?: string;
@@ -110,6 +120,73 @@ interface MaterializedFrameRow {
   newsCount: number;
   clusterCount: number;
   marketCount: number;
+}
+
+class DuckDbPathLockError extends Error {
+  code = 'DUCKDB_LOCKED';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DuckDbPathLockError';
+  }
+}
+
+function normalizeDuckDbPath(dbPath: string): string {
+  return path.resolve(dbPath || DEFAULT_DB_PATH);
+}
+
+function getDuckDbLockPath(dbPath: string): string {
+  const normalized = normalizeDuckDbPath(dbPath);
+  const digest = createHash('sha1').update(normalized).digest('hex').slice(0, 16);
+  const fileName = `${path.basename(normalized)}.${digest}.lock.json`;
+  return path.join(path.dirname(normalized), fileName);
+}
+
+async function acquireDuckDbPathLock(
+  dbPath: string,
+  ttlMinutes = DUCKDB_LOCK_TTL_MINUTES,
+): Promise<(() => Promise<void>) | null> {
+  const lockPath = getDuckDbLockPath(dbPath);
+  await mkdir(path.dirname(lockPath), { recursive: true });
+  const normalized = normalizeDuckDbPath(dbPath);
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+  const payload = JSON.stringify({
+    path: normalized,
+    pid: process.pid,
+    acquiredAt: nowIso(),
+    expiresAt,
+  }, null, 2);
+
+  const tryCreate = async (): Promise<boolean> => {
+    try {
+      const handle = await open(lockPath, 'wx');
+      await handle.writeFile(payload, 'utf8');
+      await handle.close();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (!(await tryCreate())) {
+    let existing: { expiresAt?: string } | null = null;
+    try {
+      existing = JSON.parse(await readFile(lockPath, 'utf8')) as { expiresAt?: string };
+    } catch {
+      existing = null;
+    }
+
+    if (existing?.expiresAt && asTs(existing.expiresAt) < Date.now()) {
+      await rm(lockPath, { force: true });
+      if (!(await tryCreate())) return null;
+    } else {
+      return null;
+    }
+  }
+
+  return async () => {
+    await rm(lockPath, { force: true });
+  };
 }
 
 export interface HistoricalReplayFrameArchiveRow extends MaterializedFrameRow {
@@ -185,6 +262,11 @@ function maxIso(current: string | null, candidate: string | null): string | null
 function toIso(value: unknown, fallback?: string): string {
   if (typeof value === 'string' && value.trim()) {
     const trimmed = value.trim();
+    const gdeltCompact = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/i.exec(trimmed);
+    if (gdeltCompact) {
+      const [, year, month, day, hour, minute, second] = gdeltCompact;
+      return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`).toISOString();
+    }
     const asNumber = /^\d{10,13}$/.test(trimmed) ? Number(trimmed) : null;
     if (asNumber && Number.isFinite(asNumber)) {
       const scaled = trimmed.length === 13 ? asNumber : asNumber * 1000;
@@ -224,6 +306,57 @@ function normalizeTitle(value: unknown, fallback: string): string {
 function defaultDatasetId(provider: string): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   return `${slugify(provider)}-${stamp}`;
+}
+
+function defaultTransactionTimeMode(provider: string): HistoricalTransactionTimeMode {
+  switch (String(provider || '').trim().toLowerCase()) {
+    case 'alfred':
+    case 'gdelt-doc':
+      return 'provider';
+    default:
+      return 'valid-time';
+  }
+}
+
+function defaultBucketTimeMode(provider: string): HistoricalBucketTimeMode {
+  switch (String(provider || '').trim().toLowerCase()) {
+    case 'alfred':
+      return 'transaction-time';
+    default:
+      return 'valid-time';
+  }
+}
+
+function resolveTransactionTime(
+  providerValue: unknown,
+  validTimeStart: string,
+  fetchedAt: string,
+  mode: HistoricalTransactionTimeMode,
+): string {
+  switch (mode) {
+    case 'valid-time':
+      return validTimeStart;
+    case 'fetched-at':
+      return fetchedAt;
+    case 'provider':
+    default:
+      return toIso(providerValue, validTimeStart || fetchedAt);
+  }
+}
+
+function resolveBucketTimestamp(
+  record: HistoricalRawReplayRecord,
+  mode: HistoricalBucketTimeMode,
+): number {
+  switch (mode) {
+    case 'valid-time':
+      return asTs(record.validTimeStart);
+    case 'knowledge-boundary':
+      return asTs(record.knowledgeBoundary || record.transactionTime);
+    case 'transaction-time':
+    default:
+      return asTs(record.transactionTime);
+  }
 }
 
 function newsSourceName(record: HistoricalRawReplayRecord): string {
@@ -389,6 +522,7 @@ interface StreamTransformContext {
   fetchedAt: string;
   requestId: string | null;
   seriesId: string | null;
+  transactionTimeMode: HistoricalTransactionTimeMode;
 }
 
 type StreamJsonToken = {
@@ -398,14 +532,20 @@ type StreamJsonToken = {
 
 function buildCoingeckoRecord(
   point: unknown,
-  index: number,
+  _index: number,
   context: StreamTransformContext,
 ): HistoricalRawReplayRecord | null {
   if (!Array.isArray(point)) return null;
   const validTimeStart = toIso(point[0], context.fetchedAt);
   const assetId = String(context.requestId || context.datasetId || 'coingecko').trim();
+  const transactionTime = resolveTransactionTime(
+    null,
+    validTimeStart,
+    context.fetchedAt,
+    context.transactionTimeMode,
+  );
   return {
-    id: stableId([context.datasetId, context.provider, assetId, validTimeStart, index]),
+    id: stableId([context.datasetId, context.provider, assetId, 'price', validTimeStart]),
     datasetId: context.datasetId,
     provider: context.provider,
     sourceKind: 'api',
@@ -413,8 +553,8 @@ function buildCoingeckoRecord(
     itemKind: 'market',
     validTimeStart,
     validTimeEnd: null,
-    transactionTime: context.fetchedAt,
-    knowledgeBoundary: context.fetchedAt,
+    transactionTime,
+    knowledgeBoundary: transactionTime,
     headline: `${assetId.toUpperCase()} price`,
     link: null,
     symbol: assetId.toUpperCase(),
@@ -434,17 +574,19 @@ function buildCoingeckoRecord(
 
 function buildFredObservationRecord(
   row: Record<string, unknown>,
-  index: number,
+  _index: number,
   context: StreamTransformContext,
 ): HistoricalRawReplayRecord {
   const seriesId = String(context.seriesId || context.requestId || context.datasetId || 'FRED').trim();
   const validTimeStart = toIso(row.date || row.observation_date || context.fetchedAt, context.fetchedAt);
-  const transactionTime = toIso(
-    row.realtime_start || row.realtimeStart || row.fetchedAt || context.fetchedAt,
+  const transactionTime = resolveTransactionTime(
+    row.realtime_start || row.realtimeStart || row.fetchedAt,
+    validTimeStart,
     context.fetchedAt,
+    context.transactionTimeMode,
   );
   return {
-    id: stableId([context.datasetId, context.provider, seriesId, validTimeStart, index]),
+    id: stableId([context.datasetId, context.provider, seriesId, validTimeStart]),
     datasetId: context.datasetId,
     provider: context.provider,
     sourceKind: 'api',
@@ -473,14 +615,19 @@ function buildFredObservationRecord(
 
 function buildGdeltArticleRecord(
   article: Record<string, unknown>,
-  index: number,
+  _index: number,
   context: StreamTransformContext,
 ): HistoricalRawReplayRecord {
   const validTimeStart = toIso(
     article.seendate || article.date || article.published || context.fetchedAt,
     context.fetchedAt,
   );
-  const transactionTime = toIso(article.seendate || context.fetchedAt, context.fetchedAt);
+  const transactionTime = resolveTransactionTime(
+    article.seendate || article.date || article.published,
+    validTimeStart,
+    context.fetchedAt,
+    context.transactionTimeMode,
+  );
   const title = normalizeTitle(article.title || article.title_translated, 'GDELT article');
   const link =
     typeof article.url === 'string'
@@ -489,7 +636,7 @@ function buildGdeltArticleRecord(
         ? article.link
         : null;
   return {
-    id: stableId([context.datasetId, context.provider, link || title, validTimeStart, index]),
+    id: stableId([context.datasetId, context.provider, link || title, validTimeStart]),
     datasetId: context.datasetId,
     provider: context.provider,
     sourceKind: 'api',
@@ -516,11 +663,16 @@ function buildGdeltArticleRecord(
 
 function buildAcledRecord(
   row: Record<string, unknown>,
-  index: number,
+  _index: number,
   context: StreamTransformContext,
 ): HistoricalRawReplayRecord {
   const validTimeStart = toIso(row.event_date || row.timestamp || context.fetchedAt, context.fetchedAt);
-  const transactionTime = toIso(row.timestamp || context.fetchedAt, context.fetchedAt);
+  const transactionTime = resolveTransactionTime(
+    row.timestamp || row.event_date,
+    validTimeStart,
+    context.fetchedAt,
+    context.transactionTimeMode,
+  );
   const headline = normalizeTitle(
     row.notes || row.sub_event_type || row.event_type,
     'ACLED event',
@@ -533,7 +685,6 @@ function buildAcledRecord(
         ? row.event_id_cnty
         : headline,
       validTimeStart,
-      index,
     ]),
     datasetId: context.datasetId,
     provider: context.provider,
@@ -572,9 +723,11 @@ function buildGenericRowRecord(
     row.validTimeStart || row.publishedAt || row.timestamp || context.fetchedAt,
     context.fetchedAt,
   );
-  const transactionTime = toIso(
-    row.transactionTime || row.discoveredAt || row.crawledAt || context.fetchedAt,
+  const transactionTime = resolveTransactionTime(
+    row.transactionTime || row.discoveredAt || row.crawledAt,
+    validTimeStart,
     context.fetchedAt,
+    context.transactionTimeMode,
   );
   const headline = normalizeTitle(row.headline || row.title, `${context.provider} item`);
   return {
@@ -602,6 +755,8 @@ function buildGenericRowRecord(
     payload: row,
     metadata: {
       sourceName: row.sourceName || context.provider,
+      sourceFamily: row.sourceFamily || null,
+      featureFamily: row.featureFamily || null,
       sourceVersion: context.sourceVersion,
     },
   };
@@ -628,8 +783,8 @@ function buildGenericTupleRecord(
     itemKind: 'market',
     validTimeStart,
     validTimeEnd: null,
-    transactionTime: context.fetchedAt,
-    knowledgeBoundary: context.fetchedAt,
+    transactionTime: resolveTransactionTime(null, validTimeStart, context.fetchedAt, context.transactionTimeMode),
+    knowledgeBoundary: resolveTransactionTime(null, validTimeStart, context.fetchedAt, context.transactionTimeMode),
     headline: `${symbol} point`,
     link: null,
     symbol,
@@ -705,16 +860,23 @@ function buildStreamedRecordsForProvider(
 function candidateJsonPaths(provider: string): string[][] {
   switch (provider) {
     case 'coingecko':
-      return [['data', 'prices'], ['prices']];
+      return [['envelope', 'data', 'prices'], ['data', 'prices'], ['prices']];
     case 'fred':
     case 'alfred':
-      return [['data', 'observations', 'observations'], ['observations', 'observations'], ['data', 'observations'], ['observations']];
+      return [
+        ['envelope', 'data', 'observations', 'observations'],
+        ['envelope', 'data', 'observations'],
+        ['data', 'observations', 'observations'],
+        ['observations', 'observations'],
+        ['data', 'observations'],
+        ['observations'],
+      ];
     case 'gdelt-doc':
-      return [['data', 'articles'], ['articles']];
+      return [['envelope', 'data', 'articles'], ['data', 'articles'], ['articles']];
     case 'acled':
-      return [['data', 'data'], ['data']];
+      return [['envelope', 'data', 'data'], ['envelope', 'data'], ['data', 'data'], ['data']];
     default:
-      return [['data', 'items'], ['items'], ['data'], []];
+      return [['envelope', 'data', 'items'], ['data', 'items'], ['items'], ['envelope', 'data'], ['data'], []];
   }
 }
 
@@ -890,6 +1052,7 @@ function transformEnvelopeToRecords(
   fallbackProvider?: string,
   datasetIdArg?: string,
   sourceVersionArg?: string | null,
+  transactionTimeModeArg?: HistoricalTransactionTimeMode,
 ): {
   datasetId: string;
   provider: string;
@@ -917,6 +1080,7 @@ function transformEnvelopeToRecords(
     (input.payload as Record<string, unknown> | undefined) ||
     envelope) as Record<string, unknown>;
   const records: HistoricalRawReplayRecord[] = [];
+  const transactionTimeMode = transactionTimeModeArg || defaultTransactionTimeMode(provider);
 
   const pushRecord = (record: HistoricalRawReplayRecord) => {
     records.push({
@@ -939,10 +1103,10 @@ function transformEnvelopeToRecords(
     const prices = Array.isArray(payload.prices)
       ? (payload.prices as Array<[number, number]>)
       : [];
-    prices.forEach((point, index) => {
+    prices.forEach((point) => {
       const validTimeStart = toIso(point?.[0], fetchedAt);
       pushRecord({
-        id: stableId([datasetId, provider, id, validTimeStart, index]),
+        id: stableId([datasetId, provider, id, 'price', validTimeStart]),
         datasetId,
         provider,
         sourceKind: 'api',
@@ -950,8 +1114,8 @@ function transformEnvelopeToRecords(
         itemKind: 'market',
         validTimeStart,
         validTimeEnd: null,
-        transactionTime: fetchedAt,
-        knowledgeBoundary: fetchedAt,
+        transactionTime: resolveTransactionTime(null, validTimeStart, fetchedAt, transactionTimeMode),
+        knowledgeBoundary: resolveTransactionTime(null, validTimeStart, fetchedAt, transactionTimeMode),
         headline: `${id.toUpperCase()} price`,
         link: typeof payload.link === 'string' ? payload.link : null,
         symbol: id.toUpperCase(),
@@ -973,15 +1137,17 @@ function transformEnvelopeToRecords(
       {}) as Record<string, unknown>;
     const seriesId = String(request.seriesId || payload.seriesId || payload.id || 'FRED').trim();
     const observations = extractObservations(payload);
-    observations.forEach((row, index) => {
+    observations.forEach((row) => {
       const validTimeStart = toIso(row.date || row.observation_date || fetchedAt, fetchedAt);
-      const transactionTime = toIso(
-        row.realtime_start || row.realtimeStart || row.fetchedAt || fetchedAt,
+      const transactionTime = resolveTransactionTime(
+        row.realtime_start || row.realtimeStart || row.fetchedAt,
+        validTimeStart,
         fetchedAt,
+        transactionTimeMode,
       );
       const numericValue = toNumber(row.value || row.observed_value);
       pushRecord({
-        id: stableId([datasetId, provider, seriesId, validTimeStart, index]),
+        id: stableId([datasetId, provider, seriesId, validTimeStart]),
         datasetId,
         provider,
         sourceKind: 'api',
@@ -1010,12 +1176,17 @@ function transformEnvelopeToRecords(
     const articles = Array.isArray(payload.articles)
       ? (payload.articles as Record<string, unknown>[])
       : [];
-    articles.forEach((article, index) => {
+    articles.forEach((article) => {
       const validTimeStart = toIso(
         article.seendate || article.date || article.published || fetchedAt,
         fetchedAt,
       );
-      const transactionTime = toIso(article.seendate || fetchedAt, fetchedAt);
+      const transactionTime = resolveTransactionTime(
+        article.seendate || article.date || article.published,
+        validTimeStart,
+        fetchedAt,
+        transactionTimeMode,
+      );
       const title = normalizeTitle(article.title || article.title_translated, 'GDELT article');
       const link =
         typeof article.url === 'string'
@@ -1024,7 +1195,7 @@ function transformEnvelopeToRecords(
             ? article.link
             : null;
       pushRecord({
-        id: stableId([datasetId, provider, link || title, validTimeStart, index]),
+        id: stableId([datasetId, provider, link || title, validTimeStart]),
         datasetId,
         provider,
         sourceKind: 'api',
@@ -1049,9 +1220,14 @@ function transformEnvelopeToRecords(
     });
   } else if (provider === 'acled') {
     const rows = Array.isArray(payload.data) ? (payload.data as Record<string, unknown>[]) : [];
-    rows.forEach((row, index) => {
+    rows.forEach((row) => {
       const validTimeStart = toIso(row.event_date || row.timestamp || fetchedAt, fetchedAt);
-      const transactionTime = toIso(row.timestamp || fetchedAt, fetchedAt);
+      const transactionTime = resolveTransactionTime(
+        row.timestamp || row.event_date,
+        validTimeStart,
+        fetchedAt,
+        transactionTimeMode,
+      );
       const headline = normalizeTitle(
         row.notes || row.sub_event_type || row.event_type,
         'ACLED event',
@@ -1064,7 +1240,6 @@ function transformEnvelopeToRecords(
             ? row.event_id_cnty
             : headline,
           validTimeStart,
-          index,
         ]),
         datasetId,
         provider,
@@ -1105,9 +1280,11 @@ function transformEnvelopeToRecords(
         row.validTimeStart || row.publishedAt || row.timestamp || fetchedAt,
         fetchedAt,
       );
-      const transactionTime = toIso(
-        row.transactionTime || row.discoveredAt || row.crawledAt || fetchedAt,
+      const transactionTime = resolveTransactionTime(
+        row.transactionTime || row.discoveredAt || row.crawledAt,
+        validTimeStart,
         fetchedAt,
+        transactionTimeMode,
       );
       const headline = normalizeTitle(row.headline || row.title, `${provider} item`);
       pushRecord({
@@ -1197,6 +1374,23 @@ async function appendRawRecordsToDuckDb(
   }
 }
 
+function shouldReplaceDatasetRawItemsOnImport(provider: string): boolean {
+  return ['coingecko', 'fred', 'alfred', 'yahoo-chart'].includes(String(provider || '').trim().toLowerCase());
+}
+
+async function deleteDatasetRawItems(
+  connection: DuckDbConnection,
+  datasetId: string,
+): Promise<void> {
+  await connection.run(
+    `
+      DELETE FROM historical_raw_items
+      WHERE dataset_id = $datasetId
+    `,
+    { datasetId },
+  );
+}
+
 async function replaceDatasetFrames(
   frames: MaterializedFrameRow[],
   datasetId: string,
@@ -1234,6 +1428,39 @@ async function replaceDatasetFrames(
   }
 }
 
+async function readHistoricalRawCorpusStatsForDataset(
+  connection: DuckDbConnection,
+  datasetId: string,
+): Promise<{
+  rawRecordCount: number;
+  firstValidTime: string | null;
+  lastValidTime: string | null;
+  firstTransactionTime: string | null;
+  lastTransactionTime: string | null;
+}> {
+  const result = await connection.runAndReadAll(
+    `
+      SELECT
+        COUNT(*) AS total,
+        MIN(valid_time_start) AS first_valid_time,
+        MAX(valid_time_start) AS last_valid_time,
+        MIN(transaction_time) AS first_transaction_time,
+        MAX(transaction_time) AS last_transaction_time
+      FROM historical_raw_items
+      WHERE dataset_id = $datasetId
+    `,
+    { datasetId },
+  );
+  const row = result.getRowObjectsJS()[0];
+  return {
+    rawRecordCount: Math.max(0, Number(row?.total || 0)),
+    firstValidTime: row?.first_valid_time ? String(row.first_valid_time) : null,
+    lastValidTime: row?.last_valid_time ? String(row.last_valid_time) : null,
+    firstTransactionTime: row?.first_transaction_time ? String(row.first_transaction_time) : null,
+    lastTransactionTime: row?.last_transaction_time ? String(row.last_transaction_time) : null,
+  };
+}
+
 async function upsertDatasetSummary(
   summary: HistoricalDatasetSummary,
   dbPath: string,
@@ -1267,6 +1494,51 @@ async function upsertDatasetSummary(
       metadataJson: JSON.stringify(summary.metadata || {}),
     },
   );
+}
+
+async function readHistoricalRawRecordsFromConnection(
+  connection: DuckDbConnection,
+  options: HistoricalRawRecordLoadOptions = {},
+): Promise<HistoricalRawReplayRecord[]> {
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (options.datasetId) {
+    clauses.push('dataset_id = $datasetId');
+    params.datasetId = options.datasetId;
+  }
+  if (options.startTransactionTime) {
+    clauses.push('transaction_time >= $startTransactionTime');
+    params.startTransactionTime = toIso(options.startTransactionTime);
+  }
+  if (options.endTransactionTime) {
+    clauses.push('transaction_time <= $endTransactionTime');
+    params.endTransactionTime = toIso(options.endTransactionTime);
+  }
+  if (options.knowledgeBoundaryCeiling) {
+    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
+    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  }
+
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const limit =
+    typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 1000;
+  const offset =
+    typeof options.offset === 'number' && options.offset > 0 ? Math.floor(options.offset) : 0;
+
+  const result = await connection.runAndReadAll(
+    `
+    SELECT *
+    FROM historical_raw_items
+    ${whereClause}
+    ORDER BY transaction_time ASC, valid_time_start ASC, id ASC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `,
+    params,
+  );
+
+  return result.getRowObjectsJS().map(parseRawRow);
 }
 
 function buildNewsItem(record: HistoricalRawReplayRecord): NewsItem {
@@ -1351,18 +1623,33 @@ export async function processHistoricalDump(
   const dbPath = options.dbPath || DEFAULT_DB_PATH;
   const providerHint = options.provider;
   const datasetIdHint = options.datasetId;
+  const releaseDbLock = await acquireDuckDbPathLock(dbPath);
+  if (!releaseDbLock) {
+    throw new DuckDbPathLockError(
+      `DuckDB path is locked for import-historical: ${normalizeDuckDbPath(dbPath)}`,
+    );
+  }
 
-  await ensureHistoricalReplayArchive(dbPath);
+  try {
+    const connection = await ensureHistoricalReplayArchive(dbPath);
 
-  const ext = path.extname(filePath).toLowerCase();
-  let datasetId = datasetIdHint || '';
-  let provider = providerHint || 'historical';
-  let sourceVersion = options.sourceVersion || null;
-  let rawRecordCount = 0;
-  let firstValidTime: string | null = null;
-  let lastValidTime: string | null = null;
-  let firstTransactionTime: string | null = null;
-  let lastTransactionTime: string | null = null;
+    const ext = path.extname(filePath).toLowerCase();
+    let datasetId = datasetIdHint || '';
+    let provider = providerHint || 'historical';
+    let sourceVersion = options.sourceVersion || null;
+    let rawRecordCount = 0;
+    let firstValidTime: string | null = null;
+    let lastValidTime: string | null = null;
+    let firstTransactionTime: string | null = null;
+    let lastTransactionTime: string | null = null;
+    let datasetRawReset = false;
+
+    const maybeResetDatasetRaw = async () => {
+      if (datasetRawReset || !datasetId) return;
+      if (!shouldReplaceDatasetRawItemsOnImport(provider)) return;
+      await deleteDatasetRawItems(connection, datasetId);
+      datasetRawReset = true;
+    };
 
   const flushChunk = async (records: HistoricalRawReplayRecord[]) => {
     if (records.length === 0) return;
@@ -1392,10 +1679,12 @@ export async function processHistoricalDump(
         providerHint,
         datasetIdHint,
         options.sourceVersion,
+        options.transactionTimeMode,
       );
       datasetId = datasetId || transformed.datasetId;
       provider = transformed.provider;
       sourceVersion = transformed.sourceVersion;
+      await maybeResetDatasetRaw();
       chunk.push(...transformed.records);
       if (chunk.length >= chunkSize) {
         await flushChunk(chunk);
@@ -1419,6 +1708,7 @@ export async function processHistoricalDump(
       options.sourceVersion ||
       extractJsonString(preamble, ['sourceVersion']) ||
       null;
+    await maybeResetDatasetRaw();
     const context: StreamTransformContext = {
       datasetId,
       provider,
@@ -1428,6 +1718,7 @@ export async function processHistoricalDump(
       ),
       requestId: extractJsonString(preamble, ['id', 'request.id']),
       seriesId: extractJsonString(preamble, ['seriesId', 'request.seriesId']),
+      transactionTimeMode: options.transactionTimeMode || defaultTransactionTimeMode(provider),
     };
     const streamed = await streamJsonArrayItems(
       filePath,
@@ -1460,10 +1751,12 @@ export async function processHistoricalDump(
           providerHint,
           datasetIdHint,
           options.sourceVersion,
+          options.transactionTimeMode,
         );
         datasetId = transformed.datasetId;
         provider = transformed.provider;
         sourceVersion = transformed.sourceVersion;
+        await maybeResetDatasetRaw();
         for (let index = 0; index < transformed.records.length; index += chunkSize) {
           const page = transformed.records.slice(index, index + chunkSize);
           await flushChunk(page);
@@ -1472,15 +1765,16 @@ export async function processHistoricalDump(
     }
   }
 
-  const frameRows: MaterializedFrameRow[] = [];
-  const newsLookbackMs = newsLookbackHours * 60 * 60 * 1000;
-  const bucketMs = bucketHours * 60 * 60 * 1000;
-  let maxMarketKnowledgeBoundary = 0;
-  let bucketIndex = 0;
-  let activeBucketKey: number | null = null;
-  let activeBucketRecords: HistoricalRawReplayRecord[] = [];
-  const newsWindow: HistoricalRawReplayRecord[] = [];
-  const latestMarketBySymbol = new Map<string, HistoricalRawReplayRecord>();
+    const frameRows: MaterializedFrameRow[] = [];
+    const newsLookbackMs = newsLookbackHours * 60 * 60 * 1000;
+    const bucketMs = bucketHours * 60 * 60 * 1000;
+    const bucketTimeMode = options.bucketTimeMode || defaultBucketTimeMode(provider);
+    let maxMarketKnowledgeBoundary = 0;
+    let bucketIndex = 0;
+    let activeBucketKey: number | null = null;
+    let activeBucketRecords: HistoricalRawReplayRecord[] = [];
+    const newsWindow: HistoricalRawReplayRecord[] = [];
+    const latestMarketBySymbol = new Map<string, HistoricalRawReplayRecord>();
 
   const finalizeActiveBucket = () => {
     if (activeBucketKey === null || activeBucketRecords.length === 0) return;
@@ -1501,8 +1795,15 @@ export async function processHistoricalDump(
       })
       .map(buildNewsItem);
     const clusters = buildSimpleClusters(visibleNews);
-    const markets = Array.from(latestMarketBySymbol.values()).map((record) => ({
-      symbol: record.symbol || record.headline || record.id,
+    const latestMarketEntries = Array.from(latestMarketBySymbol.entries());
+    const marketTimestampBySymbol = Object.fromEntries(
+      latestMarketEntries.map(([symbol, record]) => [symbol, record.validTimeStart]),
+    );
+    const marketKnowledgeBoundaryBySymbol = Object.fromEntries(
+      latestMarketEntries.map(([symbol, record]) => [symbol, record.knowledgeBoundary]),
+    );
+    const markets = latestMarketEntries.map(([symbol, record]) => ({
+      symbol,
       name: record.headline || record.symbol || record.id,
       display: record.symbol || record.headline || record.id,
       price: record.price ?? 0,
@@ -1520,7 +1821,10 @@ export async function processHistoricalDump(
       const itemIso = item.pubDate.toISOString();
       if (!earliest) return itemIso;
       return asTs(itemIso) < asTs(earliest) ? itemIso : earliest;
-    }, transactionTime);
+    }, activeBucketRecords.reduce((earliest, record) => {
+      if (!earliest) return record.validTimeStart;
+      return asTs(record.validTimeStart) < asTs(earliest) ? record.validTimeStart : earliest;
+    }, visibleNews.length > 0 ? '' : transactionTime));
     const warmup =
       activeBucketRecords.some((record) => record.metadata.warmup === true) ||
       (typeof options.warmupFrameCount === 'number' && bucketIndex < options.warmupFrameCount) ||
@@ -1542,10 +1846,15 @@ export async function processHistoricalDump(
       markets,
       metadata: {
         provider,
+        sourceFamily: inferCoverageFamilies({ provider, datasetId }).sourceFamily,
+        featureFamily: inferCoverageFamilies({ provider, datasetId }).featureFamily,
         bucketHours,
+        bucketTimeMode,
         frameNewsCount: visibleNews.length,
         frameMarketCount: markets.length,
         maxMarketKnowledgeBoundary,
+        marketTimestampJson: JSON.stringify(marketTimestampBySymbol),
+        marketKnowledgeBoundaryJson: JSON.stringify(marketKnowledgeBoundaryBySymbol),
       },
     };
 
@@ -1570,250 +1879,282 @@ export async function processHistoricalDump(
     bucketIndex += 1;
   };
 
-  let offset = 0;
-  const loadPageSize = Math.max(chunkSize * 4, 1000);
-  while (true) {
-    const page = await listHistoricalRawRecordsFromDuckDb({
-      dbPath,
-      datasetId,
-      limit: loadPageSize,
-      offset,
-    });
-    if (page.length === 0) break;
-    for (const record of page) {
-      const bucketKey = Math.floor(asTs(record.transactionTime) / bucketMs) * bucketMs;
-      if (activeBucketKey === null) {
-        activeBucketKey = bucketKey;
-      } else if (bucketKey !== activeBucketKey) {
-        finalizeActiveBucket();
-        activeBucketKey = bucketKey;
-      }
-      activeBucketRecords.push(record);
-      if (record.itemKind === 'news') {
-        newsWindow.push(record);
-      } else if (record.itemKind === 'market') {
-        const symbol = record.symbol || record.headline || record.id;
-        const current = latestMarketBySymbol.get(symbol);
-        if (!current || asTs(record.validTimeStart) >= asTs(current.validTimeStart)) {
-          latestMarketBySymbol.set(symbol, record);
+    let offset = 0;
+    const loadPageSize = Math.max(chunkSize * 4, 1000);
+    while (true) {
+      const page = await readHistoricalRawRecordsFromConnection(connection, {
+        dbPath,
+        datasetId,
+        limit: loadPageSize,
+        offset,
+      });
+      if (page.length === 0) break;
+      for (const record of page) {
+        const bucketTs = resolveBucketTimestamp(record, bucketTimeMode);
+        const bucketKey = Math.floor(bucketTs / bucketMs) * bucketMs;
+        if (activeBucketKey === null) {
+          activeBucketKey = bucketKey;
+        } else if (bucketKey !== activeBucketKey) {
+          finalizeActiveBucket();
+          activeBucketKey = bucketKey;
         }
-        maxMarketKnowledgeBoundary = Math.max(
-          maxMarketKnowledgeBoundary,
-          asTs(record.knowledgeBoundary),
-        );
+        activeBucketRecords.push(record);
+        if (record.itemKind === 'news') {
+          newsWindow.push(record);
+        } else if (record.itemKind === 'market') {
+          const symbol = record.symbol || record.headline || record.id;
+          const current = latestMarketBySymbol.get(symbol);
+          if (!current || asTs(record.validTimeStart) >= asTs(current.validTimeStart)) {
+            latestMarketBySymbol.set(symbol, record);
+          }
+          maxMarketKnowledgeBoundary = Math.max(
+            maxMarketKnowledgeBoundary,
+            asTs(record.knowledgeBoundary),
+          );
+        }
       }
+      offset += page.length;
     }
-    offset += page.length;
+    finalizeActiveBucket();
+
+    await replaceDatasetFrames(frameRows, datasetId, dbPath);
+    const currentImportRawRecordCount = rawRecordCount;
+    const corpusStats = await readHistoricalRawCorpusStatsForDataset(connection, datasetId);
+    const corpusRawRecordCount = corpusStats.rawRecordCount;
+
+    const summary: HistoricalDatasetSummary = {
+      datasetId,
+      provider,
+      sourceVersion,
+      importedAt: nowIso(),
+      rawRecordCount: corpusRawRecordCount,
+      frameCount: frameRows.length,
+      warmupFrameCount: frameRows.filter((frame) => frame.warmup).length,
+      bucketHours,
+      firstValidTime: corpusStats.firstValidTime,
+      lastValidTime: corpusStats.lastValidTime,
+      firstTransactionTime: corpusStats.firstTransactionTime,
+      lastTransactionTime: corpusStats.lastTransactionTime,
+      metadata: {
+        filePath,
+        newsLookbackHours,
+        transactionTimeMode: options.transactionTimeMode || defaultTransactionTimeMode(provider),
+        bucketTimeMode,
+        maxMarketKnowledgeBoundary,
+        currentImportRawRecordCount,
+        corpusRawRecordCount,
+        currentImportFirstValidTime: firstValidTime,
+        currentImportLastValidTime: lastValidTime,
+        currentImportFirstTransactionTime: firstTransactionTime,
+        currentImportLastTransactionTime: lastTransactionTime,
+        sourceArtifactCount: Array.isArray(options.sourceArtifactPaths)
+          ? options.sourceArtifactPaths.length
+          : 1,
+        sourceArtifactPaths: Array.isArray(options.sourceArtifactPaths)
+          ? options.sourceArtifactPaths.slice()
+          : [filePath],
+      },
+    };
+    await upsertDatasetSummary(summary, dbPath);
+
+    return {
+      datasetId,
+      provider,
+      dbPath: path.resolve(dbPath),
+      rawRecordCount: corpusRawRecordCount,
+      currentImportRawRecordCount,
+      frameCount: frameRows.length,
+      warmupFrameCount: summary.warmupFrameCount,
+      bucketHours,
+      firstValidTime: corpusStats.firstValidTime,
+      lastValidTime: corpusStats.lastValidTime,
+      firstTransactionTime: corpusStats.firstTransactionTime,
+      lastTransactionTime: corpusStats.lastTransactionTime,
+    };
+  } finally {
+    await releaseDbLock();
   }
-  finalizeActiveBucket();
-
-  await replaceDatasetFrames(frameRows, datasetId, dbPath);
-
-  const summary: HistoricalDatasetSummary = {
-    datasetId,
-    provider,
-    sourceVersion,
-    importedAt: nowIso(),
-    rawRecordCount,
-    frameCount: frameRows.length,
-    warmupFrameCount: frameRows.filter((frame) => frame.warmup).length,
-    bucketHours,
-    firstValidTime,
-    lastValidTime,
-    firstTransactionTime,
-    lastTransactionTime,
-    metadata: {
-      filePath,
-      newsLookbackHours,
-      maxMarketKnowledgeBoundary,
-    },
-  };
-  await upsertDatasetSummary(summary, dbPath);
-
-  return {
-    datasetId,
-    provider,
-    dbPath: path.resolve(dbPath),
-    rawRecordCount,
-    frameCount: frameRows.length,
-    warmupFrameCount: summary.warmupFrameCount,
-    bucketHours,
-    firstValidTime,
-    lastValidTime,
-    firstTransactionTime,
-    lastTransactionTime,
-  };
 }
 
 export async function listHistoricalDatasets(
   dbPath: string = DEFAULT_DB_PATH,
 ): Promise<HistoricalDatasetSummary[]> {
-  const connection = await ensureHistoricalReplayArchive(dbPath);
-  const result = await connection.runAndReadAll(`
-    SELECT *
-    FROM historical_datasets
-    ORDER BY last_transaction_time DESC NULLS LAST, imported_at DESC
-  `);
-  return result.getRowObjectsJS().map((row) => ({
-    datasetId: String(row.dataset_id || ''),
-    provider: String(row.provider || ''),
-    sourceVersion:
-      typeof row.source_version === 'string' && row.source_version.trim()
-        ? String(row.source_version)
+  const releaseDbLock = await acquireDuckDbPathLock(dbPath);
+  if (!releaseDbLock) {
+    throw new DuckDbPathLockError(
+      `DuckDB path is locked for list-datasets: ${normalizeDuckDbPath(dbPath)}`,
+    );
+  }
+
+  try {
+    const connection = await ensureHistoricalReplayArchive(dbPath);
+    const result = await connection.runAndReadAll(`
+      SELECT *
+      FROM historical_datasets
+      ORDER BY last_transaction_time DESC NULLS LAST, imported_at DESC
+    `);
+    return result.getRowObjectsJS().map((row) => ({
+      datasetId: String(row.dataset_id || ''),
+      provider: String(row.provider || ''),
+      sourceVersion:
+        typeof row.source_version === 'string' && row.source_version.trim()
+          ? String(row.source_version)
+          : null,
+      importedAt: String(row.imported_at || nowIso()),
+      rawRecordCount: Number(row.raw_record_count || 0),
+      frameCount: Number(row.frame_count || 0),
+      warmupFrameCount: Number(row.warmup_frame_count || 0),
+      bucketHours: Number(row.bucket_hours || DEFAULT_BUCKET_HOURS),
+      firstValidTime: row.first_valid_time ? String(row.first_valid_time) : null,
+      lastValidTime: row.last_valid_time ? String(row.last_valid_time) : null,
+      firstTransactionTime: row.first_transaction_time
+        ? String(row.first_transaction_time)
         : null,
-    importedAt: String(row.imported_at || nowIso()),
-    rawRecordCount: Number(row.raw_record_count || 0),
-    frameCount: Number(row.frame_count || 0),
-    warmupFrameCount: Number(row.warmup_frame_count || 0),
-    bucketHours: Number(row.bucket_hours || DEFAULT_BUCKET_HOURS),
-    firstValidTime: row.first_valid_time ? String(row.first_valid_time) : null,
-    lastValidTime: row.last_valid_time ? String(row.last_valid_time) : null,
-    firstTransactionTime: row.first_transaction_time
-      ? String(row.first_transaction_time)
-      : null,
-    lastTransactionTime: row.last_transaction_time ? String(row.last_transaction_time) : null,
-    metadata:
-      typeof row.metadata_json === 'string' && row.metadata_json
-        ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
-        : {},
-  }));
+      lastTransactionTime: row.last_transaction_time ? String(row.last_transaction_time) : null,
+      metadata:
+        typeof row.metadata_json === 'string' && row.metadata_json
+          ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
+          : {},
+    }));
+  } finally {
+    await releaseDbLock();
+  }
 }
 
 export async function loadHistoricalReplayFramesFromDuckDb(
   options: HistoricalFrameLoadOptions = {},
 ): Promise<HistoricalReplayFrame[]> {
-  const connection = await ensureHistoricalReplayArchive(options.dbPath || DEFAULT_DB_PATH);
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-
-  if (options.datasetId) {
-    clauses.push('dataset_id = $datasetId');
-    params.datasetId = options.datasetId;
-  }
-  if (!options.includeWarmup) {
-    clauses.push('warmup = FALSE');
-  }
-  if (options.startTransactionTime) {
-    clauses.push('transaction_time >= $startTransactionTime');
-    params.startTransactionTime = toIso(options.startTransactionTime);
-  }
-  if (options.endTransactionTime) {
-    clauses.push('transaction_time <= $endTransactionTime');
-    params.endTransactionTime = toIso(options.endTransactionTime);
-  }
-  if (options.knowledgeBoundaryCeiling) {
-    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
-    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  const dbPath = options.dbPath || DEFAULT_DB_PATH;
+  const releaseDbLock = await acquireDuckDbPathLock(dbPath);
+  if (!releaseDbLock) {
+    throw new DuckDbPathLockError(
+      `DuckDB path is locked for load-frames: ${normalizeDuckDbPath(dbPath)}`,
+    );
   }
 
-  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-  const limitClause =
-    typeof options.maxFrames === 'number' && options.maxFrames > 0
-      ? `LIMIT ${Math.floor(options.maxFrames)}`
-      : '';
-  const result = await connection.runAndReadAll(
-    `
-    SELECT *
-    FROM historical_replay_frames
-    ${whereClause}
-    ORDER BY transaction_time ASC, bucket_start ASC
-    ${limitClause}
-  `,
-    params,
-  );
+  try {
+    const connection = await ensureHistoricalReplayArchive(dbPath);
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = {};
 
-  return result.getRowObjectsJS().map((row) => reviveFrame(String(row.payload_json || '{}')));
+    if (options.datasetId) {
+      clauses.push('dataset_id = $datasetId');
+      params.datasetId = options.datasetId;
+    }
+    if (!options.includeWarmup) {
+      clauses.push('warmup = FALSE');
+    }
+    if (options.startTransactionTime) {
+      clauses.push('transaction_time >= $startTransactionTime');
+      params.startTransactionTime = toIso(options.startTransactionTime);
+    }
+    if (options.endTransactionTime) {
+      clauses.push('transaction_time <= $endTransactionTime');
+      params.endTransactionTime = toIso(options.endTransactionTime);
+    }
+    if (options.knowledgeBoundaryCeiling) {
+      clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
+      params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+    }
+
+    const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const limitClause =
+      typeof options.maxFrames === 'number' && options.maxFrames > 0
+        ? `LIMIT ${Math.floor(options.maxFrames)}`
+        : '';
+    const orderDirection = options.latestFirst ? 'DESC' : 'ASC';
+    const result = await connection.runAndReadAll(
+      `
+      SELECT *
+      FROM historical_replay_frames
+      ${whereClause}
+      ORDER BY transaction_time ${orderDirection}, bucket_start ${orderDirection}
+      ${limitClause}
+    `,
+      params,
+    );
+    const frames = result.getRowObjectsJS().map((row) => reviveFrame(String(row.payload_json || '{}')));
+    return options.latestFirst ? frames.reverse() : frames;
+  } finally {
+    await releaseDbLock();
+  }
 }
 
 export async function listHistoricalRawRecordsFromDuckDb(
   options: HistoricalRawRecordLoadOptions = {},
 ): Promise<HistoricalRawReplayRecord[]> {
-  const connection = await ensureHistoricalReplayArchive(options.dbPath || DEFAULT_DB_PATH);
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-
-  if (options.datasetId) {
-    clauses.push('dataset_id = $datasetId');
-    params.datasetId = options.datasetId;
-  }
-  if (options.startTransactionTime) {
-    clauses.push('transaction_time >= $startTransactionTime');
-    params.startTransactionTime = toIso(options.startTransactionTime);
-  }
-  if (options.endTransactionTime) {
-    clauses.push('transaction_time <= $endTransactionTime');
-    params.endTransactionTime = toIso(options.endTransactionTime);
-  }
-  if (options.knowledgeBoundaryCeiling) {
-    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
-    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  const dbPath = options.dbPath || DEFAULT_DB_PATH;
+  const releaseDbLock = await acquireDuckDbPathLock(dbPath);
+  if (!releaseDbLock) {
+    throw new DuckDbPathLockError(
+      `DuckDB path is locked for list-raw-records: ${normalizeDuckDbPath(dbPath)}`,
+    );
   }
 
-  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-  const limit =
-    typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 1000;
-  const offset =
-    typeof options.offset === 'number' && options.offset > 0 ? Math.floor(options.offset) : 0;
-
-  const result = await connection.runAndReadAll(
-    `
-    SELECT *
-    FROM historical_raw_items
-    ${whereClause}
-    ORDER BY transaction_time ASC, valid_time_start ASC, id ASC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `,
-    params,
-  );
-
-  return result.getRowObjectsJS().map(parseRawRow);
+  try {
+    const connection = await ensureHistoricalReplayArchive(dbPath);
+    return await readHistoricalRawRecordsFromConnection(connection, options);
+  } finally {
+    await releaseDbLock();
+  }
 }
 
 export async function listHistoricalReplayFrameRowsFromDuckDb(
   options: HistoricalReplayFrameRowLoadOptions = {},
 ): Promise<HistoricalReplayFrameArchiveRow[]> {
-  const connection = await ensureHistoricalReplayArchive(options.dbPath || DEFAULT_DB_PATH);
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-
-  if (options.datasetId) {
-    clauses.push('dataset_id = $datasetId');
-    params.datasetId = options.datasetId;
-  }
-  if (!options.includeWarmup) {
-    clauses.push('warmup = FALSE');
-  }
-  if (options.startTransactionTime) {
-    clauses.push('transaction_time >= $startTransactionTime');
-    params.startTransactionTime = toIso(options.startTransactionTime);
-  }
-  if (options.endTransactionTime) {
-    clauses.push('transaction_time <= $endTransactionTime');
-    params.endTransactionTime = toIso(options.endTransactionTime);
-  }
-  if (options.knowledgeBoundaryCeiling) {
-    clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
-    params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+  const dbPath = options.dbPath || DEFAULT_DB_PATH;
+  const releaseDbLock = await acquireDuckDbPathLock(dbPath);
+  if (!releaseDbLock) {
+    throw new DuckDbPathLockError(
+      `DuckDB path is locked for list-frame-rows: ${normalizeDuckDbPath(dbPath)}`,
+    );
   }
 
-  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-  const limit =
-    typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 1000;
-  const offset =
-    typeof options.offset === 'number' && options.offset > 0 ? Math.floor(options.offset) : 0;
+  try {
+    const connection = await ensureHistoricalReplayArchive(dbPath);
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = {};
 
-  const result = await connection.runAndReadAll(
-    `
-    SELECT *
-    FROM historical_replay_frames
-    ${whereClause}
-    ORDER BY transaction_time ASC, bucket_start ASC, id ASC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `,
-    params,
-  );
+    if (options.datasetId) {
+      clauses.push('dataset_id = $datasetId');
+      params.datasetId = options.datasetId;
+    }
+    if (!options.includeWarmup) {
+      clauses.push('warmup = FALSE');
+    }
+    if (options.startTransactionTime) {
+      clauses.push('transaction_time >= $startTransactionTime');
+      params.startTransactionTime = toIso(options.startTransactionTime);
+    }
+    if (options.endTransactionTime) {
+      clauses.push('transaction_time <= $endTransactionTime');
+      params.endTransactionTime = toIso(options.endTransactionTime);
+    }
+    if (options.knowledgeBoundaryCeiling) {
+      clauses.push('knowledge_boundary <= $knowledgeBoundaryCeiling');
+      params.knowledgeBoundaryCeiling = toIso(options.knowledgeBoundaryCeiling);
+    }
 
-  return result.getRowObjectsJS().map(parseFrameRow);
+    const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const limit =
+      typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 1000;
+    const offset =
+      typeof options.offset === 'number' && options.offset > 0 ? Math.floor(options.offset) : 0;
+
+    const result = await connection.runAndReadAll(
+      `
+      SELECT *
+      FROM historical_replay_frames
+      ${whereClause}
+      ORDER BY transaction_time ASC, bucket_start ASC, id ASC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `,
+      params,
+    );
+
+    return result.getRowObjectsJS().map(parseFrameRow);
+  } finally {
+    await releaseDbLock();
+  }
 }

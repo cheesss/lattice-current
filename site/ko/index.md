@@ -7,14 +7,14 @@ variants:
   - full
   - tech
   - finance
-updated: 2026-03-16
+updated: 2026-03-20
 owner: core
 hero:
   name: Lattice Current
-  text: AI, 온톨로지 그래프, 백테스트를 갖춘 실시간 인텔리전스
-  tagline: 실시간 모니터링, 이벤트-시장 전이 분석, 리플레이 기반 의사결정 지원을 위한 독립 공개 연구 포크입니다.
+  text: 리플레이, 운영, 그래프 인텔리전스를 갖춘 시그널 워크스페이스
+  tagline: 실시간 모니터링, 구조화된 추론, 리플레이 기반 검증, 웹 실행 경로까지 포함한 공개 연구 포크입니다.
   image:
-    src: /images/hero/worldmonitor-hero.jpg
+    src: /images/hero/lattice-current-hero.jpg
     alt: Lattice Current 공개용 히어로 이미지
   actions:
     - theme: brand
@@ -30,17 +30,17 @@ hero:
       text: GitHub Repo
       link: https://github.com/cheesss/lattice-current
 features:
-  - title: 다중 변형 인텔리전스 워크스페이스
-    details: full, tech, finance 변형이 하나의 코드베이스를 공유하면서 다른 패널, 피드, 워크플로우를 노출합니다.
-  - title: 근거 중심 AI 분석
-    details: 요약, 추론, Q&A, 구조화 분석이 자유 대화가 아니라 실제 증거와 연결된 상태로 유지됩니다.
-  - title: 리플레이와 백테스트
-    details: 히스토리컬 리플레이, 워크포워드 검증, 투자 아이디어 추적을 통해 라이브 모니터링을 검증 가능한 흐름으로 바꿉니다.
+  - title: 패널 과부하 대신 워크스페이스 셸
+    details: Overview, Intelligence, Investing, Builders, Operations 뷰로 재구성해 목적별로 훨씬 빠르게 진입할 수 있습니다.
+  - title: Replay Studio와 웹 실행 운영면
+    details: 히스토리컬 리플레이, 워크포워드, 스케줄러 제어, 파이프라인 상태를 전용 허브에서 웹 경로로도 다룰 수 있습니다.
+  - title: 공유 인텔리전스 패브릭
+    details: 뉴스, 클러스터, 스냅샷, 분석 아티팩트를 저장하고 Briefing Desk, Research Desk, Graph Studio, Replay Studio가 함께 재사용합니다.
 ---
 
 ## 가장 빠른 시작 경로
 
-이제 메인 페이지에서 실제 앱에 가장 가까운 두 표면을 바로 볼 수 있습니다. 아래 3D 지구본과 2D 운영 지도는 mock 데이터를 쓰지만 제품과 같은 시각 언어로 동작합니다.
+문서 홈은 이제 실제 제품 구조를 더 가깝게 반영합니다. 지도 중심 진입, 워크스페이스 셸, 리플레이 중심 연구 루프를 먼저 이해한 뒤 필요한 문서만 내려가면 됩니다.
 
 <div class="lc-home-signalbar">
   <div class="lc-home-signalbar-item">
@@ -68,6 +68,15 @@ features:
 ## 포크 위치
 
 이 저장소는 독립 공개 연구 포크입니다. 특정 upstream 프로젝트의 공식 배포판이나 공식 호스팅 서비스를 의미하지 않습니다.
+
+## 현재 제품 구성
+
+- **Live Workspace**: 우선순위 라이브 시그널과 지도 중심 운영 맥락
+- **Briefing Desk**: 현재 국면, 리스크 프레이밍, 운영 요약
+- **Research Desk**: Codex 보조 탐색, 자동화 거버넌스, 데이터셋 검토
+- **Replay Studio**: 리플레이, 워크포워드, 데이터 상태, 스케줄러 액션, 결과 해석
+- **Graph Studio**: 온톨로지와 관계 구조를 위한 탐색 표면
+- **Data Flow Ops**: 지연, 보존, 저장, heartbeat, coverage 품질 추적
 
 ## 변형
 
@@ -104,6 +113,15 @@ features:
   </div>
 </div>
 
+## 최근에 바뀐 것
+
+- 모니터형 레이아웃을 줄이고 목적 중심 워크스페이스 셸로 재구성했습니다
+- 리플레이, 연구, 그래프, 운영 모니터링을 전용 허브로 분리했습니다
+- 로컬 웹 런타임에서 리플레이와 스케줄러를 직접 실행할 수 있게 했습니다
+- 수집한 뉴스, 스냅샷, 인텔리전스 아티팩트를 세션 데이터가 아니라 재사용 가능한 저장 자산으로 정리했습니다
+- current-vs-replay drift, 포트폴리오 회계, 의사결정 브리프를 통해 리플레이 해석을 강화했습니다
+- 자동화 거버넌스와 데이터 플로우 가시성을 추가해 무엇이 돌고 있고 막혔는지 바로 보이게 했습니다
+
 ## 공개 문서 원칙
 
 <div class="policy-callout">
@@ -120,6 +138,7 @@ features:
 
 ## 최신 업데이트
 
+- [2026-03: 제품 표면 재구성, Replay Studio, 공유 인텔리전스 패브릭](/ko/updates/2026-03-surface-refresh)
 - [2026-03: 앱 수준 지구본과 2D 지도를 메인 페이지로 이동](/ko/updates/2026-03-home-map-surfaces)
 - [2026-03: 문서 홈에 인터랙티브 지구본 추가](/ko/updates/2026-03-interactive-globe-home)
 - [2026-03: 문서 사이트 공개와 공개 정책 정리](/ko/updates/2026-03-docs-launch)

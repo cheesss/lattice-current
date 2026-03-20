@@ -516,6 +516,22 @@ function computeQuality(record: KeywordRecord): number {
   return Math.max(0, Math.min(100, Math.round(decayed)));
 }
 
+function buildDomainCounts(records: KeywordRecord[]): Map<KeywordDomain, number> {
+  const counts = new Map<KeywordDomain, number>();
+  for (const record of records) {
+    counts.set(record.domain, (counts.get(record.domain) || 0) + 1);
+  }
+  return counts;
+}
+
+function domainBalanceBonus(domain: KeywordDomain, counts: Map<KeywordDomain, number>, total: number): number {
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  const represented = Math.max(1, counts.size);
+  const idealShare = 1 / represented;
+  const currentShare = (counts.get(domain) || 0) / total;
+  return Math.round((idealShare - currentShare) * 18);
+}
+
 function mergeAliases(a: string[], b: string[]): string[] {
   const set = new Set<string>();
   for (const raw of [...a, ...b]) {
@@ -940,7 +956,14 @@ export async function reviewKeywordRegistryLifecycle(maxActive = ACTIVE_KEYWORD_
 
   const active = Array.from(keywordMap.values())
     .filter(record => record.status === 'active')
-    .sort((a, b) => (b.qualityScore * b.weight) - (a.qualityScore * a.weight));
+  const activeDomainCounts = buildDomainCounts(active);
+  const activeTotal = active.length;
+  active.sort((a, b) => {
+    const leftScore = (a.qualityScore * a.weight) + domainBalanceBonus(a.domain, activeDomainCounts, activeTotal);
+    const rightScore = (b.qualityScore * b.weight) + domainBalanceBonus(b.domain, activeDomainCounts, activeTotal);
+    if (rightScore !== leftScore) return rightScore - leftScore;
+    return b.updatedAt - a.updatedAt;
+  });
   for (let i = maxActive; i < active.length; i += 1) {
     active[i]!.status = 'draft';
     active[i]!.updatedAt = ts;
@@ -1044,11 +1067,24 @@ export async function observeTemporalKeywordRelations(observations: TemporalRela
 
 export async function getAutonomousKeywordTopics(limit = 24): Promise<string[]> {
   await ensureLoaded();
-  return Array.from(keywordMap.values())
-    .filter(record => record.status === 'active')
-    .sort((a, b) => (b.qualityScore * b.weight) - (a.qualityScore * a.weight))
-    .slice(0, limit)
-    .map(record => record.term);
+  const ranked = Array.from(keywordMap.values())
+    .filter(record => record.status !== 'retired');
+  const rankedDomainCounts = buildDomainCounts(ranked);
+  const rankedTotal = ranked.length;
+  ranked.sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+      const leftScore = (a.qualityScore * a.weight) + domainBalanceBonus(a.domain, rankedDomainCounts, rankedTotal);
+      const rightScore = (b.qualityScore * b.weight) + domainBalanceBonus(b.domain, rankedDomainCounts, rankedTotal);
+      const scoreDelta = rightScore - leftScore;
+      if (scoreDelta !== 0) return scoreDelta;
+      return b.updatedAt - a.updatedAt;
+    });
+
+  const active = ranked.filter(record => record.status === 'active');
+  const emergentDrafts = ranked.filter(record => record.status === 'draft' && record.qualityScore >= 48);
+  const selected = (active.length > 0 ? [...active, ...emergentDrafts] : emergentDrafts)
+    .slice(0, limit);
+  return selected.map(record => record.term);
 }
 
 export async function getKeywordGraphSnapshot(limitNodes = 72, limitEdges = 140): Promise<KeywordGraphSnapshot> {

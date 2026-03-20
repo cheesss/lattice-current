@@ -40,6 +40,17 @@ export interface CalibratedDecision {
   reasons: string[];
 }
 
+export interface DecisionExplanationPayload {
+  label: string;
+  action: AutonomyAction;
+  calibratedConfidence: number;
+  confidenceBand: ConfidenceBand;
+  whyRecommended: string[];
+  whySuppressed: string[];
+  whyAbstained: string[];
+  signals: string[];
+}
+
 export interface ShadowIdeaLike {
   status: 'open' | 'closed';
   openedAt: string;
@@ -350,25 +361,61 @@ export function calibrateDecision(args: {
   if (args.rollbackLevel === 'armed') reasons.push('Shadow book rollback is armed after recent underperformance.');
   if (args.shadowMode && args.rollbackLevel !== 'armed') reasons.push('Shadow mode is active until recent performance recovers.');
 
+  const adaptiveAbstainFloor = clamp(
+    Math.round(
+      28
+      + (args.floorBreached ? 6 : 0)
+      + Math.max(0, 42 - args.realityScore) * 0.18
+      + args.contradictionPenalty * 0.14
+      + args.rumorPenalty * 0.08
+      - Math.max(0, args.corroborationQuality - 55) * 0.06
+      - Math.max(0, args.recentEvidenceScore - 48) * 0.05,
+    ),
+    20,
+    44,
+  );
+  const adaptiveShadowFloor = clamp(
+    Math.round(
+      52
+      + (args.floorBreached ? 4 : 0)
+      + args.contradictionPenalty * 0.16
+      + args.rumorPenalty * 0.08
+      + Math.max(0, 48 - args.realityScore) * 0.08
+      - Math.max(0, args.recentEvidenceScore - 50) * 0.05,
+    ),
+    42,
+    64,
+  );
+  const adaptiveWatchFloor = clamp(
+    Math.round(
+      68
+      + args.rumorPenalty * 0.18
+      + Math.max(0, 46 - args.realityScore) * 0.06
+      - Math.max(0, args.corroborationQuality - 55) * 0.06,
+    ),
+    54,
+    78,
+  );
+
   let action: AutonomyAction = 'deploy';
   if (args.direction === 'watch') {
     action = 'watch';
   } else if (
-    calibratedConfidence < 34
+    calibratedConfidence < adaptiveAbstainFloor
     || args.realityScore < 30
     || args.falsePositiveRisk >= 78
-    || (args.floorBreached && calibratedConfidence < 58)
   ) {
     action = 'abstain';
   } else if (
     args.rollbackLevel === 'armed'
     || args.shadowMode
-    || calibratedConfidence < 56
+    || (args.floorBreached && calibratedConfidence < adaptiveWatchFloor)
+    || calibratedConfidence < adaptiveShadowFloor
     || args.contradictionPenalty >= 16
   ) {
     action = 'shadow';
   } else if (
-    calibratedConfidence < 70
+    calibratedConfidence < adaptiveWatchFloor
     || args.rollbackLevel === 'watch'
     || args.rumorPenalty >= 10
     || args.realityScore < 48
@@ -391,6 +438,123 @@ export function calibrateDecision(args: {
     confidenceBand,
     action,
     reasons,
+  };
+}
+
+function pushUnique(target: string[], values: string[]): void {
+  for (const value of values) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed || target.includes(trimmed)) continue;
+    target.push(trimmed);
+  }
+}
+
+export function buildDecisionExplanation(args: {
+  label?: string;
+  calibratedDecision: CalibratedDecision;
+  corroboration: CrossCorroborationAssessment;
+  recency: RecencyAssessment;
+  reality: RealityConstraintAssessment;
+  shadow: ShadowControlState;
+  extraSignals?: string[];
+}): DecisionExplanationPayload {
+  const label = String(args.label || 'Decision').trim() || 'Decision';
+  const decision = args.calibratedDecision;
+  const whyRecommended: string[] = [];
+  const whySuppressed: string[] = [];
+  const whyAbstained: string[] = [];
+
+  if (decision.action === 'deploy') {
+    whyRecommended.push('The decision cleared deploy because evidence, recency, and execution were all aligned.');
+  } else if (decision.action === 'shadow') {
+    whyRecommended.push('The decision is still actionable, but it is best kept in shadow mode first.');
+  } else if (decision.action === 'watch') {
+    whyRecommended.push('The decision is worth watching, but not yet strong enough for direct deployment.');
+  } else {
+    whyRecommended.push('The decision remains valuable as a signal, but not as a deployable trade yet.');
+  }
+
+  if (args.corroboration.corroborationQuality >= 70) {
+    whyRecommended.push(`Corroboration quality is ${args.corroboration.corroborationQuality}/100.`);
+  }
+  if (args.recency.recentEvidenceScore >= 60) {
+    whyRecommended.push(`Recent evidence score is ${args.recency.recentEvidenceScore}/100.`);
+  }
+  if (args.reality.realityScore >= 60) {
+    whyRecommended.push(`Execution reality score is ${args.reality.realityScore}/100.`);
+  }
+  if (args.shadow.rollbackLevel === 'normal') {
+    whyRecommended.push('Shadow rollback is not armed.');
+  }
+
+  if (decision.action !== 'deploy') {
+    whySuppressed.push(`Action resolved to ${decision.action}, so the idea was not promoted to full deployment.`);
+  }
+  if (args.corroboration.contradictionPenalty > 0) {
+    whySuppressed.push(`Cross-source contradiction penalty is ${args.corroboration.contradictionPenalty}.`);
+  }
+  if (args.corroboration.rumorPenalty > 0) {
+    whySuppressed.push(`Rumor or hedge language penalty is ${args.corroboration.rumorPenalty}.`);
+  }
+  if (args.recency.floorBreached) {
+    whySuppressed.push('Recent evidence floor was breached.');
+  }
+  if (!args.reality.tradableNow) {
+    whySuppressed.push(`The market is not tradable now (${args.reality.sessionState}).`);
+  } else if (args.reality.realityScore < 48) {
+    whySuppressed.push(`Execution reality score is ${args.reality.realityScore}/100.`);
+  }
+  if (args.shadow.rollbackLevel === 'armed') {
+    whySuppressed.push('Shadow control rollback is armed.');
+  } else if (args.shadow.shadowMode) {
+    whySuppressed.push('Shadow mode is active until recent performance recovers.');
+  }
+
+  if (decision.action === 'abstain') {
+    whyAbstained.push('The calibrated decision dropped below the abstain floor.');
+  }
+  if (decision.reasons.length) {
+    pushUnique(whyAbstained, decision.reasons);
+  }
+  if (args.corroboration.corroborationQuality < 40) {
+    whyAbstained.push(`Corroboration quality is only ${args.corroboration.corroborationQuality}/100.`);
+  }
+  if (args.recency.recentEvidenceScore < 36) {
+    whyAbstained.push(`Recent evidence score is only ${args.recency.recentEvidenceScore}/100.`);
+  }
+  if (args.reality.realityScore < 30) {
+    whyAbstained.push(`Execution reality score is ${args.reality.realityScore}/100, below the deploy floor.`);
+  }
+
+  const recommended = whyRecommended.slice();
+  const suppressed = whySuppressed.slice();
+  const abstained = whyAbstained.slice();
+  pushUnique(whyRecommended, recommended);
+  pushUnique(whySuppressed, suppressed);
+  pushUnique(whyAbstained, abstained);
+
+  const signals = [
+    `${label}`,
+    `action=${decision.action}`,
+    `confidence=${decision.calibratedConfidence}`,
+    `band=${decision.confidenceBand}`,
+    `corroboration=${args.corroboration.corroborationQuality}`,
+    `recency=${args.recency.recentEvidenceScore}`,
+    `reality=${args.reality.realityScore}`,
+    `shadow=${args.shadow.rollbackLevel}`,
+    `tradable=${args.reality.tradableNow ? 'yes' : 'no'}`,
+  ];
+  pushUnique(signals, Array.isArray(args.extraSignals) ? args.extraSignals : []);
+
+  return {
+    label,
+    action: decision.action,
+    calibratedConfidence: decision.calibratedConfidence,
+    confidenceBand: decision.confidenceBand,
+    whyRecommended: whyRecommended.slice(0, 8),
+    whySuppressed: whySuppressed.slice(0, 8),
+    whyAbstained: whyAbstained.slice(0, 8),
+    signals,
   };
 }
 

@@ -40,9 +40,14 @@ const DEFAULT_REMOTE_HOSTS: Record<string, string> = {
 
 const DEFAULT_LOCAL_API_PORT = 46123;
 const FORCE_DESKTOP_RUNTIME = getRuntimeEnv('VITE_DESKTOP_RUNTIME') === '1';
+const CONFIGURED_LOCAL_API_BASE = getRuntimeEnv('VITE_LOCAL_API_BASE_URL') || getRuntimeEnv('VITE_TAURI_API_BASE_URL');
+const LOCAL_AGENT_PROBE_TTL_MS = 60_000;
+const LOCAL_AUTOMATION_OPS_SNAPSHOT_PROBE_TTL_MS = 60_000;
 
 let _resolvedPort: number | null = null;
 let _portPromise: Promise<number> | null = null;
+let _localAgentEndpointAvailability: { checkedAt: number; available: boolean } | null = null;
+let _localAutomationOpsSnapshotAvailability: { checkedAt: number; available: boolean } | null = null;
 
 export async function resolveLocalApiPort(): Promise<number> {
   if (_resolvedPort !== null) return _resolvedPort;
@@ -125,17 +130,20 @@ export function isDesktopRuntime(): boolean {
 }
 
 export function canUseLocalAgentEndpoints(): boolean {
-  return isDesktopRuntime() || isDevRuntime();
+  if (isDesktopRuntime() || isDevRuntime() || Boolean(CONFIGURED_LOCAL_API_BASE)) {
+    return true;
+  }
+
+  return typeof window !== 'undefined' && typeof fetch === 'function';
 }
 
 export function getApiBaseUrl(): string {
-  if (!isDesktopRuntime()) {
-    return '';
+  if (CONFIGURED_LOCAL_API_BASE) {
+    return normalizeBaseUrl(CONFIGURED_LOCAL_API_BASE);
   }
 
-  const configuredBaseUrl = getRuntimeEnv('VITE_TAURI_API_BASE_URL');
-  if (configuredBaseUrl) {
-    return normalizeBaseUrl(configuredBaseUrl);
+  if (!isDesktopRuntime()) {
+    return '';
   }
 
   return `http://127.0.0.1:${getLocalApiPort()}`;
@@ -166,6 +174,74 @@ export function toRuntimeUrl(path: string): string {
   }
 
   return `${baseUrl}${path}`;
+}
+
+export async function hasLocalAgentEndpointSupport(forceRefresh = false): Promise<boolean> {
+  if (!canUseLocalAgentEndpoints()) return false;
+  if (typeof fetch !== 'function') return false;
+  if (!forceRefresh && _localAgentEndpointAvailability && Date.now() - _localAgentEndpointAvailability.checkedAt < LOCAL_AGENT_PROBE_TTL_MS) {
+    return _localAgentEndpointAvailability.available;
+  }
+
+  const target = toRuntimeUrl('/api/local-source-hunt');
+  if (typeof window === 'undefined' && !/^https?:\/\//i.test(target)) {
+    _localAgentEndpointAvailability = { checkedAt: Date.now(), available: false };
+    return false;
+  }
+
+  let available = false;
+  try {
+    const response = await fetch(target, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics: [], timeoutMs: 1 }),
+      signal: AbortSignal.timeout(2_500),
+    });
+    available = response.ok || response.status === 405 || response.status === 422;
+  } catch {
+    available = false;
+  }
+
+  _localAgentEndpointAvailability = {
+    checkedAt: Date.now(),
+    available,
+  };
+  return available;
+}
+
+export function getLocalAutomationOpsSnapshotUrl(): string {
+  return toRuntimeUrl('/api/local-automation-ops-snapshot');
+}
+
+export async function hasLocalAutomationOpsSnapshotSupport(forceRefresh = false): Promise<boolean> {
+  if (!canUseLocalAgentEndpoints()) return false;
+  if (typeof fetch !== 'function') return false;
+  if (!forceRefresh && _localAutomationOpsSnapshotAvailability && Date.now() - _localAutomationOpsSnapshotAvailability.checkedAt < LOCAL_AUTOMATION_OPS_SNAPSHOT_PROBE_TTL_MS) {
+    return _localAutomationOpsSnapshotAvailability.available;
+  }
+
+  const target = getLocalAutomationOpsSnapshotUrl();
+  if (typeof window === 'undefined' && !/^https?:\/\//i.test(target)) {
+    _localAutomationOpsSnapshotAvailability = { checkedAt: Date.now(), available: false };
+    return false;
+  }
+
+  let available = false;
+  try {
+    const response = await fetch(target, {
+      method: 'GET',
+      signal: AbortSignal.timeout(2_500),
+    });
+    available = response.ok;
+  } catch {
+    available = false;
+  }
+
+  _localAutomationOpsSnapshotAvailability = {
+    checkedAt: Date.now(),
+    available,
+  };
+  return available;
 }
 
 function extractHostnames(...urls: (string | undefined)[]): string[] {
@@ -671,6 +747,7 @@ function isAllowedRedirectTarget(url: string): boolean {
 
 export function installWebApiRedirect(): void {
   if (isDesktopRuntime() || typeof window === 'undefined') return;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
   if (!WS_API_URL) return;
   if (!isAllowedRedirectTarget(WS_API_URL)) {
     console.warn('[runtime] VITE_WS_API_URL blocked — not in hostname allowlist:', WS_API_URL);

@@ -41,18 +41,60 @@ function getSafeEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
+function splitWindowsPath(pathValue: string | undefined): string[] {
+  if (!pathValue || typeof pathValue !== 'string') return [];
+  return pathValue.split(';').map((item) => item.trim()).filter(Boolean);
+}
+
+function pushPathUnique(buffer: string[], entry: string | null | undefined): void {
+  if (!entry || typeof entry !== 'string') return;
+  const trimmed = entry.trim();
+  if (!trimmed) return;
+  const lower = trimmed.toLowerCase();
+  if (buffer.some((item) => item.toLowerCase() === lower)) return;
+  buffer.push(trimmed);
+}
+
+function isWindowsAppsAliasPath(candidate: string): boolean {
+  return /[\\/]windowsapps[\\/]/i.test(String(candidate || ''));
+}
+
+function withCodexPathHints(env: NodeJS.ProcessEnv, codexCommand: string): NodeJS.ProcessEnv {
+  if (process.platform !== 'win32') return env;
+  const merged: string[] = [];
+  for (const existing of splitWindowsPath(env.PATH || env.Path || process.env.PATH || process.env.Path || '')) {
+    pushPathUnique(merged, existing);
+  }
+  const userHome = process.env.USERPROFILE || os.homedir();
+  const appData = process.env.APPDATA || path.join(userHome, 'AppData', 'Roaming');
+  pushPathUnique(merged, path.join(appData, 'npm'));
+  if (codexCommand && codexCommand !== 'codex') {
+    pushPathUnique(merged, path.dirname(codexCommand));
+  }
+  const mergedPath = merged.join(';');
+  if (mergedPath) {
+    env.PATH = mergedPath;
+    env.Path = mergedPath;
+  }
+  return env;
+}
+
 function isCodexLoggedIn(outputText: string): boolean {
   return /logged in/i.test(String(outputText || ''));
 }
 
 async function resolveCodexCommand(): Promise<string> {
-  if (process.env.CODEX_BIN?.trim() && existsSync(process.env.CODEX_BIN.trim())) {
-    return process.env.CODEX_BIN.trim();
+  const fromEnv = (process.env.CODEX_BIN || '').trim();
+  if (fromEnv && existsSync(fromEnv) && !isWindowsAppsAliasPath(fromEnv)) {
+    return fromEnv;
   }
   const userHome = process.env.USERPROFILE || os.homedir();
   const appData = process.env.APPDATA || path.join(userHome, 'AppData', 'Roaming');
   const localAppData = process.env.LOCALAPPDATA || path.join(userHome, 'AppData', 'Local');
+  const codexHome = (process.env.CODEX_HOME || path.join(userHome, '.codex')).trim();
   const candidates = [
+    path.join(codexHome, '.sandbox-bin', 'codex.exe'),
+    path.join(userHome, '.codex', '.sandbox-bin', 'codex.exe'),
     path.join(localAppData, 'Programs', 'OpenAI', 'codex', 'codex.exe'),
     path.join(appData, 'npm', 'codex.cmd'),
     path.join(appData, 'npm', 'codex'),
@@ -70,17 +112,20 @@ async function resolveCodexCommand(): Promise<string> {
       // ignore
     }
   }
-  return candidates.find((candidate) => existsSync(candidate)) || 'codex';
+  return candidates.find((candidate) => existsSync(candidate) && !isWindowsAppsAliasPath(candidate)) || 'codex';
 }
 
 async function runCodexCli(args: string[], timeoutMs = CODEX_TIMEOUT_MS): Promise<CodexExecResult> {
   const command = await resolveCodexCommand();
+  const env = withCodexPathHints(getSafeEnv(), command);
+  const useShell = process.platform === 'win32' && command.toLowerCase().endsWith('.cmd');
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd: process.cwd(),
-      env: getSafeEnv(),
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      shell: useShell,
     });
     let stdout = '';
     let stderr = '';

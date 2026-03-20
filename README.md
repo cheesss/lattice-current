@@ -1,6 +1,6 @@
 # Lattice Current
 
-Independent public research fork for real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.
+Signal workspace for live risk, markets, infrastructure, and replay-driven research.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -16,6 +16,19 @@ Lattice Current is a public research fork of a multi-variant intelligence platfo
 - ontology and graph-based relation analysis
 - event-to-market transmission modeling
 - historical replay, walk-forward backtesting, and investment idea support
+
+## What It Looks Like Now
+
+Recent work shifted the project away from a classic "wall of panels" monitor toward a more deliberate workspace model:
+
+- `Live Workspace`: prioritized live signals instead of fully expanded raw news walls
+- `Briefing Desk`: decision briefs, current regime posture, and operational summaries
+- `Research Desk`: Codex-assisted research, automation governance, and candidate review
+- `Replay Studio`: web-runnable replay, walk-forward, data-pipeline visibility, and result interpretation
+- `Graph Studio`: ontology and relationship surfaces for structured reasoning
+- `Data Flow Ops`: freshness, lag, storage, retention, and pipeline health in one place
+
+The current codebase also includes shared persistence for intelligence fabric, browser-mode replay controls, portfolio accounting, regime-aware sizing, and coverage-aware historical reuse.
 
 The same repository powers multiple variants:
 
@@ -37,6 +50,15 @@ No official hosted application deployment is represented by this fork. If you wa
 - Ontology graph, transmission graph, and historical replay/backtest tooling
 - Desktop runtime with Tauri sidecar, local services, and offline-capable workflows
 - Single codebase with variant-aware data, panels, and build targets
+
+## Current Capability Areas
+
+- Signal intake: live feeds, OSINT, macro, market, and conflict-oriented datasets
+- Evidence handling: shared intelligence fabric, snapshot persistence, and data quality operations
+- Research workflow: Codex-assisted expansion, automation governance, ontology and graph views
+- Replay workflow: historical fetch/import, replay, walk-forward, current-like checks, and portfolio accounting
+- Decision support: replay-backed briefs, defensive bias interpretation, and deployment guidance
+- Operations: scheduler loops, pipeline heartbeats, retention, and blocker visibility
 
 ## Repository Structure
 
@@ -76,11 +98,11 @@ npm run public:sync
 - Investment usage: [docs/investment-usage-playbook.md](docs/investment-usage-playbook.md)
 - Public sync workflow: [docs/public-sync.md](docs/public-sync.md)
 
-## Branding and Lineage
+## Naming Note
 
 This repository is branded as `Lattice Current`.
 
-Some deep technical documents and internal code identifiers still reference legacy `worldmonitor` names because they describe inherited code structure, storage keys, proto package paths, or upstream lineage. Those identifiers are not the public product name of this fork.
+Some deep technical documents and inherited storage keys still contain older internal identifiers. They reflect implementation lineage, not the public product name of this fork.
 
 ## Licensing and Content Policy
 
@@ -110,7 +132,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution expectations.
 
 ## Public Repo Sync
 
-The internal workspace syncs into the public repository clone at `../worldmonitor-public` with:
+The repository includes a public-sync workflow for mirroring curated changes into a publication clone:
 
 ```bash
 npm run public:sync

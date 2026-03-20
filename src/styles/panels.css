@@ -622,3 +622,104 @@ a.source-ops-link:hover {
   border-color: color-mix(in srgb, var(--semantic-positive) 54%, var(--border));
   color: var(--semantic-positive);
 }
+
+.dataflow-ops-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.dataflow-ops-check-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.dataflow-ops-check {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--overlay-light));
+}
+
+.dataflow-ops-check.ready {
+  border-color: color-mix(in srgb, var(--semantic-positive) 42%, var(--border));
+}
+
+.dataflow-ops-check.watch,
+.dataflow-ops-check.degraded {
+  border-color: color-mix(in srgb, var(--semantic-warning) 46%, var(--border));
+}
+
+.dataflow-ops-check.blocked {
+  border-color: color-mix(in srgb, var(--semantic-danger) 46%, var(--border));
+}
+
+.dataflow-ops-check-top,
+.dataflow-ops-issue-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dataflow-ops-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.dataflow-ops-issue {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--overlay-light));
+}
+
+.dataflow-ops-issue.watch,
+.dataflow-ops-issue.degraded {
+  border-color: color-mix(in srgb, var(--semantic-warning) 46%, var(--border));
+}
+
+.dataflow-ops-issue.blocked {
+  border-color: color-mix(in srgb, var(--semantic-danger) 48%, var(--border));
+}
+
+.dataflow-ops-fix {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.dataflow-ops-progress {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.dataflow-ops-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--semantic-info) 80%, white), color-mix(in srgb, var(--semantic-positive) 70%, white));
+}
+
+.dataflow-ops-table-wrap {
+  max-height: 340px;
+}
+
+.dataflow-ops-table td strong {
+  color: var(--text);
+}
+
+.dataflow-ops-meta {
+  justify-content: space-between;
+  padding: 8px 0 0;
+  flex-wrap: wrap;
+}

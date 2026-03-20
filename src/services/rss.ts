@@ -345,13 +345,18 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
 
     return parsed;
   } catch (e) {
-    console.error(`Failed to fetch ${feed.name}:`, e);
     recordFeedFailure(feedScope);
     const reason = e instanceof Error ? e.message : 'fetch failed';
     const fallbackUrl = typeof feed.url === 'string' ? feed.url : (feed.url[currentLang] || feed.url.en || '');
     void onFeedFetchFailure(feed.name, currentLang, selectedUrl || fallbackUrl, reason).catch(() => { });
     const persistent = await loadPersistentFeed(feedScope);
-    return cached?.items || persistent || [];
+    const fallbackItems = cached?.items || persistent || [];
+    if (fallbackItems.length > 0) {
+      console.warn(`[RSS] Failed to fetch ${feed.name}; serving ${cached?.items?.length ? 'memory' : 'persistent'} fallback`, e);
+      return fallbackItems;
+    }
+    console.error(`Failed to fetch ${feed.name}:`, e);
+    return [];
   }
 }
 

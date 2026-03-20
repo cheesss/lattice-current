@@ -1,6 +1,6 @@
 ﻿import { Panel } from './Panel';
 import { t } from '@/services/i18n';
-import { getLocalApiPort, isDesktopRuntime } from '@/services/runtime';
+import { getApiBaseUrl, getLocalApiPort, isDesktopRuntime } from '@/services/runtime';
 import {
   getDesktopReadinessChecks,
   getKeyBackedAvailabilitySummary,
@@ -121,7 +121,16 @@ export class ServiceStatusPanel extends Panel {
   }
 
   private buildBackendStatus(): DomChild {
-    if (!isDesktopRuntime()) return false;
+    if (!isDesktopRuntime()) {
+      const base = getApiBaseUrl() || window.location.origin;
+      return h(
+        'div',
+        { className: 'service-status-backend' },
+        'Web runtime active on ',
+        h('strong', null, base),
+        ' | local-agent features run through the browser path when those endpoints are reachable.',
+      );
+    }
 
     if (!this.localBackend?.enabled) {
       return h('div', { className: 'service-status-backend warning' }, t('components.serviceStatus.backendUnavailable'));
@@ -170,7 +179,37 @@ export class ServiceStatusPanel extends Panel {
   }
 
   private buildDesktopReadiness(): DomChild {
-    if (!isDesktopRuntime()) return false;
+    if (!isDesktopRuntime()) {
+      const keySummary = getKeyBackedAvailabilitySummary();
+      const nonParity = getNonParityFeatures();
+      return h(
+        'div',
+        { className: 'service-status-desktop-readiness' },
+        h('div', { className: 'service-status-desktop-title' }, 'Web Readiness'),
+        h(
+          'div',
+          { className: 'service-status-desktop-subtitle' },
+          `${keySummary.available}/${keySummary.total} key-backed capabilities are configured for this browser session.`,
+        ),
+        h(
+          'ul',
+          { className: 'service-status-desktop-list' },
+          h('li', null, `${getApiBaseUrl() ? '[OK]' : '[ ]'} Runtime API base is configured or same-origin`),
+          h('li', null, `[OK] Browser settings can save and validate local runtime secrets`),
+          h('li', null, '[OK] Replay Studio and ops panels can run through browser fetch paths'),
+        ),
+        h(
+          'details',
+          { className: 'service-status-non-parity' },
+          h('summary', null, `Desktop-only fallbacks (${nonParity.length})`),
+          h(
+            'ul',
+            null,
+            ...nonParity.map((feature) => h('li', null, h('strong', null, feature.panel), `: ${feature.fallback}`)),
+          ),
+        ),
+      );
+    }
 
     const checks = getDesktopReadinessChecks(Boolean(this.localBackend?.enabled));
     const keySummary = getKeyBackedAvailabilitySummary();

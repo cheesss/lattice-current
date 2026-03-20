@@ -7,7 +7,13 @@
     "warmupFrameCount": 60,
     "replayWindowDays": 60,
     "walkForwardWindowDays": 180,
-    "horizonsHours": [1, 4, 24, 72, 168],
+    "horizonsHours": [
+      1,
+      4,
+      24,
+      72,
+      168
+    ],
     "fetchEveryMinutes": 60,
     "replayEveryMinutes": 60,
     "walkForwardLocalHour": 2,
@@ -59,21 +65,48 @@
   },
   "datasetAutomation": {
     "enabled": true,
-    "mode": "guarded-auto",
     "everyMinutes": 360,
     "codexTopThemesPerCycle": 2,
+    "mode": "guarded-auto",
     "minProposalScore": 60,
     "autoRegisterScore": 74,
     "autoEnableScore": 88,
     "maxRegistrationsPerCycle": 2,
     "maxEnabledDatasets": 12,
-    "allowProviders": ["fred", "alfred", "gdelt-doc", "coingecko", "acled"]
+    "allowProviders": [
+      "fred",
+      "alfred",
+      "gdelt-doc",
+      "coingecko",
+      "acled",
+      "yahoo-chart",
+      "rss-feed"
+    ]
   },
   "experimentAutomation": {
     "enabled": true,
     "everyMinutes": 180
   },
   "datasets": [
+    {
+      "id": "acled-middle-east",
+      "label": "ACLED Middle East",
+      "enabled": true,
+      "provider": "acled",
+      "fetchArgs": {
+        "country": "Iran|Israel|Lebanon|Syria|Yemen",
+        "event_types": "Battles|Explosions/Remote violence|Violence against civilians",
+        "limit": 500
+      },
+      "importOptions": {},
+      "replayOptions": {},
+      "walkForwardOptions": {},
+      "frameLoadOptions": {},
+      "schedule": {
+        "fetchEveryMinutes": 180,
+        "replayEveryMinutes": 180
+      }
+    },
     {
       "id": "coingecko-btc-core",
       "label": "CoinGecko BTC Core",
@@ -88,10 +121,29 @@
         "bucketHours": 6,
         "warmupFrameCount": 60
       },
+      "replayOptions": {},
+      "walkForwardOptions": {},
+      "frameLoadOptions": {},
       "schedule": {
         "fetchEveryMinutes": 60,
         "replayEveryMinutes": 60
       }
+    },
+    {
+      "id": "gdelt-defense-escalation",
+      "label": "Defense Escalation / GDELT Event Feed",
+      "enabled": false,
+      "provider": "gdelt-doc",
+      "fetchArgs": {
+        "query": "missile OR rocket OR airstrike OR drone OR carrier OR navy",
+        "mode": "ArtList",
+        "max": 250
+      },
+      "importOptions": {},
+      "replayOptions": {},
+      "walkForwardOptions": {},
+      "frameLoadOptions": {},
+      "schedule": {}
     },
     {
       "id": "fred-core-cpi",
@@ -103,6 +155,10 @@
         "observation_start": "2018-01-01",
         "limit": 5000
       },
+      "importOptions": {},
+      "replayOptions": {},
+      "walkForwardOptions": {},
+      "frameLoadOptions": {},
       "schedule": {
         "fetchEveryMinutes": 360,
         "replayEveryMinutes": 360
@@ -114,10 +170,16 @@
       "enabled": true,
       "provider": "gdelt-doc",
       "fetchArgs": {
-        "query": "Hormuz OR tanker OR Red Sea OR missile OR drone OR oil",
+        "query": "Iran OR Israel OR Gaza OR Lebanon OR Syria OR Yemen OR Hormuz OR tanker OR Red Sea OR missile OR drone OR oil",
+        "query_terms": "Iran|Israel|Gaza|Lebanon|Syria|Yemen|Hormuz|tanker|Red Sea|missile|drone|oil",
+        "shard_size": 3,
         "mode": "ArtList",
         "max": 250
       },
+      "importOptions": {},
+      "replayOptions": {},
+      "walkForwardOptions": {},
+      "frameLoadOptions": {},
       "schedule": {
         "fetchEveryMinutes": 60,
         "replayEveryMinutes": 60,
@@ -125,18 +187,130 @@
       }
     },
     {
-      "id": "acled-middle-east",
-      "label": "ACLED Middle East",
-      "enabled": true,
-      "provider": "acled",
+      "id": "rss-sector-defense-escalation",
+      "label": "RSS Sector News / Defense Escalation",
+      "enabled": false,
+      "provider": "rss-feed",
       "fetchArgs": {
-        "country": "Iran",
-        "event_types": "Battles|Explosions/Remote violence|Violence against civilians",
-        "limit": 500
+        "url": "https://news.google.com/rss/search?q=ITA%20OR%20AVAV%20OR%20NOC%20OR%20KTOS%20OR%20defense%20OR%20aerospace%20when%3A30d&hl=en-US&gl=US&ceid=US:en",
+        "name": "Defense Escalation sector news",
+        "limit": 120,
+        "source_family": "broad-news",
+        "feature_family": "news"
+      },
+      "importOptions": {
+        "bucketHours": 6,
+        "warmupFrameCount": 24,
+        "transactionTimeMode": "valid-time",
+        "bucketTimeMode": "valid-time",
+        "newsLookbackHours": 48
+      },
+      "replayOptions": {
+        "warmupFrameCount": 24
+      },
+      "walkForwardOptions": {
+        "warmupFrameCount": 24
+      },
+      "frameLoadOptions": {
+        "includeWarmup": true,
+        "maxFrames": 240
       },
       "schedule": {
         "fetchEveryMinutes": 180,
-        "replayEveryMinutes": 180
+        "replayEveryMinutes": 360
+      }
+    },
+    {
+      "id": "yahoo-chart-avav-defense-escalation",
+      "label": "Yahoo Chart AVAV / Defense Escalation",
+      "enabled": false,
+      "provider": "yahoo-chart",
+      "fetchArgs": {
+        "symbol": "AVAV",
+        "range": "5y",
+        "interval": "1d"
+      },
+      "importOptions": {
+        "bucketHours": 24,
+        "warmupFrameCount": 16,
+        "transactionTimeMode": "valid-time",
+        "bucketTimeMode": "valid-time"
+      },
+      "replayOptions": {
+        "warmupFrameCount": 16
+      },
+      "walkForwardOptions": {
+        "warmupFrameCount": 16
+      },
+      "frameLoadOptions": {
+        "includeWarmup": true,
+        "maxFrames": 180
+      },
+      "schedule": {
+        "fetchEveryMinutes": 360,
+        "replayEveryMinutes": 360
+      }
+    },
+    {
+      "id": "yahoo-chart-ita-defense-escalation",
+      "label": "Yahoo Chart ITA / Defense Escalation",
+      "enabled": false,
+      "provider": "yahoo-chart",
+      "fetchArgs": {
+        "symbol": "ITA",
+        "range": "5y",
+        "interval": "1d"
+      },
+      "importOptions": {
+        "bucketHours": 24,
+        "warmupFrameCount": 16,
+        "transactionTimeMode": "valid-time",
+        "bucketTimeMode": "valid-time"
+      },
+      "replayOptions": {
+        "warmupFrameCount": 16
+      },
+      "walkForwardOptions": {
+        "warmupFrameCount": 16
+      },
+      "frameLoadOptions": {
+        "includeWarmup": true,
+        "maxFrames": 180
+      },
+      "schedule": {
+        "fetchEveryMinutes": 360,
+        "replayEveryMinutes": 360
+      }
+    },
+    {
+      "id": "yahoo-chart-noc-defense-escalation",
+      "label": "Yahoo Chart NOC / Defense Escalation",
+      "enabled": false,
+      "provider": "yahoo-chart",
+      "fetchArgs": {
+        "symbol": "NOC",
+        "range": "5y",
+        "interval": "1d"
+      },
+      "importOptions": {
+        "bucketHours": 24,
+        "warmupFrameCount": 16,
+        "transactionTimeMode": "valid-time",
+        "bucketTimeMode": "valid-time"
+      },
+      "replayOptions": {
+        "warmupFrameCount": 16
+      },
+      "walkForwardOptions": {
+        "warmupFrameCount": 16
+      },
+      "frameLoadOptions": {
+        "includeWarmup": true,
+        "maxFrames": 180
+      },
+      "schedule": {
+        "fetchEveryMinutes": 360,
+        "replayEveryMinutes": 360
       }
     }
   ]

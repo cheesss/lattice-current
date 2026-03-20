@@ -508,6 +508,7 @@ export class DeckGLMap {
   private renderScheduled = false;
   private renderPaused = false;
   private renderPending = false;
+  private mapInteractionActive = false;
   private webglLost = false;
   private resizeObserver: ResizeObserver | null = null;
 
@@ -682,41 +683,54 @@ export class DeckGLMap {
 
     this.maplibreMap.addControl(this.deckOverlay as unknown as maplibregl.IControl);
 
-    this.maplibreMap.on('movestart', () => {
+    const beginInteraction = () => {
+      this.mapInteractionActive = true;
       if (this.moveTimeoutId) {
         clearTimeout(this.moveTimeoutId);
         this.moveTimeoutId = null;
       }
+    };
+
+    const finishInteraction = (rebuildLayers: boolean) => {
+      this.mapInteractionActive = false;
+      this.invalidateClusterViewportCache();
+      if (rebuildLayers) {
+        this.debouncedRebuildLayers();
+        return;
+      }
+      if (this.renderPending) {
+        this.renderPending = false;
+        this.render();
+        return;
+      }
+      this.rafUpdateLayers();
+    };
+
+    this.maplibreMap.on('movestart', () => {
+      beginInteraction();
     });
 
     this.maplibreMap.on('moveend', () => {
-      this.lastSCZoom = -1;
-      this.rafUpdateLayers();
+      finishInteraction(false);
     });
 
-    this.maplibreMap.on('move', () => {
-      if (this.moveTimeoutId) clearTimeout(this.moveTimeoutId);
-      this.moveTimeoutId = setTimeout(() => {
-        this.lastSCZoom = -1;
-        this.rafUpdateLayers();
-      }, 180);
-    });
-
-    this.maplibreMap.on('zoom', () => {
-      if (this.moveTimeoutId) clearTimeout(this.moveTimeoutId);
-      this.moveTimeoutId = setTimeout(() => {
-        this.lastSCZoom = -1;
-        this.rafUpdateLayers();
-      }, 180);
+    this.maplibreMap.on('zoomstart', () => {
+      beginInteraction();
     });
 
     this.maplibreMap.on('zoomend', () => {
       const currentZoom = Math.floor(this.maplibreMap?.getZoom() || 2);
       const thresholdCrossed = Math.abs(currentZoom - this.lastZoomThreshold) >= 1;
-      if (thresholdCrossed) {
-        this.lastZoomThreshold = currentZoom;
-        this.debouncedRebuildLayers();
-      }
+      this.lastZoomThreshold = currentZoom;
+      finishInteraction(thresholdCrossed);
+    });
+
+    this.maplibreMap.on('rotateend', () => {
+      finishInteraction(false);
+    });
+
+    this.maplibreMap.on('pitchend', () => {
+      finishInteraction(false);
     });
   }
 
@@ -1429,7 +1443,7 @@ export class DeckGLMap {
     const bbox: [number, number, number, number] = [
       bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth(),
     ];
-    const boundsKey = `${bbox[0].toFixed(4)}:${bbox[1].toFixed(4)}:${bbox[2].toFixed(4)}:${bbox[3].toFixed(4)}`;
+    const boundsKey = `${bbox[0].toFixed(3)}:${bbox[1].toFixed(3)}:${bbox[2].toFixed(3)}:${bbox[3].toFixed(3)}`;
     const layers = this.state.layers;
     const useProtests = layers.protests && this.protestSuperclusterSource.length > 0;
     const useTechHQ = SITE_VARIANT === 'tech' && layers.techHQs;
@@ -1618,6 +1632,12 @@ export class DeckGLMap {
     } else {
       this.datacenterClusters = [];
     }
+  }
+
+  private invalidateClusterViewportCache(): void {
+    this.lastSCZoom = -1;
+    this.lastSCBoundsKey = '';
+    this.lastSCMask = '';
   }
 
 
@@ -5150,7 +5170,7 @@ export class DeckGLMap {
 
   // Public API methods (matching MapComponent interface)
   public render(): void {
-    if (this.renderPaused) {
+    if (this.renderPaused || this.mapInteractionActive) {
       this.renderPending = true;
       return;
     }
@@ -5169,6 +5189,11 @@ export class DeckGLMap {
     if (paused) {
       this.stopPulseAnimation();
       this.stopReplayTimer();
+      try {
+        this.deckOverlay?.setProps({ layers: [] });
+      } catch {
+        // Map can be mid-teardown while focus modes hide the map.
+      }
       return;
     }
 
@@ -5176,6 +5201,8 @@ export class DeckGLMap {
     if (!paused && this.renderPending) {
       this.renderPending = false;
       this.render();
+    } else if (!paused) {
+      this.updateLayers();
     }
   }
 

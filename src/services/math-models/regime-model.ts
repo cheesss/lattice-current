@@ -1,5 +1,6 @@
 import type { ClusteredEvent, MarketData, NewsItem } from '@/types';
 import { getActiveWeightProfileSync } from '../experiment-registry';
+import { inferHMMRegimePosterior } from './hmm-regime';
 
 export type MarketRegimeId = 'risk-on' | 'risk-off' | 'inflation-shock' | 'deflation-bust';
 
@@ -8,6 +9,11 @@ export interface MarketRegimeState {
   label: string;
   confidence: number;
   scores: Record<MarketRegimeId, number>;
+  posterior: Record<MarketRegimeId, number>;
+  transitionMatrix: Record<MarketRegimeId, Record<MarketRegimeId, number>>;
+  persistence: number;
+  switchPenalty: number;
+  posteriorEntropy: number;
   features: {
     vixChange: number;
     oilChange: number;
@@ -161,16 +167,37 @@ export function inferMarketRegime(args: {
   const sortedScores = Object.values(scores).sort((a, b) => b - a);
   const rawConfidence = clamp(42 + ((sortedScores[0] ?? 0) - (sortedScores[1] || 0)) * 2.4, 28, 94);
 
+  const hmm = inferHMMRegimePosterior({
+    scores,
+    previous: args.previous
+      ? {
+          id: args.previous.id,
+          confidence: args.previous.confidence,
+          posterior: args.previous.posterior,
+        }
+      : null,
+  });
+  selected = hmm.selected;
+
   if (args.previous && args.previous.id !== selected) {
-    const prevScore = scores[args.previous.id];
-    if (prevScore >= scores[selected] * 0.94) {
+    const prevPosterior = hmm.posterior[args.previous.id] ?? 0;
+    const selectedPosterior = hmm.posterior[selected] ?? 0;
+    if (prevPosterior >= selectedPosterior * 0.97) {
       selected = args.previous.id;
     }
   }
 
-  const confidence = clamp(rawConfidence + (args.previous?.id === selected ? 6 : 0), 28, 96);
+  const posteriorConfidence = hmm.confidence;
+  const confidence = clamp(
+    rawConfidence * 0.45 + posteriorConfidence * 0.55 + (args.previous?.id === selected ? 4 : 0),
+    28,
+    96,
+  );
   const relationMultipliers = buildRelationMultipliers(selected, confidence);
   const notes: string[] = [];
+  notes.push(
+    `HMM posterior ${selected}=${Math.round((hmm.posterior[selected] ?? 0) * 100)}% with switch penalty ${(hmm.switchPenalty * 100).toFixed(1)}%.`,
+  );
   if (selected === 'inflation-shock') notes.push('Energy and shipping shocks dominate cross-asset reaction.');
   if (selected === 'risk-off') notes.push('Volatility bid and equity drawdown regime active.');
   if (selected === 'risk-on') notes.push('Growth/tech beta regime outweighs macro stress.');
@@ -183,6 +210,20 @@ export function inferMarketRegime(args: {
     scores: Object.fromEntries(
       Object.entries(scores).map(([key, value]) => [key, Number(value.toFixed(2))]),
     ) as Record<MarketRegimeId, number>,
+    posterior: Object.fromEntries(
+      Object.entries(hmm.posterior).map(([key, value]) => [key, Number(value.toFixed(4))]),
+    ) as Record<MarketRegimeId, number>,
+    transitionMatrix: Object.fromEntries(
+      Object.entries(hmm.transitionMatrix).map(([from, row]) => [
+        from,
+        Object.fromEntries(
+          Object.entries(row).map(([to, value]) => [to, Number(value.toFixed(4))]),
+        ),
+      ]),
+    ) as Record<MarketRegimeId, Record<MarketRegimeId, number>>,
+    persistence: Number(hmm.persistence.toFixed(4)),
+    switchPenalty: Number(hmm.switchPenalty.toFixed(4)),
+    posteriorEntropy: Number(hmm.entropy.toFixed(4)),
     features: {
       vixChange: Number(vixChange.toFixed(2)),
       oilChange: Number(oilChange.toFixed(2)),

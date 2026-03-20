@@ -15,6 +15,11 @@ const VIRTUAL_SCROLL_THRESHOLD = 15;
 /** Summary cache TTL in milliseconds (10 minutes) */
 const SUMMARY_CACHE_TTL = 10 * 60 * 1000;
 
+const NEWS_VIEW_STORAGE_KEY = 'lattice-current-news-view-mode';
+const DEFAULT_NEWS_FOCUS_LIMIT = 12;
+
+type NewsViewMode = 'focus' | 'full';
+
 /** Prepared cluster data for rendering */
 interface PreparedCluster {
   cluster: ClusteredEvent;
@@ -52,6 +57,11 @@ export class NewsPanel extends Panel {
   // Panel summary feature
   private summaryBtn: HTMLButtonElement | null = null;
   private summaryContainer: HTMLElement | null = null;
+  private focusBtn: HTMLButtonElement | null = null;
+  private fullBtn: HTMLButtonElement | null = null;
+  private viewStatusEl: HTMLElement | null = null;
+  private viewMode: NewsViewMode = this.loadViewMode();
+  private latestItems: NewsItem[] = [];
   private currentHeadlines: string[] = [];
   private lastHeadlineSignature = '';
   private isSummarizing = false;
@@ -60,8 +70,49 @@ export class NewsPanel extends Panel {
     super({ id, title, showCount: true, trackActivity: true });
     this.createDeviationIndicator();
     this.createSummarizeButton();
+    this.createViewControls();
     this.setupActivityTracking();
     this.initWindowedList();
+  }
+
+  private isKoreanUi(): boolean {
+    return getCurrentLanguage() === 'ko';
+  }
+
+  private getViewCopy() {
+    const korean = this.isKoreanUi();
+    return {
+      focus: korean ? '집중' : 'Focus',
+      full: korean ? '전체' : 'Full',
+      focusTitle: korean ? '우선순위가 높은 뉴스만 먼저 봅니다.' : 'Show highest-priority items first.',
+      fullTitle: korean ? '원시 뉴스 스트림 전체를 봅니다.' : 'Show the full raw news stream.',
+      focusStatus: (visible: number, total: number) => korean
+        ? `상위 ${visible} / ${total}`
+        : `Top ${visible} / ${total}`,
+      fullStatus: (visible: number) => korean
+        ? `전체 ${visible}`
+        : `All ${visible}`,
+      focusNote: (visible: number, total: number) => korean
+        ? `지금은 우선순위가 높은 ${visible}개만 먼저 보여주고 있습니다. 전체 ${total}건 스트림이 필요하면 '전체'로 전환하세요.`
+        : `Showing the highest-priority ${visible} items first. Switch to Full if you need the raw stream of all ${total}.`,
+    };
+  }
+
+  private loadViewMode(): NewsViewMode {
+    try {
+      const stored = localStorage.getItem(NEWS_VIEW_STORAGE_KEY);
+      return stored === 'full' ? 'full' : 'focus';
+    } catch {
+      return 'focus';
+    }
+  }
+
+  private persistViewMode(): void {
+    try {
+      localStorage.setItem(NEWS_VIEW_STORAGE_KEY, this.viewMode);
+    } catch {
+      // Ignore storage failures.
+    }
   }
 
   private initWindowedList(): void {
@@ -144,6 +195,81 @@ export class NewsPanel extends Panel {
     } else {
       this.header.appendChild(this.summaryBtn);
     }
+  }
+
+  private createViewControls(): void {
+    const copy = this.getViewCopy();
+    const controls = document.createElement('div');
+    controls.className = 'panel-news-view-toggle';
+
+    this.focusBtn = document.createElement('button');
+    this.focusBtn.type = 'button';
+    this.focusBtn.className = 'panel-news-view-btn';
+    this.focusBtn.textContent = copy.focus;
+    this.focusBtn.title = copy.focusTitle;
+    this.focusBtn.addEventListener('click', () => this.setViewMode('focus'));
+
+    this.fullBtn = document.createElement('button');
+    this.fullBtn.type = 'button';
+    this.fullBtn.className = 'panel-news-view-btn';
+    this.fullBtn.textContent = copy.full;
+    this.fullBtn.title = copy.fullTitle;
+    this.fullBtn.addEventListener('click', () => this.setViewMode('full'));
+
+    this.viewStatusEl = document.createElement('span');
+    this.viewStatusEl.className = 'panel-news-view-status';
+
+    controls.append(this.focusBtn, this.fullBtn, this.viewStatusEl);
+    const countEl = this.header.querySelector('.panel-count');
+    if (countEl) {
+      this.header.insertBefore(controls, countEl);
+    } else {
+      this.header.appendChild(controls);
+    }
+
+    this.updateViewControls(0, 0);
+  }
+
+  private setViewMode(mode: NewsViewMode): void {
+    if (mode === this.viewMode) return;
+    this.viewMode = mode;
+    this.persistViewMode();
+    this.updateViewControls(this.latestItems.length, Math.min(this.latestItems.length, DEFAULT_NEWS_FOCUS_LIMIT));
+    if (this.latestItems.length > 0) {
+      this.renderNews([...this.latestItems]);
+    }
+  }
+
+  private updateViewControls(totalCount: number, visibleCount: number): void {
+    const copy = this.getViewCopy();
+    if (this.focusBtn) {
+      this.focusBtn.classList.toggle('active', this.viewMode === 'focus');
+      this.focusBtn.textContent = copy.focus;
+      this.focusBtn.title = copy.focusTitle;
+    }
+    if (this.fullBtn) {
+      this.fullBtn.classList.toggle('active', this.viewMode === 'full');
+      this.fullBtn.textContent = copy.full;
+      this.fullBtn.title = copy.fullTitle;
+    }
+    if (this.viewStatusEl) {
+      this.viewStatusEl.textContent = totalCount <= 0
+        ? ''
+        : this.viewMode === 'focus'
+          ? copy.focusStatus(visibleCount, totalCount)
+          : copy.fullStatus(visibleCount);
+    }
+  }
+
+  private trimToVisible<T>(items: T[]): T[] {
+    return this.viewMode === 'focus'
+      ? items.slice(0, DEFAULT_NEWS_FOCUS_LIMIT)
+      : items;
+  }
+
+  private renderViewModeNote(totalCount: number, visibleCount: number): string {
+    if (this.viewMode !== 'focus' || totalCount <= visibleCount) return '';
+    return `<div class="panel-news-focus-note">${escapeHtml(this.getViewCopy().focusNote(visibleCount, totalCount))}</div>`;
   }
 
   private async handleSummarize(): Promise<void> {
@@ -297,9 +423,11 @@ export class NewsPanel extends Panel {
   }
 
   public renderNews(items: NewsItem[]): void {
+    this.latestItems = [...items];
     if (items.length === 0) {
       this.renderRequestId += 1; // Cancel in-flight clustering from previous renders.
       this.setDataBadge('unavailable');
+      this.updateViewControls(0, 0);
       this.showError(t('common.noNewsAvailable'));
       return;
     }
@@ -319,9 +447,11 @@ export class NewsPanel extends Panel {
     this.renderRequestId += 1; // Cancel in-flight clustering from previous renders.
     this.setDataBadge('live');
     this.setCount(0);
+    this.latestItems = [];
     this.relatedAssetContext.clear();
     this.currentHeadlines = [];
     this.updateHeadlineSignature();
+    this.updateViewControls(0, 0);
     this.setContent(`<div class="panel-empty">${escapeHtml(message)}</div>`);
   }
 
@@ -329,9 +459,11 @@ export class NewsPanel extends Panel {
     this.renderRequestId += 1; // Cancel in-flight clustering from previous renders.
     this.setDataBadge('unavailable', 'AUTH REQUIRED');
     this.setCount(0);
+    this.latestItems = [];
     this.relatedAssetContext.clear();
     this.currentHeadlines = [];
     this.updateHeadlineSignature();
+    this.updateViewControls(0, 0);
     this.showError(message);
   }
 
@@ -499,15 +631,17 @@ export class NewsPanel extends Panel {
         return new Date(b.item.pubDate).getTime() - new Date(a.item.pubDate).getTime();
       });
 
+    const visibleRanked = this.trimToVisible(ranked);
     this.setCount(ranked.length);
-    this.currentHeadlines = ranked
+    this.updateViewControls(ranked.length, visibleRanked.length);
+    this.currentHeadlines = visibleRanked
       .slice(0, 5)
       .map(({ item }) => item.title)
       .filter((title): title is string => typeof title === 'string' && title.trim().length > 0);
 
     this.updateHeadlineSignature();
 
-    const html = ranked
+    const html = visibleRanked
       .map(
         ({ item, cue }) => `
       <div class="item scan-${cue.level} ${item.isAlert ? 'alert' : ''}" ${item.monitorColor ? `style="border-inline-start-color: ${escapeHtml(item.monitorColor)}"` : ''}>
@@ -531,7 +665,7 @@ export class NewsPanel extends Panel {
       )
       .join('');
 
-    this.setContent(html);
+    this.setContent(`${this.renderViewModeNote(ranked.length, visibleRanked.length)}${html}`);
   }
 
   private renderClusters(clusters: ClusteredEvent[]): void {
@@ -546,16 +680,19 @@ export class NewsPanel extends Panel {
       return b.lastUpdated.getTime() - a.lastUpdated.getTime();
     });
 
+    const visibleClusters = this.trimToVisible(sorted);
     const totalItems = sorted.reduce((sum, c) => sum + c.sourceCount, 0);
+    const visibleItems = visibleClusters.reduce((sum, c) => sum + c.sourceCount, 0);
     this.setCount(totalItems);
+    this.updateViewControls(totalItems, visibleItems);
     this.relatedAssetContext.clear();
 
     // Store headlines for summarization (cap at 5 to reduce entity conflation in small models)
-    this.currentHeadlines = sorted.slice(0, 5).map(c => c.primaryTitle);
+    this.currentHeadlines = visibleClusters.slice(0, 5).map(c => c.primaryTitle);
 
     this.updateHeadlineSignature();
 
-    const clusterIds = sorted.map(c => c.id);
+    const clusterIds = visibleClusters.map(c => c.id);
     let newItemIds: Set<string>;
 
     if (this.isFirstRender) {
@@ -571,7 +708,7 @@ export class NewsPanel extends Panel {
     }
 
     // Prepare all clusters with their rendering data (defer HTML creation)
-    const prepared: PreparedCluster[] = sorted.map(cluster => {
+    const prepared: PreparedCluster[] = visibleClusters.map(cluster => {
       const isNew = newItemIds.has(cluster.id);
       const shouldHighlight = activityTracker.shouldHighlight(this.panelId, cluster.id);
       const showNewTag = activityTracker.isNewItem(this.panelId, cluster.id) && isNew;
@@ -585,14 +722,15 @@ export class NewsPanel extends Panel {
     });
 
     // Use windowed rendering for large lists, direct render for small
-    if (this.useVirtualScroll && sorted.length > VIRTUAL_SCROLL_THRESHOLD && this.windowedList) {
+    if (this.useVirtualScroll && visibleClusters.length > VIRTUAL_SCROLL_THRESHOLD && this.windowedList) {
       this.windowedList.setItems(prepared);
     } else {
       // Direct render for small lists
+      const focusNote = this.renderViewModeNote(totalItems, visibleItems);
       const html = prepared
         .map(p => this.renderClusterHtmlSafely(p.cluster, p.isNew, p.shouldHighlight, p.showNewTag))
         .join('');
-      this.setContent(html);
+      this.setContent(`${focusNote}${html}`);
       this.bindRelatedAssetEvents();
     }
   }

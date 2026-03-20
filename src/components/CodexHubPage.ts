@@ -4,6 +4,7 @@ import type { SourceOpsPanel } from './SourceOpsPanel';
 import type { ScheduledReport } from '@/services/scheduled-reports';
 import type { EventMarketTransmissionSnapshot } from '@/services/event-market-transmission';
 import type { SourceCredibilityProfile } from '@/services/source-credibility';
+import { APP_BRAND } from '@/config/brand';
 
 interface CodexHubOptions {
   getDataQAPanel: () => DataQAPanel | null | undefined;
@@ -41,11 +42,17 @@ export class CodexHubPage {
     this.overlay = document.createElement('div');
     this.overlay.className = 'codex-hub-overlay';
     this.overlay.innerHTML = `
-      <section class="codex-hub-page" role="dialog" aria-modal="true" aria-label="Codex Hub">
+      <section class="codex-hub-page" role="dialog" aria-modal="true" aria-label="${APP_BRAND.hubs.codex}">
         <header class="codex-hub-header">
           <div>
-            <h2 class="codex-hub-title">Codex Hub</h2>
-            <p class="codex-hub-subtitle">Codex Q&A, consensus reporting, rebuttal, source discovery, and automation diagnostics</p>
+            <h2 class="codex-hub-title">${APP_BRAND.hubs.codex}</h2>
+            <p class="codex-hub-subtitle">Q&A, provenance, automation, and source health in one research workspace</p>
+            <div class="hub-desk-switcher" aria-label="Switch desk">
+              <button type="button" class="hub-desk-btn" data-open-hub-target="analysis">${APP_BRAND.hubs.analysis}</button>
+              <button type="button" class="hub-desk-btn active" data-open-hub-target="codex">${APP_BRAND.hubs.codex}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="backtest">${APP_BRAND.hubs.backtest}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="ontology">${APP_BRAND.hubs.ontology}</button>
+            </div>
           </div>
           <div class="codex-hub-actions">
             <button type="button" class="codex-hub-action-btn" data-role="refresh">Refresh</button>
@@ -80,6 +87,14 @@ export class CodexHubPage {
 
     this.clickHandler = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
+      const hubSwitchBtn = target.closest('[data-open-hub-target]') as HTMLElement | null;
+      if (hubSwitchBtn) {
+        const hub = hubSwitchBtn.dataset.openHubTarget;
+        if (hub) {
+          window.dispatchEvent(new CustomEvent('wm:open-hub', { detail: { hub } }));
+        }
+        return;
+      }
       if (target === this.overlay) {
         this.hide();
       }
@@ -182,7 +197,8 @@ export class CodexHubPage {
     if (!snapshot || snapshot.answerCount === 0) {
       this.visualsSlot.innerHTML = `
         <div class="codex-hub-empty">
-          Codex analysis graphs are not available yet. Ask questions in Data Q&A to populate them.
+          <strong>Research visuals will appear after the first analysis pass.</strong>
+          <div class="backtest-lab-note">Ask a question in Data Q&amp;A, run a replay, or wait for the next automation cycle to populate evidence graphs here.</div>
         </div>
       `;
       return;

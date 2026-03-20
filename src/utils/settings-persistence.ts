@@ -14,6 +14,8 @@ export interface ImportResult {
 const MAX_IMPORT_SIZE_BYTES = 5 * 1024 * 1024;
 
 const SETTINGS_KEY_PREFIXES = [
+  'lattice-current-variant',
+  'lattice-current-theme',
   'worldmonitor-panels',
   'worldmonitor-monitors',
   'worldmonitor-layers',
@@ -52,7 +54,7 @@ export function exportSettings(): void {
   const exportData: ExportedSettings = {
     version: 1,
     timestamp: new Date().toISOString(),
-    variant: localStorage.getItem('worldmonitor-variant') || 'full',
+    variant: localStorage.getItem('lattice-current-variant') || localStorage.getItem('worldmonitor-variant') || 'full',
     data,
   };
 
@@ -61,7 +63,7 @@ export function exportSettings(): void {
   const a = document.createElement('a');
   a.href = url;
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  a.download = `worldmonitor-settings-${ts}.json`;
+  a.download = `lattice-current-settings-${ts}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

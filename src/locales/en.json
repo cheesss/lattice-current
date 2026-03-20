@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "World Monitor",
+    "title": "Lattice Current",
     "description": "Global Situation with AI Insights"
   },
   "countryBrief": {
@@ -11,7 +11,7 @@
     "closeBtn": "Close",
     "limitedCoverage": "Limited coverage",
     "instabilityIndex": "Instability Index",
-    "notTracked": "Not tracked — {{country}} is not in the CII tier-1 list",
+    "notTracked": "Not tracked ??{{country}} is not in the CII tier-1 list",
     "intelBrief": "Intelligence Brief",
     "generatingBrief": "Generating intelligence brief...",
     "topNews": "Top News",
@@ -20,7 +20,7 @@
     "predictionMarkets": "Prediction Markets",
     "loadingMarkets": "Loading prediction markets...",
     "infrastructure": "Infrastructure Exposure",
-    "briefUnavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
+    "briefUnavailable": "AI brief unavailable ??configure GROQ_API_KEY in Settings.",
     "cached": "Cached",
     "fresh": "Fresh",
     "noMarkets": "No active markets for this country.",
@@ -268,7 +268,7 @@
     "gulfIndices": "Gulf Indices",
     "gulfCurrencies": "Gulf Currencies",
     "gulfOil": "Gulf Oil",
-    "airlineIntel": "✈️ Airline Intelligence"
+    "airlineIntel": "?덌툘 Airline Intelligence"
   },
   "commands": {
     "prefixes": {
@@ -367,11 +367,11 @@
   "modals": {
     "search": {
       "placeholder": "Search or type a command...",
-      "hint": "Search • Countries • Layers • Panels • Navigation • Settings",
+      "hint": "Search ??Countries ??Layers ??Panels ??Navigation ??Settings",
       "placeholderTech": "Search or type a command...",
-      "hintTech": "Search • Companies • AI Labs • Layers • Navigation • Settings",
+      "hintTech": "Search ??Companies ??AI Labs ??Layers ??Navigation ??Settings",
       "placeholderFinance": "Search or type a command...",
-      "hintFinance": "Search • Exchanges • Markets • Layers • Navigation • Settings",
+      "hintFinance": "Search ??Exchanges ??Markets ??Layers ??Navigation ??Settings",
       "recent": "Recent Searches",
       "empty": "Search data or run commands",
       "noResults": "No results",
@@ -481,7 +481,7 @@
         "some": "Some features need API keys"
       },
       "openSettings": "Open Settings",
-      "skipSetup": "Skip the setup — a single World Monitor license unlocks everything. Join the waitlist for early access.",
+      "skipSetup": "Skip the setup ??a single Lattice Current license unlocks everything. Join the waitlist for early access.",
       "summary": {
         "desktop": "Desktop mode",
         "web": "Web mode (read-only, server-managed credentials)",
@@ -507,8 +507,8 @@
         "ABUSEIPDB_API_KEY": "Optional enrichment source for malicious IP reputation.",
         "FINNHUB_API_KEY": "Real-time stock quotes and market data.",
         "NASA_FIRMS_API_KEY": "Fire Information for Resource Management System.",
-        "OLLAMA_API_URL": "e.g. http://127.0.0.1:11434 (Ollama) or http://127.0.0.1:1234/v1 (LM Studio) — OpenAI-compatible endpoint.",
-        "OLLAMA_MODEL": "e.g. llama3.1:8b — model tag to use for summarization."
+        "OLLAMA_API_URL": "e.g. http://127.0.0.1:11434 (Ollama) or http://127.0.0.1:1234/v1 (LM Studio) ??OpenAI-compatible endpoint.",
+        "OLLAMA_MODEL": "e.g. llama3.1:8b ??model tag to use for summarization."
       }
     },
     "settingsWindow": {
@@ -526,22 +526,22 @@
       "sidecarUnreachable": "Sidecar not reachable.",
       "logCleared": "Log cleared.",
       "worldMonitor": {
-        "tabLabel": "World Monitor",
-        "heroTitle": "One key. Everything included.",
-        "heroDescription": "A single World Monitor license replaces every API key and LLM provider you'd otherwise configure yourself. AI summaries, real-time intelligence, market data, conflict tracking, fire detection, satellite imagery — all powered, all managed, zero setup.",
+        "tabLabel": "Lattice Current Access",
+        "heroTitle": "One account. The full signal stack.",
+        "heroDescription": "Use one Lattice Current account or platform key to unlock managed data providers, hosted AI features, and shared runtime services without stitching the stack together by hand.",
         "apiKey": {
-          "title": "License Key",
+          "title": "Platform Access",
           "placeholder": "wm_xxxxxxxxxxxxxxxxxxxxxxxx",
-          "description": "Paste your license to unlock every data source and AI feature instantly.",
+          "description": "Add your Lattice Current platform key to unlock managed data sources and hosted intelligence features.",
           "statusValid": "LICENSED",
           "statusMissing": "NO LICENSE"
         },
         "dividerOr": "OR",
         "register": {
-          "title": "Reserve Your Spot",
-          "description": "We're preparing to launch World Monitor licenses. Sign up now and be first in line — early members get priority access and founding-member pricing.",
+          "title": "Request Access",
+          "description": "Do not have a platform key yet? Register an email and we will contact you when access, hosted providers, or managed runtime features open up.",
           "emailPlaceholder": "your@email.com",
-          "submitBtn": "Join Waitlist",
+          "submitBtn": "Request Access",
           "submitting": "Submitting...",
           "success": "You're on the list! We'll notify you first.",
           "alreadyRegistered": "You're already on the waitlist.",
@@ -575,14 +575,14 @@
       "fresh": "Fresh",
       "noMarkets": "No prediction markets found",
       "predictionMarkets": "Prediction Markets",
-      "unavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings."
+      "unavailable": "AI brief unavailable ??configure GROQ_API_KEY in Settings."
     },
     "countryBrief": {
       "identifying": "Identifying country...",
       "locating": "Locating region...",
       "limitedCoverage": "Limited coverage",
       "instabilityIndex": "Instability Index",
-      "notTracked": "Not tracked — {{country}} is not in the CII tier-1 list",
+      "notTracked": "Not tracked ??{{country}} is not in the CII tier-1 list",
       "intelBrief": "Intelligence Brief",
       "generatingBrief": "Generating intelligence brief...",
       "topNews": "Top News",
@@ -591,7 +591,7 @@
       "predictionMarkets": "Prediction Markets",
       "loadingMarkets": "Loading prediction markets...",
       "infrastructure": "Infrastructure Exposure",
-      "briefUnavailable": "AI brief unavailable — configure GROQ_API_KEY in Settings.",
+      "briefUnavailable": "AI brief unavailable ??configure GROQ_API_KEY in Settings.",
       "cached": "Cached",
       "fresh": "Fresh",
       "noMarkets": "No prediction markets found",
@@ -658,7 +658,7 @@
     "webcams": {
       "expand": "Expand",
       "paused": "Webcams paused",
-      "pausedIdle": "Webcams paused — move mouse to resume",
+      "pausedIdle": "Webcams paused ??move mouse to resume",
       "regions": {
         "iran": "IRAN ATTACKS",
         "all": "ALL",
@@ -676,8 +676,8 @@
       "noData": "No science breakthroughs yet"
     },
     "airlineIntel": {
-      "noOpsData": "No ops data — loading…",
-      "noFlights": "No flights — select airport in settings.",
+      "noOpsData": "No ops data - loading...",
+      "noFlights": "No flights ??select airport in settings.",
       "noCarrierData": "No carrier data yet.",
       "noTrackingData": "No aircraft tracking data.",
       "noNews": "No aviation news.",
@@ -688,7 +688,7 @@
     },
     "goodThingsDigest": {
       "noStories": "No stories available",
-      "summarizing": "Summarizing…"
+      "summarizing": "Summarizing..."
     },
     "progressCharts": {
       "noData": "No progress data available"
@@ -744,7 +744,7 @@
       "noSpending": "No recent government awards",
       "awards": "awards",
       "noIndicatorData": "No indicator data yet - FRED may be loading",
-      "fredKeyMissing": "FRED API key required — add it in Settings to enable economic indicators",
+      "fredKeyMissing": "FRED API key required ??add it in Settings to enable economic indicators",
       "noOilDataRetry": "Oil data temporarily unavailable - will retry",
       "vsPreviousWeek": "vs previous week",
       "in": "in",
@@ -766,9 +766,9 @@
       "noChokepoints": "Chokepoint data loading...",
       "noShipping": "Shipping rate data not available",
       "noMinerals": "Mineral data loading...",
-      "fredKeyMissing": "FRED API key required for shipping rates — add it in Settings. Chokepoints and minerals available without key.",
-      "upstreamUnavailable": "Supply chain data temporarily unavailable — showing cached data",
-      "spikeAlert": "Spike detected — rate significantly above 52-week average (weekly)",
+      "fredKeyMissing": "FRED API key required for shipping rates ??add it in Settings. Chokepoints and minerals available without key.",
+      "upstreamUnavailable": "Supply chain data temporarily unavailable ??showing cached data",
+      "spikeAlert": "Spike detected ??rate significantly above 52-week average (weekly)",
       "warnings": "warning(s)",
       "aisDisruptions": "AIS disruption(s)",
       "mineral": "Mineral",
@@ -785,8 +785,8 @@
       "noTariffData": "No tariff data available",
       "noFlowData": "No trade flow data available",
       "noBarriers": "No trade barriers reported",
-      "apiKeyMissing": "WTO API key required — add it in Settings",
-      "upstreamUnavailable": "WTO data temporarily unavailable — showing cached data",
+      "apiKeyMissing": "WTO API key required ??add it in Settings",
+      "upstreamUnavailable": "WTO data temporarily unavailable ??showing cached data",
       "appliedRate": "Applied Rate",
       "boundRate": "Bound Rate",
       "exports": "Exports",
@@ -800,16 +800,16 @@
       "empty": "No recent articles for this topic"
     },
     "geoHubs": {
-      "tooltip": "<strong>Geopolitical Activity Hubs</strong><br>Shows regions with the most news activity.<br><br><em>Hub types:</em><br>• 🏛️ Capitals — World capitals and government centers<br>• ⚔️ Conflict Zones — Active conflict areas<br>• ⚓ Strategic — Chokepoints and key regions<br>• 🏢 Organizations — UN, NATO, IAEA, etc.<br><br><em>Activity levels:</em><br>• <span style=\"color: #ff4444\">High</span> — Breaking news or 70+ score<br>• <span style=\"color: #ff8844\">Elevated</span> — Score 40-69<br>• <span style=\"color: #888\">Low</span> — Score below 40<br><br>Click a hub to zoom to its location.",
+      "tooltip": "<strong>Geopolitical Activity Hubs</strong><br>Shows regions with the most news activity.<br><br><em>Hub types:</em><br>???룢截?Capitals ??World capitals and government centers<br>???뷂툘 Conflict Zones ??Active conflict areas<br>????Strategic ??Chokepoints and key regions<br>???룫 Organizations ??UN, NATO, IAEA, etc.<br><br><em>Activity levels:</em><br>??<span style=\"color: #ff4444\">High</span> ??Breaking news or 70+ score<br>??<span style=\"color: #ff8844\">Elevated</span> ??Score 40-69<br>??<span style=\"color: #888\">Low</span> ??Score below 40<br><br>Click a hub to zoom to its location.",
       "noActive": "No active geopolitical hubs",
       "story": "story",
       "stories": "stories",
-      "infoTooltip": "<strong>Geopolitical Activity Hubs</strong><br>Shows regions with the most news activity.<br><br><em>Hub types:</em><br>• 🏛️ Capitals — World capitals and government centers<br>• ⚔️ Conflict Zones — Active conflict areas<br>• ⚓ Strategic — Chokepoints and key regions<br>• 🏢 Organizations — UN, NATO, IAEA, etc.<br><br><em>Activity levels:</em><br>• <span style=\"color: {{highColor}}\">High</span> — Breaking news or 70+ score<br>• <span style=\"color: {{elevatedColor}}\">Elevated</span> — Score 40-69<br>• <span style=\"color: {{lowColor}}\">Low</span> — Score below 40<br><br>Click a hub to zoom to its location."
+      "infoTooltip": "<strong>Geopolitical Activity Hubs</strong><br>Shows regions with the most news activity.<br><br><em>Hub types:</em><br>???룢截?Capitals ??World capitals and government centers<br>???뷂툘 Conflict Zones ??Active conflict areas<br>????Strategic ??Chokepoints and key regions<br>???룫 Organizations ??UN, NATO, IAEA, etc.<br><br><em>Activity levels:</em><br>??<span style=\"color: {{highColor}}\">High</span> ??Breaking news or 70+ score<br>??<span style=\"color: {{elevatedColor}}\">Elevated</span> ??Score 40-69<br>??<span style=\"color: {{lowColor}}\">Low</span> ??Score below 40<br><br>Click a hub to zoom to its location."
     },
     "techHubs": {
-      "tooltip": "<strong>Tech Hub Activity</strong><br>Shows tech hubs with the most news activity.<br><br><em>Activity levels:</em><br>• <span style=\"color: #00ff88\">High</span> — Breaking news or 50+ score<br>• <span style=\"color: #ffc800\">Elevated</span> — Score 20-49<br>• <span style=\"color: #888\">Low</span> — Score below 20<br><br>Click a hub to zoom to its location.",
+      "tooltip": "<strong>Tech Hub Activity</strong><br>Shows tech hubs with the most news activity.<br><br><em>Activity levels:</em><br>??<span style=\"color: #00ff88\">High</span> ??Breaking news or 50+ score<br>??<span style=\"color: #ffc800\">Elevated</span> ??Score 20-49<br>??<span style=\"color: #888\">Low</span> ??Score below 20<br><br>Click a hub to zoom to its location.",
       "noActive": "No active tech hubs",
-      "infoTooltip": "<strong>Tech Hub Activity</strong><br>Shows tech hubs with the most news activity.<br><br><em>Activity levels:</em><br>• <span style=\"color: {{highColor}}\">High</span> — Breaking news or 50+ score<br>• <span style=\"color: {{elevatedColor}}\">Elevated</span> — Score 20-49<br>• <span style=\"color: {{lowColor}}\">Low</span> — Score below 20<br><br>Click a hub to zoom to its location."
+      "infoTooltip": "<strong>Tech Hub Activity</strong><br>Shows tech hubs with the most news activity.<br><br><em>Activity levels:</em><br>??<span style=\"color: {{highColor}}\">High</span> ??Breaking news or 50+ score<br>??<span style=\"color: {{elevatedColor}}\">Elevated</span> ??Score 20-49<br>??<span style=\"color: {{lowColor}}\">Low</span> ??Score below 20<br><br>Click a hub to zoom to its location."
     },
     "predictions": {
       "tooltip": "<strong>Prediction Markets</strong><br>Real-money forecasting markets:<br><ul><li>Prices reflect crowd probability estimates</li><li>Higher volume = more reliable signal</li><li>Geopolitical and current events focus</li></ul>Source: Polymarket (polymarket.com)",
@@ -982,11 +982,11 @@
         "base": "Base",
         "nuclear": "Nuclear",
         "aircraft": "Aircraft",
-        "ciiLow": "Low (0–30)",
-        "ciiNormal": "Normal (31–50)",
-        "ciiElevated": "Elevated (51–65)",
-        "ciiHigh": "High (66–80)",
-        "ciiCritical": "Critical (81–100)"
+        "ciiLow": "Low (0??0)",
+        "ciiNormal": "Normal (31??0)",
+        "ciiElevated": "Elevated (51??5)",
+        "ciiHigh": "High (66??0)",
+        "ciiCritical": "Critical (81??00)"
       },
       "layerGuide": "Layer Guide",
       "layerWarningTitle": "Performance notice",
@@ -1155,7 +1155,7 @@
           "tradeRoutes": "Major global shipping lanes connecting ports through strategic chokepoints",
           "dayNight": "Real-time solar terminator showing day and night zones",
           "geoBoundaries": "Demilitarized zones, ceasefire lines, and disputed boundaries",
-          "ciiChoropleth": "Country Instability Index heat-map — colors countries by CII score (green=stable, red=critical)"
+          "ciiChoropleth": "Country Instability Index heat-map ??colors countries by CII score (green=stable, red=critical)"
         },
         "notes": {
           "timeAffects": "Affects: Earthquakes, Weather, Protests, Outages"
@@ -1174,7 +1174,7 @@
       "rankingStories": "Ranking important stories...",
       "analyzingSentiment": "Analyzing sentiment...",
       "generatingBrief": "Generating world brief...",
-      "infoTooltip": "<strong>AI-Powered Analysis</strong><br>• <strong>World Brief</strong>: AI summary (Groq/OpenRouter)<br>• <strong>Sentiment</strong>: News tone analysis<br>• <strong>Velocity</strong>: Fast-moving stories<br>• <strong>Focal Points</strong>: Correlates news entities with map signals (military, protests, outages)<br><em>Desktop only • Powered by Llama 3.3 + Focal Point Detection</em>",
+      "infoTooltip": "<strong>AI-Powered Analysis</strong><br>??<strong>World Brief</strong>: AI summary (Groq/OpenRouter)<br>??<strong>Sentiment</strong>: News tone analysis<br>??<strong>Velocity</strong>: Fast-moving stories<br>??<strong>Focal Points</strong>: Correlates news entities with map signals (military, protests, outages)<br><em>Desktop only ??Powered by Llama 3.3 + Focal Point Detection</em>",
       "settingsTitle": "Settings",
       "sectionMap": "Map",
       "sectionAi": "AI Analysis",
@@ -1200,7 +1200,7 @@
       "aiFlowBrowserWarn": "Downloads ~250 MB of model data to your browser",
       "aiFlowOllamaCta": "Want fully local AI?",
       "aiFlowOllamaCtaDesc": "Download the desktop app for Ollama support",
-      "aiFlowDownloadDesktop": "Download Desktop App →",
+      "aiFlowDownloadDesktop": "Download Desktop App",
       "aiFlowStatusActive": "Cloud AI active",
       "aiFlowStatusCloudAndBrowser": "Cloud AI + Browser model active",
       "aiFlowStatusBrowserOnly": "Browser model only",
@@ -1308,7 +1308,7 @@
       "all": "All",
       "conferencesCount": "{{count}} conferences",
       "onMap": "{{count}} on map",
-      "techmemeEvents": "Techmeme Events ↗",
+      "techmemeEvents": "Techmeme Events",
       "today": "TODAY",
       "soon": "SOON"
     },
@@ -1324,7 +1324,7 @@
       "analyzingCountries": "Analyzing 200+ countries...",
       "source": "Source: World Bank",
       "updated": "Updated: {{date}}",
-      "infoTooltip": "<strong>Global Tech Readiness</strong><br>Composite score (0-100) based on World Bank data:<br><br><strong>Metrics shown:</strong><br>🌐 Internet Users (% of population)<br>📱 Mobile Subscriptions (per 100 people)<br>🔬 R&D Expenditure (% of GDP)<br><br><strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br><em>— = No recent data available</em><br><em>Source: World Bank Open Data (2019-2024)</em>"
+      "infoTooltip": "<strong>Global Tech Readiness</strong><br>Composite score (0-100) based on World Bank data:<br><br><strong>Metrics shown:</strong><br>?뙋 Internet Users (% of population)<br>?벑 Mobile Subscriptions (per 100 people)<br>?뵮 R&D Expenditure (% of GDP)<br><br><strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br><em>??= No recent data available</em><br><em>Source: World Bank Open Data (2019-2024)</em>"
     },
     "populationExposure": {
       "noData": "No exposure data available",
@@ -1353,18 +1353,18 @@
         "hoursAgo": "{{count}}h ago",
         "daysAgo": "{{count}}d ago"
       },
-      "infoTooltip": "<strong>Security Advisories</strong><br>Travel advisories and security alerts from government foreign affairs agencies:<br><br><strong>Sources:</strong><br>🇺🇸 US State Dept Travel Advisories<br>🇦🇺 AU DFAT Smartraveller<br>🇬🇧 UK FCDO Travel Advice<br>🇳🇿 NZ MFAT SafeTravel<br><br><strong>Levels:</strong><br>🟥 Do Not Travel<br>🟧 Reconsider Travel<br>🟨 Exercise Caution<br>🟩 Normal Precautions"
+      "infoTooltip": "<strong>Security Advisories</strong><br>Travel advisories and security alerts from government foreign affairs agencies:<br><br><strong>Sources:</strong><br>?눣?눡 US State Dept Travel Advisories<br>?눇?눣 AU DFAT Smartraveller<br>?눐?눉 UK FCDO Travel Advice<br>?눛?눨 NZ MFAT SafeTravel<br><br><strong>Levels:</strong><br>?윥 Do Not Travel<br>?윧 Reconsider Travel<br>?윩 Exercise Caution<br>?윪 Normal Precautions"
     },
     "orefSirens": {
       "checking": "Checking siren alerts...",
-      "noAlerts": "No active sirens — all clear",
+      "noAlerts": "No active sirens ??all clear",
       "notConfigured": "Sirens service not configured",
       "activeSirens": "{{count}} active siren(s)",
       "area": "Area",
       "time": "Time",
       "justNow": "just now",
       "historyCount": "{{count}} alerts in last 24h",
-      "historySummary": "{{count}} alerts in 24h — {{waves}} waves",
+      "historySummary": "{{count}} alerts in 24h ??{{waves}} waves",
       "loadingHistory": "Loading history...",
       "infoTooltip": "<strong>Israel Sirens</strong><br>Real-time rocket and missile siren alerts from Israel Home Front Command.<br><br>Data is polled every 10 seconds. A pulsing red indicator means active sirens are sounding."
     },
@@ -1452,7 +1452,7 @@
         "moderate": "MODERATE",
         "normal": "NORMAL"
       },
-      "infoTooltip": "<strong>Climate Anomaly Monitor</strong> Temperature and precipitation deviations from 30-day baseline. Data from Open-Meteo (ERA5 reanalysis).<ul><li><strong>Extreme</strong>: >5°C or >80mm/day deviation</li><li><strong>Moderate</strong>: >3°C or >40mm/day deviation</li></ul>Monitors 15 conflict/disaster-prone zones."
+      "infoTooltip": "<strong>Climate Anomaly Monitor</strong> Temperature and precipitation deviations from 30-day baseline. Data from Open-Meteo (ERA5 reanalysis).<ul><li><strong>Extreme</strong>: >5째C or >80mm/day deviation</li><li><strong>Moderate</strong>: >3째C or >40mm/day deviation</li></ul>Monitors 15 conflict/disaster-prone zones."
     },
     "newsPanel": {
       "close": "Close",
@@ -1534,7 +1534,7 @@
     },
     "investments": {
       "infoTooltip": "Database of Saudi Arabia and UAE foreign direct investments in global critical infrastructure. Click a row to fly to the investment on the map.",
-      "searchPlaceholder": "Search assets, countries, entities…",
+      "searchPlaceholder": "Search assets, countries, entities...",
       "allCountries": "All Countries",
       "saudiArabia": "Saudi Arabia",
       "uae": "UAE",
@@ -1574,7 +1574,7 @@
     },
     "etfFlows": {
       "unavailable": "ETF data temporarily unavailable",
-      "rateLimited": "ETF data temporarily unavailable (rate limited) — retrying shortly",
+      "rateLimited": "ETF data temporarily unavailable (rate limited) ??retrying shortly",
       "netFlow": "Net Flow",
       "estFlow": "Est. Flow",
       "totalVol": "Total Vol",
@@ -1623,7 +1623,7 @@
       "outage": "Outage",
       "backendUnavailable": "Desktop local backend unavailable. Falling back to cloud API.",
       "desktopReadiness": "Desktop readiness",
-      "acceptanceChecks": "Acceptance checks: {{ready}}/{{total}} ready · key-backed features {{available}}/{{featureTotal}}",
+      "acceptanceChecks": "Acceptance checks: {{ready}}/{{total}} ready 쨌 key-backed features {{available}}/{{featureTotal}}",
       "nonParityFallbacks": "Non-parity fallbacks ({{count}})",
       "categories": {
         "all": "All",
@@ -1662,7 +1662,7 @@
     "liveNews": {
       "retry": "Retry",
       "notLive": "{{name}} is not currently live",
-      "cannotEmbed": "{{name}} can't be played here — it may be restricted in your region (error {{code}})",
+      "cannotEmbed": "{{name}} can't be played here ??it may be restricted in your region (error {{code}})",
       "botCheck": "YouTube is requesting sign-in to play {{name}}",
       "signInToYouTube": "Sign in to YouTube",
       "openOnYouTube": "Open on YouTube",
@@ -1692,7 +1692,7 @@
       "regionOceania": "Oceania",
       "invalidHandle": "Enter a valid YouTube handle (e.g. @ChannelName)",
       "channelNotFound": "YouTube channel not found",
-      "verifying": "Verifying…",
+      "verifying": "Verifying...",
       "hlsUrl": "HLS Stream URL (optional)",
       "invalidHlsUrl": "Enter a valid HLS stream URL (.m3u8)"
     },
@@ -2070,8 +2070,8 @@
       "deploymentStatus": "STATUS",
       "usniIntel": "USNI Intel",
       "usniSource": "Source: USNI News Fleet Tracker",
-      "approximatePosition": "Position approximate — based on USNI weekly report, not real-time AIS.",
-      "darkDescription": "⚠ Vessel has gone dark - AIS signal lost. May indicate sensitive operations."
+      "approximatePosition": "Position approximate ??based on USNI weekly report, not real-time AIS.",
+      "darkDescription": "??Vessel has gone dark - AIS signal lost. May indicate sensitive operations."
     },
     "militaryCluster": {
       "flightActivity": {
@@ -2182,22 +2182,22 @@
   "signals": {
     "context": {
       "prediction_leads_news": {
-        "whyItMatters": "Prediction markets often price in information before it becomes news—traders may have early access to developments.",
+        "whyItMatters": "Prediction markets often price in information before it becomes news?봳raders may have early access to developments.",
         "actionableInsight": "Monitor for breaking news in the next 1-6 hours that could explain the market move.",
         "confidenceNote": "Higher confidence if multiple prediction markets move in same direction."
       },
       "news_leads_markets": {
-        "whyItMatters": "News is breaking faster than markets are reacting—potential mispricing opportunity.",
+        "whyItMatters": "News is breaking faster than markets are reacting?봯otential mispricing opportunity.",
         "actionableInsight": "Watch for market catch-up as algorithms and traders digest the news.",
         "confidenceNote": "Stronger signal if news is from Tier 1 wire services."
       },
       "silent_divergence": {
-        "whyItMatters": "Market moving significantly without any identifiable news catalyst—possible insider knowledge, algorithmic trading, or unreported development.",
+        "whyItMatters": "Market moving significantly without any identifiable news catalyst?봯ossible insider knowledge, algorithmic trading, or unreported development.",
         "actionableInsight": "Investigate alternative data sources; news may emerge later explaining the move.",
-        "confidenceNote": "Lower confidence as cause is unknown—treat as early warning, not confirmed intelligence."
+        "confidenceNote": "Lower confidence as cause is unknown?봳reat as early warning, not confirmed intelligence."
       },
       "velocity_spike": {
-        "whyItMatters": "A story is accelerating across multiple news sources—indicates growing significance and potential for market/policy impact.",
+        "whyItMatters": "A story is accelerating across multiple news sources?봧ndicates growing significance and potential for market/policy impact.",
         "actionableInsight": "This topic warrants immediate attention; expect official statements or market reactions.",
         "confidenceNote": "Higher confidence with more sources; check if Tier 1 sources are among them."
       },
@@ -2207,47 +2207,47 @@
         "confidenceNote": "Confidence increases with stronger baseline multiplier and broader source diversity."
       },
       "convergence": {
-        "whyItMatters": "Multiple independent source types confirming same event—cross-validation increases likelihood of accuracy.",
+        "whyItMatters": "Multiple independent source types confirming same event?봠ross-validation increases likelihood of accuracy.",
         "actionableInsight": "Treat this as high-confidence intelligence; triangulation reduces false positive risk.",
         "confidenceNote": "Very high confidence when wire + government + intel sources align."
       },
       "triangulation": {
-        "whyItMatters": "The \"authority triangle\" (wire services, government sources, intel specialists) are aligned—this is the gold standard for breaking news confirmation.",
+        "whyItMatters": "The \"authority triangle\" (wire services, government sources, intel specialists) are aligned?봳his is the gold standard for breaking news confirmation.",
         "actionableInsight": "This is actionable intelligence; expect market/policy reactions imminently.",
-        "confidenceNote": "Highest confidence signal in the system—multiple authoritative sources agree."
+        "confidenceNote": "Highest confidence signal in the system?봫ultiple authoritative sources agree."
       },
       "flow_drop": {
-        "whyItMatters": "Physical commodity flow disruption detected—supply constraints often precede price spikes.",
+        "whyItMatters": "Physical commodity flow disruption detected?봲upply constraints often precede price spikes.",
         "actionableInsight": "Monitor energy commodity prices; assess supply chain exposure.",
         "confidenceNote": "Confidence depends on disruption duration and alternative supply availability."
       },
       "flow_price_divergence": {
-        "whyItMatters": "Supply disruption news is not yet reflected in commodity prices—potential information edge.",
+        "whyItMatters": "Supply disruption news is not yet reflected in commodity prices?봯otential information edge.",
         "actionableInsight": "Either markets are slow to react, or the disruption is less significant than reported.",
-        "confidenceNote": "Medium confidence—markets may have better information than news reports."
+        "confidenceNote": "Medium confidence?봫arkets may have better information than news reports."
       },
       "geo_convergence": {
-        "whyItMatters": "Multiple news events clustering around same geographic location—potential escalation or coordinated activity.",
+        "whyItMatters": "Multiple news events clustering around same geographic location?봯otential escalation or coordinated activity.",
         "actionableInsight": "Increase monitoring priority for this region; correlate with satellite/AIS data if available.",
         "confidenceNote": "Higher confidence if events span multiple source types and time periods."
       },
       "explained_market_move": {
-        "whyItMatters": "Market move has clear news catalyst—no mystery, price action reflects known information.",
+        "whyItMatters": "Market move has clear news catalyst?봭o mystery, price action reflects known information.",
         "actionableInsight": "Understand the narrative driving the move; assess if reaction is proportional.",
-        "confidenceNote": "High confidence—news and price action are correlated."
+        "confidenceNote": "High confidence?봭ews and price action are correlated."
       },
       "hotspot_escalation": {
         "whyItMatters": "Geopolitical hotspot showing significant escalation based on news activity, country instability, geographic convergence, and military presence.",
         "actionableInsight": "Increase monitoring priority; assess downstream impacts on infrastructure, markets, and regional stability.",
-        "confidenceNote": "Confidence weighted by multiple data sources—news (35%), country instability (25%), geo-convergence (25%), military activity (15%)."
+        "confidenceNote": "Confidence weighted by multiple data sources?봭ews (35%), country instability (25%), geo-convergence (25%), military activity (15%)."
       },
       "sector_cascade": {
-        "whyItMatters": "Market movement is cascading across related sectors—indicates systemic reaction to a catalyzing event.",
+        "whyItMatters": "Market movement is cascading across related sectors?봧ndicates systemic reaction to a catalyzing event.",
         "actionableInsight": "Identify the primary catalyst; assess exposure across correlated assets.",
         "confidenceNote": "Higher confidence when multiple sectors move with similar velocity and direction."
       },
       "military_surge": {
-        "whyItMatters": "Military transport activity significantly above baseline—indicates potential deployment, humanitarian operation, or force projection.",
+        "whyItMatters": "Military transport activity significantly above baseline?봧ndicates potential deployment, humanitarian operation, or force projection.",
         "actionableInsight": "Correlate with regional news; assess nearby base activity and naval movements.",
         "confidenceNote": "Higher confidence with sustained activity over multiple hours and diverse aircraft types."
       },
@@ -2270,7 +2270,7 @@
     "alert": "Alert: {{location}}",
     "multipleRegions": "Multiple Regions",
     "trending": "\"{{term}}\" Trending - {{count}} mentions in {{hours}}h",
-    "eventsDetected": "{{count}} events detected in region ({{lat}}°, {{lon}}°)"
+    "eventsDetected": "{{count}} events detected in region ({{lat}}째, {{lon}}째)"
   },
   "intel": {
     "topics": {
@@ -2308,10 +2308,10 @@
     "updated": "Updated just now",
     "ago": "{{time}} ago",
     "retrying": "Retrying...",
-    "failedToLoad": "Temporarily unavailable — retrying",
+    "failedToLoad": "Temporarily unavailable ??retrying",
     "noDataShort": "No data",
     "dataTemporarilyUnavailable": "Data temporarily unavailable",
-    "upstreamUnavailable": "Upstream API unavailable — will retry automatically",
+    "upstreamUnavailable": "Upstream API unavailable ??will retry automatically",
     "loadingUcdpEvents": "Loading armed conflict events",
     "loadingStablecoins": "Loading stablecoins...",
     "scanningThermalData": "Scanning thermal data",
@@ -2331,7 +2331,7 @@
     "failedSectorData": "Sector data temporarily unavailable",
     "failedCommodities": "Commodities data temporarily unavailable",
     "failedCryptoData": "Crypto data temporarily unavailable",
-    "rateLimitedMarket": "Market data temporarily unavailable (rate limited) — retrying shortly",
+    "rateLimitedMarket": "Market data temporarily unavailable (rate limited) ??retrying shortly",
     "failedClusterNews": "Failed to cluster news",
     "noNewsAvailable": "No news available",
     "noActiveTechHubs": "No active tech hubs",
@@ -2381,8 +2381,8 @@
   },
   "premium": {
     "pro": "PRO",
-    "lockedDesc": "Requires a World Monitor license key",
-    "joinWaitlist": "Join Waitlist",
+    "lockedDesc": "Requires a Lattice Current platform key",
+    "joinWaitlist": "Request Access",
     "features": {
       "orefSirens1": "Real-time Israel missile & rocket alerts",
       "orefSirens2": "Siren zone mapping with threat classification",
@@ -2391,3 +2391,5 @@
     }
   }
 }
+
+

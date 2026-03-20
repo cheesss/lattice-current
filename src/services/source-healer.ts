@@ -1,6 +1,6 @@
 import { fetchWithProxy } from '@/utils';
 import { FEEDS } from '@/config/feeds';
-import { canUseLocalAgentEndpoints } from './runtime';
+import { canUseLocalAgentEndpoints, hasLocalAgentEndpointSupport } from './runtime';
 import { claimNextInvestigationTask, completeInvestigationTask, enqueueSourceInvestigation } from './source-investigation-queue';
 import {
   addDiscoveredSource,
@@ -389,7 +389,7 @@ async function discoverViaPlaywrightAgent(task: {
   reason: string;
   topicHints?: string[];
 }): Promise<AgentDiscoveryResult | null> {
-  if (!canUseLocalAgentEndpoints()) return null;
+  if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) return null;
   try {
     const response = await fetch('/api/local-source-discover', {
       method: 'POST',
@@ -654,7 +654,7 @@ async function buildAutonomousTopicBatch(force: boolean): Promise<string[]> {
 
 async function runAutonomousDiscoveryCycle(force = false): Promise<void> {
   if (autonomyInFlight) return;
-  if (!canUseLocalAgentEndpoints()) return;
+  if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) return;
   autonomyInFlight = true;
 
   try {
@@ -748,7 +748,7 @@ export async function onFeedFetchFailure(
   reason: string,
 ): Promise<void> {
   await recordFeedHealth(feedName, lang, usedUrl, { ok: false, reason });
-  if (!canUseLocalAgentEndpoints()) return;
+  if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) return;
   await enqueueSourceInvestigation({
     feedName,
     lang,

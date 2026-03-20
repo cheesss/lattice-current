@@ -326,6 +326,7 @@ export class App {
       syncDataFreshnessWithLayers: () => this.dataLoader.syncDataFreshnessWithLayers(),
       ensureCorrectZones: () => this.panelLayout.ensureCorrectZones(),
       refreshOpenCountryBrief: () => this.countryIntel.refreshOpenBrief(),
+      flushIntelligenceFabric: () => this.dataLoader.flushPersistedIntelligenceFabric(),
     });
 
     // Wire cross-module callback: DataLoader → SearchManager
@@ -408,6 +409,7 @@ export class App {
 
     // Phase 1: Layout (creates map + panels — they'll find hydrated data)
     this.panelLayout.init();
+    await this.dataLoader.hydratePersistedIntelligenceFabric();
 
     const mobileGeoCoords = await geoCoordsPromise;
     if (mobileGeoCoords && this.state.map) {

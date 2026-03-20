@@ -22,7 +22,9 @@ const DEFAULT_LOCAL_API_PORT: u16 = 46123;
 const KEYRING_SERVICE: &str = "world-monitor";
 const LOCAL_API_LOG_FILE: &str = "local-api.log";
 const DESKTOP_LOG_FILE: &str = "desktop.log";
+const RUNTIME_SECRETS_MIRROR_FILE: &str = "runtime-secrets-mirror.json";
 const MENU_FILE_SETTINGS_ID: &str = "file.settings";
+const MENU_FILE_BACKTEST_HUB_ID: &str = "file.backtest-hub";
 const MENU_HELP_GITHUB_ID: &str = "help.github";
 #[cfg(feature = "devtools")]
 const MENU_HELP_DEVTOOLS_ID: &str = "help.devtools";
@@ -190,9 +192,67 @@ fn save_vault(cache: &HashMap<String, String>) -> Result<(), String> {
         serde_json::to_string(cache).map_err(|e| format!("Failed to serialize vault: {e}"))?;
     let entry = Entry::new(KEYRING_SERVICE, "secrets-vault")
         .map_err(|e| format!("Keyring init failed: {e}"))?;
-    entry
-        .set_password(&json)
-        .map_err(|e| format!("Failed to write vault: {e}"))?;
+    match entry.set_password(&json) {
+        Ok(()) => {
+            for key in SUPPORTED_SECRET_KEYS.iter() {
+                if let Ok(per_key) = Entry::new(KEYRING_SERVICE, key) {
+                    let _ = per_key.delete_credential();
+                }
+            }
+            Ok(())
+        }
+        Err(_vault_err) => {
+            // Windows Credential Manager can reject a large consolidated JSON
+            // payload. Fall back to per-key storage so saving a full config
+            // still works when the single-vault entry exceeds the platform limit.
+            for key in SUPPORTED_SECRET_KEYS.iter() {
+                let per_key = Entry::new(KEYRING_SERVICE, key)
+                    .map_err(|e| format!("Keyring init failed: {e}"))?;
+                if let Some(value) = cache.get(*key).map(|v| v.trim()).filter(|v| !v.is_empty()) {
+                    per_key
+                        .set_password(value)
+                        .map_err(|e| format!("Failed to write key {key}: {e}"))?;
+                } else {
+                    let _ = per_key.delete_credential();
+                }
+            }
+            let _ = entry.delete_credential();
+            Ok(())
+        }
+    }
+}
+
+fn secrets_mirror_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create app data directory {}: {e}", dir.display()))?;
+    Ok(dir.join(RUNTIME_SECRETS_MIRROR_FILE))
+}
+
+fn write_secrets_mirror(app: &AppHandle, cache: &HashMap<String, String>) -> Result<(), String> {
+    let mirror_path = secrets_mirror_path(app)?;
+    let filtered: HashMap<String, String> = cache
+        .iter()
+        .filter_map(|(key, value)| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some((key.clone(), trimmed.to_string()))
+            }
+        })
+        .collect();
+    let serialized = serde_json::to_string(&filtered)
+        .map_err(|e| format!("Failed to serialize runtime secrets mirror: {e}"))?;
+    std::fs::write(&mirror_path, serialized).map_err(|e| {
+        format!(
+            "Failed to write runtime secrets mirror {}: {e}",
+            mirror_path.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -285,6 +345,7 @@ fn get_all_secrets(webview: Webview, cache: tauri::State<'_, SecretsCache>) -> R
 #[tauri::command]
 fn set_secret(
     webview: Webview,
+    app: AppHandle,
     key: String,
     value: String,
     cache: tauri::State<'_, SecretsCache>,
@@ -307,11 +368,23 @@ fn set_secret(
     }
     save_vault(&proposed)?;
     *secrets = proposed;
+    if let Err(err) = write_secrets_mirror(&app, &secrets) {
+        append_desktop_log(
+            &app,
+            "WARN",
+            &format!("failed to sync runtime secrets mirror after set_secret: {err}"),
+        );
+    }
     Ok(())
 }
 
 #[tauri::command]
-fn delete_secret(webview: Webview, key: String, cache: tauri::State<'_, SecretsCache>) -> Result<(), String> {
+fn delete_secret(
+    webview: Webview,
+    app: AppHandle,
+    key: String,
+    cache: tauri::State<'_, SecretsCache>,
+) -> Result<(), String> {
     require_trusted_window(webview.label())?;
     if !SUPPORTED_SECRET_KEYS.contains(&key.as_str()) {
         return Err(format!("Unsupported secret key: {key}"));
@@ -324,6 +397,13 @@ fn delete_secret(webview: Webview, key: String, cache: tauri::State<'_, SecretsC
     proposed.remove(&key);
     save_vault(&proposed)?;
     *secrets = proposed;
+    if let Err(err) = write_secrets_mirror(&app, &secrets) {
+        append_desktop_log(
+            &app,
+            "WARN",
+            &format!("failed to sync runtime secrets mirror after delete_secret: {err}"),
+        );
+    }
     Ok(())
 }
 
@@ -527,6 +607,21 @@ fn close_live_channels_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn open_backtest_hub_window_command(app: AppHandle) -> Result<(), String> {
+    open_backtest_hub_window(&app)
+}
+
+#[tauri::command]
+fn close_backtest_hub_window(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("backtest-hub") {
+        window
+            .close()
+            .map_err(|e| format!("Failed to close backtest hub window: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Fetch JSON from Polymarket Gamma API using native TLS (bypasses Cloudflare JA3 blocking).
 /// Called from frontend when browser CORS and sidecar Node.js TLS both fail.
 #[tauri::command]
@@ -614,6 +709,34 @@ fn open_live_channels_window(app: &AppHandle, base_url: Option<String>) -> Resul
 
     #[cfg(not(target_os = "macos"))]
     let _ = _live_channels_window.remove_menu();
+
+    Ok(())
+}
+
+fn open_backtest_hub_window(app: &AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("backtest-hub") {
+        let _ = window.show();
+        window
+            .set_focus()
+            .map_err(|e| format!("Failed to focus backtest hub window: {e}"))?;
+        return Ok(());
+    }
+
+    let backtest_hub_window = WebviewWindowBuilder::new(
+        app,
+        "backtest-hub",
+        WebviewUrl::App("backtest-hub.html".into()),
+    )
+    .title("Backtest & Data Hub - World Monitor")
+    .inner_size(1420.0, 920.0)
+    .min_inner_size(1100.0, 760.0)
+    .resizable(true)
+    .background_color(tauri::webview::Color(18, 19, 24, 255))
+    .build()
+    .map_err(|e| format!("Failed to create backtest hub window: {e}"))?;
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = backtest_hub_window.remove_menu();
 
     Ok(())
 }
@@ -1011,13 +1134,20 @@ fn build_app_menu(handle: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         true,
         Some("CmdOrCtrl+,"),
     )?;
+    let backtest_hub_item = MenuItem::with_id(
+        handle,
+        MENU_FILE_BACKTEST_HUB_ID,
+        "Backtest & Data Hub...",
+        true,
+        Some("CmdOrCtrl+Shift+B"),
+    )?;
     let separator = PredefinedMenuItem::separator(handle)?;
     let quit_item = PredefinedMenuItem::quit(handle, Some("Quit"))?;
     let file_menu = Submenu::with_items(
         handle,
         "File",
         true,
-        &[&settings_item, &separator, &quit_item],
+        &[&settings_item, &backtest_hub_item, &separator, &quit_item],
     )?;
 
     let about_metadata = AboutMetadata {
@@ -1089,6 +1219,12 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             if let Err(err) = open_settings_window(app) {
                 append_desktop_log(app, "ERROR", &format!("settings menu failed: {err}"));
                 eprintln!("[tauri] settings menu failed: {err}");
+            }
+        }
+        MENU_FILE_BACKTEST_HUB_ID => {
+            if let Err(err) = open_backtest_hub_window(app) {
+                append_desktop_log(app, "ERROR", &format!("backtest hub menu failed: {err}"));
+                eprintln!("[tauri] backtest hub menu failed: {err}");
             }
         }
         MENU_HELP_GITHUB_ID => {
@@ -1636,6 +1772,8 @@ fn main() {
             close_settings_window,
             open_live_channels_window_command,
             close_live_channels_window,
+            open_backtest_hub_window_command,
+            close_backtest_hub_window,
             open_url,
             open_youtube_login,
             open_glint_login,
@@ -1646,6 +1784,18 @@ fn main() {
             // Load persistent cache into memory (avoids 14MB file I/O on every IPC call)
             let cache_path = cache_file_path(&app.handle()).unwrap_or_default();
             app.manage(PersistentCache::load(&cache_path));
+
+            if let Ok(secrets_cache) = app.try_state::<SecretsCache>() {
+                if let Ok(secrets) = secrets_cache.secrets.lock() {
+                    if let Err(err) = write_secrets_mirror(&app.handle(), &secrets) {
+                        append_desktop_log(
+                            &app.handle(),
+                            "WARN",
+                            &format!("failed to initialize runtime secrets mirror: {err}"),
+                        );
+                    }
+                }
+            }
 
             if let Err(err) = start_local_api(&app.handle()) {
                 append_desktop_log(

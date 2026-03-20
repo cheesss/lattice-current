@@ -141,7 +141,7 @@ export class DataQAPanel extends Panel {
 
     this.pushMessage(
       'system',
-      '현재 로드된 World Monitor 데이터를 기준으로 답변합니다. 빠르게 보내려면 Ctrl+Enter를 사용하세요.',
+      '현재 로드된 Lattice Current 데이터를 기준으로 답변합니다. 빠르게 보내려면 Ctrl+Enter를 사용하세요.',
     );
     this.refreshSnapshot();
   }

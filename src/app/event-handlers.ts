@@ -19,6 +19,7 @@ import {
   getCurrentTheme,
   setTheme,
 } from '@/utils';
+import { escapeHtml } from '@/utils/sanitize';
 import {
   STORAGE_KEYS,
   SITE_VARIANT,
@@ -43,9 +44,18 @@ import {
 import { invokeTauri } from '@/services/tauri-bridge';
 import { dataFreshness } from '@/services/data-freshness';
 import { mlWorker } from '@/services/ml-worker';
+import { openBacktestHubWindow } from '@/services/backtest-hub-launcher';
 import { UnifiedSettings } from '@/components/UnifiedSettings';
-import { t } from '@/services/i18n';
+import { t, getCurrentLanguage } from '@/services/i18n';
 import { TvModeController } from '@/services/tv-mode';
+import {
+  getWorkspaceDefinition,
+  LEGACY_WORKSPACE_STORAGE_KEY,
+  type WorkspaceDefinition,
+  type WorkspaceId,
+  WORKSPACE_STORAGE_KEY,
+} from '@/config/workspaces';
+import { LEGACY_VARIANT_STORAGE_KEY, VARIANT_STORAGE_KEY } from '@/config/variant';
 
 export interface EventHandlerCallbacks {
   updateSearchIndex: () => void;
@@ -57,6 +67,7 @@ export interface EventHandlerCallbacks {
   syncDataFreshnessWithLayers: () => void;
   ensureCorrectZones?: () => void;
   refreshOpenCountryBrief?: () => void;
+  flushIntelligenceFabric?: () => void;
 }
 
 export class EventHandlerManager implements AppModule {
@@ -72,6 +83,7 @@ export class EventHandlerManager implements AppModule {
   private boundNewsTelemetryHandler: ((e: Event) => void) | null = null;
   private boundNewsMapFocusHandler: ((e: Event) => void) | null = null;
   private boundOpenCodexHubHandler: ((e: Event) => void) | null = null;
+  private boundOpenHubRequestHandler: ((e: Event) => void) | null = null;
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -80,14 +92,31 @@ export class EventHandlerManager implements AppModule {
   private tapeHeadlineIndex = -1;
   private focusedHeadlineIndex = -1;
   private readonly IDLE_PAUSE_MS = 2 * 60 * 1000;
+  private activeWorkspace: WorkspaceId = getWorkspaceDefinition().id;
 
   constructor(ctx: AppContext, callbacks: EventHandlerCallbacks) {
     this.ctx = ctx;
     this.callbacks = callbacks;
   }
 
+  private renderWorkspaceStory(workspace: WorkspaceDefinition): string {
+    return workspace.flowSteps.map((step) => `
+      <article class="workspace-story-card">
+        <span class="workspace-story-label">${escapeHtml(step.label)}</span>
+        <p>${escapeHtml(step.summary)}</p>
+      </article>
+    `).join('');
+  }
+
+  private renderWorkspaceFocus(workspace: WorkspaceDefinition): string {
+    return workspace.focusAreas
+      .map((item) => `<span class="workspace-chip workspace-focus-chip">${escapeHtml(item)}</span>`)
+      .join('');
+  }
+
   init(): void {
     this.setupEventListeners();
+    this.setupWorkspaceShell();
     this.setupTerminalTape();
     this.setupKeyboardShortcuts();
     this.setupIdleDetection();
@@ -186,6 +215,10 @@ export class EventHandlerManager implements AppModule {
       window.removeEventListener('wm:open-codex-hub', this.boundOpenCodexHubHandler);
       this.boundOpenCodexHubHandler = null;
     }
+    if (this.boundOpenHubRequestHandler) {
+      window.removeEventListener('wm:open-hub', this.boundOpenHubRequestHandler);
+      this.boundOpenHubRequestHandler = null;
+    }
     if (this.boundHotkeyHandler) {
       document.removeEventListener('keydown', this.boundHotkeyHandler);
       this.boundHotkeyHandler = null;
@@ -197,18 +230,57 @@ export class EventHandlerManager implements AppModule {
   }
 
   private setupEventListeners(): void {
+    const openHub = (hub: 'analysis' | 'codex' | 'backtest' | 'ontology'): void => {
+      const hideOverlayHubs = (): void => {
+        this.ctx.analysisHubPage?.hide();
+        this.ctx.codexHubPage?.hide();
+        this.ctx.ontologyGraphPage?.hide();
+      };
+
+      if (hub === 'analysis') {
+        const alreadyVisible = this.ctx.analysisHubPage?.isVisible() ?? false;
+        hideOverlayHubs();
+        if (!alreadyVisible) this.ctx.analysisHubPage?.show();
+        return;
+      }
+      if (hub === 'codex') {
+        const alreadyVisible = this.ctx.codexHubPage?.isVisible() ?? false;
+        hideOverlayHubs();
+        if (!alreadyVisible) this.ctx.codexHubPage?.show();
+        return;
+      }
+      if (hub === 'backtest') {
+        void openBacktestHubWindow();
+        return;
+      }
+      const alreadyVisible = this.ctx.ontologyGraphPage?.isVisible() ?? false;
+      hideOverlayHubs();
+      if (!alreadyVisible) this.ctx.ontologyGraphPage?.show();
+    };
+
     document.getElementById('searchBtn')?.addEventListener('click', () => {
       this.callbacks.updateSearchIndex();
       this.ctx.searchModal?.open();
     });
     document.getElementById('analysisHubBtn')?.addEventListener('click', () => {
-      this.ctx.analysisHubPage?.toggle();
+      openHub('analysis');
     });
     document.getElementById('codexHubBtn')?.addEventListener('click', () => {
-      this.ctx.codexHubPage?.toggle();
+      openHub('codex');
+    });
+    document.getElementById('backtestHubBtn')?.addEventListener('click', () => {
+      openHub('backtest');
     });
     document.getElementById('ontologyGraphBtn')?.addEventListener('click', () => {
-      this.ctx.ontologyGraphPage?.toggle();
+      openHub('ontology');
+    });
+    this.ctx.container.querySelectorAll<HTMLElement>('[data-open-hub]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const hub = button.dataset.openHub;
+        if (hub === 'analysis' || hub === 'codex' || hub === 'backtest' || hub === 'ontology') {
+          openHub(hub);
+        }
+      });
     });
 
     if (this.boundOpenCodexHubHandler) {
@@ -218,6 +290,18 @@ export class EventHandlerManager implements AppModule {
       this.ctx.codexHubPage?.show();
     };
     window.addEventListener('wm:open-codex-hub', this.boundOpenCodexHubHandler);
+
+    if (this.boundOpenHubRequestHandler) {
+      window.removeEventListener('wm:open-hub', this.boundOpenHubRequestHandler);
+    }
+    this.boundOpenHubRequestHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{ hub?: string }>).detail;
+      const hub = detail?.hub;
+      if (hub === 'analysis' || hub === 'codex' || hub === 'backtest' || hub === 'ontology') {
+        openHub(hub);
+      }
+    };
+    window.addEventListener('wm:open-hub', this.boundOpenHubRequestHandler);
 
     document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
       const shareUrl = this.getShareUrl();
@@ -255,20 +339,17 @@ export class EventHandlerManager implements AppModule {
       trackThemeChanged(next);
     });
 
-    const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    if (this.ctx.isDesktopApp || isLocalDev) {
-      this.ctx.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
-        link.addEventListener('click', (e) => {
-          const variant = link.dataset.variant;
-          if (variant && variant !== SITE_VARIANT) {
-            e.preventDefault();
-            trackVariantSwitch(SITE_VARIANT, variant);
-            localStorage.setItem('worldmonitor-variant', variant);
-            window.location.reload();
-          }
-        });
+    this.ctx.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
+      link.addEventListener('click', (e) => {
+        const variant = link.dataset.variant;
+        if (!variant || variant === SITE_VARIANT) return;
+        e.preventDefault();
+        trackVariantSwitch(SITE_VARIANT, variant);
+        localStorage.setItem(VARIANT_STORAGE_KEY, variant);
+        localStorage.setItem(LEGACY_VARIANT_STORAGE_KEY, variant);
+        window.location.reload();
       });
-    }
+    });
 
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     if (!this.ctx.isDesktopApp && fullscreenBtn) {
@@ -299,6 +380,7 @@ export class EventHandlerManager implements AppModule {
       if (document.hidden) {
         this.callbacks.setHiddenSince(Date.now());
         mlWorker.unloadOptionalModels();
+        void this.callbacks.flushIntelligenceFabric?.();
       } else {
         this.resetIdleTimer();
         this.callbacks.flushStaleRefreshes();
@@ -352,6 +434,116 @@ export class EventHandlerManager implements AppModule {
       document.getElementById('mapSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     window.addEventListener('wm:focus-news-location', this.boundNewsMapFocusHandler);
+  }
+
+  private setupWorkspaceShell(): void {
+    this.activeWorkspace = getWorkspaceDefinition(
+      localStorage.getItem(WORKSPACE_STORAGE_KEY) || localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY),
+      SITE_VARIANT,
+    ).id;
+
+    this.ctx.container.querySelectorAll<HTMLButtonElement>('[data-workspace-target]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const next = button.dataset.workspaceTarget;
+        if (!next) return;
+        this.setActiveWorkspace(next as WorkspaceId);
+      });
+    });
+
+    this.applyWorkspaceMode();
+  }
+
+  private setActiveWorkspace(nextWorkspace: WorkspaceId): void {
+    const resolved = getWorkspaceDefinition(nextWorkspace, SITE_VARIANT).id;
+    if (resolved === this.activeWorkspace) return;
+    this.activeWorkspace = resolved;
+    localStorage.setItem(WORKSPACE_STORAGE_KEY, this.activeWorkspace);
+    localStorage.setItem(LEGACY_WORKSPACE_STORAGE_KEY, this.activeWorkspace);
+    this.applyWorkspaceMode();
+  }
+
+  private applyWorkspaceMode(): void {
+    const workspace = getWorkspaceDefinition(this.activeWorkspace, SITE_VARIANT);
+    const isKoreanUi = getCurrentLanguage() === 'ko';
+    document.documentElement.dataset.workspace = workspace.id;
+
+    const allowedPanels = workspace.id === 'all' ? null : new Set(workspace.panelKeys);
+    const enabledPanels = new Set(
+      Object.entries(this.ctx.panelSettings)
+        .filter(([, config]) => config.enabled !== false)
+        .map(([key]) => key),
+    );
+
+    let visibleCount = 0;
+    document.querySelectorAll<HTMLElement>('#panelsGrid .panel[data-panel]').forEach((panelEl) => {
+      const key = panelEl.dataset.panel;
+      if (!key) return;
+      const enabled = enabledPanels.has(key);
+      const inWorkspace = !allowedPanels || allowedPanels.has(key);
+      const shouldShow = enabled && inWorkspace;
+      panelEl.classList.toggle('workspace-hidden', !shouldShow);
+      panelEl.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+      if (shouldShow) visibleCount += 1;
+    });
+
+    const mapEnabled = this.ctx.panelSettings.map?.enabled !== false;
+    const mapVisible = mapEnabled && workspace.showMap;
+    const mapSection = document.getElementById('mapSection');
+    mapSection?.classList.toggle('workspace-hidden', !mapVisible);
+    this.ctx.map?.setRenderPaused(!mapVisible);
+
+    this.ctx.container.querySelectorAll<HTMLButtonElement>('[data-workspace-target]').forEach((button) => {
+      const active = button.dataset.workspaceTarget === workspace.id;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    const titleEl = document.getElementById('workspaceTitle');
+    if (titleEl) titleEl.textContent = workspace.title;
+    const eyebrowEl = document.getElementById('workspaceEyebrow');
+    if (eyebrowEl) eyebrowEl.textContent = workspace.eyebrow;
+    const summaryEl = document.getElementById('workspaceSummary');
+    if (summaryEl) summaryEl.textContent = workspace.description;
+    const intentTitleEl = document.getElementById('workspaceIntentTitle');
+    if (intentTitleEl) intentTitleEl.textContent = workspace.heroTitle;
+    const intentSummaryEl = document.getElementById('workspaceIntentSummary');
+    if (intentSummaryEl) intentSummaryEl.textContent = workspace.heroSummary;
+    const storyEl = document.getElementById('workspaceStory');
+    if (storyEl) storyEl.innerHTML = this.renderWorkspaceStory(workspace);
+    const statEl = document.getElementById('workspaceStat');
+    if (statEl) statEl.textContent = `${visibleCount} modules in view · ${Math.max(workspace.featuredPanels.length, 1)} curated`;
+    const mapModeEl = document.getElementById('workspaceMapMode');
+    if (mapModeEl) mapModeEl.textContent = workspace.showMap ? 'Context map active' : 'Context map tucked away';
+    const statOverrideEl = document.getElementById('workspaceStat');
+    if (statOverrideEl) {
+      const curatedCount = Math.max(workspace.featuredPanels.length, 1);
+      statOverrideEl.textContent = isKoreanUi
+        ? `${visibleCount}개 표시 중 · 추천 ${curatedCount}개`
+        : `${visibleCount} visible now · ${curatedCount} recommended`;
+    }
+    const mapModeOverrideEl = document.getElementById('workspaceMapMode');
+    if (mapModeOverrideEl) {
+      mapModeOverrideEl.textContent = workspace.showMap
+        ? (isKoreanUi ? '지도 컨텍스트 표시 중' : 'Context map active')
+        : (isKoreanUi ? '지도는 필요할 때만 표시' : 'Context map tucked away');
+    }
+    const focusEl = document.getElementById('workspaceFocusAreas');
+    if (focusEl) focusEl.innerHTML = this.renderWorkspaceFocus(workspace);
+
+    const featuredEl = document.getElementById('workspaceFeatured');
+    if (featuredEl) {
+      const chips = workspace.featuredPanels
+        .filter((key) => enabledPanels.has(key) && (!allowedPanels || allowedPanels.has(key)))
+        .map((key) => this.ctx.panelSettings[key]?.name ?? DEFAULT_PANELS[key]?.name ?? key)
+        .slice(0, 4);
+      featuredEl.innerHTML = chips.length > 0
+        ? chips.map((label) => `<span class="workspace-chip">${escapeHtml(label)}</span>`).join('')
+        : '<span class="workspace-chip muted">Workspace suggestions update as this surface fills in</span>';
+    }
+
+    requestAnimationFrame(() => {
+      this.ctx.map?.render();
+    });
   }
 
   private setupTerminalTape(): void {
@@ -433,6 +625,21 @@ export class EventHandlerManager implements AppModule {
         || target.tagName === 'SELECT'
         || target.isContentEditable
       );
+
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && /^[1-7]$/.test(event.key)) {
+        if (!isTypingTarget) {
+          const index = Number(event.key) - 1;
+          const buttons = Array.from(
+            this.ctx.container.querySelectorAll<HTMLButtonElement>('[data-workspace-target]'),
+          );
+          const next = buttons[index];
+          if (next) {
+            event.preventDefault();
+            next.click();
+          }
+        }
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === 'A' || event.key === 'a')) {
         if (!isTypingTarget) {
@@ -958,5 +1165,7 @@ export class EventHandlerManager implements AppModule {
       const panel = this.ctx.panels[key];
       panel?.toggle(config.enabled);
     });
+    this.applyWorkspaceMode();
   }
 }
+

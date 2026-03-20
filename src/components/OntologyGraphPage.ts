@@ -16,6 +16,7 @@ import {
   splitCanonicalAlias,
   summarizeStixBundle,
 } from '@/services';
+import { APP_BRAND } from '@/config/brand';
 import { escapeHtml } from '@/utils/sanitize';
 
 interface OntologyGraphSnapshot {
@@ -242,11 +243,17 @@ export class OntologyGraphPage {
     this.overlay = document.createElement('div');
     this.overlay.className = 'ontology-graph-overlay';
     this.overlay.innerHTML = `
-      <section class="ontology-graph-page" role="dialog" aria-modal="true" aria-label="Ontology Graph">
+      <section class="ontology-graph-page" role="dialog" aria-modal="true" aria-label="${APP_BRAND.hubs.ontology}">
         <header class="ontology-graph-header">
           <div>
-            <h2 class="ontology-graph-title">Ontology Graph</h2>
-            <p class="ontology-graph-subtitle">Type system, relation grammar, event nodes, alias operations, and graph history</p>
+            <h2 class="ontology-graph-title">${APP_BRAND.hubs.ontology}</h2>
+            <p class="ontology-graph-subtitle">Entities, relations, replayable graph state, and ontology health in one graph workspace</p>
+            <div class="hub-desk-switcher" aria-label="Switch desk">
+              <button type="button" class="hub-desk-btn" data-open-hub-target="analysis">${APP_BRAND.hubs.analysis}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="codex">${APP_BRAND.hubs.codex}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="backtest">${APP_BRAND.hubs.backtest}</button>
+              <button type="button" class="hub-desk-btn active" data-open-hub-target="ontology">${APP_BRAND.hubs.ontology}</button>
+            </div>
           </div>
           <div class="ontology-graph-actions">
             <button type="button" class="ontology-graph-action-btn" data-role="refresh">Refresh</button>
@@ -314,6 +321,14 @@ export class OntologyGraphPage {
 
   private async handleContentClick(event: Event): Promise<void> {
     const target = event.target as HTMLElement | null;
+    const hubSwitchBtn = target?.closest<HTMLElement>('[data-open-hub-target]');
+    if (hubSwitchBtn) {
+      const hub = hubSwitchBtn.dataset.openHubTarget;
+      if (hub) {
+        window.dispatchEvent(new CustomEvent('wm:open-hub', { detail: { hub } }));
+      }
+      return;
+    }
     const button = target?.closest<HTMLButtonElement>('[data-action]');
     if (!button) return;
     const action = button.dataset.action || '';
@@ -400,7 +415,8 @@ export class OntologyGraphPage {
     if ((!graph || graph.nodes.length === 0) && (!ontologyGraph || ontologyGraph.nodes.length === 0)) {
       this.content.innerHTML = `
         <div class="ontology-graph-empty">
-          No ontology graph available yet. Wait for keyword discovery and graph refresh cycles to populate it.
+          <strong>Graph Studio is waiting for the first relationship build.</strong>
+          <div class="backtest-lab-note">Run the scheduler or let keyword discovery finish, then come back here to inspect the entity graph and replay ledger.</div>
         </div>
       `;
       return;

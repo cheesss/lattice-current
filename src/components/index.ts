@@ -53,6 +53,7 @@ export * from './DataQAPanel';
 export * from './OpenbbFallbackBanner';
 export * from './SourceOpsPanel';
 export * from './CodexOpsPanel';
+export * from './DataFlowOpsPanel';
 export * from './TelegramIntelPanel';
 export * from './CodexHubPage';
 export * from './OntologyGraphPage';

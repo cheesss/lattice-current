@@ -3,28 +3,31 @@ import { invalidateColorCache } from './theme-colors';
 export type Theme = 'dark' | 'light';
 export type ThemePreference = 'auto' | 'dark' | 'light';
 
-const STORAGE_KEY = 'worldmonitor-theme';
+const STORAGE_KEY = 'lattice-current-theme';
+const LEGACY_STORAGE_KEY = 'worldmonitor-theme';
 const DEFAULT_THEME: Theme = 'dark';
+
+function readStoredValue(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Read the stored theme preference from localStorage.
  * Returns 'dark' or 'light' if valid, otherwise DEFAULT_THEME.
  */
 export function getStoredTheme(): Theme {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light') return stored;
-  } catch {
-    // localStorage unavailable (e.g., sandboxed iframe, private browsing)
-  }
+  const stored = readStoredValue();
+  if (stored === 'dark' || stored === 'light') return stored;
   return DEFAULT_THEME;
 }
 
 export function getThemePreference(): ThemePreference {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'auto' || stored === 'dark' || stored === 'light') return stored;
-  } catch { /* noop */ }
+  const stored = readStoredValue();
+  if (stored === 'auto' || stored === 'dark' || stored === 'light') return stored;
   return 'auto';
 }
 
@@ -47,7 +50,10 @@ function teardownAutoListener(): void {
 }
 
 export function setThemePreference(pref: ThemePreference): void {
-  try { localStorage.setItem(STORAGE_KEY, pref); } catch { /* noop */ }
+  try {
+    localStorage.setItem(STORAGE_KEY, pref);
+    localStorage.setItem(LEGACY_STORAGE_KEY, pref);
+  } catch { /* noop */ }
   teardownAutoListener();
   const effective: Theme = pref === 'auto' ? resolveAutoTheme() : pref;
   setTheme(effective);
@@ -76,6 +82,7 @@ export function setTheme(theme: Theme): void {
   invalidateColorCache();
   try {
     localStorage.setItem(STORAGE_KEY, theme);
+    localStorage.setItem(LEGACY_STORAGE_KEY, theme);
   } catch {
     // localStorage unavailable
   }
@@ -100,7 +107,7 @@ export function applyStoredTheme(): void {
 
   // Check raw localStorage to distinguish "no preference" from "explicitly chose dark"
   let raw: string | null = null;
-  try { raw = localStorage.getItem(STORAGE_KEY); } catch { /* noop */ }
+  try { raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY); } catch { /* noop */ }
   const hasExplicitPreference = raw === 'dark' || raw === 'light' || raw === 'auto';
 
   let effective: Theme;

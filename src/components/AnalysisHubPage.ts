@@ -8,6 +8,7 @@ import type { EventMarketTransmissionSnapshot } from '@/services/event-market-tr
 import type { SourceCredibilityProfile } from '@/services/source-credibility';
 import type { MultiHopInferenceAlert } from '@/services/multi-hop-inference';
 import type { InvestmentIntelligenceSnapshot } from '@/services/investment-intelligence';
+import { APP_BRAND } from '@/config/brand';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 export interface AnalysisHubSnapshot {
@@ -74,11 +75,17 @@ export class AnalysisHubPage {
     this.overlay = document.createElement('div');
     this.overlay.className = 'analysis-hub-overlay';
     this.overlay.innerHTML = `
-      <section class="analysis-hub-page" role="dialog" aria-modal="true" aria-label="Analysis Hub">
+      <section class="analysis-hub-page" role="dialog" aria-modal="true" aria-label="${APP_BRAND.hubs.analysis}">
         <header class="analysis-hub-header">
           <div>
-            <h2 class="analysis-hub-title">Analysis Hub</h2>
-            <p class="analysis-hub-subtitle">Risk scores and analytical outputs in one view</p>
+            <h2 class="analysis-hub-title">${APP_BRAND.hubs.analysis}</h2>
+            <p class="analysis-hub-subtitle">Live posture, transmission, and capital context on one reading surface</p>
+            <div class="hub-desk-switcher" aria-label="Switch desk">
+              <button type="button" class="hub-desk-btn active" data-open-hub-target="analysis">${APP_BRAND.hubs.analysis}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="codex">${APP_BRAND.hubs.codex}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="backtest">${APP_BRAND.hubs.backtest}</button>
+              <button type="button" class="hub-desk-btn" data-open-hub-target="ontology">${APP_BRAND.hubs.ontology}</button>
+            </div>
           </div>
           <div class="analysis-hub-actions">
             <button type="button" class="analysis-hub-action-btn" data-role="refresh">Refresh</button>
@@ -103,6 +110,14 @@ export class AnalysisHubPage {
 
     this.clickHandler = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
+      const hubSwitchBtn = target.closest('[data-open-hub-target]') as HTMLElement | null;
+      if (hubSwitchBtn) {
+        const hub = hubSwitchBtn.dataset.openHubTarget;
+        if (hub) {
+          window.dispatchEvent(new CustomEvent('wm:open-hub', { detail: { hub } }));
+        }
+        return;
+      }
       if (target === this.overlay) {
         this.hide();
         return;

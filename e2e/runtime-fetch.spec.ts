@@ -107,6 +107,9 @@ test.describe('desktop runtime routing guardrails', () => {
         if (url.includes('worldmonitor.app/api/stablecoin-markets')) {
           return responseJson({ stablecoins: [{ symbol: 'USDT' }] }, 200);
         }
+        if (url.includes('/api/local-env-update')) {
+          return responseJson({ ok: true }, 200);
+        }
 
         return responseJson({ ok: true }, 200);
       }) as typeof window.fetch;
@@ -135,6 +138,7 @@ test.describe('desktop runtime routing guardrails', () => {
           calls,
         };
       } finally {
+        await runtimeConfig.setSecretValue('WORLDMONITOR_API_KEY' as import('/src/services/runtime-config.ts').RuntimeSecretKey, '');
         window.fetch = originalFetch;
         delete globalWindow.__wmFetchPatched;
         if (previousTauri === undefined) {
@@ -142,7 +146,6 @@ test.describe('desktop runtime routing guardrails', () => {
         } else {
           globalWindow.__TAURI__ = previousTauri;
         }
-        await runtimeConfig.setSecretValue('WORLDMONITOR_API_KEY' as import('/src/services/runtime-config.ts').RuntimeSecretKey, '');
       }
     });
 
@@ -245,6 +248,77 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.calls.some((url) => url.includes('127.0.0.1:46123/api/local-validate-secret'))).toBe(true);
     expect(result.calls.some((url) => url.includes('worldmonitor.app/api/local-env-update'))).toBe(false);
     expect(result.calls.some((url) => url.includes('worldmonitor.app/api/local-validate-secret'))).toBe(false);
+  });
+
+  test('runtime-config can save and validate secrets in browser mode through local proxy routes', async ({ page }) => {
+    await page.goto('/tests/runtime-harness.html');
+
+    const result = await page.evaluate(async () => {
+      const originalFetch = window.fetch.bind(window);
+      const calls: Array<{ url: string; method: string; body: string | null }> = [];
+      const responseJson = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input.url;
+        const method = (init?.method || 'GET').toUpperCase();
+        const body = typeof init?.body === 'string' ? init.body : null;
+        calls.push({ url, method, body });
+
+        if (url.includes('/api/local-runtime-secrets')) {
+          return responseJson({ ok: true, secrets: {}, sources: {} }, 200);
+        }
+        if (url.includes('/api/local-env-update')) {
+          return responseJson({ ok: true }, 200);
+        }
+        if (url.includes('/api/local-validate-secret')) {
+          return responseJson({ valid: true, message: 'Verified by proxy' }, 200);
+        }
+
+        return responseJson({ ok: true }, 200);
+      }) as typeof window.fetch;
+
+      try {
+        const runtimeConfig = await import('/src/services/runtime-config.ts');
+        const secretValue = 'wm_test_key_1234567890abcdef';
+
+        await runtimeConfig.setSecretValue(
+          'WORLDMONITOR_API_KEY' as import('/src/services/runtime-config.ts').RuntimeSecretKey,
+          secretValue,
+        );
+        const verification = await runtimeConfig.verifySecretWithApi(
+          'WORLDMONITOR_API_KEY' as import('/src/services/runtime-config.ts').RuntimeSecretKey,
+          secretValue,
+        );
+        const snapshot = runtimeConfig.getRuntimeConfigSnapshot();
+
+        return {
+          verification,
+          storedValue: snapshot.secrets.WORLDMONITOR_API_KEY?.value ?? null,
+          envUpdateCalls: calls.filter((entry) => entry.url.includes('/api/local-env-update')),
+          validateCalls: calls.filter((entry) => entry.url.includes('/api/local-validate-secret')),
+        };
+      } finally {
+        window.fetch = originalFetch;
+      }
+    });
+
+    expect(result.storedValue).toBe('wm_test_key_1234567890abcdef');
+    expect(result.verification.valid).toBe(true);
+    expect(result.verification.message).toContain('Verified by proxy');
+    expect(result.envUpdateCalls).toHaveLength(1);
+    expect(result.envUpdateCalls[0]?.method).toBe('POST');
+    expect(result.envUpdateCalls[0]?.body).toContain('"key":"WORLDMONITOR_API_KEY"');
+    expect(result.validateCalls).toHaveLength(1);
+    expect(result.validateCalls[0]?.method).toBe('POST');
   });
 
   test('chunk preload reload guard is one-shot until app boot clears it', async ({ page }) => {
@@ -377,8 +451,8 @@ test.describe('desktop runtime routing guardrails', () => {
     });
 
     expect(result.macArm).toBe('https://worldmonitor.app/api/download?platform=macos-arm64&variant=full');
-    expect(result.windowsX64).toBe('https://worldmonitor.app/api/download?platform=windows-exe&variant=full');
-    expect(result.linuxFallback).toBe('https://github.com/koala73/worldmonitor/releases/latest');
+    expect(result.windowsX64).toBe('https://worldmonitor.app/api/download?platform=windows-msi&variant=full');
+    expect(result.linuxFallback).toBe('https://worldmonitor.app/api/download?platform=linux-appimage&variant=full');
   });
 
   test('MapContainer falls back to SVG when WebGL2 is unavailable', async ({ page }) => {
@@ -564,8 +638,10 @@ test.describe('desktop runtime routing guardrails', () => {
 
         // Sebuf proto: POST /api/market/v1/list-market-quotes
         if (parsed.pathname === '/api/market/v1/list-market-quotes') {
-          const body = init?.body ? JSON.parse(String(init.body)) : {};
-          const symbols: string[] = body.symbols || [];
+          const symbols = String(parsed.searchParams.get('symbols') || '')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
           const quotes = symbols
             .filter((s: string) => yahooOnly.has(s))
             .map((s: string) => {
@@ -621,6 +697,10 @@ test.describe('desktop runtime routing guardrails', () => {
             },
           },
         },
+        ensureOpenbbStartupHealth: async () => {},
+        shouldRefreshOpenbbIntel: () => false,
+        loadMarketsFallbackOnly: (DataLoaderManager.prototype as unknown as { loadMarketsFallbackOnly: () => Promise<void> }).loadMarketsFallbackOnly,
+        refreshOpenbbIntelDebounced: () => {},
       };
 
       try {
@@ -654,7 +734,7 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.marketConfigErrors.length).toBe(0);
 
     expect(result.heatmapRenders.length).toBe(0);
-    expect(result.heatmapConfigErrors).toEqual(['FINNHUB_API_KEY not configured — add in Settings']);
+    expect(result.heatmapConfigErrors).toEqual(['FINNHUB_API_KEY not configured - add in Settings']);
 
     expect(result.commoditiesRenders.some((count) => count > 0)).toBe(true);
     expect(result.commoditiesConfigErrors.length).toBe(0);
@@ -687,8 +767,7 @@ test.describe('desktop runtime routing guardrails', () => {
       window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const parsed = new URL(toUrl(input));
         if (parsed.pathname === '/api/conflict/v1/get-humanitarian-summary') {
-          const body = init?.body ? JSON.parse(String(init.body)) : {};
-          const countryCode = String(body.countryCode || '').toUpperCase();
+          const countryCode = String(parsed.searchParams.get('country_code') || '').toUpperCase();
           seenCountryCodes.add(countryCode);
           return responseJson({
             summary: {
@@ -835,6 +914,9 @@ test.describe('desktop runtime routing guardrails', () => {
         if (url.includes('worldmonitor.app/api/market/v1/test')) {
           return responseJson({ quotes: [] }, 200);
         }
+        if (url.includes('/api/local-env-update')) {
+          return responseJson({ ok: true }, 200);
+        }
         return responseJson({ ok: true }, 200);
       }) as typeof window.fetch;
 
@@ -858,6 +940,7 @@ test.describe('desktop runtime routing guardrails', () => {
           wmKeyHeader: capturedHeaders['X-WorldMonitor-Key'] || null,
         };
       } finally {
+        await runtimeConfig.setSecretValue('WORLDMONITOR_API_KEY' as import('/src/services/runtime-config.ts').RuntimeSecretKey, '');
         window.fetch = originalFetch;
         delete globalWindow.__wmFetchPatched;
         if (previousTauri === undefined) {
@@ -865,7 +948,6 @@ test.describe('desktop runtime routing guardrails', () => {
         } else {
           globalWindow.__TAURI__ = previousTauri;
         }
-        await runtimeConfig.setSecretValue('WORLDMONITOR_API_KEY' as import('/src/services/runtime-config.ts').RuntimeSecretKey, '');
       }
     });
 

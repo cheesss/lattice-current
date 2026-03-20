@@ -1489,18 +1489,18 @@ test('service-status reports bound fallback port after EADDRINUSE recovery', asy
     res.writeHead(200, { 'content-type': 'text/plain' });
     res.end('occupied');
   });
-  await listen(blocker, '127.0.0.1', 46123);
+  const blockerPort = await listen(blocker, '127.0.0.1', 0);
 
   const localApi = await setupApiDir({});
   const app = await createLocalApiServer({
-    port: 46123,
+    port: blockerPort,
     apiDir: localApi.apiDir,
     logger: { log() {}, warn() {}, error() {} },
   });
   const { port } = await app.start();
 
   try {
-    assert.notEqual(port, 46123);
+    assert.notEqual(port, blockerPort);
 
     const response = await fetch(`http://127.0.0.1:${port}/api/service-status`);
     assert.equal(response.status, 200);
@@ -1514,6 +1514,115 @@ test('service-status reports bound fallback port after EADDRINUSE recovery', asy
     await localApi.cleanup();
     await new Promise((resolve, reject) => {
       blocker.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
+
+test('serves persisted intelligence fabric cache from local resource data dir', async () => {
+  const localResource = await setupResourceDirWithUpApi({});
+  const cacheDir = path.join(localResource.resourceDir, 'data', 'persistent-cache');
+  const cachePath = path.join(cacheDir, `${encodeURIComponent('intelligence-fabric:v1')}.json`);
+  await mkdir(cacheDir, { recursive: true });
+  await writeFile(cachePath, JSON.stringify({
+    key: 'intelligence-fabric:v1',
+    updatedAt: Date.now(),
+    data: {
+      generatedAt: new Date().toISOString(),
+      allNews: [{ title: 'cached-news', pubDate: Date.now() }],
+      newsByCategory: { politics: [{ title: 'cached-news', pubDate: Date.now() }] },
+      latestMarkets: [],
+      latestPredictions: [],
+      latestClusters: [],
+      intelligenceCache: {},
+      cyberThreatsCache: null,
+    },
+  }), 'utf8');
+
+  const app = await createLocalApiServer({
+    port: 0,
+    resourceDir: localResource.resourceDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/local-intelligence-fabric-cache`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.entry?.key, 'intelligence-fabric:v1');
+    assert.equal(body.entry?.data?.allNews?.[0]?.title, 'cached-news');
+  } finally {
+    await app.stop();
+    await localResource.cleanup();
+  }
+});
+
+test('serves /api/local-openbb and reflects OpenBB health in service-status', async () => {
+  const openbbServer = createServer((req, res) => {
+    const url = new URL(req.url || '/', 'http://127.0.0.1');
+    if (url.pathname !== '/api/v1/equity/price/quote') {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'not found' }));
+      return;
+    }
+
+    const symbol = url.searchParams.get('symbol') || 'AAPL';
+    const price = symbol === 'AAPL' ? 101.25 : 202.5;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({
+      symbol,
+      price,
+      prev_close: price - 1.25,
+      change_pct: 1.25 / (price - 1.25) * 100,
+      change_abs: 1.25,
+      volume: 123456,
+    }));
+  });
+  const openbbPort = await listen(openbbServer, '127.0.0.1', 0);
+  const originalOpenbbUrl = process.env.OPENBB_API_URL;
+  process.env.OPENBB_API_URL = `http://127.0.0.1:${openbbPort}`;
+
+  const localApi = await setupApiDir({});
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const healthResponse = await fetch(`http://127.0.0.1:${port}/api/local-openbb?action=health`);
+    assert.equal(healthResponse.status, 200);
+    const healthBody = await healthResponse.json();
+    assert.equal(healthBody.ok, true);
+    assert.ok(Array.isArray(healthBody.coverage?.commands));
+    assert.equal(healthBody.coverage.commands.includes('/equity/price/quote'), true);
+
+    const tapeResponse = await fetch(`http://127.0.0.1:${port}/api/local-openbb?action=tape&symbols=AAPL,MSFT`);
+    assert.equal(tapeResponse.status, 200);
+    const tapeBody = await tapeResponse.json();
+    assert.equal(tapeBody.ok, true);
+    assert.equal(Array.isArray(tapeBody.rows), true);
+    assert.equal(tapeBody.rows.length, 2);
+    assert.equal(tapeBody.rows[0].symbol === 'AAPL' || tapeBody.rows[1].symbol === 'AAPL', true);
+
+    const serviceStatusResponse = await fetch(`http://127.0.0.1:${port}/api/service-status`);
+    assert.equal(serviceStatusResponse.status, 200);
+    const serviceStatusBody = await serviceStatusResponse.json();
+    const openbbService = serviceStatusBody.services.find((service) => service.id === 'openbb');
+    assert.ok(openbbService, 'service-status should include OpenBB');
+    assert.equal(openbbService.status, 'operational');
+  } finally {
+    if (originalOpenbbUrl !== undefined) {
+      process.env.OPENBB_API_URL = originalOpenbbUrl;
+    } else {
+      delete process.env.OPENBB_API_URL;
+    }
+    await app.close();
+    await localApi.cleanup();
+    await new Promise((resolve, reject) => {
+      openbbServer.close((error) => (error ? reject(error) : resolve()));
     });
   }
 });

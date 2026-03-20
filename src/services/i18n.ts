@@ -71,7 +71,9 @@ async function ensureLanguageLoaded(lng: string): Promise<SupportedLanguage> {
   } else {
     const loader = localeModules[`../locales/${normalized}.json`];
     if (!loader) {
-      console.warn(`No locale file for "${normalized}", falling back to English`);
+      if (normalized !== 'ko') {
+        console.warn(`No locale file for "${normalized}", falling back to English`);
+      }
       translation = enTranslation as TranslationDictionary;
     } else {
       translation = await loader();

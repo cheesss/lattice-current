@@ -21,6 +21,7 @@ import { TECH_HQS, ACCELERATORS } from '@/config/tech-geo';
 import { STOCK_EXCHANGES, FINANCIAL_CENTERS, CENTRAL_BANKS, COMMODITY_HUBS } from '@/config/finance-geo';
 import { trackSearchResultSelected, trackCountrySelected } from '@/services/analytics';
 import { t } from '@/services/i18n';
+import { openBacktestHubWindow } from '@/services/backtest-hub-launcher';
 import { saveToStorage, setTheme } from '@/utils';
 import { CountryIntelManager } from '@/app/country-intel';
 
@@ -431,7 +432,9 @@ export class SearchManager implements AppModule {
       }
 
       case 'panel':
-        if (action === 'data-qa' || action === 'source-ops' || action === 'codex-hub') {
+        if (action === 'backtest-hub') {
+          void openBacktestHubWindow();
+        } else if (action === 'data-qa' || action === 'source-ops' || action === 'codex-hub') {
           window.dispatchEvent(new CustomEvent('wm:open-codex-hub'));
         } else if (action === 'ontology') {
           this.ctx.ontologyGraphPage?.show();

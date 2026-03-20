@@ -7,14 +7,14 @@ variants:
   - full
   - tech
   - finance
-updated: 2026-03-16
+updated: 2026-03-20
 owner: core
 hero:
   name: Lattice Current
-  text: Real-time intelligence with AI, ontology graphs, and backtesting
-  tagline: An independent public research fork for live monitoring, event-to-market analysis, and replay-driven decision support.
+  text: Signal workspace with replay, operations, and graph intelligence
+  tagline: A public research fork for live monitoring, structured reasoning, replay-backed validation, and browser-ready decision support.
   image:
-    src: /images/hero/worldmonitor-hero.jpg
+    src: /images/hero/lattice-current-hero.jpg
     alt: Lattice Current sanitized hero image
   actions:
     - theme: brand
@@ -30,17 +30,17 @@ hero:
       text: GitHub Repo
       link: https://github.com/cheesss/lattice-current
 features:
-  - title: Multi-variant intelligence workspace
-    details: Full, tech, and finance variants share one codebase while exposing different panels, feeds, and workflows.
-  - title: AI plus evidence-first analysis
-    details: Summaries, deduction, Q&A, and structured analytics stay tied to live evidence, not free-form chat alone.
-  - title: Replay and backtesting
-    details: Historical replay, walk-forward validation, and investment idea tracking turn live monitoring into testable workflows.
+  - title: Workspace shell instead of panel overload
+    details: Overview, Intelligence, Investing, Builders, and Operations views now organize the product around intent instead of forcing every panel open at once.
+  - title: Replay Studio and browser-run operations
+    details: Historical replay, walk-forward validation, scheduler controls, and pipeline monitoring now run from a dedicated surface that works in the web path too.
+  - title: Shared intelligence fabric
+    details: News, clusters, snapshots, and analysis artifacts are persisted and reused across Briefing Desk, Research Desk, Graph Studio, and Replay Studio.
 ---
 
 ## Start here
 
-The home page now carries the two closest read-only surfaces to the actual app: a detailed 3D globe and a flat operations map. Both run on mock data but use the same visual grammar as the product.
+The docs home now mirrors the actual product more closely: a map-first entry, workspace-oriented surfaces, and replay-first research loops instead of a static dashboard description.
 
 <div class="lc-home-signalbar">
   <div class="lc-home-signalbar-item">
@@ -68,6 +68,15 @@ The home page now carries the two closest read-only surfaces to the actual app: 
 ## Fork position
 
 This is an independent public research fork. It does not claim to be the official upstream distribution or hosted service.
+
+## Current product shape
+
+- **Live Workspace**: prioritized live signals and map-first operating context
+- **Briefing Desk**: current posture, risk framing, and operator-facing synthesis
+- **Research Desk**: Codex-assisted discovery, automation governance, and dataset review
+- **Replay Studio**: replay, walk-forward, data health, scheduler actions, and run interpretation
+- **Graph Studio**: ontology and relationship views for structured exploration
+- **Data Flow Ops**: lag, retention, storage, heartbeat, and coverage quality tracking
 
 ## Variants
 
@@ -104,6 +113,15 @@ This is an independent public research fork. It does not claim to be the officia
   </div>
 </div>
 
+## What changed recently
+
+- Replaced a monitor-heavy layout with a workspace shell that groups the app by intent
+- Added dedicated hubs for replay, research, graph analysis, and operational monitoring
+- Enabled browser-mode replay and scheduler actions through the local web runtime
+- Added shared persistence so collected news, snapshots, and intelligence artifacts can be reused instead of treated as disposable session data
+- Expanded replay interpretation with current-vs-replay drift, portfolio accounting, and decision briefs
+- Added automation governance and data-flow visibility so users can see what is running, stale, blocked, or reusable
+
 ## Public docs policy
 
 <div class="policy-callout">
@@ -120,6 +138,7 @@ Public docs intentionally describe product behavior, architecture, and algorithm
 
 ## Latest update
 
+- [2026-03: Product surface refresh, Replay Studio, and shared intelligence fabric](/updates/2026-03-surface-refresh)
 - [2026-03: App-grade globe and 2D map moved onto the home page](/updates/2026-03-home-map-surfaces)
 - [2026-03: Interactive globe added to the docs home](/updates/2026-03-interactive-globe-home)
 - [2026-03: GitHub Pages docs launch and publication policy](/updates/2026-03-docs-launch)

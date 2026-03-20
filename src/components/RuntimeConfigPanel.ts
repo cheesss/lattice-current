@@ -221,6 +221,7 @@ export class RuntimeConfigPanel extends Panel {
           </button>
         </section>
       `;
+      this.content.innerHTML = this.content.innerHTML.split(' 쨌 ').join(' · ');
       this.attachListeners();
       return;
     }
@@ -234,6 +235,7 @@ export class RuntimeConfigPanel extends Panel {
       </div>
     `;
 
+    this.content.innerHTML = this.content.innerHTML.split(' 쨌 ').join(' · ');
     this.attachListeners();
   }
 
@@ -247,14 +249,13 @@ export class RuntimeConfigPanel extends Panel {
     const pillClass = available ? 'ok' : allStaged ? 'staged' : 'warn';
     const pillLabel = available ? t('modals.runtimeConfig.status.ready') : allStaged ? t('modals.runtimeConfig.status.staged') : t('modals.runtimeConfig.status.needsKeys');
     const secrets = effectiveSecrets.map((key) => this.renderSecretRow(key)).join('');
-    const desktop = isDesktopRuntime();
     const fallbackHtml = available || allStaged ? '' : `<p class="runtime-feature-fallback fallback">${escapeHtml(feature.fallback)}</p>`;
 
     return `
       <section class="runtime-feature ${available ? 'available' : allStaged ? 'staged' : 'degraded'}">
         <header class="runtime-feature-header">
           <label>
-            <input type="checkbox" data-toggle="${feature.id}" ${enabled ? 'checked' : ''} ${desktop ? '' : 'disabled'}>
+            <input type="checkbox" data-toggle="${feature.id}" ${enabled ? 'checked' : ''}>
             <span>${escapeHtml(feature.name)}</span>
           </label>
           <span class="runtime-pill ${pillClass}">${pillLabel}</span>
@@ -297,10 +298,10 @@ export class RuntimeConfigPanel extends Panel {
           <span class="runtime-secret-status ${statusClass}">${escapeHtml(status)}</span>
           <span class="runtime-secret-check ${checkClass}">&#x2713;</span>
           ${helpText ? `<div class="runtime-secret-meta">${escapeHtml(helpText)}</div>` : ''}
-          <select data-model-select class="${inputClass}" ${isDesktopRuntime() ? '' : 'disabled'}>
+          <select data-model-select class="${inputClass}">
             ${storedModel ? `<option value="${escapeHtml(storedModel)}" selected>${escapeHtml(storedModel)}</option>` : '<option value="" selected disabled>Loading models...</option>'}
           </select>
-          <input type="text" data-model-manual class="${inputClass} hidden-input" placeholder="Or type model name" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'} ${storedModel ? `value="${escapeHtml(storedModel)}"` : ''}>
+          <input type="text" data-model-manual class="${inputClass} hidden-input" placeholder="Or type model name" autocomplete="off" ${storedModel ? `value="${escapeHtml(storedModel)}"` : ''}>
           ${hintText ? `<span class="runtime-secret-hint">${escapeHtml(hintText)}</span>` : ''}
         </div>
       `;
@@ -317,7 +318,7 @@ export class RuntimeConfigPanel extends Panel {
         <span class="runtime-secret-check ${checkClass}">&#x2713;</span>
         ${helpText ? `<div class="runtime-secret-meta">${escapeHtml(helpText)}</div>` : ''}
         <div class="runtime-input-wrapper${showGetKey ? ' has-suffix' : ''}">
-          <input type="${PLAINTEXT_KEYS.has(key) ? 'text' : 'password'}" data-secret="${key}" placeholder="${pending ? t('modals.runtimeConfig.placeholder.staged') : t('modals.runtimeConfig.placeholder.setSecret')}" autocomplete="off" ${isDesktopRuntime() ? '' : 'disabled'} class="${inputClass}" ${pending ? `value="${PLAINTEXT_KEYS.has(key) ? escapeHtml(this.pendingSecrets.get(key) || '') : MASKED_SENTINEL}"` : (PLAINTEXT_KEYS.has(key) && state.present ? `value="${escapeHtml(getRuntimeConfigSnapshot().secrets[key]?.value || '')}"` : '')}>
+          <input type="${PLAINTEXT_KEYS.has(key) ? 'text' : 'password'}" data-secret="${key}" placeholder="${pending ? t('modals.runtimeConfig.placeholder.staged') : t('modals.runtimeConfig.placeholder.setSecret')}" autocomplete="off" class="${inputClass}" ${pending ? `value="${PLAINTEXT_KEYS.has(key) ? escapeHtml(this.pendingSecrets.get(key) || '') : MASKED_SENTINEL}"` : (PLAINTEXT_KEYS.has(key) && state.present ? `value="${escapeHtml(getRuntimeConfigSnapshot().secrets[key]?.value || '')}"` : '')}>
           ${getKeyHtml}
         </div>
         ${hintText ? `<span class="runtime-secret-hint">${escapeHtml(hintText)}</span>` : ''}
@@ -339,13 +340,15 @@ export class RuntimeConfigPanel extends Panel {
       });
     });
 
-    if (!isDesktopRuntime()) return;
-
     if (this.mode === 'alert') {
       this.content.querySelector<HTMLButtonElement>('[data-open-settings]')?.addEventListener('click', () => {
-        void invokeTauri<void>('open_settings_window_command').catch((error) => {
-          console.warn('[runtime-config] Failed to open settings window', error);
-        });
+        if (isDesktopRuntime()) {
+          void invokeTauri<void>('open_settings_window_command').catch((error) => {
+            console.warn('[runtime-config] Failed to open settings window', error);
+          });
+        } else {
+          window.open('/settings.html', '_blank', 'noopener');
+        }
       });
       return;
     }

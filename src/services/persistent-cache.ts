@@ -12,11 +12,93 @@ const CACHE_PREFIX = 'worldmonitor-persistent-cache:';
 const CACHE_DB_NAME = 'worldmonitor_persistent_cache';
 const CACHE_DB_VERSION = 1;
 const CACHE_STORE = 'entries';
+const NODE_CACHE_DIR_ENV = 'WORLDMONITOR_PERSISTENT_CACHE_DIR';
+const NODE_FS_PROMISES_SPEC = ['node:', 'fs/promises'].join('');
+const NODE_PATH_SPEC = ['node:', 'path'].join('');
 
 let cacheDbPromise: Promise<IDBDatabase> | null = null;
+let nodeModuleLoader: ((specifier: string) => Promise<unknown>) | null = null;
 
 function isIndexedDbAvailable(): boolean {
   return typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
+}
+
+function canUseNodeFileCache(): boolean {
+  return typeof window === 'undefined' && typeof process !== 'undefined' && typeof process.cwd === 'function';
+}
+
+type NodeCacheModules = {
+  mkdir: (path: string, options?: { recursive?: boolean }) => Promise<unknown>;
+  readFile: (path: string, encoding: BufferEncoding) => Promise<string>;
+  writeFile: (path: string, data: string, encoding: BufferEncoding) => Promise<unknown>;
+  rm: (path: string, options?: { force?: boolean }) => Promise<unknown>;
+  path: {
+    resolve: (...segments: string[]) => string;
+    join: (...segments: string[]) => string;
+  };
+};
+
+function getNodeModuleLoader(): (specifier: string) => Promise<unknown> {
+  if (!nodeModuleLoader) {
+    nodeModuleLoader = new Function('specifier', 'return import(specifier);') as (specifier: string) => Promise<unknown>;
+  }
+  return nodeModuleLoader;
+}
+
+async function loadNodeCacheModules(): Promise<NodeCacheModules> {
+  const importModule = getNodeModuleLoader();
+  const [fsPromises, path] = await Promise.all([
+    importModule(NODE_FS_PROMISES_SPEC) as Promise<{
+      mkdir: NodeCacheModules['mkdir'];
+      readFile: NodeCacheModules['readFile'];
+      writeFile: NodeCacheModules['writeFile'];
+      rm: NodeCacheModules['rm'];
+    }>,
+    importModule(NODE_PATH_SPEC) as Promise<NodeCacheModules['path']>,
+  ]);
+  return {
+    mkdir: fsPromises.mkdir,
+    readFile: fsPromises.readFile,
+    writeFile: fsPromises.writeFile,
+    rm: fsPromises.rm,
+    path,
+  };
+}
+
+async function resolveNodeCacheFilePath(key: string): Promise<string> {
+  const { mkdir, path } = await loadNodeCacheModules();
+  const baseDir = process.env?.[NODE_CACHE_DIR_ENV]?.trim()
+    ? path.resolve(process.env[NODE_CACHE_DIR_ENV]!)
+    : path.resolve(process.cwd(), 'data', 'persistent-cache');
+  await mkdir(baseDir, { recursive: true });
+  return path.join(baseDir, `${encodeURIComponent(key)}.json`);
+}
+
+async function getFromNodeFile<T>(key: string): Promise<CacheEnvelope<T> | null> {
+  const { readFile } = await loadNodeCacheModules();
+  try {
+    const filePath = await resolveNodeCacheFilePath(key);
+    const raw = await readFile(filePath, 'utf8');
+    return raw ? JSON.parse(raw) as CacheEnvelope<T> : null;
+  } catch {
+    return null;
+  }
+}
+
+async function setInNodeFile<T>(payload: CacheEnvelope<T>): Promise<void> {
+  const { writeFile } = await loadNodeCacheModules();
+  const filePath = await resolveNodeCacheFilePath(payload.key);
+  await writeFile(filePath, JSON.stringify(payload), 'utf8');
+}
+
+async function deleteFromNodeFile(key: string): Promise<void> {
+  const { rm } = await loadNodeCacheModules();
+  try {
+    const filePath = await resolveNodeCacheFilePath(key);
+    await rm(filePath, { force: true });
+  } catch {
+    // Ignore delete failures for optional cache storage.
+  }
 }
 
 function getCacheDb(): Promise<IDBDatabase> {
@@ -88,6 +170,14 @@ export async function getPersistentCache<T>(key: string): Promise<CacheEnvelope<
     }
   }
 
+  if (canUseNodeFileCache()) {
+    try {
+      return await getFromNodeFile<T>(key);
+    } catch (error) {
+      console.warn('[persistent-cache] Node file read failed; falling back to localStorage', error);
+    }
+  }
+
   try {
     const raw = localStorage.getItem(`${CACHE_PREFIX}${key}`);
     return raw ? JSON.parse(raw) as CacheEnvelope<T> : null;
@@ -116,6 +206,15 @@ export async function setPersistentCache<T>(key: string, data: T): Promise<void>
       if (isQuotaError(error)) markStorageQuotaExceeded();
       else console.warn('[persistent-cache] IndexedDB write failed; falling back to localStorage', error);
       cacheDbPromise = null;
+    }
+  }
+
+  if (canUseNodeFileCache()) {
+    try {
+      await setInNodeFile(payload);
+      return;
+    } catch (error) {
+      console.warn('[persistent-cache] Node file write failed; falling back to localStorage', error);
     }
   }
 
@@ -150,6 +249,15 @@ export async function deletePersistentCache(key: string): Promise<void> {
     } catch (error) {
       console.warn('[persistent-cache] IndexedDB delete failed; falling back to localStorage', error);
       cacheDbPromise = null;
+    }
+  }
+
+  if (canUseNodeFileCache()) {
+    try {
+      await deleteFromNodeFile(key);
+      return;
+    } catch (error) {
+      console.warn('[persistent-cache] Node file delete failed; falling back to localStorage', error);
     }
   }
 

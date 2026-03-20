@@ -1,5 +1,9 @@
 import { Panel } from './Panel';
 import {
+  buildCurrentDecisionSupportSnapshot,
+  buildIdeaCardExplanationPayload,
+  buildThemeDiagnosticsSnapshot,
+  buildWorkflowDropoffSummary,
   getInvestmentIntelligenceSnapshot,
   requestCodexCandidateExpansion,
   setCandidateExpansionReviewStatus,
@@ -8,6 +12,10 @@ import {
   type InvestmentIntelligenceSnapshot,
 } from '@/services/investment-intelligence';
 import type { MarketRegimeState } from '@/services/math-models/regime-model';
+import {
+  getReplayAdaptationSnapshot,
+  type ReplayAdaptationSnapshot,
+} from '@/services/replay-adaptation';
 import {
   clearInvestmentFocusContext,
   getInvestmentFocusContext,
@@ -34,6 +42,12 @@ function autonomyTone(action: string): string {
   if (action === 'deploy') return 'ready';
   if (action === 'shadow') return 'watch';
   if (action === 'watch') return 'watch';
+  return 'blocked';
+}
+
+function explanationTone(status: 'recommended' | 'suppressed' | 'abstained' | 'watch'): string {
+  if (status === 'recommended') return 'ready';
+  if (status === 'watch') return 'watch';
   return 'blocked';
 }
 
@@ -237,6 +251,8 @@ function filterSnapshot(
 
 export class InvestmentWorkflowPanel extends Panel {
   private snapshot: InvestmentIntelligenceSnapshot | null = null;
+  private replayAdaptation: ReplayAdaptationSnapshot | null = null;
+  private adaptationRequestId = 0;
   private focus = getInvestmentFocusContext();
   private unsubscribeFocus: (() => void) | null = null;
 
@@ -302,7 +318,24 @@ export class InvestmentWorkflowPanel extends Panel {
 
   public setData(snapshot: InvestmentIntelligenceSnapshot | null): void {
     this.snapshot = snapshot;
+    if (!snapshot) {
+      this.replayAdaptation = null;
+      this.renderPanel();
+      return;
+    }
     this.renderPanel();
+    const requestId = ++this.adaptationRequestId;
+    void getReplayAdaptationSnapshot()
+      .then((adaptation) => {
+        if (requestId !== this.adaptationRequestId) return;
+        this.replayAdaptation = adaptation;
+        this.renderPanel();
+      })
+      .catch(() => {
+        if (requestId !== this.adaptationRequestId) return;
+        this.replayAdaptation = null;
+        this.renderPanel();
+      });
   }
 
   private async handleReviewStatus(
@@ -357,6 +390,71 @@ export class InvestmentWorkflowPanel extends Panel {
       !this.focus.themeId || proposal.sourceThemeId === this.focus.themeId,
     );
     const activeThemeForCodex = this.focus.themeId || filtered.mappings[0]?.themeId || snapshot.directMappings[0]?.themeId || '';
+    const themeDiagnostics = buildThemeDiagnosticsSnapshot({
+      snapshot,
+      replayAdaptation: this.replayAdaptation,
+    });
+    const workflowDropoff = buildWorkflowDropoffSummary({
+      snapshot,
+      replayAdaptation: this.replayAdaptation,
+    });
+    const themeDiagnosticRows = themeDiagnostics.rows
+      .filter((row) => !this.focus.themeId || row.themeId === this.focus.themeId);
+    const ideaExplanationRows = filtered.ideaCards
+      .slice(0, 8)
+      .map((card) => buildIdeaCardExplanationPayload({
+        card,
+        snapshot,
+        replayAdaptation: this.replayAdaptation,
+        themeDiagnostics,
+      }));
+    const decisionSupport = buildCurrentDecisionSupportSnapshot({
+      snapshot,
+      replayAdaptation: this.replayAdaptation,
+      themeDiagnostics,
+    });
+    const renderDecisionSupportBucket = (
+      label: string,
+      items: typeof decisionSupport.actNow,
+    ): string => {
+      const rows = items.map((item) => `
+        <tr>
+          <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(item.themeId)}">${escapeHtml(item.title)}</button></td>
+          <td>${escapeHtml(item.symbols.join(', ') || '-')}</td>
+          <td>${formatPct(item.replayAvgReturnPct)}</td>
+          <td>${formatPct(item.currentAvgReturnPct)}</td>
+          <td>${item.preferredHorizonHours ? `${item.preferredHorizonHours}h` : '-'}</td>
+          <td>${formatPct(item.sizePct)}</td>
+          <td>${escapeHtml(item.suggestedAction)}</td>
+          <td>${escapeHtml(item.rationale.join(' | ') || item.caution.join(' | ') || '-')}</td>
+        </tr>
+      `).join('');
+      return `
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>${escapeHtml(label)}</h4>
+            <span class="investment-mini-label">${items.length} items</span>
+          </div>
+          <table class="investment-table">
+            <thead><tr><th>Idea</th><th>Symbols</th><th>Replay</th><th>Current</th><th>Horizon</th><th>Size</th><th>Suggested Action</th><th>Why</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="8">No items in this bucket</td></tr>'}</tbody>
+          </table>
+        </section>
+      `;
+    };
+    const decisionSupportSummary = `
+      <div class="investment-policy-note">
+        ${escapeHtml(decisionSupport.summary.join(' '))}
+      </div>
+      <div class="investment-coverage-grid">
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Regime</span><b>${escapeHtml(decisionSupport.regimeLabel)}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Confidence</span><b>${Math.round(decisionSupport.regimeConfidence)}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Act Now</span><b>${decisionSupport.actNow.length}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Defensive</span><b>${decisionSupport.defensive.length}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Avoid</span><b>${decisionSupport.avoid.length}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Watch</span><b>${decisionSupport.watch.length}</b></div>
+      </div>
+    `;
 
     const workflow = snapshot.workflow.map((step) => `
       <div class="investment-workflow-step ${workflowTone(step.status)}">
@@ -496,6 +594,58 @@ export class InvestmentWorkflowPanel extends Panel {
     }).join('');
 
     const summary = snapshot.summaryLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+    const diagnosticsStats = `
+      <div class="investment-coverage-grid">
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Ready themes</span><b>${themeDiagnostics.readyCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Watch themes</span><b>${themeDiagnostics.watchCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Blocked themes</span><b>${themeDiagnostics.blockedCount}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Coverage density</span><b>${themeDiagnostics.globalCoverageDensity.toFixed(0)}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Completeness</span><b>${themeDiagnostics.globalCompletenessScore.toFixed(0)}</b></div>
+        <div class="investment-coverage-stat"><span class="investment-mini-label">Replay memory</span><b>${this.replayAdaptation ? 'LIVE' : 'LOADING'}</b></div>
+      </div>
+    `;
+    const themeDiagnosticTableRows = themeDiagnosticRows.slice(0, 10).map((row) => `
+      <tr>
+        <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(row.themeId)}">${escapeHtml(row.themeLabel)}</button></td>
+        <td><span class="investment-action-chip ${workflowTone(row.status)}">${escapeHtml(row.status.toUpperCase())}</span></td>
+        <td>${row.confirmationScore}</td>
+        <td>${row.coveragePenalty}</td>
+        <td>${formatPct(row.currentAvgReturnPct)}</td>
+        <td>${formatPct(row.replayAvgReturnPct)}</td>
+        <td>${row.currentVsReplayDrift.toFixed(2)}</td>
+        <td>${row.executionGate ? 'open' : 'closed'}</td>
+        <td>${row.sizeMultiplier.toFixed(2)} / ${row.horizonMultiplier.toFixed(2)}</td>
+        <td>${escapeHtml(row.reasons.join(' | ') || '-')}</td>
+      </tr>
+    `).join('');
+    const workflowDropoffRows = workflowDropoff.stages.map((stage) => `
+      <tr>
+        <td>${escapeHtml(stage.label)}</td>
+        <td><span class="investment-action-chip ${workflowTone(stage.status)}">${escapeHtml(stage.status.toUpperCase())}</span></td>
+        <td>${stage.metric}</td>
+        <td>${stage.keptCount}</td>
+        <td>${stage.droppedCount}</td>
+        <td>${escapeHtml(stage.reasons.join(' | ') || '-')}</td>
+      </tr>
+    `).join('');
+    const explanationRows = ideaExplanationRows.map((row) => {
+      const why = row.status === 'recommended'
+        ? row.whyRecommended
+        : row.status === 'abstained'
+          ? row.whyAbstained
+          : row.whySuppressed;
+      return `
+        <tr>
+          <td><button type="button" class="backtest-lab-link" data-action="focus-theme" data-theme-id="${escapeHtml(row.themeId)}">${escapeHtml(row.title)}</button></td>
+          <td><span class="investment-action-chip ${explanationTone(row.status)}">${escapeHtml(row.status.toUpperCase())}</span></td>
+          <td>${row.confirmationScore}</td>
+          <td>${row.executionGate ? 'open' : 'closed'}</td>
+          <td>${row.sizeMultiplier.toFixed(2)} / ${row.horizonMultiplier.toFixed(2)}</td>
+          <td>${row.currentVsReplayDrift.toFixed(2)}</td>
+          <td>${escapeHtml(why.join(' | ') || '-')}</td>
+        </tr>
+      `;
+    }).join('');
     const autonomyStats = `
       <div class="investment-coverage-grid">
         <div class="investment-coverage-stat"><span class="investment-mini-label">Shadow mode</span><b>${snapshot.autonomy.shadowMode ? 'ON' : 'OFF'}</b></div>
@@ -621,6 +771,42 @@ export class InvestmentWorkflowPanel extends Panel {
           <h4>Workflow Summary</h4>
           <ul>${summary}</ul>
         </div>
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>Current Decision Brief</h4>
+            <span class="investment-mini-label">${escapeHtml(decisionSupport.regimeLabel)}</span>
+          </div>
+          ${decisionSupportSummary}
+          <div class="investment-grid-two">
+            ${renderDecisionSupportBucket('Act Now', decisionSupport.actNow)}
+            ${renderDecisionSupportBucket('Defensive Cover', decisionSupport.defensive)}
+          </div>
+          <div class="investment-grid-two">
+            ${renderDecisionSupportBucket('Avoid / Underweight', decisionSupport.avoid)}
+            ${renderDecisionSupportBucket('Watch For Confirmation', decisionSupport.watch)}
+          </div>
+        </section>
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>Theme Diagnostics</h4>
+            <span class="investment-mini-label">${themeDiagnosticRows.length} themes</span>
+          </div>
+          ${diagnosticsStats}
+          <table class="investment-table">
+            <thead><tr><th>Theme</th><th>Status</th><th>Confirm</th><th>Coverage</th><th>Current</th><th>Replay</th><th>Drift</th><th>Gate</th><th>Size/H</th><th>Why</th></tr></thead>
+            <tbody>${themeDiagnosticTableRows || '<tr><td colspan="10">No theme diagnostics in current focus</td></tr>'}</tbody>
+          </table>
+        </section>
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>Workflow Drop-off</h4>
+            <span class="investment-mini-label">${workflowDropoff.stages.length} stages</span>
+          </div>
+          <table class="investment-table">
+            <thead><tr><th>Stage</th><th>Status</th><th>Metric</th><th>Kept</th><th>Dropped</th><th>Top reasons</th></tr></thead>
+            <tbody>${workflowDropoffRows || '<tr><td colspan="6">No workflow drop-off summary yet</td></tr>'}</tbody>
+          </table>
+        </section>
         <section class="investment-subcard investment-coverage-card">
           <div class="investment-subcard-head">
             <h4>Coverage-aware Universe</h4>
@@ -656,6 +842,16 @@ export class InvestmentWorkflowPanel extends Panel {
           <table class="investment-table">
             <thead><tr><th>Idea</th><th>Action</th><th>Cal</th><th>Reality</th><th>Recent</th><th>Size</th><th>Why</th></tr></thead>
             <tbody>${autonomyRows || '<tr><td colspan="7">No autonomy-scored ideas in current focus</td></tr>'}</tbody>
+          </table>
+        </section>
+        <section class="investment-subcard">
+          <div class="investment-subcard-head">
+            <h4>Decision Explanations</h4>
+            <span class="investment-mini-label">${ideaExplanationRows.length} cards</span>
+          </div>
+          <table class="investment-table">
+            <thead><tr><th>Idea</th><th>Status</th><th>Confirm</th><th>Gate</th><th>Size/H</th><th>Drift</th><th>Why</th></tr></thead>
+            <tbody>${explanationRows || '<tr><td colspan="7">No idea explanations in current focus</td></tr>'}</tbody>
           </table>
         </section>
         <div class="investment-grid-two">

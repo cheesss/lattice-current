@@ -17,7 +17,7 @@ const DEFAULT_IMAGE = `${BASE_URL}/favico/${SITE_VARIANT === 'full' ? '' : SITE_
 export function updateMetaTagsForStory(meta: StoryMeta): void {
   const { countryCode, countryName, ciiScore, ciiLevel, trend, type } = meta;
 
-  const title = `${countryName} Intelligence Brief | ${variantMeta.siteName}`;
+  const title = `${countryName} Briefing | ${variantMeta.siteName}`;
   const description = generateDescription(ciiScore, ciiLevel, trend, type, countryName);
   const storyUrl = `${BASE_URL}/api/story?c=${countryCode}&t=${type}`;
   let imageUrl = `${BASE_URL}/api/og-story?c=${countryCode}&t=${type}`;
@@ -88,7 +88,7 @@ function generateDescription(
     parts.push(typeDescriptions[type]);
   }
 
-  return `${variantMeta.siteName} ${parts.join('. ')}. Free, open-source geopolitical intelligence.`;
+  return `${variantMeta.siteName} ${parts.join('. ')}. Adaptive signal workspace for analysts and operators.`;
 }
 
 function setMetaTag(property: string, content: string): void {

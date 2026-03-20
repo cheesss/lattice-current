@@ -12,6 +12,7 @@ owner: core
 
 # 업데이트
 
+- [2026-03: 제품 표면 재구성, Replay Studio, 공유 인텔리전스 패브릭](/ko/updates/2026-03-surface-refresh)
 - [2026-03: Codex Ops 패널과 활성화/큐 진단](/ko/updates/2026-03-codex-ops-panel)
 - [2026-03: 제약된 자율성, 현실 반영 리플레이, shadow rollback](/ko/updates/2026-03-constrained-autonomy)
 - [2026-03: 앱 수준 지구본과 2D 지도를 메인 페이지로 이동](/ko/updates/2026-03-home-map-surfaces)

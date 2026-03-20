@@ -1,4 +1,5 @@
 import type { ClusteredEvent, NewsItem } from '@/types';
+import { estimateDirectionalFlowSummary, type TimedFlowPoint } from './information-flow';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { listSourceRegistrySnapshot } from './source-registry';
 import { logSourceOpsEvent } from './source-ops-log';
@@ -23,6 +24,11 @@ export interface SourceCredibilityProfile {
   articleCount: number;
   corroboratedClusterCount: number;
   highImpactCount: number;
+  directionalFlowScore?: number;
+  leadLagScore?: number;
+  flowDirection?: 'source-leading' | 'target-leading' | 'neutral';
+  flowLagHours?: number;
+  flowSampleSize?: number;
   lastSeenAt: number | null;
   lastEvaluatedAt: number;
   notes: string[];
@@ -114,6 +120,10 @@ function boundedScore(value: number, fallback = 0): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function tokenize(value: string): string[] {
   return Array.from(
     new Set(
@@ -166,6 +176,47 @@ function computeLinguisticRisk(items: NewsItem[]): number {
     + volatility * 14,
     18,
   );
+}
+
+function toTimestamp(value: Date | string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const ts = value instanceof Date ? value.getTime() : Date.parse(String(value));
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function threatIntensity(item: NewsItem): number {
+  const weight = threatWeight(item.threat?.level);
+  return weight + (item.isAlert ? 1.6 : 0.8);
+}
+
+function buildSourceFlowPoints(items: NewsItem[]): TimedFlowPoint[] {
+  return items
+    .map((item) => ({
+      at: item.pubDate,
+      value: threatIntensity(item),
+      weight: 1 + Math.min(2.5, Math.log1p(threatWeight(item.threat?.level)) * 0.35),
+    }))
+    .filter((point) => toTimestamp(point.at) != null);
+}
+
+function buildClusterFlowPoints(sourceId: string, clusters: ClusteredEvent[]): TimedFlowPoint[] {
+  const normalizedSource = normalizeSource(sourceId);
+  const points: TimedFlowPoint[] = [];
+  for (const cluster of clusters.slice(0, 120)) {
+    const sourceMatch = normalizeSource(cluster.primarySource || '') === normalizedSource
+      || (cluster.allItems || []).some((item) => normalizeSource(item.source || '') === normalizedSource);
+    if (!sourceMatch) continue;
+    const timestamp = cluster.lastUpdated || cluster.firstSeen;
+    const ts = toTimestamp(timestamp);
+    if (ts == null) continue;
+    points.push({
+      at: ts,
+      value: 1 + cluster.sourceCount * 0.45 + (cluster.isAlert ? 1.2 : 0) + Math.min(2, (cluster.relations?.confidenceScore || 0) / 60),
+      weight: 1 + Math.min(1.8, (cluster.relations?.confidenceScore || 0) / 80),
+    });
+  }
+  return points;
 }
 
 function buildSourceTopicProfiles(grouped: Map<string, NewsItem[]>): Map<string, Set<string>> {
@@ -343,6 +394,21 @@ export async function recomputeSourceCredibility(
       return items.some((item) => item.title && cluster.primaryTitle && item.title === cluster.primaryTitle && cluster.sourceCount > 1);
     }).length;
 
+    const flow = estimateDirectionalFlowSummary(
+      buildSourceFlowPoints(items),
+      buildClusterFlowPoints(normalizedSource, clusters),
+      { bucketMs: 12 * 60 * 60 * 1000, maxLag: 4, minBuckets: 8 },
+    );
+    const flowBonus = clamp(
+      Math.round(
+        Math.max(0, flow.flowScore - 52) * 0.16
+        + Math.max(0, flow.leadLagScore) * 0.03
+        + Math.max(0, flow.supportScore - 58) * 0.08,
+      ),
+      0,
+      12,
+    );
+
     const corroborationScore = boundedScore(
       18
       + Math.min(52, corroboratedClusterCount * 12)
@@ -413,7 +479,7 @@ export async function recomputeSourceCredibility(
       + Math.max(0, 65 - truthAgreementScore) * 0.14,
       basePropagandaRisk,
     );
-    const credibilityScore = boundedScore(
+    const baseCredibility = boundedScore(
       corroborationScore * 0.22
       + historicalAccuracyScore * 0.14
       + posteriorAccuracyScore * 0.12
@@ -421,6 +487,11 @@ export async function recomputeSourceCredibility(
       + emReliabilityScore * 0.14
       + feedHealthScore * 0.14
       + (100 - propagandaRiskScore) * 0.10,
+      priorCredibility,
+    );
+    const credibilityScore = boundedScore(
+      baseCredibility
+      + flowBonus,
       priorCredibility,
     );
 
@@ -433,6 +504,7 @@ export async function recomputeSourceCredibility(
     if (linguisticRiskScore >= 58) notes.push('Title language shows elevated sensationalism');
     if (emReliabilityScore >= 70) notes.push('EM truth discovery rates source as above baseline');
     if (articleCount >= 12) notes.push('High article volume in current snapshot');
+    if (flow.direction === 'source-leading' && flow.flowScore >= 60) notes.push('Directional lead-lag support observed');
 
     nextProfiles.push({
       id: normalizedSource,
@@ -453,6 +525,11 @@ export async function recomputeSourceCredibility(
       articleCount,
       corroboratedClusterCount,
       highImpactCount,
+      directionalFlowScore: Number(flow.flowScore.toFixed(2)),
+      leadLagScore: Number(flow.leadLagScore.toFixed(2)),
+      flowDirection: flow.direction,
+      flowLagHours: Number(flow.bestLagHours.toFixed(2)),
+      flowSampleSize: flow.sampleSize,
       lastSeenAt,
       lastEvaluatedAt: nowMs(),
       notes,

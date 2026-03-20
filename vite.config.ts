@@ -9,6 +9,8 @@ import { VARIANT_META } from './src/config/variant-meta';
 
 const isE2E = process.env.VITE_E2E === '1';
 const isDesktopBuild = process.env.VITE_DESKTOP_RUNTIME === '1';
+const localApiProxyTarget = process.env.WM_LOCAL_API_PROXY_TARGET || 'http://127.0.0.1:46123';
+const localApiProxyToken = process.env.WM_LOCAL_API_TOKEN || '';
 
 const brotliCompressAsync = promisify(brotliCompress);
 const BROTLI_EXTENSIONS = new Set(['.js', '.mjs', '.css', '.html', '.svg', '.json', '.txt', '.xml', '.wasm']);
@@ -158,6 +160,21 @@ function polymarketPlugin(): Plugin {
       });
     },
   };
+}
+
+function attachLocalProxyAuth(proxy: {
+  on: (event: string, listener: (...args: unknown[]) => void) => void;
+}): void {
+  proxy.on('proxyReq', (proxyReq: {
+    setHeader: (name: string, value: string) => void;
+  }) => {
+    if (localApiProxyToken) {
+      proxyReq.setHeader('Authorization', `Bearer ${localApiProxyToken}`);
+    }
+  });
+  proxy.on('error', (err: { message?: string }) => {
+    console.log('Local API proxy error:', err?.message ?? String(err));
+  });
 }
 
 /**
@@ -743,6 +760,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         settings: resolve(__dirname, 'settings.html'),
         liveChannels: resolve(__dirname, 'live-channels.html'),
+        backtestHub: resolve(__dirname, 'backtest-hub.html'),
       },
       output: {
         manualChunks(id) {
@@ -779,6 +797,18 @@ export default defineConfig({
             }
           }
           if (id.includes('/src/components/') && id.endsWith('Panel.ts')) {
+            if (
+              id.includes('BacktestLabPanel.ts')
+              || id.includes('CodexOpsPanel.ts')
+              || id.includes('DataFlowOpsPanel.ts')
+              || id.includes('DataQAPanel.ts')
+              || id.includes('ResourceProfilerPanel.ts')
+              || id.includes('RuntimeConfigPanel.ts')
+              || id.includes('ServiceStatusPanel.ts')
+              || id.includes('SourceOpsPanel.ts')
+            ) {
+              return 'panels-ops';
+            }
             return 'panels';
           }
           // Give lazy-loaded locale chunks a recognizable prefix so the
@@ -1126,38 +1156,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gdelt/, ''),
       },
-      // Local Codex sidecar endpoints for dev runtime
-      '/api/local-codex-status': {
-        target: 'http://127.0.0.1:46123',
+      // Local sidecar endpoints for browser/dev runtime, including backtesting.
+      '/api/local-': {
+        target: localApiProxyTarget,
         changeOrigin: true,
+        configure: attachLocalProxyAuth,
       },
-      '/api/local-codex-summarize': {
-        target: 'http://127.0.0.1:46123',
+      '/api/service-status': {
+        target: localApiProxyTarget,
         changeOrigin: true,
-      },
-      '/api/local-ollama-chat': {
-        target: 'http://127.0.0.1:46123',
-        changeOrigin: true,
-      },
-      '/api/local-source-hunt': {
-        target: 'http://127.0.0.1:46123',
-        changeOrigin: true,
-      },
-      '/api/local-source-discover': {
-        target: 'http://127.0.0.1:46123',
-        changeOrigin: true,
-      },
-      '/api/local-api-source-hunt': {
-        target: 'http://127.0.0.1:46123',
-        changeOrigin: true,
-      },
-      '/api/local-entity-resolve': {
-        target: 'http://127.0.0.1:46123',
-        changeOrigin: true,
-      },
-      '/api/local-multimodal-extract': {
-        target: 'http://127.0.0.1:46123',
-        changeOrigin: true,
+        configure: attachLocalProxyAuth,
       },
       // AISStream WebSocket proxy for live vessel tracking
       '/ws/aisstream': {
