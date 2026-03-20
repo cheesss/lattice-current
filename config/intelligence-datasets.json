@@ -171,8 +171,6 @@
       "provider": "gdelt-doc",
       "fetchArgs": {
         "query": "Iran OR Israel OR Gaza OR Lebanon OR Syria OR Yemen OR Hormuz OR tanker OR Red Sea OR missile OR drone OR oil",
-        "query_terms": "Iran|Israel|Gaza|Lebanon|Syria|Yemen|Hormuz|tanker|Red Sea|missile|drone|oil",
-        "shard_size": 3,
         "mode": "ArtList",
         "max": 250
       },
@@ -181,7 +179,7 @@
       "walkForwardOptions": {},
       "frameLoadOptions": {},
       "schedule": {
-        "fetchEveryMinutes": 60,
+        "fetchEveryMinutes": 180,
         "replayEveryMinutes": 60,
         "themeDiscoveryEveryMinutes": 120
       }

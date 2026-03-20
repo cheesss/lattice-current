@@ -321,6 +321,75 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.validateCalls[0]?.method).toBe('POST');
   });
 
+  test('Glint token shares the same browser runtime secret path and is readable by Glint loaders', async ({ page }) => {
+    await page.goto('/tests/runtime-harness.html');
+
+    const result = await page.evaluate(async () => {
+      const originalFetch = window.fetch.bind(window);
+      const calls: Array<{ url: string; method: string; body: string | null }> = [];
+      const responseJson = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input.url;
+        const method = (init?.method || 'GET').toUpperCase();
+        const body = typeof init?.body === 'string' ? init.body : null;
+        calls.push({ url, method, body });
+
+        if (url.includes('/api/local-runtime-secrets')) {
+          return responseJson({ ok: true, secrets: {}, sources: {} }, 200);
+        }
+        if (url.includes('/api/local-env-update')) {
+          return responseJson({ ok: true }, 200);
+        }
+        if (url.includes('/api/local-validate-secret')) {
+          return responseJson({ valid: true, message: 'Glint verified by proxy' }, 200);
+        }
+
+        return responseJson({ ok: true }, 200);
+      }) as typeof window.fetch;
+
+      try {
+        const runtimeConfig = await import('/src/services/runtime-config.ts');
+        const glint = await import('/src/services/glint.ts');
+        const token = 'glint_runtime_token_1234567890';
+
+        await runtimeConfig.setSecretValue(
+          'GLINT_AUTH_TOKEN' as import('/src/services/runtime-config.ts').RuntimeSecretKey,
+          token,
+        );
+        const verification = await runtimeConfig.verifySecretWithApi(
+          'GLINT_AUTH_TOKEN' as import('/src/services/runtime-config.ts').RuntimeSecretKey,
+          token,
+        );
+
+        return {
+          verification,
+          resolvedToken: glint.getGlintAuthToken(),
+          envUpdateCalls: calls.filter((entry) => entry.url.includes('/api/local-env-update')),
+          validateCalls: calls.filter((entry) => entry.url.includes('/api/local-validate-secret')),
+        };
+      } finally {
+        window.fetch = originalFetch;
+      }
+    });
+
+    expect(result.resolvedToken).toBe('glint_runtime_token_1234567890');
+    expect(result.verification.valid).toBe(true);
+    expect(result.verification.message).toContain('Glint verified by proxy');
+    expect(result.envUpdateCalls).toHaveLength(1);
+    expect(result.envUpdateCalls[0]?.body).toContain('"key":"GLINT_AUTH_TOKEN"');
+    expect(result.validateCalls).toHaveLength(1);
+  });
+
   test('chunk preload reload guard is one-shot until app boot clears it', async ({ page }) => {
     await page.goto('/tests/runtime-harness.html');
 

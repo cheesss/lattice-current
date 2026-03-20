@@ -102,7 +102,7 @@ globalThis.fetch = async function ipv4Fetch(input, init) {
 };
 
 const ALLOWED_ENV_KEYS = new Set([
-  'GROQ_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'FRED_API_KEY', 'EIA_API_KEY',
+  'GROQ_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'GLINT_AUTH_TOKEN', 'FRED_API_KEY', 'EIA_API_KEY',
   'CLOUDFLARE_API_TOKEN', 'ACLED_ACCESS_TOKEN', 'URLHAUS_AUTH_KEY',
   'OTX_API_KEY', 'ABUSEIPDB_API_KEY', 'WINGBITS_API_KEY', 'WS_RELAY_URL',
   'VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET',
@@ -3737,6 +3737,26 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
       if (response.status === 429) return ok('OpenAI key accepted (rate limited)');
       if (!response.ok) return fail(`OpenAI probe failed (${response.status})`);
       return ok('OpenAI key verified');
+    }
+
+    case 'GLINT_AUTH_TOKEN': {
+      const response = await fetchWithTimeout('https://api.glint.trade/api/movers', {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${value}`,
+          'User-Agent': CHROME_UA,
+        },
+      });
+      const text = await response.text();
+      if (isCloudflareChallenge403(response, text)) return ok('Glint token stored (Cloudflare blocked verification)');
+      if (isAuthFailure(response.status, text)) return fail('Glint rejected this token');
+      if (!response.ok) return fail(`Glint probe failed (${response.status})`);
+      let payload = null;
+      try { payload = JSON.parse(text); } catch { /* ignore */ }
+      if (!Array.isArray(payload) && !Array.isArray(payload?.data)) {
+        return fail('Unexpected Glint response');
+      }
+      return ok('Glint token verified');
     }
 
     case 'FRED_API_KEY': {

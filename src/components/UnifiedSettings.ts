@@ -3,9 +3,9 @@ import { PANEL_CATEGORY_MAP } from '@/config/panels';
 import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
-import { getGlintAuthToken, setGlintAuthToken, clearGlintAuthToken } from '@/services/glint';
+import { getGlintAuthToken, persistGlintAuthToken, removePersistedGlintAuthToken } from '@/services/glint';
 import { invokeTauri } from '@/services/tauri-bridge';
-import type { RuntimeSecretKey } from '@/services/runtime-config';
+import { verifySecretWithApi, type RuntimeSecretKey } from '@/services/runtime-config';
 import { SIGNUP_URLS, HUMAN_LABELS } from '@/services/settings-constants';
 import type { StreamQuality } from '@/services/ai-flow-settings';
 import { escapeHtml } from '@/utils/sanitize';
@@ -19,6 +19,7 @@ const STARTUP_SETUP_KEYS: RuntimeSecretKey[] = [
   'OPENAI_API_KEY',
   'GROQ_API_KEY',
   'OPENROUTER_API_KEY',
+  'GLINT_AUTH_TOKEN',
   'FRED_API_KEY',
   'EIA_API_KEY',
   'ACLED_ACCESS_TOKEN',
@@ -199,21 +200,63 @@ export class UnifiedSettings {
 
       // Glint token save
       if (target.closest('[data-glint-save]')) {
-        const input = this.overlay.querySelector<HTMLInputElement>('#us-glint-token');
-        const token = input?.value.trim() || '';
-        if (!token) return;
-        setGlintAuthToken(token);
-        if (input) input.value = '';
-        this.updateGlintTokenStatus();
+        void (async () => {
+          const input = this.overlay.querySelector<HTMLInputElement>('#us-glint-token');
+          const status = this.overlay.querySelector<HTMLElement>('#us-glint-login-status');
+          const token = input?.value.trim() || '';
+          if (!token) {
+            if (status) {
+              status.textContent = getGlintAuthToken()
+                ? 'Glint token is already configured.'
+                : 'Paste a Glint token first, then click Save Token.';
+            }
+            this.updateGlintTokenStatus();
+            return;
+          }
+          try {
+            const verification = await verifySecretWithApi('GLINT_AUTH_TOKEN', token);
+            if (!verification.valid) {
+              throw new Error(verification.message || 'Glint token verification failed');
+            }
+            await persistGlintAuthToken(token);
+            if (input) {
+              input.value = '';
+              input.placeholder = 'Configured (enter new token to replace)';
+            }
+            this.updateGlintTokenStatus();
+            if (status) {
+              status.textContent = verification.message || 'Glint token saved and activated.';
+            }
+          } catch (error) {
+            if (status) {
+              status.textContent = `Failed to save token: ${String(error)}`;
+            }
+          }
+        })();
         return;
       }
 
       // Glint token clear
       if (target.closest('[data-glint-clear]')) {
-        clearGlintAuthToken();
-        const input = this.overlay.querySelector<HTMLInputElement>('#us-glint-token');
-        if (input) input.value = '';
-        this.updateGlintTokenStatus();
+        void (async () => {
+          const input = this.overlay.querySelector<HTMLInputElement>('#us-glint-token');
+          const status = this.overlay.querySelector<HTMLElement>('#us-glint-login-status');
+          try {
+            await removePersistedGlintAuthToken();
+            if (input) {
+              input.value = '';
+              input.placeholder = 'Paste Glint auth token';
+            }
+            this.updateGlintTokenStatus();
+            if (status) {
+              status.textContent = 'Glint token cleared.';
+            }
+          } catch (error) {
+            if (status) {
+              status.textContent = `Failed to clear token: ${String(error)}`;
+            }
+          }
+        })();
         return;
       }
 
@@ -260,7 +303,7 @@ export class UnifiedSettings {
           try {
             const token = await invokeTauri<string>('sync_glint_auth_token');
             if (token && token.trim()) {
-              setGlintAuthToken(token.trim());
+              await persistGlintAuthToken(token.trim());
               this.updateGlintTokenStatus();
               if (status) {
                 status.textContent = 'Glint token synced from login window.';
@@ -526,7 +569,9 @@ export class UnifiedSettings {
     html += `
       <div class="ai-flow-cta">
         <div class="ai-flow-cta-desc" id="us-glint-status">${glintConfigured ? 'Configured' : 'Not set'}</div>
-        ${this.config.isDesktopApp ? `<button type="button" class="sources-select-all" data-glint-login>Open Glint Login</button>` : ''}
+        <button type="button" class="sources-select-all" data-signup-url="${escapeHtml(SIGNUP_URLS.GLINT_AUTH_TOKEN || 'https://glint.trade/')}">Open Glint</button>
+        <div class="ai-flow-cta-desc" style="margin-top:8px;">${this.config.isDesktopApp ? 'Use the desktop helper below if you want Codex to sync the token for you after login.' : 'Browser mode cannot sync from the desktop helper. Sign in on Glint, then paste your token below.'}</div>
+        ${this.config.isDesktopApp ? `<button type="button" class="sources-select-all" data-glint-login style="margin-top:8px;">Open Glint Login</button>` : ''}
         ${this.config.isDesktopApp ? `<button type="button" class="sources-select-all" data-glint-sync style="margin-top:8px;">Sync Token from Login Window</button>` : ''}
         <div class="ai-flow-cta-desc" id="us-glint-login-status" style="margin-top:8px;"></div>
         <div class="settings-input-wrapper" style="margin-top:8px;">
@@ -639,7 +684,7 @@ export class UnifiedSettings {
   private updateGlintTokenStatus(): void {
     const status = this.overlay.querySelector<HTMLElement>('#us-glint-status');
     if (!status) return;
-    status.textContent = getGlintAuthToken() ? 'Configured' : 'Not set';
+    status.textContent = getGlintAuthToken() ? 'Configured and active' : 'Not set';
   }
 
   private completeStartupGate(): void {

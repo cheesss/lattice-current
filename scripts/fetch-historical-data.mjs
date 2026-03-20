@@ -107,8 +107,9 @@ function dedupeArticles(items) {
   });
 }
 
-const GDELT_MIN_INTERVAL_MS = Math.max(5000, optionalInt(process.env.GDELT_MIN_INTERVAL_MS, 5500));
+const GDELT_MIN_INTERVAL_MS = Math.max(7000, optionalInt(process.env.GDELT_MIN_INTERVAL_MS, 8000));
 const GDELT_MAX_ATTEMPTS = Math.max(1, optionalInt(process.env.GDELT_MAX_ATTEMPTS, 3));
+const GDELT_RATE_LIMIT_JITTER_MS = Math.max(250, optionalInt(process.env.GDELT_RATE_LIMIT_JITTER_MS, 1250));
 let lastGdeltDocRequestAt = 0;
 
 function isGdeltRateLimitError(error) {
@@ -135,7 +136,8 @@ async function fetchGdeltJson(url) {
       if (!isGdeltRateLimitError(error) || attempt >= GDELT_MAX_ATTEMPTS) {
         throw error;
       }
-      await sleep(GDELT_MIN_INTERVAL_MS * attempt);
+      const jitter = Math.round(Math.random() * GDELT_RATE_LIMIT_JITTER_MS);
+      await sleep((GDELT_MIN_INTERVAL_MS * (attempt + 1)) + jitter);
     }
   }
   throw lastError || new Error('GDELT fetch failed');
@@ -170,17 +172,67 @@ function readCookieHeader(response) {
   return firstCookie || null;
 }
 
-async function getAcledAuthHeaders() {
-  const token = String(process.env.ACLED_ACCESS_TOKEN || '').trim();
-  if (token) {
-    return {
-      accept: 'application/json',
-      authorization: `Bearer ${token}`,
-    };
+function decodeJwtPayload(token) {
+  const parts = String(token || '').trim().split('.');
+  if (parts.length < 2) return null;
+  try {
+    const base64 = parts[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, '=');
+    return JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+  } catch {
+    return null;
   }
+}
 
+function readAcledTokenExpiry(token) {
+  const payload = decodeJwtPayload(token);
+  const exp = Number(payload?.exp);
+  if (!Number.isFinite(exp) || exp <= 0) return null;
+  return new Date(Math.floor(exp) * 1000);
+}
+
+function formatAcledExpiry(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'unknown time';
+  return date.toLocaleString('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).replace(',', '') + ' KST';
+}
+
+async function getAcledAuthHeaders() {
   const email = String(process.env.ACLED_EMAIL || '').trim();
   const password = String(process.env.ACLED_PASSWORD || '').trim();
+  return getAcledAuthHeadersWithPreference({
+    token: String(process.env.ACLED_ACCESS_TOKEN || '').trim(),
+    email,
+    password,
+  });
+}
+
+async function getAcledAuthHeadersWithPreference({ token, email, password, forceCookie = false }) {
+  if (token) {
+    const expiry = readAcledTokenExpiry(token);
+    if (!forceCookie && (!expiry || expiry.getTime() > Date.now())) {
+      return {
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+      };
+    }
+    if (expiry && expiry.getTime() <= Date.now()) {
+      if (!email || !password) {
+        throw new Error(`ACLED_ACCESS_TOKEN expired at ${formatAcledExpiry(expiry)}. Refresh the ACLED access token or set ACLED_EMAIL and ACLED_PASSWORD for cookie login fallback.`);
+      }
+    }
+  }
+
   if (!email || !password) {
     throw new Error('ACLED_ACCESS_TOKEN is required (or set ACLED_EMAIL and ACLED_PASSWORD for cookie login)');
   }
@@ -404,9 +456,28 @@ async function fetchAcled(args) {
       _format: 'json',
     });
     if (args.country) params.set('country', buildAcledEqualityValue('country', args.country));
-    const data = await fetchJson(`https://acleddata.com/api/acled/read?${params}`, {
-      headers,
-    });
+    let data;
+    try {
+      data = await fetchJson(`https://acleddata.com/api/acled/read?${params}`, {
+        headers,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || '');
+      const hasCookieFallback = String(process.env.ACLED_EMAIL || '').trim() && String(process.env.ACLED_PASSWORD || '').trim();
+      const usedBearer = Boolean(headers?.authorization);
+      if (!usedBearer || !hasCookieFallback || !/^401\b/i.test(message)) {
+        throw error;
+      }
+      const fallbackHeaders = await getAcledAuthHeadersWithPreference({
+        token: String(process.env.ACLED_ACCESS_TOKEN || '').trim(),
+        email: String(process.env.ACLED_EMAIL || '').trim(),
+        password: String(process.env.ACLED_PASSWORD || '').trim(),
+        forceCookie: true,
+      });
+      data = await fetchJson(`https://acleddata.com/api/acled/read?${params}`, {
+        headers: fallbackHeaders,
+      });
+    }
     const count = Number(data?.count || data?.total_count || (Array.isArray(data?.data) ? data.data.length : 0) || 0);
     lastResponse = {
       provider: 'acled',

@@ -1,4 +1,5 @@
 import { getCountryBbox, getCountryNameByCode, matchCountryNamesInText } from './country-geometry';
+import { getSecretValue, setSecretValue } from './runtime-config';
 
 export type GlintThreatLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
@@ -162,6 +163,7 @@ const GLINT_FETCH_TIMEOUT_MS = 8_000;
 const GLINT_FEED_PAGE_SIZE = 100;
 const GLINT_FEED_MAX_PAGES = 4;
 const GLINT_LOCAL_TOKEN_KEY = 'wm_glint_auth_token';
+const GLINT_RUNTIME_SECRET_KEY = 'GLINT_AUTH_TOKEN';
 
 let glintPublicCache:
   | { timestamp: number; data: GlintPublicGlobeResponse }
@@ -500,6 +502,9 @@ export function isGlintGeoEnabled(): boolean {
 }
 
 export function getGlintAuthToken(): string | null {
+  const runtimeToken = getString(getSecretValue(GLINT_RUNTIME_SECRET_KEY));
+  if (runtimeToken) return runtimeToken;
+
   const envToken = getString(import.meta.env.VITE_GLINT_AUTH_TOKEN as unknown);
   if (envToken) return envToken;
 
@@ -522,12 +527,24 @@ export function setGlintAuthToken(token: string): void {
   }
 }
 
+export async function persistGlintAuthToken(token: string): Promise<void> {
+  const clean = token.trim();
+  if (!clean) return;
+  setGlintAuthToken(clean);
+  await setSecretValue(GLINT_RUNTIME_SECRET_KEY, clean);
+}
+
 export function clearGlintAuthToken(): void {
   try {
     localStorage.removeItem(GLINT_LOCAL_TOKEN_KEY);
   } catch {
     // best effort
   }
+}
+
+export async function removePersistedGlintAuthToken(): Promise<void> {
+  clearGlintAuthToken();
+  await setSecretValue(GLINT_RUNTIME_SECRET_KEY, '');
 }
 
 export async function isGlintAuthTokenUsable(authToken?: string | null): Promise<boolean> {

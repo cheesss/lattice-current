@@ -911,14 +911,18 @@ function backoffMsForDataset(
   const provider = String(dataset.provider || '').toLowerCase();
   if (provider === 'gdelt-doc' && /429|too many requests/i.test(errorMessage)) {
     const fetchEveryMinutes = Number(dataset.schedule?.fetchEveryMinutes) || registry.defaults.fetchEveryMinutes;
-    const gentleRetryMs = Math.max(5 * 60 * 1000, Math.min(30 * 60 * 1000, Math.round(fetchEveryMinutes * 60_000 * 0.5)));
-    return Math.min(defaultBackoff, gentleRetryMs);
+    const gentleRetryMs = Math.max(15 * 60 * 1000, Math.min(90 * 60 * 1000, Math.round(fetchEveryMinutes * 60_000 * 0.5)));
+    return Math.max(defaultBackoff, gentleRetryMs);
   }
   return defaultBackoff;
 }
 
 function appendRun(state: IntelligenceAutomationState, run: AutomationRunRecord): void {
   state.runs = [...state.runs, run].slice(-MAX_RUN_RECORDS);
+}
+
+function isGdeltRateLimitMessage(message: string | null | undefined): boolean {
+  return /429|too many requests/i.test(String(message || ''));
 }
 
 function applyPromotedThemes(state: IntelligenceAutomationState): void {
@@ -2206,41 +2210,62 @@ export async function runIntelligenceAutomationCycle(args: {
           touchedDatasets: Array.from(touchedDatasets),
         });
         const previousUsableArtifact = await findMostRecentUsableArtifact(datasetState.artifacts);
-        latestArtifactPath = await runWithRetry(dataset.id, 'fetch', registry.defaults.maxRetries, async () => {
-          const fetchResult = await fetchHistoricalDatasetArtifact(registry, dataset, datasetState.artifacts);
-          const artifactPath = fetchResult.artifactPath;
-          const artifactEmpty = await artifactLooksEmpty(artifactPath);
-          datasetState.lastFetchAt = nowIso();
-          if (!datasetState.artifacts.includes(artifactPath)) {
-            datasetState.artifacts = [...datasetState.artifacts, artifactPath].slice(-(registry.defaults.artifactRetentionCount * 2));
-          }
-          if (fetchResult.reusedExisting) {
+        const fetchRetryCount = dataset.provider === 'gdelt-doc' ? 1 : registry.defaults.maxRetries;
+        try {
+          latestArtifactPath = await runWithRetry(dataset.id, 'fetch', fetchRetryCount, async () => {
+            const fetchResult = await fetchHistoricalDatasetArtifact(registry, dataset, datasetState.artifacts);
+            const artifactPath = fetchResult.artifactPath;
+            const artifactEmpty = await artifactLooksEmpty(artifactPath);
+            datasetState.lastFetchAt = nowIso();
+            if (!datasetState.artifacts.includes(artifactPath)) {
+              datasetState.artifacts = [...datasetState.artifacts, artifactPath].slice(-(registry.defaults.artifactRetentionCount * 2));
+            }
+            if (fetchResult.reusedExisting) {
+              appendRun(state, {
+                id: `${dataset.id}:fetch-reused:${nowIso()}`,
+                datasetId: dataset.id,
+                kind: 'fetch',
+                status: 'ok',
+                startedAt: datasetState.lastFetchAt,
+                completedAt: nowIso(),
+                attempts: 1,
+                detail: `fetch matched retained artifact; reused existing payload ${path.basename(artifactPath)}`,
+              });
+            }
+            if (artifactEmpty && previousUsableArtifact) {
+              appendRun(state, {
+                id: `${dataset.id}:fetch-retained:${nowIso()}`,
+                datasetId: dataset.id,
+                kind: 'fetch',
+                status: 'skipped',
+                startedAt: datasetState.lastFetchAt,
+                completedAt: nowIso(),
+                attempts: 1,
+                detail: 'fetch returned 0 rows; retained the most recent non-empty artifact for downstream import/replay',
+              });
+              return previousUsableArtifact;
+            }
+            return artifactPath;
+          }, state);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (dataset.provider === 'gdelt-doc' && previousUsableArtifact && isGdeltRateLimitMessage(errorMessage)) {
+            datasetState.lastFetchAt = nowIso();
+            latestArtifactPath = previousUsableArtifact;
             appendRun(state, {
-              id: `${dataset.id}:fetch-reused:${nowIso()}`,
-              datasetId: dataset.id,
-              kind: 'fetch',
-              status: 'ok',
-              startedAt: datasetState.lastFetchAt,
-              completedAt: nowIso(),
-              attempts: 1,
-              detail: `fetch matched retained artifact; reused existing payload ${path.basename(artifactPath)}`,
-            });
-          }
-          if (artifactEmpty && previousUsableArtifact) {
-            appendRun(state, {
-              id: `${dataset.id}:fetch-retained:${nowIso()}`,
+              id: `${dataset.id}:fetch-cooldown:${nowIso()}`,
               datasetId: dataset.id,
               kind: 'fetch',
               status: 'skipped',
               startedAt: datasetState.lastFetchAt,
               completedAt: nowIso(),
               attempts: 1,
-              detail: 'fetch returned 0 rows; retained the most recent non-empty artifact for downstream import/replay',
+              detail: 'GDELT returned 429; reused the most recent non-empty artifact and deferred refresh until the next cooldown window',
             });
-            return previousUsableArtifact;
+          } else {
+            throw error;
           }
-          return artifactPath;
-        }, state);
+        }
       }
 
       let importedFreshCorpus = false;

@@ -135,7 +135,7 @@ import { fetchUnhcrPopulation } from '@/services/displacement';
 import { fetchClimateAnomalies } from '@/services/climate';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
-import { isFeatureAvailable } from '@/services/runtime-config';
+import { isFeatureAvailable, secretsReady } from '@/services/runtime-config';
 import { canUseLocalAgentEndpoints, hasLocalAgentEndpointSupport, isDesktopRuntime, toRuntimeUrl } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { getCurrentLanguage, t } from '@/services/i18n';
@@ -504,29 +504,33 @@ export class DataLoaderManager implements AppModule {
   public startGlintRealtime(): void {
     if (this.glintRealtimeStarted || this.ctx.isDestroyed) return;
     if (SITE_VARIANT !== 'full' || !isGlintGeoEnabled()) return;
-
-    const authToken = getGlintAuthToken();
-    this.glintRealtimeClient = new GlintMarketWatchClient({
-      authToken,
-      rooms: ['feed', 'market_watch'],
-      reconnect: Boolean(authToken),
-      onStatus: (status, detail) => {
-        if (status === 'authenticated' || status === 'connected') {
-          this.triggerGlintRealtimeRefreshDebounced();
-        }
-        if (status === 'error' && detail) {
-          console.warn('[Glint] Realtime status error:', detail);
-        }
-      },
-      onMessage: (message) => {
-        if (this.shouldTriggerGlintRealtimeRefresh(message)) {
-          this.triggerGlintRealtimeRefreshDebounced();
-        }
-      },
-    });
-
     this.glintRealtimeStarted = true;
-    void this.glintRealtimeClient.connect();
+    void (async () => {
+      await Promise.race([secretsReady, new Promise<void>((resolve) => setTimeout(resolve, 2_000))]);
+      if (this.ctx.isDestroyed || this.glintRealtimeClient) return;
+
+      const authToken = getGlintAuthToken();
+      this.glintRealtimeClient = new GlintMarketWatchClient({
+        authToken,
+        rooms: ['feed', 'market_watch'],
+        reconnect: Boolean(authToken),
+        onStatus: (status, detail) => {
+          if (status === 'authenticated' || status === 'connected') {
+            this.triggerGlintRealtimeRefreshDebounced();
+          }
+          if (status === 'error' && detail) {
+            console.warn('[Glint] Realtime status error:', detail);
+          }
+        },
+        onMessage: (message) => {
+          if (this.shouldTriggerGlintRealtimeRefresh(message)) {
+            this.triggerGlintRealtimeRefreshDebounced();
+          }
+        },
+      });
+
+      void this.glintRealtimeClient.connect();
+    })();
   }
 
   public stopGlintRealtime(): void {
@@ -1649,6 +1653,7 @@ export class DataLoaderManager implements AppModule {
       if (!isGlintGeoEnabled() || this.ctx.isDestroyed) return;
 
       try {
+        await Promise.race([secretsReady, new Promise<void>((resolve) => setTimeout(resolve, 2_000))]);
         const authToken = getGlintAuthToken();
         const [signals, feedRecords, glintLocations] = await Promise.all([
           fetchGlintCountrySignals({ maxCountries: 80, authToken }),

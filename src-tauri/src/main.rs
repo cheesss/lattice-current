@@ -28,10 +28,11 @@ const MENU_FILE_BACKTEST_HUB_ID: &str = "file.backtest-hub";
 const MENU_HELP_GITHUB_ID: &str = "help.github";
 #[cfg(feature = "devtools")]
 const MENU_HELP_DEVTOOLS_ID: &str = "help.devtools";
-const SUPPORTED_SECRET_KEYS: [&str; 25] = [
+const SUPPORTED_SECRET_KEYS: [&str; 26] = [
     "GROQ_API_KEY",
     "OPENAI_API_KEY",
     "OPENROUTER_API_KEY",
+    "GLINT_AUTH_TOKEN",
     "FRED_API_KEY",
     "EIA_API_KEY",
     "CLOUDFLARE_API_TOKEN",
@@ -806,7 +807,11 @@ async fn open_glint_login(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn sync_glint_auth_token(webview: Webview, app: AppHandle) -> Result<String, String> {
+async fn sync_glint_auth_token(
+    webview: Webview,
+    app: AppHandle,
+    cache: tauri::State<'_, SecretsCache>,
+) -> Result<String, String> {
     require_trusted_window(webview.label())?;
     append_desktop_log(
         &app,
@@ -1071,6 +1076,21 @@ async fn sync_glint_auth_token(webview: Webview, app: AppHandle) -> Result<Strin
             if let Some(token) = rest.strip_prefix("TOKEN:") {
                 let clean = token.trim();
                 if !clean.is_empty() {
+                    let mut secrets = cache
+                        .secrets
+                        .lock()
+                        .map_err(|_| "Failed to lock secrets cache".to_string())?;
+                    let mut proposed = secrets.clone();
+                    proposed.insert("GLINT_AUTH_TOKEN".to_string(), clean.to_string());
+                    save_vault(&proposed)?;
+                    *secrets = proposed;
+                    if let Err(err) = write_secrets_mirror(&app, &secrets) {
+                        append_desktop_log(
+                            &app,
+                            "WARN",
+                            &format!("failed to sync runtime secrets mirror after glint sync: {err}"),
+                        );
+                    }
                     append_desktop_log(
                         &app,
                         "INFO",

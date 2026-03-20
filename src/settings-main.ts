@@ -32,7 +32,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import { getCurrentLanguage, initI18n, t } from '@/services/i18n';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { trackFeatureToggle } from '@/services/analytics';
-import { getGlintAuthToken, setGlintAuthToken, clearGlintAuthToken } from '@/services/glint';
+import { getGlintAuthToken, persistGlintAuthToken, removePersistedGlintAuthToken } from '@/services/glint';
 
 let activeSection = 'overview';
 let settingsManager: SettingsManager;
@@ -384,12 +384,20 @@ function renderOverview(area: HTMLElement): void {
         </div>
         ${desktop ? `
         <div class="wm-register-row" style="margin-top:10px;">
+          <button type="button" class="wm-submit-btn" data-glint-open>Open Glint</button>
           <button type="button" class="wm-submit-btn" data-glint-login>Open Glint Login</button>
           <button type="button" class="wm-submit-btn" data-glint-sync>Sync Token from Login Window</button>
         </div>
         ` : `
-        <p class="wm-section-desc" style="margin-top:10px;">Browser mode skips the desktop Glint helper. Paste your Glint token directly into the field above.</p>
+        <div class="wm-register-row" style="margin-top:10px;">
+          <button type="button" class="wm-submit-btn" data-glint-open>Open Glint</button>
+        </div>
+        <p class="wm-section-desc" style="margin-top:10px;">Browser mode cannot use the desktop Glint helper. Open Glint in a separate tab, sign in there, then paste your Glint token into the field above.</p>
         `}
+        <div class="wm-register-row" style="margin-top:10px;">
+          <button type="button" class="wm-submit-btn" data-glint-save>Save Token</button>
+          <button type="button" class="wm-submit-btn secondary" data-glint-clear>Clear Token</button>
+        </div>
         <p class="wm-reg-status" data-glint-login-status></p>
       </section>
 
@@ -415,6 +423,31 @@ function renderOverview(area: HTMLElement): void {
   `;
 
   initOverviewListeners(area);
+}
+
+function refreshGlintOverviewState(area: HTMLElement, options?: {
+  message?: string;
+  tone?: 'ok' | 'error' | 'warn';
+}): void {
+  const hasToken = Boolean(getGlintAuthToken());
+  const badge = area.querySelector<HTMLElement>('.wm-section [data-glint-token-input]')?.closest('.wm-key-row')?.querySelector<HTMLElement>('.wm-badge');
+  if (badge) {
+    badge.textContent = hasToken ? 'Active' : 'Not set';
+    badge.className = `wm-badge ${hasToken ? 'ok' : 'warn'}`;
+  }
+
+  const input = area.querySelector<HTMLInputElement>('[data-glint-token-input]');
+  if (input) {
+    input.type = 'password';
+    input.value = hasToken ? MASKED_SENTINEL : '';
+    input.placeholder = hasToken ? 'Configured (enter new token to replace)' : 'Paste Glint auth token';
+  }
+
+  const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
+  if (statusEl && options?.message) {
+    statusEl.textContent = options.message;
+    statusEl.className = `wm-reg-status ${options.tone || 'ok'}`;
+  }
 }
 
 function initOverviewListeners(area: HTMLElement): void {
@@ -443,6 +476,74 @@ function initOverviewListeners(area: HTMLElement): void {
     }
   });
 
+  area.querySelector('[data-glint-open]')?.addEventListener('click', async () => {
+    const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
+    const signupUrl = SIGNUP_URLS.GLINT_AUTH_TOKEN || 'https://glint.trade/';
+    try {
+      if (isDesktopRuntime()) {
+        await invokeTauri<void>('open_url', { url: signupUrl });
+      } else {
+        window.open(signupUrl, '_blank', 'noopener');
+      }
+      if (statusEl) {
+        statusEl.textContent = 'Glint opened in a new window. Sign in there, then return here to save your token.';
+        statusEl.className = 'wm-reg-status ok';
+      }
+    } catch (error) {
+      if (statusEl) {
+        statusEl.textContent = `Failed to open Glint: ${String(error)}`;
+        statusEl.className = 'wm-reg-status error';
+      }
+    }
+  });
+
+  area.querySelector('[data-glint-save]')?.addEventListener('click', async () => {
+    const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
+    const input = area.querySelector<HTMLInputElement>('[data-glint-token-input]');
+    const token = input?.value.trim() || '';
+    if (!token || token === MASKED_SENTINEL) {
+      refreshGlintOverviewState(area, {
+        message: getGlintAuthToken()
+          ? 'Glint token is already configured.'
+          : 'Paste a Glint token first, then click Save Token.',
+        tone: getGlintAuthToken() ? 'ok' : 'warn',
+      });
+      return;
+    }
+    try {
+      const verification = await verifySecretWithApi('GLINT_AUTH_TOKEN', token);
+      if (!verification.valid) {
+        throw new Error(verification.message || 'Glint token verification failed');
+      }
+      await persistGlintAuthToken(token);
+      refreshGlintOverviewState(area, {
+        message: verification.message || 'Glint token saved and activated.',
+        tone: 'ok',
+      });
+    } catch (error) {
+      if (statusEl) {
+        statusEl.textContent = `Failed to save token: ${String(error)}`;
+        statusEl.className = 'wm-reg-status error';
+      }
+    }
+  });
+
+  area.querySelector('[data-glint-clear]')?.addEventListener('click', async () => {
+    const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
+    try {
+      await removePersistedGlintAuthToken();
+      refreshGlintOverviewState(area, {
+        message: 'Glint token cleared.',
+        tone: 'ok',
+      });
+    } catch (error) {
+      if (statusEl) {
+        statusEl.textContent = `Failed to clear token: ${String(error)}`;
+        statusEl.className = 'wm-reg-status error';
+      }
+    }
+  });
+
   if (isDesktopRuntime()) {
     area.querySelector('[data-glint-login]')?.addEventListener('click', async () => {
       const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
@@ -468,11 +569,15 @@ function initOverviewListeners(area: HTMLElement): void {
         if (!clean) {
           throw new Error('Empty token returned');
         }
-        setGlintAuthToken(clean);
-        if (statusEl) {
-          statusEl.textContent = 'Glint token synced from login window.';
-          statusEl.className = 'wm-reg-status ok';
+        const verification = await verifySecretWithApi('GLINT_AUTH_TOKEN', clean);
+        if (!verification.valid) {
+          throw new Error(verification.message || 'Glint token verification failed');
         }
+        await persistGlintAuthToken(clean);
+        refreshGlintOverviewState(area, {
+          message: verification.message || 'Glint token synced from login window.',
+          tone: 'ok',
+        });
       } catch (error) {
         if (statusEl) {
           statusEl.textContent = `Failed to sync token: ${String(error)}`;
@@ -1186,9 +1291,14 @@ async function initSettingsWindow(): Promise<void> {
 
         if (hasGlintTokenChange) {
           if (glintTokenValue) {
-            setGlintAuthToken(glintTokenValue);
+            const verification = await verifySecretWithApi('GLINT_AUTH_TOKEN', glintTokenValue);
+            if (!verification.valid) {
+              setActionStatus(verification.message || 'Glint token verification failed', 'error');
+              return;
+            }
+            await persistGlintAuthToken(glintTokenValue);
           } else {
-            clearGlintAuthToken();
+            await removePersistedGlintAuthToken();
           }
         }
 

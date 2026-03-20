@@ -5,6 +5,7 @@ export type RuntimeSecretKey =
   | 'GROQ_API_KEY'
   | 'OPENAI_API_KEY'
   | 'OPENROUTER_API_KEY'
+  | 'GLINT_AUTH_TOKEN'
   | 'FRED_API_KEY'
   | 'EIA_API_KEY'
   | 'CLOUDFLARE_API_TOKEN'
@@ -255,6 +256,10 @@ function readEnvSecret(key: RuntimeSecretKey): string {
   return typeof envValue === 'string' ? envValue.trim() : '';
 }
 
+const EXTRA_RUNTIME_SECRET_KEYS: RuntimeSecretKey[] = [
+  'GLINT_AUTH_TOKEN',
+];
+
 function readStoredToggles(): Record<RuntimeFeatureId, boolean> {
   try {
     const stored = localStorage.getItem(TOGGLES_STORAGE_KEY);
@@ -345,7 +350,10 @@ function notifyConfigChanged(): void {
 function seedSecretsFromEnvironment(): void {
   if (isDesktopRuntime()) return;
 
-  const keys = new Set<RuntimeSecretKey>(RUNTIME_FEATURES.flatMap(feature => feature.requiredSecrets));
+  const keys = new Set<RuntimeSecretKey>([
+    ...RUNTIME_FEATURES.flatMap(feature => feature.requiredSecrets),
+    ...EXTRA_RUNTIME_SECRET_KEYS,
+  ]);
   for (const key of keys) {
     const value = readEnvSecret(key);
     if (value) {
@@ -425,6 +433,10 @@ export function getRuntimeConfigSnapshot(): RuntimeConfig {
     featureToggles: { ...runtimeConfig.featureToggles },
     secrets: { ...runtimeConfig.secrets },
   };
+}
+
+export function getSecretValue(key: RuntimeSecretKey): string {
+  return runtimeConfig.secrets[key]?.value?.trim() || '';
 }
 
 export function isFeatureEnabled(featureId: RuntimeFeatureId): boolean {

@@ -156,6 +156,11 @@ function renderOpsSummaryCard(title: string, summary: BacktestOpsRunSummary | nu
   `;
 }
 
+function hasUsableHistoricalFrames(dataset: HistoricalDatasetSummary | null | undefined): boolean {
+  if (!dataset) return false;
+  return (Number(dataset.frameCount) || 0) > 0 || (Number(dataset.rawRecordCount) || 0) > 0;
+}
+
 function datasetStatusTone(
   completenessScore: number,
   gapRatio: number,
@@ -981,7 +986,13 @@ export class BacktestLabPanel extends Panel {
   private async handleReplay(): Promise<void> {
     const datasetId = this.controlState.datasetId.trim();
     if (!datasetId) {
-      this.actionMessage = 'dataset required';
+      this.actionMessage = '먼저 가져온 히스토리컬 데이터셋을 선택하세요.';
+      this.render();
+      return;
+    }
+    const selectedDataset = this.datasets.find((dataset) => dataset.datasetId === datasetId);
+    if (!hasUsableHistoricalFrames(selectedDataset)) {
+      this.actionMessage = '지금은 리플레이를 돌릴 준비가 안 됐습니다. 먼저 파일을 Import 하거나 usable frames가 있는 데이터셋을 고르세요.';
       this.render();
       return;
     }
@@ -1008,7 +1019,13 @@ export class BacktestLabPanel extends Panel {
   private async handleWalkForward(): Promise<void> {
     const datasetId = this.controlState.datasetId.trim();
     if (!datasetId) {
-      this.actionMessage = 'dataset required';
+      this.actionMessage = '먼저 가져온 히스토리컬 데이터셋을 선택하세요.';
+      this.render();
+      return;
+    }
+    const selectedDataset = this.datasets.find((dataset) => dataset.datasetId === datasetId);
+    if (!hasUsableHistoricalFrames(selectedDataset)) {
+      this.actionMessage = '지금은 워크포워드를 돌릴 준비가 안 됐습니다. 먼저 파일을 Import 하거나 usable frames가 있는 데이터셋을 고르세요.';
       this.render();
       return;
     }
@@ -1087,9 +1104,62 @@ export class BacktestLabPanel extends Panel {
         ${escapeHtml(dataset.datasetId)} (${escapeHtml(dataset.provider)})
       </option>
     `).join('');
+    const selectedDataset = this.datasets.find((dataset) => dataset.datasetId === this.controlState.datasetId) || null;
+    const hasSelectedHistoricalDataset = hasUsableHistoricalFrames(selectedDataset);
+    const hasImportSource = this.controlState.filePath.trim().length > 0;
+    const builderStage = hasSelectedHistoricalDataset
+      ? 'ready-to-run'
+      : hasImportSource
+        ? 'ready-to-import'
+        : 'missing-source';
+    const builderStatusTone = builderStage === 'ready-to-run'
+      ? 'ready'
+      : builderStage === 'ready-to-import'
+        ? 'watch'
+        : 'blocked';
+    const builderStatusTitle = builderStage === 'ready-to-run'
+      ? 'Replay Ready'
+      : builderStage === 'ready-to-import'
+        ? 'Import First'
+        : 'Pick A Source';
+    const builderStatusSummary = builderStage === 'ready-to-run'
+      ? `${selectedDataset?.datasetId || 'selected dataset'} has reusable historical frames, so you can run Replay or Walk-forward now.`
+      : builderStage === 'ready-to-import'
+        ? 'A source file is present, but it is not imported into the historical corpus yet.'
+        : 'This panel has no reusable historical dataset selected yet.';
+    const builderStatusNextStep = builderStage === 'ready-to-run'
+      ? 'Use Replay for a quick manual run, or Walk-forward for a stricter out-of-sample check.'
+      : builderStage === 'ready-to-import'
+        ? 'Press Import first. Replay and Walk-forward will unlock after the dataset has usable frames.'
+        : 'Either select a loaded historical dataset with frames, or paste a file path and import it first.';
+    const currentContextLabel = this.runs.length > 0 ? 'Current Market Context' : 'Current Snapshot Context';
     const controlBlock = `
       <section class="investment-subcard">
-        <h4>Replay Builder</h4>
+        <div class="investment-subcard-head">
+          <h4>Replay Builder</h4>
+          <span class="investment-action-chip ${builderStatusTone}">${escapeHtml(builderStatusTitle.toUpperCase())}</span>
+        </div>
+        <div class="backtest-builder-status ${builderStatusTone}">
+          <div class="backtest-builder-status-copy">
+            <strong>${escapeHtml(builderStatusTitle)}</strong>
+            <div class="backtest-lab-note">${escapeHtml(builderStatusSummary)}</div>
+            <div class="backtest-lab-note">${escapeHtml(builderStatusNextStep)}</div>
+          </div>
+          <div class="backtest-builder-steps">
+            <div class="backtest-builder-step ${hasImportSource || hasSelectedHistoricalDataset ? 'ready' : 'blocked'}">
+              <span class="backtest-builder-step-label">1. Source</span>
+              <span class="backtest-builder-step-value">${hasSelectedHistoricalDataset ? 'Loaded dataset' : hasImportSource ? 'File path ready' : 'Missing'}</span>
+            </div>
+            <div class="backtest-builder-step ${hasSelectedHistoricalDataset ? 'ready' : hasImportSource ? 'watch' : 'blocked'}">
+              <span class="backtest-builder-step-label">2. Import</span>
+              <span class="backtest-builder-step-value">${hasSelectedHistoricalDataset ? 'Done' : hasImportSource ? 'Needed now' : 'Waiting for source'}</span>
+            </div>
+            <div class="backtest-builder-step ${hasSelectedHistoricalDataset ? 'ready' : 'blocked'}">
+              <span class="backtest-builder-step-label">3. Run</span>
+              <span class="backtest-builder-step-value">${hasSelectedHistoricalDataset ? 'Replay / Walk-forward' : 'Locked until import'}</span>
+            </div>
+          </div>
+        </div>
         <div class="backtest-lab-controls">
           <label class="backtest-lab-control">
             <span>File</span>
@@ -1150,12 +1220,16 @@ export class BacktestLabPanel extends Panel {
         <div class="backtest-lab-toolbar">
           <button type="button" class="backtest-lab-btn" data-action="refresh"${this.actionBusy ? ' disabled' : ''}>Refresh</button>
           <button type="button" class="backtest-lab-btn" data-action="import-dataset"${this.actionBusy ? ' disabled' : ''}>Import</button>
-          <button type="button" class="backtest-lab-btn" data-action="run-replay"${this.actionBusy ? ' disabled' : ''}>Replay</button>
-          <button type="button" class="backtest-lab-btn" data-action="run-walk-forward"${this.actionBusy ? ' disabled' : ''}>Walk-forward</button>
+          <button type="button" class="backtest-lab-btn" data-action="run-replay"${this.actionBusy || !hasSelectedHistoricalDataset ? ' disabled' : ''}>Replay</button>
+          <button type="button" class="backtest-lab-btn" data-action="run-walk-forward"${this.actionBusy || !hasSelectedHistoricalDataset ? ' disabled' : ''}>Walk-forward</button>
           <button type="button" class="backtest-lab-btn" data-action="test-postgres"${this.actionBusy ? ' disabled' : ''}>Test PG</button>
           <button type="button" class="backtest-lab-btn secondary" data-action="open-hub">Open ${APP_BRAND.hubs.backtest}</button>
         </div>
-        <div class="backtest-lab-note">${escapeHtml(this.actionBusy ? `${this.actionMessage} (working)` : this.actionMessage || 'Pick a dataset, then import, replay, or walk-forward from this workspace.')}</div>
+        <div class="backtest-lab-note">${escapeHtml(this.actionBusy ? `${this.actionMessage} (working)` : this.actionMessage || (hasSelectedHistoricalDataset
+          ? 'This dataset is ready. You can run Replay or Walk-forward now.'
+          : hasImportSource
+            ? 'The file path is ready. Import it first, then Replay and Walk-forward will unlock.'
+            : 'Pick a historical dataset or paste a file path first. Live snapshot cards below are context, not a replay run.'))}</div>
         <div class="backtest-lab-postgres ${escapeHtml(this.postgresStatus.state)}">
           <strong>Postgres</strong>
           <span>${escapeHtml(this.postgresStatus.message)}</span>
@@ -1263,7 +1337,7 @@ export class BacktestLabPanel extends Panel {
     const missionControlSection = `
       <section class="investment-subcard backtest-mission-card">
         <div class="investment-subcard-head">
-          <h4>Replay Overview</h4>
+          <h4>${escapeHtml(currentContextLabel)}</h4>
           <span class="investment-mini-label">${escapeHtml(intelligenceSnapshot ? formatRelativeTime(intelligenceSnapshot.generatedAt) : opsSnapshot ? formatRelativeTime(opsSnapshot.updatedAt) : 'n/a')}</span>
         </div>
         <div class="backtest-lab-kpis">
