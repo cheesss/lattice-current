@@ -38,7 +38,8 @@ import { trackEvent, trackDeeplinkOpened } from '@/services/analytics';
 import { preloadCountryGeometry, getCountryNameByCode } from '@/services/country-geometry';
 import { initI18n, t } from '@/services/i18n';
 
-import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount } from '@/config/feeds';
+
+import { runMigrations } from '@/bootstrap/migrations';
 import { fetchBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, type BootstrapHydrationState } from '@/services/bootstrap';
 import { describeFreshness } from '@/services/persistent-cache';
 import { DesktopUpdater } from '@/app/desktop-updater';
@@ -330,28 +331,6 @@ export class App {
         DEFAULT_PANELS
       );
 
-      // One-time migration: preserve user preferences across panel key renames.
-      const PANEL_KEY_RENAMES_MIGRATION_KEY = 'worldmonitor-panel-key-renames-v2.6';
-      if (!localStorage.getItem(PANEL_KEY_RENAMES_MIGRATION_KEY)) {
-        const keyRenames: Array<[string, string]> = [
-          ['live-youtube', 'live-webcams'],
-          ['pinned-webcams', 'windy-webcams'],
-        ];
-        let migrated = false;
-        for (const [legacyKey, nextKey] of keyRenames) {
-          if (!panelSettings[legacyKey] || panelSettings[nextKey]) continue;
-          panelSettings[nextKey] = {
-            ...DEFAULT_PANELS[nextKey],
-            ...panelSettings[legacyKey],
-            name: DEFAULT_PANELS[nextKey]?.name ?? panelSettings[legacyKey].name,
-          };
-          delete panelSettings[legacyKey];
-          migrated = true;
-        }
-        if (migrated) saveToStorage(STORAGE_KEYS.panels, panelSettings);
-        localStorage.setItem(PANEL_KEY_RENAMES_MIGRATION_KEY, 'done');
-      }
-
       // Merge in any panels from ALL_PANELS that didn't exist when settings were saved
       for (const key of Object.keys(ALL_PANELS)) {
         if (!(key in panelSettings)) {
@@ -359,106 +338,16 @@ export class App {
           panelSettings[key] = { ...getEffectivePanelConfig(key, SITE_VARIANT), enabled: isDefault };
         }
       }
-
-      // One-time migration: expose all panels to existing users (previously variant-gated)
-      const UNIFIED_MIGRATION_KEY = 'worldmonitor-unified-panels-v1';
-      if (!localStorage.getItem(UNIFIED_MIGRATION_KEY)) {
-        const variantDefaults = new Set(VARIANT_DEFAULTS[SITE_VARIANT] ?? []);
-        for (const key of Object.keys(ALL_PANELS)) {
-          if (!(key in panelSettings)) {
-            panelSettings[key] = { ...getEffectivePanelConfig(key, SITE_VARIANT), enabled: variantDefaults.has(key) };
-          }
-        }
-        saveToStorage(STORAGE_KEYS.panels, panelSettings);
-        localStorage.setItem(UNIFIED_MIGRATION_KEY, 'done');
-      }
       console.log('[App] Loaded panel settings from storage:', Object.entries(panelSettings).filter(([_, v]) => !v.enabled).map(([k]) => k));
-
-      // One-time migration: reorder panels for existing users (v1.9 panel layout)
-      const PANEL_ORDER_MIGRATION_KEY = 'worldmonitor-panel-order-v1.9';
-      if (!localStorage.getItem(PANEL_ORDER_MIGRATION_KEY)) {
-        const savedOrder = localStorage.getItem(PANEL_ORDER_KEY);
-        if (savedOrder) {
-          try {
-            const order: string[] = JSON.parse(savedOrder);
-            const priorityPanels = ['insights', 'strategic-posture', 'cii', 'strategic-risk'];
-            const filtered = order.filter(k => !priorityPanels.includes(k) && k !== 'live-news');
-            const liveNewsIdx = order.indexOf('live-news');
-            const newOrder = liveNewsIdx !== -1 ? ['live-news'] : [];
-            newOrder.push(...priorityPanels.filter(p => order.includes(p)));
-            newOrder.push(...filtered);
-            localStorage.setItem(PANEL_ORDER_KEY, JSON.stringify(newOrder));
-            console.log('[App] Migrated panel order to v1.9 layout');
-          } catch {
-            // Invalid saved order, will use defaults
-          }
-        }
-        localStorage.setItem(PANEL_ORDER_MIGRATION_KEY, 'done');
-      }
-
-      // Tech variant migration: move insights to top (after live-news)
-      if (currentVariant === 'tech') {
-        const TECH_INSIGHTS_MIGRATION_KEY = 'worldmonitor-tech-insights-top-v1';
-        if (!localStorage.getItem(TECH_INSIGHTS_MIGRATION_KEY)) {
-          const savedOrder = localStorage.getItem(PANEL_ORDER_KEY);
-          if (savedOrder) {
-            try {
-              const order: string[] = JSON.parse(savedOrder);
-              const filtered = order.filter(k => k !== 'insights' && k !== 'live-news');
-              const newOrder: string[] = [];
-              if (order.includes('live-news')) newOrder.push('live-news');
-              if (order.includes('insights')) newOrder.push('insights');
-              newOrder.push(...filtered);
-              localStorage.setItem(PANEL_ORDER_KEY, JSON.stringify(newOrder));
-              console.log('[App] Tech variant: Migrated insights panel to top');
-            } catch {
-              // Invalid saved order, will use defaults
-            }
-          }
-          localStorage.setItem(TECH_INSIGHTS_MIGRATION_KEY, 'done');
-        }
-      }
     }
 
-    // One-time migration: prune removed panel keys from stored settings and order
-    const PANEL_PRUNE_KEY = 'worldmonitor-panel-prune-v1';
-    if (!localStorage.getItem(PANEL_PRUNE_KEY)) {
-      const validKeys = new Set(Object.keys(ALL_PANELS));
-      let pruned = false;
-      for (const key of Object.keys(panelSettings)) {
-        if (!validKeys.has(key) && key !== 'runtime-config') {
-          delete panelSettings[key];
-          pruned = true;
-        }
-      }
-      if (pruned) saveToStorage(STORAGE_KEYS.panels, panelSettings);
-      for (const orderKey of [PANEL_ORDER_KEY, PANEL_ORDER_KEY + '-bottom-set', PANEL_ORDER_KEY + '-bottom']) {
-        try {
-          const raw = localStorage.getItem(orderKey);
-          if (!raw) continue;
-          const arr = JSON.parse(raw);
-          if (!Array.isArray(arr)) continue;
-          const filtered = arr.filter((k: string) => validKeys.has(k));
-          if (filtered.length !== arr.length) localStorage.setItem(orderKey, JSON.stringify(filtered));
-        } catch { localStorage.removeItem(orderKey); }
-      }
-      localStorage.setItem(PANEL_PRUNE_KEY, 'done');
-    }
-
-    // One-time migration: clear stale panel ordering and sizing state
-    const LAYOUT_RESET_MIGRATION_KEY = 'worldmonitor-layout-reset-v2.5';
-    if (!localStorage.getItem(LAYOUT_RESET_MIGRATION_KEY)) {
-      const hadSavedOrder = !!localStorage.getItem(PANEL_ORDER_KEY);
-      const hadSavedSpans = !!localStorage.getItem(PANEL_SPANS_KEY);
-      if (hadSavedOrder || hadSavedSpans) {
-        localStorage.removeItem(PANEL_ORDER_KEY);
-        localStorage.removeItem(PANEL_ORDER_KEY + '-bottom');
-        localStorage.removeItem(PANEL_ORDER_KEY + '-bottom-set');
-        localStorage.removeItem(PANEL_SPANS_KEY);
-        console.log('[App] Applied layout reset migration (v2.5): cleared panel order/spans');
-      }
-      localStorage.setItem(LAYOUT_RESET_MIGRATION_KEY, 'done');
-    }
+    // Run all one-time localStorage migrations (extracted to src/bootstrap/migrations.ts)
+    runMigrations({
+      panelSettings,
+      panelOrderKey: PANEL_ORDER_KEY,
+      panelSpansKey: PANEL_SPANS_KEY,
+      currentVariant,
+    });
 
     // Desktop key management panel must always remain accessible in Tauri.
     if (isDesktopApp) {
@@ -479,30 +368,6 @@ export class App {
     }
     if (!CYBER_LAYER_ENABLED) {
       mapLayers.cyberThreats = false;
-    }
-    // One-time migration: reduce default-enabled sources (full variant only)
-    if (currentVariant === 'full') {
-      const baseKey = 'worldmonitor-sources-reduction-v3';
-      if (!localStorage.getItem(baseKey)) {
-        const defaultDisabled = computeDefaultDisabledSources();
-        saveToStorage(STORAGE_KEYS.disabledFeeds, defaultDisabled);
-        localStorage.setItem(baseKey, 'done');
-        const total = getTotalFeedCount();
-        console.log(`[App] Sources reduction: ${defaultDisabled.length} disabled, ${total - defaultDisabled.length} enabled`);
-      }
-      // Locale boost: additively enable locale-matched sources (runs once per locale)
-      const userLang = ((navigator.language ?? 'en').split('-')[0] ?? 'en').toLowerCase();
-      const localeKey = `worldmonitor-locale-boost-${userLang}`;
-      if (userLang !== 'en' && !localStorage.getItem(localeKey)) {
-        const boosted = getLocaleBoostedSources(userLang);
-        if (boosted.size > 0) {
-          const current = loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []);
-          const updated = current.filter(name => !boosted.has(name));
-          saveToStorage(STORAGE_KEYS.disabledFeeds, updated);
-          console.log(`[App] Locale boost (${userLang}): enabled ${current.length - updated.length} sources`);
-        }
-        localStorage.setItem(localeKey, 'done');
-      }
     }
 
     const disabledSources = new Set(loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []));
@@ -542,16 +407,7 @@ export class App {
       llmStatusIndicator: null,
       countryBriefPage: null,
       countryTimeline: null,
-      positivePanel: null,
-      countersPanel: null,
-      progressPanel: null,
-      breakthroughsPanel: null,
-      heroPanel: null,
-      digestPanel: null,
-      speciesPanel: null,
-      renewablePanel: null,
       tvMode: null,
-      happyAllItems: [],
       isDestroyed: false,
       isPlaybackMode: false,
       isIdle: false,
@@ -691,10 +547,6 @@ export class App {
       this.state.map.setCenter(mobileGeoCoords.lat, mobileGeoCoords.lon, 6);
     }
 
-    // Happy variant: pre-populate panels from persistent cache for instant render
-    if (SITE_VARIANT === 'happy') {
-      await this.dataLoader.hydrateHappyPanelsFromCache();
-    }
 
     // Phase 2: Shared UI components
     this.state.signalModal = new SignalModal();

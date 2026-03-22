@@ -57,4 +57,8 @@ message BacktestStockResponse {
   string generated_at = 16;
   repeated BacktestStockEvaluation evaluations = 17;
   string engine_version = 18;
+  double sharpe_ratio = 19;
+  double sortino_ratio = 20;
+  double max_drawdown_pct = 21;
+  double kelly_criterion_pct = 22;
 }

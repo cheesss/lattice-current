@@ -76,6 +76,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 2 },
   'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
   'national-debt': { name: 'Global Debt Clock', enabled: true, priority: 2 },
+  'backtest-lab': { name: 'Backtest Lab', enabled: true, priority: 2, premium: 'enhanced' },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
@@ -416,6 +417,7 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'airline-intel': { name: 'Airline Intelligence', enabled: true, priority: 2 },
   'world-clock': { name: 'World Clock', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+  'backtest-lab': { name: 'Backtest Lab', enabled: true, priority: 1, premium: 'enhanced' },
 };
 
 const FINANCE_MAP_LAYERS: MapLayers = {
@@ -540,143 +542,6 @@ const FINANCE_MOBILE_MAP_LAYERS: MapLayers = {
   weatherRadar: false,
 };
 
-// ============================================
-// HAPPY VARIANT (Good News & Progress)
-// ============================================
-const HAPPY_PANELS: Record<string, PanelConfig> = {
-  map: { name: 'World Map', enabled: true, priority: 1 },
-  'positive-feed': { name: 'Good News Feed', enabled: true, priority: 1 },
-  progress: { name: 'Human Progress', enabled: true, priority: 1 },
-  counters: { name: 'Live Counters', enabled: true, priority: 1 },
-  spotlight: { name: "Today's Hero", enabled: true, priority: 1 },
-  breakthroughs: { name: 'Breakthroughs', enabled: true, priority: 1 },
-  digest: { name: '5 Good Things', enabled: true, priority: 1 },
-  species: { name: 'Conservation Wins', enabled: true, priority: 1 },
-  renewable: { name: 'Renewable Energy', enabled: true, priority: 1 },
-  giving: { name: 'Global Giving', enabled: true, priority: 1 },
-};
-
-const HAPPY_MAP_LAYERS: MapLayers = {
-  gpsJamming: false,
-  satellites: false,
-
-
-  conflicts: false,
-  bases: false,
-  cables: false,
-  pipelines: false,
-  hotspots: false,
-  ais: false,
-  nuclear: false,
-  irradiators: false,
-  sanctions: false,
-  weather: false,
-  economic: false,
-  waterways: false,
-  outages: false,
-  cyberThreats: false,
-  datacenters: false,
-  protests: false,
-  flights: false,
-  military: false,
-  natural: false,
-  spaceports: false,
-  minerals: false,
-  fires: false,
-  // Data source layers
-  ucdpEvents: false,
-  displacement: false,
-  climate: false,
-  // Tech layers (disabled)
-  startupHubs: false,
-  cloudRegions: false,
-  accelerators: false,
-  techHQs: false,
-  techEvents: false,
-  // Finance layers (disabled)
-  stockExchanges: false,
-  financialCenters: false,
-  centralBanks: false,
-  commodityHubs: false,
-  gulfInvestments: false,
-  // Happy variant layers
-  positiveEvents: true,
-  kindness: true,
-  happiness: true,
-  speciesRecovery: true,
-  renewableInstallations: true,
-  tradeRoutes: false,
-  iranAttacks: false,
-  ciiChoropleth: false,
-  dayNight: false,
-  // Commodity layers (disabled)
-  miningSites: false,
-  processingPlants: false,
-  commodityPorts: false,
-  webcams: false,
-  weatherRadar: false,
-};
-
-const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
-  gpsJamming: false,
-  satellites: false,
-
-
-  conflicts: false,
-  bases: false,
-  cables: false,
-  pipelines: false,
-  hotspots: false,
-  ais: false,
-  nuclear: false,
-  irradiators: false,
-  sanctions: false,
-  weather: false,
-  economic: false,
-  waterways: false,
-  outages: false,
-  cyberThreats: false,
-  datacenters: false,
-  protests: false,
-  flights: false,
-  military: false,
-  natural: false,
-  spaceports: false,
-  minerals: false,
-  fires: false,
-  // Data source layers
-  ucdpEvents: false,
-  displacement: false,
-  climate: false,
-  // Tech layers (disabled)
-  startupHubs: false,
-  cloudRegions: false,
-  accelerators: false,
-  techHQs: false,
-  techEvents: false,
-  // Finance layers (disabled)
-  stockExchanges: false,
-  financialCenters: false,
-  centralBanks: false,
-  commodityHubs: false,
-  gulfInvestments: false,
-  // Happy variant layers
-  positiveEvents: true,
-  kindness: true,
-  happiness: true,
-  speciesRecovery: true,
-  renewableInstallations: true,
-  tradeRoutes: false,
-  iranAttacks: false,
-  ciiChoropleth: false,
-  dayNight: false,
-  // Commodity layers (disabled)
-  miningSites: false,
-  processingPlants: false,
-  commodityPorts: false,
-  webcams: false,
-  weatherRadar: false,
-};
 
 // ============================================
 // COMMODITY VARIANT (Mining, Metals, Energy)
@@ -837,9 +702,7 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
 // UNIFIED PANEL REGISTRY
 // ============================================
 
-/** All panels from all variants — union with FULL taking precedence for duplicate keys. */
 export const ALL_PANELS: Record<string, PanelConfig> = {
-  ...HAPPY_PANELS,
   ...COMMODITY_PANELS,
   ...TECH_PANELS,
   ...FINANCE_PANELS,
@@ -852,7 +715,6 @@ export const VARIANT_DEFAULTS: Record<string, string[]> = {
   tech:      Object.keys(TECH_PANELS),
   finance:   Object.keys(FINANCE_PANELS),
   commodity: Object.keys(COMMODITY_PANELS),
-  happy:     Object.keys(HAPPY_PANELS),
 };
 
 /**
@@ -874,9 +736,6 @@ export const VARIANT_PANEL_OVERRIDES: Partial<Record<string, Partial<Record<stri
     map:         { name: 'Commodity Map' },
     'live-news': { name: 'Commodity Headlines' },
     insights:    { name: 'AI Commodity Insights' },
-  },
-  happy: {
-    map:         { name: 'World Map' },
   },
 };
 
@@ -916,9 +775,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = Object.fromEntries(
   )
 );
 
-export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' 
-  ? HAPPY_MAP_LAYERS 
-  : SITE_VARIANT === 'tech' 
+export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' 
     ? TECH_MAP_LAYERS 
     : SITE_VARIANT === 'finance' 
       ? FINANCE_MAP_LAYERS 
@@ -926,9 +783,7 @@ export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
         ? COMMODITY_MAP_LAYERS
         : FULL_MAP_LAYERS;
 
-export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' 
-  ? HAPPY_MOBILE_MAP_LAYERS 
-  : SITE_VARIANT === 'tech' 
+export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'tech' 
     ? TECH_MOBILE_MAP_LAYERS 
     : SITE_VARIANT === 'finance' 
       ? FINANCE_MOBILE_MAP_LAYERS 
@@ -1054,15 +909,6 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
     variants: ['commodity'],
   },
 
-  // Happy variant
-  happyNews: {
-    labelKey: 'header.panelCatHappyNews',
-    panelKeys: ['positive-feed', 'progress', 'counters', 'spotlight', 'breakthroughs', 'digest'],
-  },
-  happyPlanet: {
-    labelKey: 'header.panelCatHappyPlanet',
-    panelKeys: ['species', 'renewable', 'giving'],
-  },
 };
 
 // Monitor palette — fixed category colors persisted to localStorage (not theme-dependent)

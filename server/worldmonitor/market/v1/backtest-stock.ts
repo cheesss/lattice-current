@@ -40,41 +40,96 @@ function simulateEvaluation(
   forwardBars: Candle[],
 ): BacktestStockEvaluation | null {
   const direction = signalDirection(analysis.signal);
-  if (!direction) return null;
+  if (!direction || forwardBars.length === 0) return null;
 
-  const entryPrice = analysis.currentPrice;
-  const stopLoss = analysis.stopLoss;
+  // Real-world execution: enter at the open of the first forward bar (the day after signal generation)
+  const firstBar = forwardBars[0];
+  if (!firstBar) return null;
+  
+  // Apply 0.15% (15 bps) slippage penalty to simulate real-world execution friction
+  const SLIPPAGE_RATE = 0.0015;
+  const entryPrice = direction === 'long' 
+    ? firstBar.open * (1 + SLIPPAGE_RATE) 
+    : firstBar.open * (1 - SLIPPAGE_RATE);
+
+  const initialStopLoss = analysis.stopLoss;
   const takeProfit = analysis.takeProfit;
-  if (!entryPrice || !stopLoss || !takeProfit) return null;
+  if (!entryPrice || !initialStopLoss || !takeProfit) return null;
 
+  let currentStopLoss = initialStopLoss;
   let exitPrice = forwardBars[forwardBars.length - 1]?.close ?? entryPrice;
-  let outcome = 'window_close';
+  let outcome = 'time_stop'; // Default if neither TP nor SL hit by end of window
 
-  for (const bar of forwardBars) {
+  for (let i = 0; i < forwardBars.length; i++) {
+    const bar = forwardBars[i];
+    if (!bar) continue;
+
     if (direction === 'long') {
-      if (bar.low <= stopLoss) {
-        exitPrice = stopLoss;
-        outcome = 'stop_loss';
+      // Gap down below stop loss at open -> fill at open price
+      if (bar.open <= currentStopLoss) {
+        exitPrice = bar.open * (1 - SLIPPAGE_RATE);
+        outcome = currentStopLoss > initialStopLoss ? 'trailing_stop' : 'stop_loss';
         break;
       }
-      if (bar.high >= takeProfit) {
-        exitPrice = takeProfit;
+      // Gap up above take profit at open -> fill at open price
+      if (bar.open >= takeProfit) {
+        exitPrice = bar.open * (1 - SLIPPAGE_RATE);
         outcome = 'take_profit';
         break;
       }
-      continue;
+      // Intra-day movement: conservative assumption (stop hit before TP)
+      if (bar.low <= currentStopLoss) {
+        exitPrice = currentStopLoss * (1 - SLIPPAGE_RATE);
+        outcome = currentStopLoss > initialStopLoss ? 'trailing_stop' : 'stop_loss';
+        break;
+      }
+      if (bar.high >= takeProfit) {
+        exitPrice = takeProfit * (1 - SLIPPAGE_RATE);
+        outcome = 'take_profit';
+        break;
+      }
+      
+      // Trailing Stop rule: move stop up to 3% below the highest high observed so far
+      const potentialTrail = bar.high * 0.97;
+      if (potentialTrail > currentStopLoss) {
+        currentStopLoss = potentialTrail;
+      }
+    } else {
+      // Short direction
+      if (bar.open >= currentStopLoss) {
+        exitPrice = bar.open * (1 + SLIPPAGE_RATE);
+        outcome = currentStopLoss < initialStopLoss ? 'trailing_stop' : 'stop_loss';
+        break;
+      }
+      if (bar.open <= takeProfit) {
+        exitPrice = bar.open * (1 + SLIPPAGE_RATE);
+        outcome = 'take_profit';
+        break;
+      }
+      if (bar.high >= currentStopLoss) {
+        exitPrice = currentStopLoss * (1 + SLIPPAGE_RATE);
+        outcome = currentStopLoss < initialStopLoss ? 'trailing_stop' : 'stop_loss';
+        break;
+      }
+      if (bar.low <= takeProfit) {
+        exitPrice = takeProfit * (1 + SLIPPAGE_RATE);
+        outcome = 'take_profit';
+        break;
+      }
+      
+      // Trailing rule: move stop down to 3% above the lowest low observed so far
+      const potentialTrail = bar.low * 1.03;
+      if (potentialTrail < currentStopLoss) {
+        currentStopLoss = potentialTrail;
+      }
     }
+  }
 
-    if (bar.high >= stopLoss) {
-      exitPrice = stopLoss;
-      outcome = 'stop_loss';
-      break;
-    }
-    if (bar.low <= takeProfit) {
-      exitPrice = takeProfit;
-      outcome = 'take_profit';
-      break;
-    }
+  // If time_stop, apply exit slippage to the final unforced close
+  if (outcome === 'time_stop') {
+    exitPrice = direction === 'long' 
+      ? exitPrice * (1 - SLIPPAGE_RATE)
+      : exitPrice * (1 + SLIPPAGE_RATE);
   }
 
   const simulatedReturnPct = direction === 'long'
@@ -91,7 +146,7 @@ function simulateEvaluation(
     simulatedReturnPct: round(simulatedReturnPct),
     directionCorrect: simulatedReturnPct > 0,
     outcome,
-    stopLoss: round(stopLoss),
+    stopLoss: round(initialStopLoss),
     takeProfit: round(takeProfit),
   };
 }
@@ -179,6 +234,10 @@ export const backtestStock: MarketServiceHandler['backtestStock'] = async (
       generatedAt: new Date().toISOString(),
       evaluations: [],
       engineVersion: STOCK_ANALYSIS_ENGINE_VERSION,
+      sharpeRatio: 0,
+      sortinoRatio: 0,
+      maxDrawdownPct: 0,
+      kellyCriterionPct: 0,
     };
   }
 
@@ -218,11 +277,51 @@ export const backtestStock: MarketServiceHandler['backtestStock'] = async (
 
       const actionableEvaluations = evaluations.length;
       const profitable = evaluations.filter((evaluation) => evaluation.simulatedReturnPct > 0);
+      const losses = evaluations.filter((evaluation) => evaluation.simulatedReturnPct <= 0);
       const winRate = (profitable.length / actionableEvaluations) * 100;
       const directionAccuracy = (evaluations.filter((evaluation) => evaluation.directionCorrect).length / actionableEvaluations) * 100;
       const avgSimulatedReturnPct = evaluations.reduce((sum, evaluation) => sum + evaluation.simulatedReturnPct, 0) / actionableEvaluations;
       const cumulativeSimulatedReturnPct = evaluations.reduce((sum, evaluation) => sum + evaluation.simulatedReturnPct, 0);
       const latest = evaluations[0]!;
+
+      // Advanced Analytics (Sharpe, Sortino, MDD, Kelly)
+      const returns = evaluations.map(e => e.simulatedReturnPct);
+      const negativeReturns = returns.filter(r => r < 0);
+      
+      const stdDev = Math.sqrt(returns.reduce((sq, r) => sq + Math.pow(r - avgSimulatedReturnPct, 2), 0) / (actionableEvaluations || 1));
+      const downsideDeviation = Math.sqrt(negativeReturns.reduce((sq, r) => sq + Math.pow(r, 2), 0) / (negativeReturns.length || 1));
+      
+      const sharpeRatio = stdDev === 0 ? 0 : avgSimulatedReturnPct / stdDev;
+      const sortinoRatio = downsideDeviation === 0 ? 0 : avgSimulatedReturnPct / downsideDeviation;
+
+      // Max Drawdown
+      let peak = 0;
+      let maxDrawdownPct = 0;
+      let currentEquity = 0;
+      // Reverse evaluations so chronological order for drawdown
+      for (const e of [...evaluations].reverse()) {
+        currentEquity += e.simulatedReturnPct;
+        if (currentEquity > peak) {
+          peak = currentEquity;
+        }
+        const drawdown = peak - currentEquity;
+        if (drawdown > maxDrawdownPct) {
+          maxDrawdownPct = drawdown;
+        }
+      }
+
+      // Kelly Criterion: W - ((1 - W) / R)
+      // R = Average Win / Absolute Average Loss
+      const avgWin = profitable.length ? profitable.reduce((sum, e) => sum + e.simulatedReturnPct, 0) / profitable.length : 0;
+      const avgLoss = losses.length ? Math.abs(losses.reduce((sum, e) => sum + e.simulatedReturnPct, 0) / losses.length) : 1;
+      const W = profitable.length / actionableEvaluations;
+      const R = avgWin / (avgLoss || 1);
+      let kellyCriterionPct = 0;
+      if (R > 0) {
+        kellyCriterionPct = (W - ((1 - W) / R)) * 100; // as percentage
+        if (kellyCriterionPct < 0) kellyCriterionPct = 0;
+      }
+
       const response: BacktestStockResponse = {
         available: true,
         symbol,
@@ -238,10 +337,14 @@ export const backtestStock: MarketServiceHandler['backtestStock'] = async (
         cumulativeSimulatedReturnPct: round(cumulativeSimulatedReturnPct),
         latestSignal: latest.signal,
         latestSignalScore: round(latest.signalScore),
-        summary: `Validated ${actionableEvaluations} stored analysis records over ${evalWindowDays} trading days with ${round(winRate)}% win rate and ${round(avgSimulatedReturnPct)}% average simulated return.`,
+        summary: `Validated ${actionableEvaluations} records over ${evalWindowDays} days. WinRate: ${round(winRate)}%, Sharpe: ${round(sharpeRatio)}, MDD: ${round(maxDrawdownPct)}%.`,
         generatedAt: new Date().toISOString(),
         evaluations: evaluations.slice(0, MAX_EVALUATIONS),
         engineVersion: STOCK_ANALYSIS_ENGINE_VERSION,
+        sharpeRatio: round(sharpeRatio),
+        sortinoRatio: round(sortinoRatio),
+        maxDrawdownPct: round(maxDrawdownPct),
+        kellyCriterionPct: round(kellyCriterionPct),
       };
       await storeStockBacktestSnapshot(response);
       return response;
@@ -270,5 +373,9 @@ export const backtestStock: MarketServiceHandler['backtestStock'] = async (
     generatedAt: new Date().toISOString(),
     evaluations: [],
     engineVersion: STOCK_ANALYSIS_ENGINE_VERSION,
+    sharpeRatio: 0,
+    sortinoRatio: 0,
+    maxDrawdownPct: 0,
+    kellyCriterionPct: 0,
   };
 };

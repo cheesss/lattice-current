@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
-import { sparkline } from '@/utils/sparkline';
+import { createSparkline } from '@/utils/charts';
 import {
   fetchConsumerPriceOverview,
   fetchConsumerPriceCategories,
@@ -229,6 +229,38 @@ export class ConsumerPricesPanel extends Panel {
         <div class="cp-body">${bodyHtml}</div>
       </div>
     `);
+
+    if (tab === 'overview' || tab === 'categories') {
+      this.mountCharts();
+    }
+  }
+
+  private mountCharts(): void {
+    requestAnimationFrame(() => {
+      const topCats = this.overview?.topCategories || [];
+      const allCats = this.categories?.categories || [];
+      const sourceList = this.settings.tab === 'overview' ? topCats : allCats;
+
+      sourceList.forEach((c) => {
+        if (!c.sparkline || c.sparkline.length < 2) return;
+        const containers = this.content.querySelectorAll(`.uplot-container[data-series-id="${c.slug}"]`);
+        
+        containers.forEach((container) => {
+          const isMini = container.classList.contains('uplot-mini');
+          const xData = c.sparkline!.map((_, i) => i);
+          const yData = c.sparkline!;
+          const color = c.momPct > 0 ? '#f44336' : '#4caf50'; // For prices, up is red, down is green
+
+          createSparkline({
+            container: container as HTMLElement,
+            data: [xData, yData],
+            color,
+            width: isMini ? 60 : 100,
+            height: isMini ? 24 : 32
+          });
+        });
+      });
+    });
   }
 
   private renderOverview(): string {
@@ -279,7 +311,7 @@ export class ConsumerPricesPanel extends Panel {
   }
 
   private renderCategoryMini(c: CategorySnapshot): string {
-    const spark = c.sparkline?.length ? sparkline(c.sparkline, 'var(--accent)', 40, 16) : '';
+    const spark = c.sparkline?.length ? `<div class="uplot-container uplot-mini" data-series-id="${escapeHtml(c.slug)}"></div>` : '';
     return `
       <div class="cp-cat-mini-row" data-category="${escapeHtml(c.slug)}">
         <span class="cp-cat-name">${escapeHtml(c.name)}</span>
@@ -310,7 +342,7 @@ export class ConsumerPricesPanel extends Panel {
               <td><strong>${escapeHtml(c.name)}</strong></td>
               <td>${pctBadge(c.wowPct, true)}</td>
               <td>${pctBadge(c.momPct, true)}</td>
-              <td>${c.sparkline?.length ? sparkline(c.sparkline, 'var(--accent)', 48, 18) : '—'}</td>
+              <td>${c.sparkline?.length ? `<div class="uplot-container uplot-td" data-series-id="${escapeHtml(c.slug)}"></div>` : '—'}</td>
               <td>${c.coveragePct > 0 ? `${c.coveragePct.toFixed(0)}%` : '—'}</td>
             </tr>
           `).join('')}

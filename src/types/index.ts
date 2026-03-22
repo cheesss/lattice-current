@@ -135,6 +135,11 @@ export interface ClusteredEvent {
   lat?: number;
   lon?: number;
   lang?: string;
+  themeId?: string;
+  relations?: {
+    evidence: string[];
+    confidenceScore?: number;
+  };
 }
 
 export type AssetType = 'pipeline' | 'cable' | 'datacenter' | 'base' | 'nuclear';

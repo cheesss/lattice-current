@@ -618,10 +618,9 @@ export function ingestGpsJammingForCII(hexes: GpsJamHex[]): void {
         code = hit.code;
         h3CountryCache.set(hex.h3, code);
       } else {
-        continue;
       }
     }
-
+    if (!code) continue;
     if (!countryDataMap.has(code)) countryDataMap.set(code, initCountryData());
     const data = countryDataMap.get(code)!;
     if (hex.level === 'high') data.gpsJammingHighCount++;

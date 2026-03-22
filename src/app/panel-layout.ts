@@ -50,7 +50,11 @@ import {
   EscalationCorrelationPanel,
   EconomicCorrelationPanel,
   DisasterCorrelationPanel,
+  CodexHubPage,
+  OntologyGraphPage,
+  BacktestLabPanel,
 } from '@/components';
+import './../styles/hubs.css';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
 import { debounce, saveToStorage, loadFromStorage } from '@/utils';
@@ -93,6 +97,9 @@ export class PanelLayoutManager implements AppModule {
   private bottomSetMemory: Set<string> = new Set();
   private criticalBannerEl: HTMLElement | null = null;
   private aviationCommandBar: AviationCommandBar | null = null;
+  private codexHubPage: CodexHubPage | null = null;
+  private ontologyGraphPage: OntologyGraphPage | null = null;
+  private currentActiveHub: 'codex' | 'ontology' | null = null;
   private readonly applyTimeRangeFilterDebounced: (() => void) & { cancel(): void };
 
   constructor(ctx: AppContext, callbacks: PanelLayoutCallbacks) {
@@ -116,16 +123,8 @@ export class PanelLayoutManager implements AppModule {
       this.criticalBannerEl.remove();
       this.criticalBannerEl = null;
     }
-    // Clean up happy variant panels
     this.ctx.tvMode?.destroy();
     this.ctx.tvMode = null;
-    this.ctx.countersPanel?.destroy();
-    this.ctx.progressPanel?.destroy();
-    this.ctx.breakthroughsPanel?.destroy();
-    this.ctx.heroPanel?.destroy();
-    this.ctx.digestPanel?.destroy();
-    this.ctx.speciesPanel?.destroy();
-    this.ctx.renewablePanel?.destroy();
 
     // Clean up aviation components
     this.aviationCommandBar?.destroy();
@@ -183,25 +182,9 @@ export class PanelLayoutManager implements AppModule {
                title="${t('header.commodity')}${SITE_VARIANT === 'commodity' ? ` ${t('common.currentVariant')}` : ''}">
               <span class="variant-icon">⛏️</span>
               <span class="variant-label">${t('header.commodity')}</span>
-            </a>
-            <span class="variant-divider"></span>
-            <a href="${vHref('happy', 'https://happy.worldmonitor.app')}"
-               class="variant-option ${SITE_VARIANT === 'happy' ? 'active' : ''}"
-               data-variant="happy"
-               ${vTarget('happy')}
-               title="Good News${SITE_VARIANT === 'happy' ? ` ${t('common.currentVariant')}` : ''}">
-              <span class="variant-icon">☀️</span>
-              <span class="variant-label">Good News</span>
             </a>`;
       })()}</div>
           <span class="logo">MONITOR</span><span class="logo-mobile">World Monitor</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
-          <a href="https://x.com/eliehabib" target="_blank" rel="noopener" class="credit-link">
-            <svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            <span class="credit-text">@eliehabib</span>
-          </a>
-          <a href="https://github.com/koala73/worldmonitor" target="_blank" rel="noopener" class="github-link" title="${t('header.viewOnGitHub')}">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          </a>
           <button class="mobile-settings-btn" id="mobileSettingsBtn" title="${t('header.settings')}">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
@@ -233,10 +216,17 @@ export class PanelLayoutManager implements AppModule {
             </button>
             <div class="download-dropdown" id="downloadDropdown"></div>
           </div>`}
+          <div class="hub-toggles" style="display: flex; gap: 8px; margin-right: 12px;">
+            <button class="hub-toggle-btn" id="codexHubToggle">
+              <span>🧠</span> CODEX HUB
+            </button>
+            <button class="hub-toggle-btn" id="ontologyGraphToggle">
+              <span>🕸️</span> ONTOLOGY
+            </button>
+          </div>
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           ${this.ctx.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
-          ${SITE_VARIANT === 'happy' ? `<button class="tv-mode-btn" id="tvModeBtn" title="TV Mode (Shift+T)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></button>` : ''}
           <span id="unifiedSettingsMount"></span>
         </div>
       </div>
@@ -255,7 +245,6 @@ export class PanelLayoutManager implements AppModule {
           { key: 'tech', icon: '💻', label: t('header.tech') },
           { key: 'finance', icon: '📈', label: t('header.finance') },
           { key: 'commodity', icon: '⛏️', label: t('header.commodity') },
-          { key: 'happy', icon: '☀️', label: 'Good News' },
         ];
         return variants.map(v =>
           `<button class="mobile-menu-item mobile-menu-variant ${v.key === SITE_VARIANT ? 'active' : ''}" data-variant="${v.key}">
@@ -280,17 +269,7 @@ export class PanelLayoutManager implements AppModule {
           <span class="mobile-menu-item-icon">${getCurrentTheme() === 'dark' ? '☀️' : '🌙'}</span>
           <span class="mobile-menu-item-label">${getCurrentTheme() === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
-        <a class="mobile-menu-item" href="https://x.com/eliehabib" target="_blank" rel="noopener">
-          <span class="mobile-menu-item-icon"><svg class="x-logo" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></span>
-          <span class="mobile-menu-item-label">@eliehabib</span>
-        </a>
         <div class="mobile-menu-divider"></div>
-        <div class="mobile-menu-footer-links">
-          <a href="${this.ctx.isDesktopApp ? 'https://worldmonitor.app/pro' : 'https://www.worldmonitor.app/pro'}" target="_blank" rel="noopener">Pro</a>
-          <a href="${this.ctx.isDesktopApp ? 'https://worldmonitor.app/blog/' : 'https://www.worldmonitor.app/blog/'}" target="_blank" rel="noopener">Blog</a>
-          <a href="${this.ctx.isDesktopApp ? 'https://worldmonitor.app/docs' : 'https://www.worldmonitor.app/docs'}" target="_blank" rel="noopener">Docs</a>
-          <a href="https://status.worldmonitor.app/" target="_blank" rel="noopener">Status</a>
-        </div>
         <div class="mobile-menu-version">v${__APP_VERSION__}</div>
       </nav>
       <div class="region-sheet-backdrop" id="regionSheetBackdrop"></div>
@@ -315,7 +294,7 @@ export class PanelLayoutManager implements AppModule {
       </div>
       <div class="main-content">
         <div class="map-section" id="mapSection">
-          <div class="panel-header">
+          <div class="panel-header" id="mapHeader">
             <div class="panel-header-left">
               <span class="panel-title">${SITE_VARIANT === 'tech' ? t('panels.techMap') : SITE_VARIANT === 'happy' ? 'Good News Map' : t('panels.map')}</span>
             </div>
@@ -337,12 +316,36 @@ export class PanelLayoutManager implements AppModule {
           </div>
           <div class="map-container" id="mapContainer"></div>
           ${SITE_VARIANT === 'happy' ? '<button class="tv-exit-btn" id="tvExitBtn">Exit TV Mode</button>' : ''}
-          <div class="map-resize-handle" id="mapResizeHandle"></div>
           <div class="map-bottom-grid" id="mapBottomGrid"></div>
         </div>
+        
+        <!-- Left Sidebar HUD for Focus Modes -->
+        <aside class="hud-left-sidebar" id="leftSidebar">
+          <button class="focus-mode-btn active" data-focus="all">
+            <span style="font-size: 16px">🌍</span> Global View
+          </button>
+          <button class="focus-mode-btn" data-focus="geopolitics">
+            <span style="font-size: 16px">🛡️</span> Geopolitics
+          </button>
+          <button class="focus-mode-btn" data-focus="markets">
+            <span style="font-size: 16px">📈</span> Markets & Economy
+          </button>
+          <button class="focus-mode-btn" data-focus="climate">
+            <span style="font-size: 16px">🔥</span> Climate & Resources
+          </button>
+          <button class="focus-mode-btn" data-focus="infra">
+            <span style="font-size: 16px">⚡</span> Cyber & Infra
+          </button>
+        </aside>
+
+        <!-- Right Inspector HUD (Old panels-grid) -->
         <div class="panels-grid" id="panelsGrid"></div>
         <button class="search-mobile-fab" id="searchMobileFab" aria-label="Search">\u{1F50D}</button>
       </div>
+      
+      <div id="codexHubPage" class="hub-overlay-page"></div>
+      <div id="ontologyGraphPage" class="hub-overlay-page"></div>
+
       <footer class="site-footer">
         <div class="site-footer-brand">
           <img src="/favico/favicon-32x32.png" alt="" width="28" height="28" class="site-footer-icon" />
@@ -366,9 +369,98 @@ export class PanelLayoutManager implements AppModule {
 
     this.createPanels();
 
+    this.setupFocusModes();
+    this.initHubPages();
+
     if (this.ctx.isMobile) {
       this.setupMobileMapToggle();
     }
+  }
+
+  private initHubPages(): void {
+    const codexToggle = document.getElementById('codexHubToggle');
+    const ontologyToggle = document.getElementById('ontologyGraphToggle');
+
+    codexToggle?.addEventListener('click', () => this.toggleHub('codex'));
+    ontologyToggle?.addEventListener('click', () => this.toggleHub('ontology'));
+  }
+
+  private getOntologySnapshot(): any {
+    return {
+      generatedAt: new Date(),
+      keywordGraph: null, // TODO: Wire from actual keyword service if available
+      ontologyGraph: null,
+      graphRagSummary: null,
+      reports: [],
+      timeslices: [],
+      entities: [],
+      ledger: [],
+      replayState: null,
+      stixBundle: null,
+    };
+  }
+
+  private toggleHub(hub: 'codex' | 'ontology'): void {
+    const codexToggle = document.getElementById('codexHubToggle');
+    const ontologyToggle = document.getElementById('ontologyGraphToggle');
+
+    if (this.currentActiveHub === hub) {
+      // Deactivate
+      this.currentActiveHub = null;
+      codexToggle?.classList.remove('active');
+      ontologyToggle?.classList.remove('active');
+      this.codexHubPage?.hide();
+      this.ontologyGraphPage?.hide();
+      document.body.classList.remove('hub-active');
+    } else {
+      // Activate
+      this.currentActiveHub = hub;
+      
+      // Lazy init if needed with proper options
+      if (hub === 'codex' && !this.codexHubPage) {
+        this.codexHubPage = new CodexHubPage({
+          getDataQAPanel: () => this.ctx.panels['data-qa'] as any,
+          getSourceOpsPanel: () => this.ctx.panels['source-ops'] as any,
+          getCodexOpsPanel: () => this.ctx.panels['codex-ops'] as any,
+        });
+      }
+      if (hub === 'ontology' && !this.ontologyGraphPage) {
+        this.ontologyGraphPage = new OntologyGraphPage({
+          getSnapshot: () => this.getOntologySnapshot(),
+        });
+      }
+
+      codexToggle?.classList.toggle('active', hub === 'codex');
+      ontologyToggle?.classList.toggle('active', hub === 'ontology');
+      
+      if (hub === 'codex') {
+        this.ontologyGraphPage?.hide();
+        this.codexHubPage?.show();
+      } else {
+        this.codexHubPage?.hide();
+        this.ontologyGraphPage?.show();
+      }
+      document.body.classList.add('hub-active');
+    }
+  }
+
+  private setupFocusModes(): void {
+    const btns = document.querySelectorAll('.focus-mode-btn');
+    btns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // Update active button
+        btns.forEach(b => b.classList.remove('active'));
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('active');
+        
+        // Apply focus to body
+        const focus = target.dataset.focus || 'all';
+        document.body.dataset.focusMode = focus;
+
+        // Force a resize event so map recalculates if needed
+        window.dispatchEvent(new Event('resize'));
+      });
+    });
   }
 
   private setupMobileMapToggle(): void {
@@ -583,6 +675,15 @@ export class PanelLayoutManager implements AppModule {
     this.createNewsPanel('thinktanks', 'panels.thinktanks');
     this.createPanel('economic', () => new EconomicPanel());
     this.createPanel('consumer-prices', () => new ConsumerPricesPanel());
+    
+    const backtestLab = this.createPanel('backtest-lab', () => new BacktestLabPanel());
+    if (backtestLab && !getSecretState('WORLDMONITOR_API_KEY').present && !isProWidgetEnabled()) {
+      backtestLab.showLocked([
+        'Historical backtesting of multi-domain intelligence signals',
+        'Walk-forward optimization across global event ledgers',
+        'Custom investment-focus heatmaps and equity curve analysis',
+      ]);
+    }
 
     this.createPanel('trade-policy', () => new TradePolicyPanel());
     this.createPanel('sanctions-pressure', () => new SanctionsPressurePanel());
@@ -834,77 +935,6 @@ export class PanelLayoutManager implements AppModule {
       import('@/components/GivingPanel').then(m => new m.GivingPanel()),
     );
 
-    // Happy variant panels (lazy-loaded — only relevant for happy variant)
-    if (SITE_VARIANT === 'happy') {
-      this.lazyPanel('positive-feed', () =>
-        import('@/components/PositiveNewsFeedPanel').then(m => {
-          const p = new m.PositiveNewsFeedPanel();
-          this.ctx.positivePanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('counters', () =>
-        import('@/components/CountersPanel').then(m => {
-          const p = new m.CountersPanel();
-          p.startTicking();
-          this.ctx.countersPanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('progress', () =>
-        import('@/components/ProgressChartsPanel').then(m => {
-          const p = new m.ProgressChartsPanel();
-          this.ctx.progressPanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('breakthroughs', () =>
-        import('@/components/BreakthroughsTickerPanel').then(m => {
-          const p = new m.BreakthroughsTickerPanel();
-          this.ctx.breakthroughsPanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('spotlight', () =>
-        import('@/components/HeroSpotlightPanel').then(m => {
-          const p = new m.HeroSpotlightPanel();
-          p.onLocationRequest = (lat: number, lon: number) => {
-            this.ctx.map?.setCenter(lat, lon, 4);
-            this.ctx.map?.flashLocation(lat, lon, 3000);
-          };
-          this.ctx.heroPanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('digest', () =>
-        import('@/components/GoodThingsDigestPanel').then(m => {
-          const p = new m.GoodThingsDigestPanel();
-          this.ctx.digestPanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('species', () =>
-        import('@/components/SpeciesComebackPanel').then(m => {
-          const p = new m.SpeciesComebackPanel();
-          this.ctx.speciesPanel = p;
-          return p;
-        }),
-      );
-
-      this.lazyPanel('renewable', () =>
-        import('@/components/RenewableEnergyPanel').then(m => {
-          const p = new m.RenewableEnergyPanel();
-          this.ctx.renewablePanel = p;
-          return p;
-        }),
-      );
-    }
 
     if (isWidgetFeatureEnabled() || isProWidgetEnabled()) {
       for (const spec of loadWidgets()) {
@@ -956,24 +986,22 @@ export class PanelLayoutManager implements AppModule {
 
       const monitorsIdx = valid.indexOf('monitors');
       if (monitorsIdx !== -1) valid.splice(monitorsIdx, 1);
-      if (SITE_VARIANT !== 'happy') valid.push('monitors');
+      valid.push('monitors');
       allOrder = valid;
     } else {
       allOrder = [...defaultOrder];
 
-      if (SITE_VARIANT !== 'happy') {
-        const liveNewsIdx = allOrder.indexOf('live-news');
-        if (liveNewsIdx > 0) {
-          allOrder.splice(liveNewsIdx, 1);
-          allOrder.unshift('live-news');
-        }
+      const liveNewsIdx = allOrder.indexOf('live-news');
+      if (liveNewsIdx > 0) {
+        allOrder.splice(liveNewsIdx, 1);
+        allOrder.unshift('live-news');
+      }
 
-        const webcamsIdx = allOrder.indexOf('live-webcams');
-        if (webcamsIdx !== -1 && webcamsIdx !== allOrder.indexOf('live-news') + 1) {
-          allOrder.splice(webcamsIdx, 1);
-          const afterNews = allOrder.indexOf('live-news') + 1;
-          allOrder.splice(afterNews, 0, 'live-webcams');
-        }
+      const webcamsIdx = allOrder.indexOf('live-webcams');
+      if (webcamsIdx !== -1 && webcamsIdx !== allOrder.indexOf('live-news') + 1) {
+        allOrder.splice(webcamsIdx, 1);
+        const afterNews = allOrder.indexOf('live-news') + 1;
+        allOrder.splice(afterNews, 0, 'live-webcams');
       }
 
       if (this.ctx.isDesktopApp) {

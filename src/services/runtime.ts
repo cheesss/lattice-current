@@ -799,3 +799,10 @@ export function installWebApiRedirect(): void {
 
   (window as unknown as Record<string, unknown>).__wmWebRedirectPatched = true;
 }
+
+export function canUseLocalAgentEndpoints(): boolean {
+  return isDesktopRuntime() || (typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1'
+  ));
+}

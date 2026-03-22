@@ -349,13 +349,13 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     if (!this.infrastructureBody) return;
     this.infrastructureBody.replaceChildren();
 
-    const centroid = getCountryCentroid(countryCode, ME_STRIKE_BOUNDS);
+    const centroid = getCountryCentroid(countryCode);
     if (!centroid) {
       this.infrastructureBody.append(this.makeEmpty(t('countryBrief.noGeometry')));
       return;
     }
 
-    const assets = getNearbyInfrastructure(centroid.lat, centroid.lon, INFRA_TYPES);
+    const assets = getNearbyInfrastructure(centroid[1], centroid[0], INFRA_TYPES);
     if (assets.length === 0) {
       this.infrastructureBody.append(this.makeEmpty(t('countryBrief.noInfrastructure')));
       return;
@@ -404,7 +404,7 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     const nearbyPorts = PORTS
       .map((port) => ({
         ...port,
-        distanceKm: haversineDistanceKm(centroid.lat, centroid.lon, port.lat, port.lon),
+        distanceKm: haversineDistanceKm(centroid[1], centroid[0], port.lat, port.lon),
       }))
       .filter((port) => port.distanceKm <= 1500)
       .sort((a, b) => a.distanceKm - b.distanceKm)

@@ -48,6 +48,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+  'stock-backtest': { name: 'Premium Backtesting', enabled: true, priority: 2 },
 };
 
 // Map layers for geopolitical view
@@ -93,7 +94,7 @@ export const DEFAULT_MAP_LAYERS: MapLayers = {
   centralBanks: false,
   commodityHubs: false,
   gulfInvestments: false,
-  // Happy variant layers
+  // Unused variant layers
   positiveEvents: false,
   kindness: false,
   happiness: false,
@@ -154,7 +155,7 @@ export const MOBILE_DEFAULT_MAP_LAYERS: MapLayers = {
   centralBanks: false,
   commodityHubs: false,
   gulfInvestments: false,
-  // Happy variant layers
+  // Unused variant layers
   positiveEvents: false,
   kindness: false,
   happiness: false,

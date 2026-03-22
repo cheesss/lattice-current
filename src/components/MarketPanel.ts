@@ -3,7 +3,7 @@ import { t } from '@/services/i18n';
 import type { MarketData, CryptoData, TokenData } from '@/types';
 import { formatPrice, formatChange, getChangeClass, getHeatmapClass } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
-import { miniSparkline } from '@/utils/sparkline';
+import { createSparkline } from '@/utils/charts';
 import {
   getMarketWatchlistEntries,
   parseMarketWatchlistInput,
@@ -113,14 +113,15 @@ export class MarketPanel extends Panel {
 
     const html = data
       .map(
-        (stock) => `
+        (stock, i) => `
       <div class="market-item">
         <div class="market-info">
           <span class="market-name">${escapeHtml(stock.name)}</span>
           <span class="market-symbol">${escapeHtml(stock.display)}</span>
         </div>
         <div class="market-data">
-          ${miniSparkline(stock.sparkline, stock.change)}
+        <div class="market-data">
+          <div class="uplot-container uplot-market-${i}" style="width:60px;height:24px"></div>
           <span class="market-price">${formatPrice(stock.price!)}</span>
           <span class="market-change ${getChangeClass(stock.change!)}">${formatChange(stock.change!)}</span>
         </div>
@@ -130,6 +131,26 @@ export class MarketPanel extends Panel {
       .join('');
 
     this.setContent(html);
+    
+    // Mount uPlot charts
+    requestAnimationFrame(() => {
+      data.forEach((stock, i) => {
+        if (!stock.sparkline || stock.sparkline.length < 2) return;
+        const container = this.content.querySelector(`.uplot-market-${i}`) as HTMLElement;
+        if (!container) return;
+        
+        const xData = stock.sparkline.map((_, idx) => idx);
+        const color = (stock.change ?? 0) >= 0 ? '#4caf50' : '#f44336';
+        
+        createSparkline({
+          container,
+          data: [xData, stock.sparkline],
+          color,
+          width: 60,
+          height: 24
+        });
+      });
+    });
   }
 }
 
@@ -182,10 +203,10 @@ export class CommoditiesPanel extends Panel {
       '<div class="commodities-grid">' +
       validData
         .map(
-          (c) => `
+          (c, i) => `
         <div class="commodity-item">
           <div class="commodity-name">${escapeHtml(c.display)}</div>
-          ${miniSparkline(c.sparkline, c.change, 60, 18)}
+          <div class="uplot-container uplot-comm-${i}" style="width:60px;height:18px"></div>
           <div class="commodity-price">${formatPrice(c.price!)}</div>
           <div class="commodity-change ${getChangeClass(c.change!)}">${formatChange(c.change!)}</div>
         </div>
@@ -195,6 +216,25 @@ export class CommoditiesPanel extends Panel {
       '</div>';
 
     this.setContent(html);
+
+    requestAnimationFrame(() => {
+      validData.forEach((c, i) => {
+        if (!c.sparkline || c.sparkline.length < 2) return;
+        const container = this.content.querySelector(`.uplot-comm-${i}`) as HTMLElement;
+        if (!container) return;
+        
+        const xData = c.sparkline.map((_, idx) => idx);
+        const color = (c.change ?? 0) >= 0 ? '#4caf50' : '#f44336';
+        
+        createSparkline({
+          container,
+          data: [xData, c.sparkline],
+          color,
+          width: 60,
+          height: 18
+        });
+      });
+    });
   }
 }
 
@@ -211,14 +251,14 @@ export class CryptoPanel extends Panel {
 
     const html = data
       .map(
-        (coin) => `
+        (coin, i) => `
       <div class="market-item">
         <div class="market-info">
           <span class="market-name">${escapeHtml(coin.name)}</span>
           <span class="market-symbol">${escapeHtml(coin.symbol)}</span>
         </div>
         <div class="market-data">
-          ${miniSparkline(coin.sparkline, coin.change)}
+          <div class="uplot-container uplot-crypto-${i}" style="width:60px;height:24px"></div>
           <span class="market-price">$${coin.price.toLocaleString()}</span>
           <span class="market-change ${getChangeClass(coin.change)}">${formatChange(coin.change)}</span>
         </div>
@@ -228,6 +268,25 @@ export class CryptoPanel extends Panel {
       .join('');
 
     this.setContent(html);
+
+    requestAnimationFrame(() => {
+      data.forEach((coin, i) => {
+        if (!coin.sparkline || coin.sparkline.length < 2) return;
+        const container = this.content.querySelector(`.uplot-crypto-${i}`) as HTMLElement;
+        if (!container) return;
+        
+        const xData = coin.sparkline.map((_, idx) => idx);
+        const color = (coin.change ?? 0) >= 0 ? '#4caf50' : '#f44336';
+        
+        createSparkline({
+          container,
+          data: [xData, coin.sparkline],
+          color,
+          width: 60,
+          height: 24
+        });
+      });
+    });
   }
 }
 

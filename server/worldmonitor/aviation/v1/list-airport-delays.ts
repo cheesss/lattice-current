@@ -16,7 +16,7 @@ import {
   loadNotamClosures,
   mergeNotamWithExistingAlert,
 } from './_shared';
-import { getCachedJson, setCachedJson } from '../../../_shared/redis';
+import { getCachedJson } from '../../../_shared/redis';
 
 const FAA_CACHE_KEY = 'aviation:delays:faa:v1';
 const INTL_CACHE_KEY = 'aviation:delays:intl:v3';
@@ -111,10 +111,21 @@ export async function listAirportDelays(
     }
   }
 
-  // Write bootstrap key for initial page load hydration
+  // Write bootstrap key for initial page load hydration using the robust snapshot merger
   try {
-    await setCachedJson('aviation:delays-bootstrap:v1', { alerts: allAlerts }, 1800);
-  } catch { /* non-critical */ }
+    const { mergeAndSetHistoricalSnapshot } = await import('../../../_shared/redis-snapshots');
+    await mergeAndSetHistoricalSnapshot(
+      'aviation:delays-bootstrap:v1', 
+      allAlerts,
+      'id', // dedupeKey
+      300,  // maxItems trailing window
+      1800, // ttl
+      'alerts', // arrayKey
+      'aviation-delays-loader'
+    );
+  } catch (err) { 
+    console.error(`[Aviation] Snapshot merge failed:`, err);
+  }
 
   return { alerts: allAlerts };
 }

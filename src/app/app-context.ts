@@ -22,6 +22,17 @@ export interface IntelligenceCache {
   sanctions?: SanctionsPressureResult;
   radiation?: RadiationWatchResult;
   imageryScenes?: Array<{ id: string; satellite: string; datetime: string; resolutionM: number; mode: string; geometryGeojson: string; previewUrl: string; assetUrl: string }>;
+
+  // Strategic Intelligence (missing previously)
+  keywordGraph?: import('@/services/keyword-registry').KeywordGraphSnapshot;
+  graphRagSummary?: import('@/services/graph-rag').GraphRagSummary;
+  ontologyGraph?: import('@/services/ontology-graph').OntologyGraphSnapshot;
+  multimodalFindings?: Array<{ topic: string; url: string; summary: string; capturedAt: Date | string; evidence?: string[] }>;
+  sourceCredibility?: import('@/services/source-credibility').SourceCredibilityProfile[];
+  eventMarketTransmission?: import('@/services/event-market-transmission').EventMarketTransmissionSnapshot;
+  scheduledReports?: import('@/services/scheduled-reports').ScheduledReport[];
+  multiHopInferences?: Array<{ title: string; severity: string; category: string; confidence: number; summary: string; chain: string[] }>;
+  ontologyEntities?: import('@/services/entity-ontology').CanonicalEntity[];
 }
 
 export interface AppContext {
@@ -65,16 +76,7 @@ export interface AppContext {
   countryBriefPage: import('@/components/CountryBriefPanel').CountryBriefPanel | null;
   countryTimeline: import('@/components/CountryTimeline').CountryTimeline | null;
 
-  positivePanel: import('@/components/PositiveNewsFeedPanel').PositiveNewsFeedPanel | null;
-  countersPanel: import('@/components/CountersPanel').CountersPanel | null;
-  progressPanel: import('@/components/ProgressChartsPanel').ProgressChartsPanel | null;
-  breakthroughsPanel: import('@/components/BreakthroughsTickerPanel').BreakthroughsTickerPanel | null;
-  heroPanel: import('@/components/HeroSpotlightPanel').HeroSpotlightPanel | null;
-  digestPanel: import('@/components/GoodThingsDigestPanel').GoodThingsDigestPanel | null;
-  speciesPanel: import('@/components/SpeciesComebackPanel').SpeciesComebackPanel | null;
-  renewablePanel: import('@/components/RenewableEnergyPanel').RenewableEnergyPanel | null;
   tvMode: import('@/services/tv-mode').TvModeController | null;
-  happyAllItems: NewsItem[];
   isDestroyed: boolean;
   isPlaybackMode: boolean;
   isIdle: boolean;

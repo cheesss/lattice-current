@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { getRpcBaseUrl } from '@/services/rpc-client';
 import { escapeHtml } from '@/utils/sanitize';
+import { createSparkline } from '@/utils/charts';
 import { t } from '@/services/i18n';
 import { EconomicServiceClient } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import type { GetMacroSignalsResponse } from '@/generated/client/worldmonitor/economic/v1/service_client';
@@ -77,17 +78,8 @@ function mapProtoToData(r: GetMacroSignalsResponse): MacroSignalData {
   };
 }
 
-function sparklineSvg(data: number[], width = 80, height = 24, color = '#4fc3f7'): string {
-  if (!data || data.length < 2) return '';
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((v - min) / range) * (height - 2) - 1;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="signal-sparkline"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function renderChartPlaceholder(id: string, width = 80, height = 24): string {
+  return `<div class="uplot-container uplot-${id}" data-series-id="${escapeHtml(id)}" style="width:${width}px;height:${height}px"></div>`;
 }
 
 function donutGaugeSvg(value: number | null, size = 48): string {
@@ -197,10 +189,10 @@ export class MacroSignalsPanel extends Panel {
           <span class="verdict-detail">${t('components.macroSignals.bullish', { count: String(d.bullishCount), total: String(d.totalCount) })}</span>
         </div>
         <div class="signals-grid">
-          ${this.renderSignalCard(t('components.macroSignals.signals.liquidity'), s.liquidity.status, formatNum(s.liquidity.value), sparklineSvg(s.liquidity.sparkline, 60, 20, '#4fc3f7'), 'JPY 30d ROC', 'https://www.tradingview.com/symbols/JPYUSD/')}
+          ${this.renderSignalCard(t('components.macroSignals.signals.liquidity'), s.liquidity.status, formatNum(s.liquidity.value), s.liquidity.sparkline?.length >= 2 ? renderChartPlaceholder('liquidity', 60, 20) : '', 'JPY 30d ROC', 'https://www.tradingview.com/symbols/JPYUSD/')}
           ${this.renderSignalCard(t('components.macroSignals.signals.flow'), s.flowStructure.status, `BTC ${formatNum(s.flowStructure.btcReturn5)} / QQQ ${formatNum(s.flowStructure.qqqReturn5)}`, '', '5d returns', null)}
-          ${this.renderSignalCard(t('components.macroSignals.signals.regime'), s.macroRegime.status, `QQQ ${formatNum(s.macroRegime.qqqRoc20)} / XLP ${formatNum(s.macroRegime.xlpRoc20)}`, sparklineSvg(d.meta.qqqSparkline, 60, 20, '#ab47bc'), '20d ROC', 'https://www.tradingview.com/symbols/QQQ/')}
-          ${this.renderSignalCard(t('components.macroSignals.signals.btcTrend'), s.technicalTrend.status, `$${s.technicalTrend.btcPrice?.toLocaleString() ?? 'N/A'}`, sparklineSvg(s.technicalTrend.sparkline, 60, 20, '#ff9800'), `SMA50: $${s.technicalTrend.sma50?.toLocaleString() ?? '-'} | VWAP: $${s.technicalTrend.vwap30d?.toLocaleString() ?? '-'} | Mayer: ${s.technicalTrend.mayerMultiple ?? '-'}`, 'https://www.tradingview.com/symbols/BTCUSD/')}
+          ${this.renderSignalCard(t('components.macroSignals.signals.regime'), s.macroRegime.status, `QQQ ${formatNum(s.macroRegime.qqqRoc20)} / XLP ${formatNum(s.macroRegime.xlpRoc20)}`, d.meta.qqqSparkline?.length >= 2 ? renderChartPlaceholder('regime', 60, 20) : '', '20d ROC', 'https://www.tradingview.com/symbols/QQQ/')}
+          ${this.renderSignalCard(t('components.macroSignals.signals.btcTrend'), s.technicalTrend.status, `$${s.technicalTrend.btcPrice?.toLocaleString() ?? 'N/A'}`, s.technicalTrend.sparkline?.length >= 2 ? renderChartPlaceholder('btcTrend', 60, 20) : '', `SMA50: $${s.technicalTrend.sma50?.toLocaleString() ?? '-'} | VWAP: $${s.technicalTrend.vwap30d?.toLocaleString() ?? '-'} | Mayer: ${s.technicalTrend.mayerMultiple ?? '-'}`, 'https://www.tradingview.com/symbols/BTCUSD/')}
           ${this.renderSignalCard(t('components.macroSignals.signals.hashRate'), s.hashRate.status, formatNum(s.hashRate.change30d), '', '30d change', 'https://mempool.space/mining')}
           ${this.renderSignalCard(t('components.macroSignals.signals.momentum'), s.priceMomentum.status, '', '', 'Mayer Multiple', null)}
           ${this.renderFearGreedCard(s.fearGreed)}
@@ -209,6 +201,33 @@ export class MacroSignalsPanel extends Panel {
     `;
 
     this.setContent(html);
+    this.mountCharts(d);
+  }
+
+  private mountCharts(d: MacroSignalData): void {
+    requestAnimationFrame(() => {
+      const mountMap = [
+        { id: 'liquidity', data: d.signals.liquidity.sparkline, color: '#4fc3f7', w: 60, h: 20 },
+        { id: 'regime', data: d.meta.qqqSparkline, color: '#ab47bc', w: 60, h: 20 },
+        { id: 'btcTrend', data: d.signals.technicalTrend.sparkline, color: '#ff9800', w: 60, h: 20 },
+        { id: 'fearGreed', data: d.signals.fearGreed.history.map(h => h.value), color: fgSparklineColor(d.signals.fearGreed.status), w: 80, h: 28 }
+      ];
+
+      for (const config of mountMap) {
+        if (!config.data || config.data.length < 2) continue;
+        const container = this.content.querySelector(`.uplot-${config.id}`) as HTMLElement;
+        if (!container) continue;
+
+        const xData = config.data.map((_, i) => i);
+        createSparkline({
+          container,
+          data: [xData, config.data],
+          color: config.color,
+          width: config.w,
+          height: config.h
+        });
+      }
+    });
   }
 
   private renderSignalCard(name: string, status: string, value: string, sparkline: string, detail: string, link: string | null): string {
@@ -239,7 +258,7 @@ export class MacroSignalsPanel extends Panel {
         <div class="signal-body signal-body-fg">
           <div style="display:flex;align-items:center;gap:8px">
             ${donutGaugeSvg(fg.value)}
-            ${sparklineSvg(fg.history.map(h => h.value), 80, 28, fgSparklineColor(fg.status))}
+            ${fg.history.length >= 2 ? renderChartPlaceholder('fearGreed', 80, 28) : ''}
           </div>
         </div>
         <div class="signal-detail">

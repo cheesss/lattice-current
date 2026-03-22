@@ -1,0 +1,201 @@
+/* ============================================================
+   HUD Layout Overlay 
+   Transforms the masonry grid into a Full-Screen Map + Right Inspector
+   ============================================================ */
+
+/* 1. Reset main content to relative container */
+.main-content {
+  display: flex !important;
+  flex-direction: row !important;
+  position: relative !important;
+  overflow: hidden !important;
+  height: calc(100vh - 48px) !important; /* subtract header */
+  background: var(--bg) !important;
+}
+
+/* 2. Map becomes the full-screen background */
+.map-section {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  z-index: 0 !important;
+  border-right: none !important;
+}
+
+#mapContainer {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Hide the old map header to make it immersive */
+.map-section > .panel-header {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  background: rgba(0,0,0,0.5) !important;
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+/* Hide resize handle for map since it's full screen */
+.map-resize-handle {
+  display: none !important;
+}
+
+/* 3. Panels grid becomes the floating Right Inspector HUD */
+.panels-grid {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 440px !important;
+  z-index: 2 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  padding: 24px 16px 80px 16px !important;
+  overflow-y: overlay !important;
+  background: linear-gradient(to left, rgba(9, 9, 11, 0.85) 0%, rgba(9, 9, 11, 0.5) 70%, transparent 100%) !important;
+  pointer-events: none !important;
+  /* Remove masonry grid sizing constraints */
+  grid-template-columns: 1fr !important;
+  align-content: flex-start !important;
+}
+
+.panel {
+  pointer-events: auto !important;
+  width: 100% !important;
+  grid-column: span 1 !important;
+  flex-shrink: 0 !important;
+}
+
+/* 4. Left Sidebar Focus Modes Container (Injected via JS but styled here) */
+.hud-left-sidebar {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 240px !important;
+  z-index: 2 !important;
+  padding: 24px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  background: linear-gradient(to right, rgba(9, 9, 11, 0.85) 0%, rgba(9, 9, 11, 0.4) 70%, transparent 100%) !important;
+  pointer-events: none !important;
+}
+
+.focus-mode-btn {
+  pointer-events: auto !important;
+  background: rgba(24, 24, 27, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #a1a1aa !important;
+  padding: 12px 16px !important;
+  border-radius: 12px !important;
+  font-family: var(--font-body-base, 'Inter') !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-size: 13px !important;
+}
+
+.focus-mode-btn:hover {
+  background: rgba(39, 39, 42, 0.8) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.focus-mode-btn.active {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #60a5fa !important;
+  font-weight: 600 !important;
+}
+
+/* Global scrollbar fix for overlay */
+.panels-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+@media (max-width: 1024px) {
+  .panels-grid {
+    width: 360px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .hud-left-sidebar {
+    display: none !important; /* Hide left sidebar on mobile for now */
+  }
+  .panels-grid {
+    width: 100% !important;
+    background: transparent !important; /* Remove gradient overlay */
+  }
+}
+
+/* ============================================================
+   Focus Mode Filtering
+   ============================================================ */
+body[data-focus-mode="geopolitics"] .panel:not(
+  [data-panel="ucdp-events"],
+  [data-panel="military-correlation"],
+  [data-panel="escalation-correlation"],
+  [data-panel="strategic-posture"],
+  [data-panel="strategic-risk"],
+  [data-panel="cii"],
+  [data-panel="displacement"],
+  [data-panel="gdelt-intel"],
+  [data-panel="intel"],
+  [data-panel="politics"]
+) {
+  display: none !important;
+}
+
+body[data-focus-mode="markets"] .panel:not(
+  [data-panel="markets"],
+  [data-panel="economic"],
+  [data-panel="consumer-prices"],
+  [data-panel="macro-signals"],
+  [data-panel="etf-flows"],
+  [data-panel="stablecoins"],
+  [data-panel="crypto"],
+  [data-panel="finance"],
+  [data-panel="stock-analysis"],
+  [data-panel="stock-backtest"],
+  [data-panel="trade-policy"],
+  [data-panel="sanctions-pressure"],
+  [data-panel="gulf-economies"],
+  [data-panel="commodities"]
+) {
+  display: none !important;
+}
+
+body[data-focus-mode="climate"] .panel:not(
+  [data-panel="climate"],
+  [data-panel="satellite-fires"],
+  [data-panel="disaster-correlation"],
+  [data-panel="population-exposure"],
+  [data-panel="thermal-escalation"]
+) {
+  display: none !important;
+}
+
+body[data-focus-mode="infra"] .panel:not(
+  [data-panel="cascade"],
+  [data-panel="supply-chain"],
+  [data-panel="tech"],
+  [data-panel="security-advisories"],
+  [data-panel="radiation-watch"],
+  [data-panel="tech-readiness"]
+) {
+  display: none !important;
+}

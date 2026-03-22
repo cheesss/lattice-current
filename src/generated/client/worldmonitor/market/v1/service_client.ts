@@ -269,6 +269,10 @@ export interface BacktestStockResponse {
   generatedAt: string;
   evaluations: BacktestStockEvaluation[];
   engineVersion: string;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdownPct: number;
+  kellyCriterionPct: number;
 }
 
 export interface BacktestStockEvaluation {

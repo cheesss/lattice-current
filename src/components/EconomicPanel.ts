@@ -7,7 +7,7 @@ import { isFeatureAvailable } from '@/services/runtime-config';
 import type { SpendingSummary } from '@/services/usa-spending';
 import { formatAwardAmount, getAwardTypeIcon } from '@/services/usa-spending';
 import { getCSSColor } from '@/utils';
-import { sparkline } from '@/utils/sparkline';
+import { createSparkline } from '@/utils/charts';
 
 type TabId = 'indicators' | 'spending' | 'centralBanks';
 
@@ -161,6 +161,40 @@ export class EconomicPanel extends Panel {
         <span class="economic-source">${this.getSourceLabel()} • ${updateTime}</span>
       </div>
     `);
+
+    if (this.activeTab === 'indicators') {
+      this.mountCharts();
+    }
+  }
+
+  private mountCharts(): void {
+    if (this.fredData.length === 0) return;
+    
+    requestAnimationFrame(() => {
+      const summaryIds = ['VIXCLS', 'T10Y2Y', 'FEDFUNDS', 'UNRATE'];
+      const seriesList = this.fredData.filter((s) => !summaryIds.includes(s.id));
+      
+      seriesList.forEach((series) => {
+        const container = this.content.querySelector(`.uplot-container[data-series-id="${series.id}"]`) as HTMLElement;
+        if (!container) return;
+        
+        const obs = series.observations || [];
+        if (obs.length < 2) return;
+        
+        // uPlot expects [xValues, yValues]
+        const xData = obs.map((_, i) => i);
+        const yData = obs.map(o => o.value);
+        const color = series.change !== null && series.change >= 0 ? '#4caf50' : '#f44336';
+        
+        createSparkline({
+          container,
+          data: [xData, yData],
+          color,
+          width: 140,
+          height: 40
+        });
+      });
+    });
   }
 
   private getSourceLabel(): string {
@@ -216,7 +250,7 @@ export class EconomicPanel extends Panel {
                 <span class="change ${getSeriesChangeClass(series.change)}">${escapeHtml(formatSeriesChange(series))}</span>
               </div>
               <div class="indicator-date">${escapeHtml(series.date)}</div>
-              ${sparkline(series.observations?.map(o => o.value) ?? [], series.change !== null && series.change >= 0 ? '#4caf50' : '#f44336', 120, 28, 'display:block;margin:2px 0')}
+              <div class="uplot-container" data-series-id="${escapeHtml(series.id)}" style="margin-top: 8px;"></div>
             </div>
           `).join('')}
         </div>

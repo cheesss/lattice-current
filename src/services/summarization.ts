@@ -18,7 +18,7 @@ import { NewsServiceClient, type SummarizeArticleResponse } from '@/generated/cl
 import { createCircuitBreaker } from '@/utils';
 import { buildSummaryCacheKey } from '@/utils/summary-cache-key';
 
-export type SummarizationProvider = 'ollama' | 'groq' | 'openrouter' | 'browser' | 'cache';
+export type SummarizationProvider = 'ollama' | 'groq' | 'openrouter' | 'browser' | 'cache' | 'codex';
 
 export interface SummarizationResult {
   summary: string;

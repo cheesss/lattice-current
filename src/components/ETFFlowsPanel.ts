@@ -81,15 +81,30 @@ export class ETFFlowsPanel extends Panel {
     const s = d.summary || { etfCount: 0, totalVolume: 0, totalEstFlow: 0, netDirection: 'NEUTRAL', inflowCount: 0, outflowCount: 0 };
     const dirClass = s.netDirection.includes('INFLOW') ? 'flow-inflow' : s.netDirection.includes('OUTFLOW') ? 'flow-outflow' : 'flow-neutral';
 
-    const rows = d.etfs.map(etf => `
-      <tr class="etf-row ${flowClass(etf.direction)}">
-        <td class="etf-ticker">${escapeHtml(etf.ticker)}</td>
-        <td class="etf-issuer">${escapeHtml(etf.issuer)}</td>
-        <td class="etf-flow ${flowClass(etf.direction)}">${etf.direction === 'inflow' ? '+' : etf.direction === 'outflow' ? '-' : ''}$${formatVolume(Math.abs(etf.estFlow))}</td>
-        <td class="etf-volume">${formatVolume(etf.volume)}</td>
-        <td class="etf-change ${changeClass(etf.priceChange)}">${etf.priceChange > 0 ? '+' : ''}${etf.priceChange.toFixed(2)}%</td>
-      </tr>
-    `).join('');
+    const maxFlow = Math.max(...d.etfs.map(e => Math.abs(e.estFlow || 0)), 1);
+
+    const rows = d.etfs.map(etf => {
+      const pct = Math.max(2, (Math.abs(etf.estFlow) / maxFlow) * 100);
+      const barColor = etf.direction === 'inflow' ? '#4caf50' : '#f44336';
+      
+      return `
+        <div class="etf-list-row ${flowClass(etf.direction)}">
+          <div class="etf-list-header">
+            <div class="etf-ticker-wrap">
+              <span class="etf-ticker">${escapeHtml(etf.ticker)}</span>
+              <span class="etf-issuer">${escapeHtml(etf.issuer)}</span>
+            </div>
+            <div class="etf-data-wrap">
+              <span class="etf-change ${changeClass(etf.priceChange)}">${etf.priceChange > 0 ? '+' : ''}${etf.priceChange.toFixed(2)}%</span>
+              <span class="etf-flow-val ${flowClass(etf.direction)}">${etf.direction === 'inflow' ? '+' : '-'}$${formatVolume(Math.abs(etf.estFlow))}</span>
+            </div>
+          </div>
+          <div class="etf-bar-track">
+            <div class="etf-bar-fill" style="width: ${pct}%; background-color: ${barColor};"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
 
     const html = `
       <div class="etf-flows-container">
@@ -111,19 +126,8 @@ export class ETFFlowsPanel extends Panel {
             <span class="etf-summary-value">${s.inflowCount}↑ ${s.outflowCount}↓</span>
           </div>
         </div>
-        <div class="etf-table-wrap">
-          <table class="etf-table">
-            <thead>
-              <tr>
-                <th>${t('components.etfFlows.table.ticker')}</th>
-                <th>${t('components.etfFlows.table.issuer')}</th>
-                <th>${t('components.etfFlows.table.estFlow')}</th>
-                <th>${t('components.etfFlows.table.volume')}</th>
-                <th>${t('components.etfFlows.table.change')}</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
+        <div class="etf-list-wrap">
+          ${rows}
         </div>
       </div>
     `;

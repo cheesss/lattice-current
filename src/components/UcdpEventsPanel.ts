@@ -87,26 +87,24 @@ export class UcdpEventsPanel extends Panel {
           : '<span class="ucdp-deaths-zero">0</span>';
         const actors = `${escapeHtml(e.side_a)} vs ${escapeHtml(e.side_b)}`;
 
-        return `<tr class="ucdp-row" data-lat="${e.latitude}" data-lon="${e.longitude}">
-          <td class="ucdp-country">${escapeHtml(e.country)}</td>
-          <td class="ucdp-deaths">${deathsHtml}</td>
-          <td class="ucdp-date">${e.date_start}</td>
-          <td class="ucdp-actors">${actors}</td>
-        </tr>`;
+        return `<div class="ucdp-row" data-lat="${e.latitude}" data-lon="${e.longitude}">
+          <div class="ucdp-cell-country">${escapeHtml(e.country)}</div>
+          <div class="ucdp-cell-deaths">${deathsHtml}</div>
+          <div class="ucdp-cell-date">${e.date_start}</div>
+          <div class="ucdp-cell-actors">${actors}</div>
+        </div>`;
       }).join('');
 
       bodyHtml = `
-        <table class="ucdp-table">
-          <thead>
-            <tr>
-              <th>${t('components.ucdpEvents.country')}</th>
-              <th>${t('components.ucdpEvents.deaths')}</th>
-              <th>${t('components.ucdpEvents.date')}</th>
-              <th>${t('components.ucdpEvents.actors')}</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>`;
+        <div class="ucdp-list-container">
+          <div class="ucdp-header-row">
+            <div class="ucdp-cell-country">${t('components.ucdpEvents.country')}</div>
+            <div class="ucdp-cell-deaths">${t('components.ucdpEvents.deaths')}</div>
+            <div class="ucdp-cell-date">${t('components.ucdpEvents.date')}</div>
+            <div class="ucdp-cell-actors">${t('components.ucdpEvents.actors')}</div>
+          </div>
+          <div class="ucdp-rows">${rows}</div>
+        </div>`;
     }
 
     const moreHtml = filtered.length > 50

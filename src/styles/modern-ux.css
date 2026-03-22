@@ -1,0 +1,171 @@
+/* ============================================================
+   Premium UI/UX Modernization Overlay
+   ============================================================ */
+:root {
+  /* Modern Web Typography: Default to Inter / system sans-serif instead of monospace */
+  --font-body-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace !important;
+  
+  /* Deep, sophisticated dark palette (Slate/Zinc instead of pure black) */
+  --bg: #09090b !important;
+  --bg-secondary: #18181b !important;
+  
+  /* Glassmorphism surfaces */
+  --surface: rgba(24, 24, 27, 0.65) !important;
+  --surface-hover: rgba(39, 39, 42, 0.8) !important;
+  --surface-active: rgba(63, 63, 70, 0.9) !important;
+  
+  /* Softer, barely-there borders (Tailwind Zinc-800) */
+  --border: rgba(255, 255, 255, 0.08) !important;
+  --border-strong: rgba(255, 255, 255, 0.15) !important;
+  --border-subtle: rgba(255, 255, 255, 0.03) !important;
+  
+  /* Text */
+  --text: #f4f4f5 !important;
+  --text-secondary: #d4d4d8 !important;
+  --text-dim: #a1a1aa !important;
+  --text-muted: #71717a !important;
+  
+  --panel-bg: rgba(24, 24, 27, 0.65) !important;
+}
+
+/* ============================================================
+   Animated Mesh Background (Body)
+   ============================================================ */
+body {
+  background-color: var(--bg) !important;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(139, 92, 246, 0.07) 0%, transparent 50%) !important;
+  background-attachment: fixed !important;
+  font-family: var(--font-body-base) !important;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================
+   Header Modernization
+   ============================================================ */
+.header {
+  background: rgba(9, 9, 11, 0.75) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  height: 48px !important;
+}
+
+.logo {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 16px !important;
+}
+
+/* ============================================================
+   Sleek Panels (Glassmorphism & Shadows)
+   ============================================================ */
+.panel {
+  background: var(--panel-bg) !important;
+  backdrop-filter: blur(12px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease !important;
+}
+
+.panel:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.panel-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  padding: 12px 14px !important;
+}
+
+.panel-title {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  font-size: 13px !important;
+  color: #fff !important;
+}
+
+/* Tab modernizations */
+.panel-tabs {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 4px 8px 0 !important;
+}
+
+.panel-tab {
+  border-radius: 6px 6px 0 0 !important;
+  padding: 8px 12px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
+}
+
+.panel-tab:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.panel-tab.active {
+  color: #fff !important;
+  border-bottom: 2px solid #3b82f6 !important;
+}
+
+/* ============================================================
+   Tables & Data rows
+   ============================================================ */
+th {
+  font-family: 'Inter', sans-serif !important;
+  letter-spacing: 0.05em !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+tr:hover {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Number columns keep monospace for alignment */
+td[class*="count"], td[class*="num"], td[class*="value"], .tabular-nums {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================
+   Mobile Nav Optimization
+   ============================================================ */
+@media (max-width: 768px) {
+  .panels-grid, .map-bottom-grid {
+    padding: 12px !important;
+    gap: 16px !important;
+  }
+  .panel {
+    border-radius: 16px !important;
+  }
+}

@@ -14,7 +14,6 @@ import {
   getCountryCentroid,
   hasCountryGeometry,
   isCoordinateInCountry,
-  ME_STRIKE_BOUNDS,
   iso3ToIso2Code,
   nameToCountryCode,
 } from '@/services/country-geometry';
@@ -747,9 +746,9 @@ export class CountryIntelManager implements AppModule {
     );
     const foreignVessels = vesselsInCountry.filter((vessel) => !this.sameCountry(code, country, vessel.operatorCountry)).length;
 
-    const centroid = getCountryCentroid(code, CountryIntelManager.COUNTRY_BOUNDS);
+    const centroid = getCountryCentroid(code);
     const nearbyBases = centroid
-      ? getNearbyInfrastructure(centroid.lat, centroid.lon, ['base']).slice(0, 3).map((base) => ({
+      ? getNearbyInfrastructure(centroid[1], centroid[0], ['base']).slice(0, 3).map((base) => ({
         id: base.id,
         name: base.name,
         distanceKm: base.distanceKm,
@@ -914,7 +913,8 @@ export class CountryIntelManager implements AppModule {
   }
 
   static COUNTRY_BOUNDS: Record<string, { n: number; s: number; e: number; w: number }> = {
-    ...ME_STRIKE_BOUNDS,
+    IL: { n: 34, s: 29, e: 36, w: 34 },
+    IR: { n: 39, s: 25, e: 63, w: 44 },
     CN: { n: 53.6, s: 18.2, e: 134.8, w: 73.5 }, TW: { n: 25.3, s: 21.9, e: 122, w: 120 },
     JP: { n: 45.5, s: 24.2, e: 153.9, w: 122.9 }, KR: { n: 38.6, s: 33.1, e: 131.9, w: 124.6 },
     KP: { n: 43.0, s: 37.7, e: 130.7, w: 124.2 }, IN: { n: 35.5, s: 6.7, e: 97.4, w: 68.2 },

@@ -12,14 +12,15 @@ import { PORTS } from '@/config/ports';
 import type { Port } from '@/types';
 import { exportCountryBriefJSON, exportCountryBriefCSV } from '@/utils/export';
 import type { CountryBriefExport } from '@/utils/export';
-import { ME_STRIKE_BOUNDS } from '@/services/country-geometry';
+/* import removed */
 import { toFlagEmoji } from '@/utils/country-flag';
 
 type BriefAssetType = AssetType | 'port';
 
 export class CountryBriefPage implements CountryBriefPanel {
   private static BRIEF_BOUNDS: Record<string, { n: number; s: number; e: number; w: number }> = {
-    ...ME_STRIKE_BOUNDS,
+    IL: { n: 34, s: 29, e: 36, w: 34 },
+    IR: { n: 39, s: 25, e: 63, w: 44 },
     CN: { n: 53.6, s: 18.2, e: 134.8, w: 73.5 }, TW: { n: 25.3, s: 21.9, e: 122, w: 120 },
     JP: { n: 45.5, s: 24.2, e: 153.9, w: 122.9 }, KR: { n: 38.6, s: 33.1, e: 131.9, w: 124.6 },
     KP: { n: 43.0, s: 37.7, e: 130.7, w: 124.2 }, IN: { n: 35.5, s: 6.7, e: 97.4, w: 68.2 },
