@@ -9,6 +9,7 @@ import type {
   InvestmentThemeDefinition,
   UniverseCoverageGap,
 } from '../investment-intelligence';
+import type { ProposalEvidenceBundle } from './proposal-evidence-builder';
 
 interface CodexExecResult {
   code: number;
@@ -23,7 +24,7 @@ function buildExecArgs(prompt: string): string[] {
   if (process.env.CODEX_MODEL?.trim()) {
     args.push('--model', process.env.CODEX_MODEL.trim());
   }
-  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--ask-for-approval', 'never', prompt);
+  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto', prompt);
   return args;
 }
 
@@ -118,15 +119,23 @@ async function resolveCodexCommand(): Promise<string> {
 async function runCodexCli(args: string[], timeoutMs = CODEX_TIMEOUT_MS): Promise<CodexExecResult> {
   const command = await resolveCodexCommand();
   const env = withCodexPathHints(getSafeEnv(), command);
-  const useShell = process.platform === 'win32' && command.toLowerCase().endsWith('.cmd');
+  const useShell = process.platform === 'win32';
+  // If the last argument (prompt) is very long, pipe it via stdin instead
+  const lastArg = args.length > 0 ? args[args.length - 1] ?? '' : '';
+  const usePipedPrompt = lastArg.length > 6000;
+  const spawnArgs = usePipedPrompt ? args.slice(0, -1) : args;
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    const child = spawn(command, spawnArgs, {
       cwd: process.cwd(),
       env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [usePipedPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: useShell,
     });
+    if (usePipedPrompt) {
+      child.stdin?.write(lastArg);
+      child.stdin?.end();
+    }
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
@@ -190,6 +199,7 @@ function buildCandidatePrompt(input: {
   theme: InvestmentThemeDefinition;
   gaps: UniverseCoverageGap[];
   topMappings: DirectAssetMapping[];
+  evidence?: ProposalEvidenceBundle | null;
 }): string {
   const gapRows = input.gaps
     .slice(0, 5)
@@ -234,6 +244,19 @@ function buildCandidatePrompt(input: {
     `Commodities: ${input.theme.commodities.join(', ') || '(none)'}`,
     `Invalidation: ${input.theme.invalidation.join(' | ') || '(none)'}`,
     `Existing symbols: ${existingSymbols || '(none)'}`,
+    input.evidence?.summary ? `Evidence summary: ${input.evidence.summary}` : '',
+    input.evidence?.historicalAnalogs?.length
+      ? `Historical analogs:\n${input.evidence.historicalAnalogs.map((row) => `- ${row}`).join('\n')}`
+      : '',
+    input.evidence?.weaknessSignals?.length
+      ? `Weakness signals:\n${input.evidence.weaknessSignals.map((row) => `- ${row}`).join('\n')}`
+      : '',
+    input.evidence?.coverageSignals?.length
+      ? `Coverage signals:\n${input.evidence.coverageSignals.map((row) => `- ${row}`).join('\n')}`
+      : '',
+    input.evidence?.eventImpact?.length
+      ? `Event impact evidence (real historical stock reactions for this theme):\n${input.evidence.eventImpact.map((row) => `- ${row}`).join('\n')}`
+      : '',
     'Coverage gaps:',
     gapRows || '(none)',
     'Top current mappings:',
@@ -289,6 +312,7 @@ export async function proposeCandidatesWithCodex(input: {
   theme: InvestmentThemeDefinition;
   gaps: UniverseCoverageGap[];
   topMappings: DirectAssetMapping[];
+  evidence?: ProposalEvidenceBundle | null;
 }): Promise<CodexCandidateExpansionProposal[] | null> {
   const loginStatus = await runCodexCli(['login', 'status'], 8_000);
   if (loginStatus.code !== 0 || !isCodexLoggedIn(`${loginStatus.stdout}\n${loginStatus.stderr}`)) {

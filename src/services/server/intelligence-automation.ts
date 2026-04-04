@@ -18,6 +18,7 @@ import {
 import {
   discoverThemeQueue,
   type CodexThemeProposal,
+  type KnownThemeCatalogEntry,
   type ThemeDiscoveryQueueItem,
 } from '../theme-discovery';
 import {
@@ -47,9 +48,18 @@ import {
   reviewKeywordRegistryLifecycle,
   upsertKeywordCandidates,
 } from '../keyword-registry';
+import { addDiscoveredSource } from '../source-registry';
+import { proposeGdeltTopicsFromKeywords } from '../gdelt-topic-registry';
 import { proposeCandidatesWithCodex } from './codex-candidate-proposer';
 import { proposeDatasetsWithCodex } from './codex-dataset-proposer';
 import { proposeThemeWithCodex } from './codex-theme-proposer';
+import {
+  buildCandidateProposalEvidence,
+  buildDatasetProposalEvidence,
+  buildThemeProposalEvidence,
+  queryEventImpactEvidence,
+} from './proposal-evidence-builder';
+import { runAutonomousDiscoverySweep } from './autonomous-discovery';
 import {
   normalizeSourceAutomationPolicy,
   runSourceAutomationSweep,
@@ -66,11 +76,14 @@ type AutomationJobKind = 'fetch' | 'import' | 'replay' | 'walk-forward' | 'theme
 type ThemeAutomationMode = 'manual' | 'guarded-auto' | 'full-auto';
 type GapSeverity = 'watch' | 'elevated' | 'critical';
 
-const ROLLING_ARTIFACT_IMPORT_WINDOW: Partial<Record<HistoricalProvider, number>> = {
-  'gdelt-doc': 12,
-  acled: 12,
-  'rss-feed': 10,
-};
+/** Read rolling import window from registry or use defaults. */
+function getRollingImportWindow(provider: string, registry?: any): number {
+  const registryValue = registry?.defaults?.rollingImportWindowHours?.[provider];
+  if (typeof registryValue === 'number' && registryValue > 0) return registryValue;
+  // Fallback defaults
+  const defaults: Record<string, number> = { 'gdelt-doc': 12, acled: 12, 'rss-feed': 10 };
+  return defaults[provider] ?? 12;
+}
 
 export interface IntelligenceDatasetRegistryEntry {
   id: string;
@@ -500,12 +513,12 @@ function createDefaultRegistry(): IntelligenceAutomationRegistry {
     },
     themeAutomation: {
       mode: 'guarded-auto',
-      minDiscoveryScore: 58,
+      minDiscoveryScore: 40,
       minSampleCount: 4,
       minSourceCount: 2,
-      minCodexConfidence: 78,
+      minCodexConfidence: 58,
       minAssetCount: 2,
-      minPromotionScore: 72,
+      minPromotionScore: 55,
       maxOverlapWithKnownThemes: 0.62,
       maxPromotionsPerDay: 1,
     },
@@ -522,7 +535,7 @@ function createDefaultRegistry(): IntelligenceAutomationRegistry {
     datasetAutomation: {
       enabled: true,
       everyMinutes: 360,
-      codexTopThemesPerCycle: 2,
+      codexTopThemesPerCycle: 5,
       ...normalizeDatasetDiscoveryPolicy({
         mode: 'guarded-auto',
         minProposalScore: 60,
@@ -714,7 +727,7 @@ function normalizeRegistry(raw?: Partial<IntelligenceAutomationRegistry> | null)
     datasetAutomation: {
       enabled: typeof raw?.datasetAutomation?.enabled === 'boolean' ? raw.datasetAutomation.enabled : fallback.datasetAutomation.enabled,
       everyMinutes: Math.max(30, Number(raw?.datasetAutomation?.everyMinutes) || fallback.datasetAutomation.everyMinutes),
-      codexTopThemesPerCycle: Math.max(0, Math.min(4, Number(raw?.datasetAutomation?.codexTopThemesPerCycle) || fallback.datasetAutomation.codexTopThemesPerCycle)),
+      codexTopThemesPerCycle: Math.max(0, Math.min(8, Number(raw?.datasetAutomation?.codexTopThemesPerCycle) || fallback.datasetAutomation.codexTopThemesPerCycle)),
       ...normalizeDatasetDiscoveryPolicy(raw?.datasetAutomation),
     },
     experimentAutomation: {
@@ -1059,8 +1072,9 @@ async function buildArtifactImportPlan(args: {
   latestArtifactPath: string | null;
   artifactPaths: string[];
   existingRawRecordCount: number;
+  registry?: any;
 }): Promise<ArtifactImportPlan> {
-  const rollingWindow = ROLLING_ARTIFACT_IMPORT_WINDOW[args.dataset.provider] || 0;
+  const rollingWindow = getRollingImportWindow(args.dataset.provider, args.registry);
   const latestArtifactEmpty = await artifactLooksEmpty(args.latestArtifactPath);
 
     if (rollingWindow > 1) {
@@ -1492,6 +1506,73 @@ function buildThemeDefinitionFromProposal(proposal: CodexThemeProposal): Investm
   };
 }
 
+function inferDiscoveryDomainFromProposal(proposal: CodexThemeProposal): 'defense' | 'energy' | 'macro' | 'mixed' {
+  const haystack = [
+    proposal.label,
+    proposal.reason,
+    proposal.thesis,
+    ...(proposal.triggers || []),
+    ...(proposal.sectors || []),
+    ...(proposal.commodities || []),
+  ].join(' ').toLowerCase();
+
+  if (/(military|missile|drone|war|naval|cyber|intelligence|nuclear|sanction|defense)/.test(haystack)) {
+    return 'defense';
+  }
+  if (/(oil|gas|lng|crude|uranium|solar|wind|power|grid|energy|commodity)/.test(haystack)) {
+    return 'energy';
+  }
+  if (/(inflation|yield|rates|macro|tariff|trade|currency|bond|equity|fx|gdp)/.test(haystack)) {
+    return 'macro';
+  }
+  return 'mixed';
+}
+
+async function ingestThemeProposalArtifacts(proposal: CodexThemeProposal): Promise<void> {
+  const domain = inferDiscoveryDomainFromProposal(proposal);
+
+  for (const source of proposal.suggestedSources || []) {
+    if (!source?.url) continue;
+    try {
+      // Codex suggestions stay draft unless confidence is already high enough for approval.
+      // This keeps the automation path additive instead of silently activating new feeds.
+      // eslint-disable-next-line no-await-in-loop
+      await addDiscoveredSource({
+        category: domain,
+        feedName: `${proposal.label} source`,
+        url: source.url,
+        lang: 'en',
+        discoveredBy: 'codex-playwright',
+        confidence: Math.max(0, Math.min(100, Math.round(Number(source.confidence) || proposal.confidence || 70))),
+        reason: `Codex theme proposal for ${proposal.label}`,
+        topics: [proposal.label, ...proposal.triggers.slice(0, 5)].filter(Boolean),
+      });
+    } catch (error) {
+      console.warn('[intelligence-automation] Failed to register suggested source', error);
+    }
+  }
+
+  const keywordInputs = (proposal.suggestedGdeltKeywords || [])
+    .map((term) => String(term || '').trim())
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((term) => ({
+      term,
+      domain,
+      lang: 'en',
+      ingress: 'llm' as const,
+      confidence: Math.max(55, Math.min(100, Math.round(proposal.confidence || 70))),
+      relatedTerms: [proposal.label, ...proposal.triggers.slice(0, 4)].filter(Boolean),
+      marketRelevance: Math.max(35, Math.min(100, Math.round(proposal.confidence || 60))),
+      sourceTier: 3,
+    }));
+
+  if (keywordInputs.length > 0) {
+    await upsertKeywordCandidates(keywordInputs);
+    await proposeGdeltTopicsFromKeywords().catch(() => []);
+  }
+}
+
 function autoPromoteTheme(
   proposal: CodexThemeProposal,
   queueItem: ThemeDiscoveryQueueItem,
@@ -1586,6 +1667,86 @@ async function pruneArtifacts(artifactDir: string, keepCount: number, retentionD
   return retainedAfterPolicy
     .sort((left, right) => left.mtimeMs - right.mtimeMs)
     .map((file) => file.filePath);
+}
+
+function buildSeedThemeQueueItems(
+  frames: HistoricalReplayFrame[],
+  knownThemes: KnownThemeCatalogEntry[],
+): ThemeDiscoveryQueueItem[] {
+  const knownTriggers = new Set<string>();
+  for (const theme of knownThemes) {
+    knownTriggers.add(theme.label.toLowerCase());
+    for (const trigger of theme.triggers || []) {
+      knownTriggers.add(trigger.toLowerCase());
+    }
+  }
+
+  // Collect all cluster titles across frames
+  const titleCounts = new Map<string, { count: number; sources: Set<string>; regions: Set<string>; datasetIds: Set<string>; symbols: Set<string>; headlines: string[] }>();
+
+  for (const frame of frames) {
+    const datasetId = String(frame.datasetId || 'default');
+    const frameSymbols = (frame.markets || []).map((row: any) => String(row.symbol || '').trim()).filter(Boolean).slice(0, 4);
+    for (const cluster of frame.clusters || []) {
+      const title = String((cluster as { primaryTitle?: string; title?: string }).primaryTitle || (cluster as { title?: string }).title || '').trim();
+      const titleLower = title.toLowerCase();
+      if (!title || title.length < 10) continue;
+
+      // Skip if matches known theme triggers
+      const matchesKnown = [...knownTriggers].some((trigger) => titleLower.includes(trigger));
+      if (matchesKnown) continue;
+
+      // Extract key topic (first 5 meaningful words)
+      const words = titleLower.split(/\s+/).filter((w: string) => w.length > 3).slice(0, 5);
+      const topicKey = words.join('-');
+      if (!topicKey) continue;
+
+      const entry = titleCounts.get(topicKey) || { count: 0, sources: new Set(), regions: new Set(), datasetIds: new Set(), symbols: new Set(), headlines: [] };
+      entry.count++;
+      const primarySource = String((cluster as { primarySource?: string }).primarySource || 'cluster');
+      if (primarySource) entry.sources.add(primarySource);
+      const region = String(frame.metadata?.['region'] || (cluster as { region?: string }).region || 'Global');
+      if (region) entry.regions.add(region);
+      entry.datasetIds.add(datasetId);
+      for (const sym of frameSymbols) entry.symbols.add(sym);
+      if (entry.headlines.length < 6) entry.headlines.push(title);
+      titleCounts.set(topicKey, entry);
+    }
+  }
+
+  const now = new Date().toISOString();
+
+  // Sort by frequency and take top items
+  return [...titleCounts.entries()]
+    .filter(([, data]) => data.count >= 2)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 8)  // More seeds than before
+    .map(([topicKey, data], index): ThemeDiscoveryQueueItem => {
+      const signalScore = Math.min(70, 40 + data.count * 3 + data.sources.size * 5);
+      return {
+        id: `seed-${Date.now()}-${index}`,
+        topicKey,
+        label: data.headlines[0] || topicKey,
+        status: 'open',
+        signalScore,
+        overlapWithKnownThemes: 0,
+        sampleCount: data.count,
+        sourceCount: data.sources.size,
+        regionCount: data.regions.size,
+        supportingHeadlines: data.headlines.slice(0, 6),
+        supportingRegions: Array.from(data.regions).sort().slice(0, 3),
+        supportingSources: Array.from(data.sources).sort(),
+        datasetIds: Array.from(data.datasetIds).sort(),
+        suggestedSymbols: Array.from(data.symbols).slice(0, 6),
+        hints: [...Array.from(data.sources)].slice(0, 3),
+        reason: `Seed: recurring cluster motif "${topicKey}" not covered by known themes (rank #${index + 1}).`,
+        createdAt: now,
+        updatedAt: now,
+        proposedThemeId: null,
+        promotedThemeId: null,
+        rejectedReason: null,
+      };
+    });
 }
 
 function mergeThemeQueue(state: IntelligenceAutomationState, queue: ThemeDiscoveryQueueItem[]): void {
@@ -1924,7 +2085,13 @@ async function runDatasetDiscoverySweep(args: {
   }
 
   for (const themeInput of themeInputs.slice(0, args.registry.datasetAutomation.codexTopThemesPerCycle)) {
-    const codexProposals = await proposeDatasetsWithCodex(themeInput).catch(() => null);
+    const codexProposals = await proposeDatasetsWithCodex(
+      themeInput,
+      buildDatasetProposalEvidence({
+        themeInput,
+        replayAdaptation,
+      }),
+    ).catch(() => null);
     for (const proposal of codexProposals || []) {
       const existing = merged.get(proposal.id);
       if (!existing || existing.proposalScore < proposal.proposalScore) {
@@ -2071,6 +2238,28 @@ async function runCandidateExpansionSweep(args: {
         theme,
         gaps: snapshot.coverageGaps.filter((gap) => gap.themeId === themeId),
         topMappings: snapshot.directMappings.filter((mapping) => mapping.themeId === themeId),
+        evidence: await (async () => {
+          let eventImpact: string[] = [];
+          try {
+            const ragMod = await import('../investment/rag-retriever.js').catch(() => null);
+            const pool = (ragMod as { getRagPool?: () => unknown } | null)?.getRagPool?.();
+            if (pool) {
+              const ev = await queryEventImpactEvidence(
+                pool as Parameters<typeof queryEventImpactEvidence>[0],
+                themeId,
+                theme.assets.map(a => a.symbol),
+              );
+              eventImpact = ev.eventImpact;
+            }
+          } catch { /* non-fatal */ }
+          return buildCandidateProposalEvidence({
+            theme,
+            gaps: snapshot.coverageGaps.filter((gap) => gap.themeId === themeId),
+            topMappings: snapshot.directMappings.filter((mapping) => mapping.themeId === themeId),
+            replayAdaptation,
+            eventImpact,
+          });
+        })(),
       })
     ), args.state);
     args.state.candidateThemeHistory = {
@@ -2283,6 +2472,7 @@ export async function runIntelligenceAutomationCycle(args: {
           latestArtifactPath,
           artifactPaths: datasetState.artifacts,
           existingRawRecordCount: Number(datasetSummary?.rawRecordCount) || 0,
+          registry,
         });
         if (importPlan.importPath) {
           try {
@@ -2398,6 +2588,11 @@ export async function runIntelligenceAutomationCycle(args: {
           const knownThemes = [...listBaseInvestmentThemes(), ...state.promotedThemes.map((entry) => entry.theme)];
           const queue = discoverThemeQueue(frames, knownThemes, state.themeQueue);
           mergeThemeQueue(state, queue.filter((item) => item.datasetIds.includes(dataset.id)));
+          // If queue is empty and we have frames with clusters, seed with top cluster patterns
+          if (state.themeQueue.filter((item) => item.status === 'open').length === 0 && frames.length > 0) {
+            const seedItems = buildSeedThemeQueueItems(frames, knownThemes);
+            state.themeQueue.push(...seedItems);
+          }
           datasetState.lastThemeDiscoveryAt = nowIso();
           appendRun(state, {
             id: `${dataset.id}:theme-discovery:${datasetState.lastThemeDiscoveryAt}`,
@@ -2524,7 +2719,45 @@ export async function runIntelligenceAutomationCycle(args: {
     await flushAutomationState(state, statePath, registry.defaults.retentionDays);
   }
 
+  if (manualTrigger || shouldRunEvery(state.lastKeywordLifecycleAt, registry.defaults.keywordLifecycleEveryMinutes, nowMs)) {
+    updateActiveCycle(state, {
+      stage: 'global:autonomous-discovery',
+      datasetId: null,
+      completedDatasets,
+      touchedDatasets: Array.from(touchedDatasets),
+    });
+    const discovery = await runWithRetry('global', 'source-automation', Math.max(1, registry.defaults.maxRetries - 1), async () => (
+      runAutonomousDiscoverySweep()
+    ), state);
+    appendRun(state, {
+      id: `global:autonomous-discovery:${nowIso()}`,
+      datasetId: 'global',
+      kind: 'source-automation',
+      status: 'ok',
+      startedAt: nowIso(),
+      completedAt: nowIso(),
+      attempts: 1,
+      detail: `gdelt=${discovery.gdeltTopicsProposed} keyword-sources=${discovery.keywordSourceProposals} playwright=${discovery.playwrightFeedProposals} source-keywords=${discovery.sourceKeywordUpserts} feedback=${discovery.keywordConfidenceAdjustments}`,
+    });
+    await flushAutomationState(state, statePath, registry.defaults.retentionDays);
+  }
+
   reviewThemeQueueState(state, registry);
+
+  // ── Tech Trend Detection → inject SURGING trends into theme queue ──
+  try {
+    const { detectTechTrends, trendSignalsToQueueItems } = await import('./tech-trend-integration.js');
+    const ragMod = await import('../investment/rag-retriever.js').catch(() => null);
+    const pool = (ragMod as { getRagPool?: () => unknown } | null)?.getRagPool?.();
+    if (pool) {
+      const trends = await detectTechTrends(pool as Parameters<typeof detectTechTrends>[0]);
+      const newItems = trendSignalsToQueueItems(trends, state.themeQueue || []);
+      if (newItems.length > 0) {
+        state.themeQueue = [...(state.themeQueue || []), ...newItems];
+        process.stderr.write(`[automation:tech-trends] Injected ${newItems.length} surging tech trends into theme queue\n`);
+      }
+    }
+  } catch { /* tech trend detection is non-fatal */ }
 
   const knownThemes = [...listBaseInvestmentThemes(), ...state.promotedThemes.map((entry) => entry.theme)];
   let promotionsToday = state.promotedThemes.filter((entry) => sameLocalDay(entry.promotedAt, nowIso())).length;
@@ -2543,12 +2776,52 @@ export async function runIntelligenceAutomationCycle(args: {
     if (!releaseThemeLock) continue;
     try {
       const proposal = await runWithRetry(queueItem.topicKey, 'theme-proposer', Math.max(1, registry.defaults.maxRetries - 1), async () => (
-        proposeThemeWithCodex(queueItem, knownThemes)
+        (async () => {
+          // Enrich with event impact + tech trend data from NAS
+          let eventImpact: string[] = [];
+          let techTrends: string[] = [];
+          try {
+            const ragMod = await import('../investment/rag-retriever.js').catch(() => null);
+            const pool = (ragMod as { getRagPool?: () => unknown } | null)?.getRagPool?.();
+            if (pool) {
+              const evidence = await queryEventImpactEvidence(
+                pool as Parameters<typeof queryEventImpactEvidence>[0],
+                queueItem.topicKey,
+                queueItem.suggestedSymbols,
+              );
+              eventImpact = evidence.eventImpact;
+              techTrends = evidence.techTrends;
+            }
+          } catch { /* non-fatal */ }
+          return proposeThemeWithCodex(
+            queueItem,
+            knownThemes,
+            buildThemeProposalEvidence({ queueItem, knownThemes, eventImpact, techTrends }),
+          );
+        })()
       ), state);
       if (!proposal) continue;
       queueItem.status = 'proposed';
       queueItem.proposedThemeId = proposal.id;
       queueItem.updatedAt = nowIso();
+      await ingestThemeProposalArtifacts(proposal);
+
+      // Save codex proposal audit trail
+      try {
+        const auditPath = path.join(path.dirname(statePath), 'codex-audit');
+        await mkdir(auditPath, { recursive: true });
+        await writeFile(
+          path.join(auditPath, `codex-proposal-${Date.now()}.json`),
+          JSON.stringify({
+            queueItem,
+            proposal,
+            promoted: proposal.confidence >= registry.themeAutomation.minCodexConfidence,
+            timestamp: new Date().toISOString(),
+          }, null, 2)
+        );
+      } catch {
+        // Audit trail is best-effort
+      }
 
       if (autoPromoteTheme(proposal, queueItem, registry, state, knownThemes, promotionsToday)) {
         const promoted = {
@@ -2701,6 +2974,25 @@ export async function runIntelligenceAutomationCycle(args: {
       detail: `score=${tuned.lastScore.toFixed(1)} action=${tuningAction}`,
     });
     await flushAutomationState(state, statePath, registry.defaults.retentionDays);
+  }
+
+  // ── Auto-Pipeline: refresh event analysis with auto-detected themes/symbols ──
+  updateActiveCycle(state, {
+    stage: 'global:event-analysis-refresh',
+    datasetId: null,
+    completedDatasets,
+    touchedDatasets: Array.from(touchedDatasets),
+  });
+  try {
+    const { execSync } = await import('child_process');
+    execSync('node --import tsx scripts/auto-pipeline.mjs --step 3 --step 5 --limit 500', {
+      cwd: path.resolve(path.dirname(statePath), '..'),
+      timeout: 120_000,
+      stdio: 'pipe',
+    });
+    process.stderr.write('[automation:event-analysis] Auto-pipeline refresh completed\n');
+  } catch {
+    process.stderr.write('[automation:event-analysis] Auto-pipeline refresh skipped (non-fatal)\n');
   }
 
   updateActiveCycle(state, {

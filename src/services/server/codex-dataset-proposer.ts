@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import type { DatasetProposal, DatasetDiscoveryThemeInput } from '../dataset-discovery';
+import type { ProposalEvidenceBundle } from './proposal-evidence-builder';
 
 interface CodexExecResult {
   code: number;
@@ -16,7 +17,7 @@ const CODEX_TIMEOUT_MS = 95_000;
 function buildExecArgs(prompt: string): string[] {
   const args = ['exec'];
   if (process.env.CODEX_MODEL?.trim()) args.push('--model', process.env.CODEX_MODEL.trim());
-  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--ask-for-approval', 'never', prompt);
+  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto', prompt);
   return args;
 }
 
@@ -62,13 +63,22 @@ async function resolveCodexCommand(): Promise<string> {
 
 async function runCodexCli(args: string[], timeoutMs = CODEX_TIMEOUT_MS): Promise<CodexExecResult> {
   const command = await resolveCodexCommand();
+  // If the last argument (prompt) is very long, pipe it via stdin instead
+  const lastArg = args.length > 0 ? args[args.length - 1] ?? '' : '';
+  const usePipedPrompt = lastArg.length > 6000;
+  const spawnArgs = usePipedPrompt ? args.slice(0, -1) : args;
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    const child = spawn(command, spawnArgs, {
       cwd: process.cwd(),
       env: getSafeEnv(),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [usePipedPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      shell: process.platform === 'win32',
     });
+    if (usePipedPrompt) {
+      child.stdin?.write(lastArg);
+      child.stdin?.end();
+    }
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
@@ -122,7 +132,7 @@ function parseJsonObject(rawText: string): Record<string, unknown> | null {
   }
 }
 
-function buildPrompt(theme: DatasetDiscoveryThemeInput): string {
+function buildPrompt(theme: DatasetDiscoveryThemeInput, evidence?: ProposalEvidenceBundle | null): string {
   return [
     'You are a historical dataset planner for macro and geopolitical replay.',
     'Return strict JSON only. No markdown.',
@@ -135,13 +145,26 @@ function buildPrompt(theme: DatasetDiscoveryThemeInput): string {
     `Commodities: ${theme.commodities.join(', ') || '(none)'}`,
     `Headlines: ${(theme.supportingHeadlines || []).slice(0, 4).join(' || ') || '(none)'}`,
     `Suggested symbols: ${(theme.suggestedSymbols || []).join(', ') || '(none)'}`,
+    evidence?.summary ? `Evidence summary: ${evidence.summary}` : '',
+    evidence?.historicalAnalogs?.length
+      ? `Historical analogs:\n${evidence.historicalAnalogs.map((row) => `- ${row}`).join('\n')}`
+      : '',
+    evidence?.weaknessSignals?.length
+      ? `Weakness signals:\n${evidence.weaknessSignals.map((row) => `- ${row}`).join('\n')}`
+      : '',
+    evidence?.coverageSignals?.length
+      ? `Coverage signals:\n${evidence.coverageSignals.map((row) => `- ${row}`).join('\n')}`
+      : '',
   ].join('\n');
 }
 
-export async function proposeDatasetsWithCodex(theme: DatasetDiscoveryThemeInput): Promise<DatasetProposal[] | null> {
+export async function proposeDatasetsWithCodex(
+  theme: DatasetDiscoveryThemeInput,
+  evidence?: ProposalEvidenceBundle | null,
+): Promise<DatasetProposal[] | null> {
   const loginStatus = await runCodexCli(['login', 'status'], 8_000);
   if (loginStatus.code !== 0 || !isCodexLoggedIn(`${loginStatus.stdout}\n${loginStatus.stderr}`)) return null;
-  const result = await runCodexCli(buildExecArgs(buildPrompt(theme)), CODEX_TIMEOUT_MS);
+  const result = await runCodexCli(buildExecArgs(buildPrompt(theme, evidence)), CODEX_TIMEOUT_MS);
   if (result.code !== 0) return null;
   const parsed = parseJsonObject(parseCodexJsonOutput(result.stdout || '') || result.stdout);
   if (!parsed || !Array.isArray(parsed.proposals)) return null;

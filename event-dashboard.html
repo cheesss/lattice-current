@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lattice Event Intelligence Dashboard</title>
+<style>
+  :root { --bg: #0a0f0a; --surface: #141a14; --border: #1e2e1e; --text: #e0e8e0; --dim: #6a7a6a; --accent: #4aff8a; --negative: #ff5a5a; --positive: #4aff8a; --warn: #ffaa33; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Fira Code', monospace; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  h1 { color: var(--accent); font-size: 18px; margin-bottom: 8px; }
+  h2 { color: var(--accent); font-size: 14px; margin: 20px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+  .card-title { color: var(--accent); font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: var(--dim); padding: 4px 8px; border-bottom: 1px solid var(--border); font-weight: normal; }
+  td { padding: 4px 8px; border-bottom: 1px solid #111; }
+  .pos { color: var(--positive); }
+  .neg { color: var(--negative); }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+  .tag-surge { background: #1a3a1a; color: var(--positive); }
+  .tag-decline { background: #3a1a1a; color: var(--negative); }
+  .tag-stable { background: #1a1a2a; color: #6a8aff; }
+  .tag-regime { background: #2a1a2a; color: #aa6aff; font-size: 10px; }
+  .search-box { width: 100%; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-family: inherit; font-size: 13px; margin-bottom: 12px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .tab { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--dim); cursor: pointer; border-radius: 4px 4px 0 0; font-family: inherit; font-size: 12px; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--bg); background: var(--bg); }
+  .loading { color: var(--dim); padding: 20px; text-align: center; }
+  .chart-bar { display: flex; align-items: center; gap: 4px; margin: 2px 0; }
+  .chart-bar-fill { height: 14px; border-radius: 2px; min-width: 2px; }
+  .chart-bar-label { font-size: 11px; color: var(--dim); min-width: 40px; text-align: right; }
+  .chart-bar-value { font-size: 11px; min-width: 50px; }
+  #hawkes-chart { width: 100%; height: 200px; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>LATTICE EVENT INTELLIGENCE</h1>
+  <p style="color:var(--dim);margin-bottom:16px">이벤트-종목 반응 분석 | 시장 상태별 민감도 | 기술 트렌드</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('overview')">Overview</button>
+    <button class="tab" onclick="showTab('stock')">Stock Analysis</button>
+    <button class="tab" onclick="showTab('events')">Event Search</button>
+    <button class="tab" onclick="showTab('regime')">Regime Analysis</button>
+    <button class="tab" onclick="showTab('trends')">Tech Trends</button>
+    <button class="tab" onclick="showTab('anomalies')">Anomalies</button>
+    <button class="tab" onclick="showTab('whatif')">What-If</button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div id="tab-overview">
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">Sensitivity Matrix (2w)</div>
+        <div id="sensitivity-table" class="loading">Loading...</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Best What-If Strategies</div>
+        <div id="whatif-overview" class="loading">Loading...</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Recent Anomalies</div>
+      <div id="anomalies-overview" class="loading">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Stock Tab -->
+  <div id="tab-stock" style="display:none">
+    <input class="search-box" id="stock-input" placeholder="종목 심볼 입력 (예: NVDA, GLD, SPY)" onkeydown="if(event.key==='Enter')loadStock()">
+    <div id="stock-result"></div>
+  </div>
+
+  <!-- Event Search Tab -->
+  <div id="tab-events" style="display:none">
+    <input class="search-box" id="event-input" placeholder="이벤트 키워드 검색 (예: semiconductor, Ukraine, tariff)" onkeydown="if(event.key==='Enter')searchEvents()">
+    <div id="event-results"></div>
+  </div>
+
+  <!-- Regime Tab -->
+  <div id="tab-regime" style="display:none">
+    <div id="regime-data" class="loading">Loading...</div>
+  </div>
+
+  <!-- Trends Tab -->
+  <div id="tab-trends" style="display:none">
+    <div id="trends-data" class="loading">Loading...</div>
+  </div>
+
+  <!-- Anomalies Tab -->
+  <div id="tab-anomalies" style="display:none">
+    <div id="anomalies-data" class="loading">Loading...</div>
+  </div>
+
+  <!-- What-If Tab -->
+  <div id="tab-whatif" style="display:none">
+    <div id="whatif-data" class="loading">Loading...</div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:46200/api';
+
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).style.display = 'block';
+  event.target.classList.add('active');
+}
+
+function fmt(v, d=2) { return v != null ? Number(v).toFixed(d) : 'n/a'; }
+function pct(v) { return v != null ? (Number(v)*100).toFixed(0)+'%' : 'n/a'; }
+function retClass(v) { return Number(v) >= 0 ? 'pos' : 'neg'; }
+function retFmt(v) { const n = Number(v); return `<span class="${retClass(v)}">${n>=0?'+':''}${n.toFixed(2)}%</span>`; }
+
+async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
+
+// ── Overview ──
+async function loadOverview() {
+  // Sensitivity
+  const sens = await fetchJSON(API + '/sensitivity');
+  const twoWeek = sens.filter(r => r.horizon === '2w');
+  let html = '<table><tr><th>Theme</th><th>Symbol</th><th>AvgRet</th><th>Hit</th><th>Volatility</th></tr>';
+  for (const r of twoWeek.slice(0, 20)) {
+    html += `<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td><td>${fmt(r.volatility)}%</td></tr>`;
+  }
+  html += '</table>';
+  document.getElementById('sensitivity-table').innerHTML = html;
+
+  // What-if
+  const whatif = await fetchJSON(API + '/whatif//');
+  let wh = '<table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th><th>AvgPnL</th></tr>';
+  for (const r of whatif.slice(0, 15)) {
+    wh += `<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${r.direction}</td><td>${fmt(r.sharpe_ratio)}</td><td>${pct(r.hit_rate)}</td><td>${retFmt(r.avg_pnl_pct)}</td></tr>`;
+  }
+  wh += '</table>';
+  document.getElementById('whatif-overview').innerHTML = wh;
+
+  // Anomalies
+  const anom = await fetchJSON(API + '/anomalies');
+  let ah = '<table><tr><th>Date</th><th>Theme</th><th>Symbol</th><th>Actual</th><th>Expected</th><th>Z-Score</th></tr>';
+  for (const r of anom.slice(0, 10)) {
+    ah += `<tr><td>${String(r.event_date).slice(0,10)}</td><td>${r.theme}</td><td>${r.symbol}</td><td>${retFmt(r.forward_return_pct)}</td><td>${retFmt(r.expected_return)}</td><td><strong>${fmt(r.z_score,1)}</strong></td></tr>`;
+  }
+  ah += '</table>';
+  document.getElementById('anomalies-overview').innerHTML = ah;
+}
+
+// ── Stock Analysis ──
+async function loadStock() {
+  const sym = document.getElementById('stock-input').value.toUpperCase();
+  if (!sym) return;
+  const data = await fetchJSON(API + '/stock/' + sym);
+  let html = '<h2>' + sym + ' Event Reaction Profile</h2>';
+
+  // Sensitivity by theme
+  html += '<div class="grid"><div class="card"><div class="card-title">Theme Sensitivity</div><table><tr><th>Theme</th><th>Horizon</th><th>AvgRet</th><th>Hit</th></tr>';
+  for (const r of data.sensitivity) html += `<tr><td>${r.theme}</td><td>${r.horizon}</td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td></tr>`;
+  html += '</table></div>';
+
+  // Regime
+  html += '<div class="card"><div class="card-title">Regime Conditional</div><table><tr><th>Theme</th><th>Regime</th><th>AvgRet</th><th>Hit</th><th>Mult</th></tr>';
+  for (const r of data.regime) html += `<tr><td>${r.theme}</td><td><span class="tag tag-regime">${r.regime}</span></td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td><td>${fmt(r.regime_multiplier)}x</td></tr>`;
+  html += '</table></div></div>';
+
+  // Patterns
+  html += '<div class="card" style="margin-top:12px"><div class="card-title">Reaction Pattern Distribution</div>';
+  const maxN = Math.max(...data.patterns.map(p => Number(p.n)));
+  for (const p of data.patterns) {
+    const w = (Number(p.n) / maxN * 100).toFixed(0);
+    const color = Number(p.avg_ret) >= 0 ? 'var(--positive)' : 'var(--negative)';
+    html += `<div class="chart-bar"><div class="chart-bar-label">${p.reaction_pattern}</div><div class="chart-bar-fill" style="width:${w}%;background:${color};opacity:0.5"></div><div class="chart-bar-value">${p.n} (${retFmt(p.avg_ret)})</div></div>`;
+  }
+  html += '</div>';
+
+  // What-if
+  html += '<div class="card" style="margin-top:12px"><div class="card-title">What-If Simulations</div><table><tr><th>Theme</th><th>Dir</th><th>Trades</th><th>Sharpe</th><th>Hit</th><th>VaR95</th><th>Total</th></tr>';
+  for (const r of data.whatif) html += `<tr><td>${r.theme}</td><td>${r.direction}</td><td>${r.simulated_trades}</td><td>${fmt(r.sharpe_ratio)}</td><td>${pct(r.hit_rate)}</td><td>${retFmt(r.var_95_pct)}</td><td>${retFmt(r.total_return_pct)}</td></tr>`;
+  html += '</table></div>';
+
+  document.getElementById('stock-result').innerHTML = html;
+}
+
+// ── Event Search ──
+async function searchEvents() {
+  const q = document.getElementById('event-input').value;
+  if (!q) return;
+  const data = await fetchJSON(API + '/event-search?q=' + encodeURIComponent(q));
+  let html = `<h2>"${q}" 관련 이벤트 (${data.length}건)</h2><table><tr><th>Date</th><th>Source</th><th>Theme</th><th>Symbol</th><th>Return</th><th>Pattern</th><th>Title</th></tr>`;
+  for (const r of data) {
+    html += `<tr><td>${String(r.event_date).slice(0,10)}</td><td>${r.source}</td><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${retFmt(r.forward_return_pct)}</td><td>${r.reaction_pattern||''}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</td></tr>`;
+  }
+  html += '</table>';
+  document.getElementById('event-results').innerHTML = html;
+}
+
+// ── Regime ──
+async function loadRegime() {
+  const data = await fetchJSON(API + '/regime//');
+  let html = '<h2>Regime-Conditional Impact (2w)</h2>';
+  const byTheme = {};
+  for (const r of data) { if (!byTheme[r.theme]) byTheme[r.theme] = []; byTheme[r.theme].push(r); }
+  for (const [theme, rows] of Object.entries(byTheme)) {
+    html += `<div class="card" style="margin-bottom:12px"><div class="card-title">${theme}</div><table><tr><th>Symbol</th><th>Regime</th><th>AvgRet</th><th>Hit</th><th>|Move|</th><th>Multiplier</th><th>N</th></tr>`;
+    for (const r of rows) html += `<tr><td><strong>${r.symbol}</strong></td><td><span class="tag tag-regime">${r.regime}</span></td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td><td>${fmt(r.avg_abs_return)}%</td><td>${fmt(r.regime_multiplier)}x</td><td>${r.sample_size}</td></tr>`;
+    html += '</table></div>';
+  }
+  document.getElementById('regime-data').innerHTML = html;
+}
+
+// ── Trends ──
+async function loadTrends() {
+  const data = await fetchJSON(API + '/trends');
+  let html = '<h2>Technology Trend Tracker</h2><div class="grid-3">';
+  for (const t of data.sort((a,b) => b.momentum - a.momentum)) {
+    const status = t.momentum > 30 ? 'SURGING' : t.momentum > 10 ? 'GROWING' : t.momentum > -10 ? 'STABLE' : 'DECLINING';
+    const tagClass = status === 'SURGING' || status === 'GROWING' ? 'tag-surge' : status === 'DECLINING' ? 'tag-decline' : 'tag-stable';
+    html += `<div class="card"><div class="card-title">${t.name} <span class="tag ${tagClass}">${status}</span></div>`;
+    html += `<div style="margin:8px 0">Total: ${t.total} articles | Recent: ${fmt(t.recentAvg,0)}/mo | Momentum: <span class="${t.momentum>=0?'pos':'neg'}">${t.momentum>=0?'+':''}${fmt(t.momentum,0)}%</span></div>`;
+    // Mini sparkline
+    const timeline = t.timeline.slice(-24);
+    if (timeline.length > 0) {
+      const maxN = Math.max(...timeline.map(p => p.n));
+      html += '<div style="display:flex;align-items:end;gap:1px;height:40px">';
+      for (const p of timeline) {
+        const h = maxN > 0 ? (p.n / maxN * 38) : 0;
+        html += `<div style="flex:1;height:${h}px;background:var(--accent);opacity:0.4;border-radius:1px" title="${String(p.month).slice(0,7)}: ${p.n}"></div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById('trends-data').innerHTML = html;
+}
+
+// ── Anomalies ──
+async function loadAnomalies() {
+  const data = await fetchJSON(API + '/anomalies');
+  let html = '<h2>Anomalous Reactions (|z-score| > 2.5)</h2><table><tr><th>Date</th><th>Theme</th><th>Symbol</th><th>Actual</th><th>Expected</th><th>Z-Score</th><th>Type</th><th>Event</th></tr>';
+  for (const r of data) {
+    html += `<tr><td>${String(r.event_date).slice(0,10)}</td><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${retFmt(r.forward_return_pct)}</td><td>${retFmt(r.expected_return)}</td><td><strong>${fmt(r.z_score,1)}</strong></td><td>${r.anomaly_type}</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</td></tr>`;
+  }
+  html += '</table>';
+  document.getElementById('anomalies-data').innerHTML = html;
+}
+
+// ── What-If ──
+async function loadWhatif() {
+  const data = await fetchJSON(API + '/whatif//');
+  let html = '<h2>What-If Simulations — "이 이벤트에 진입했으면?"</h2>';
+  html += '<table><tr><th>Theme</th><th>Symbol</th><th>Direction</th><th>Trades</th><th>Avg PnL</th><th>Hit Rate</th><th>Sharpe</th><th>VaR 95%</th><th>Max DD</th><th>Total Return</th></tr>';
+  for (const r of data) {
+    html += `<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${r.direction}</td><td>${r.simulated_trades}</td><td>${retFmt(r.avg_pnl_pct)}</td><td>${pct(r.hit_rate)}</td><td class="${Number(r.sharpe_ratio)>=0?'pos':'neg'}">${fmt(r.sharpe_ratio)}</td><td>${retFmt(r.var_95_pct)}</td><td>${retFmt(r.max_drawdown_pct)}</td><td>${retFmt(r.total_return_pct)}</td></tr>`;
+  }
+  html += '</table>';
+  document.getElementById('whatif-data').innerHTML = html;
+}
+
+// Initial load
+loadOverview();
+// Lazy load other tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const name = tab.textContent.toLowerCase().replace(/[^a-z]/g, '').replace('stockanalysis','stock').replace('eventsearch','events').replace('regimeanalysis','regime').replace('techtrends','trends');
+    if (name === 'regime') loadRegime();
+    if (name === 'trends') loadTrends();
+    if (name === 'anomalies') loadAnomalies();
+    if (name === 'whatif') loadWhatif();
+  });
+});
+</script>
+</body>
+</html>

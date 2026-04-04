@@ -40,6 +40,7 @@ interface PortfolioAccountingForwardReturnLike {
   costAdjustedSignedReturnPct: number | null;
   direction: InvestmentDirection;
   tradableNow: boolean;
+  executionPenaltyPct?: number | null;
 }
 
 export interface PortfolioAccountingTrade {
@@ -58,6 +59,7 @@ export interface PortfolioAccountingTrade {
   signedReturnPct: number | null;
   costAdjustedSignedReturnPct: number | null;
   tradableNow: boolean;
+  executionPenaltyPct?: number | null;
 }
 
 export interface PortfolioAccountingPoint {
@@ -82,8 +84,11 @@ export interface PortfolioAccountingSummary {
   weightedHitRate: number;
   cagrPct: number;
   maxDrawdownPct: number;
+  worstPeriodReturnPct: number;
   sharpeRatio: number;
   volatilityPct: number;
+  dailyVar95Pct: number;
+  dailyCvar95Pct: number;
   avgCashPct: number;
   minCashPct: number;
   avgGrossExposurePct: number;
@@ -91,8 +96,25 @@ export interface PortfolioAccountingSummary {
   avgNetExposurePct: number;
   maxConcurrentPositions: number;
   tradeCount: number;
+  plannedTradeCount: number;
   selectedTradeCount: number;
+  sizingAdjustmentCount: number;
+  riskGuardTriggerCount: number;
+  forcedExitCount: number;
+  drawdownGovernorTriggerCount: number;
   periodsPerYear: number;
+}
+
+export interface PortfolioAccountingRiskControls {
+  grossExposureCapPct: number;
+  minCashReservePct: number;
+  maxSymbolExposurePct: number;
+  maxThemeExposurePct: number;
+  maxDailyVar95Pct: number;
+  maxDailyCvar95Pct: number;
+  drawdownGovernorPct: number;
+  drawdownCooldownDays: number;
+  targetPositionVolatilityPct: number;
 }
 
 export interface PortfolioAccountingSnapshot {
@@ -198,6 +220,117 @@ function findPriceAtOrBefore(series: PricePoint[], targetTs: number): PricePoint
   return best;
 }
 
+function buildTrailingReturns(series: PricePoint[], targetTs: number, lookbackPoints = 20): number[] {
+  const trailing = series.filter((point) => point.ts <= targetTs).slice(-Math.max(lookbackPoints + 1, 2));
+  const returns: number[] = [];
+  for (let index = 1; index < trailing.length; index += 1) {
+    const prev = trailing[index - 1]!.price;
+    const curr = trailing[index]!.price;
+    if (!(prev > 0) || !(curr > 0)) continue;
+    returns.push((curr / prev) - 1);
+  }
+  return returns;
+}
+
+function estimateSymbolDailyVolatilityPct(series: PricePoint[], targetTs: number): number {
+  const lookbackMs = 90 * 24 * 60 * 60 * 1000;
+  const cutoff = targetTs - lookbackMs;
+  const trailingReturns = buildTrailingReturns(series.filter((point) => point.ts >= cutoff), targetTs);
+  if (trailingReturns.length < 5) return DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.targetPositionVolatilityPct;
+  const mean = average(trailingReturns);
+  const variance = average(trailingReturns.map((value) => (value - mean) ** 2));
+  return Math.max(0.25, Math.sqrt(Math.max(variance, 0)) * 100);
+}
+
+function normalQuantile(probability: number): number {
+  const p = Math.min(1 - 1e-9, Math.max(1e-9, probability));
+  const a = [
+    -3.969683028665376e+01,
+    2.209460984245205e+02,
+    -2.759285104469687e+02,
+    1.38357751867269e+02,
+    -3.066479806614716e+01,
+    2.506628277459239e+00,
+  ];
+  const b = [
+    -5.447609879822406e+01,
+    1.615858368580409e+02,
+    -1.556989798598866e+02,
+    6.680131188771972e+01,
+    -1.328068155288572e+01,
+  ];
+  const c = [
+    -7.784894002430293e-03,
+    -3.223964580411365e-01,
+    -2.400758277161838e+00,
+    -2.549732539343734e+00,
+    4.374664141464968e+00,
+    2.938163982698783e+00,
+  ];
+  const d = [
+    7.784695709041462e-03,
+    3.224671290700398e-01,
+    2.445134137142996e+00,
+    3.754408661907416e+00,
+  ];
+  const plow = 0.02425;
+  const phigh = 1 - plow;
+  let q = 0;
+  let r = 0;
+  if (p < plow) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]! * q + c[1]!) * q + c[2]!) * q + c[3]!) * q + c[4]!) * q + c[5]!)
+      / ((((d[0]! * q + d[1]!) * q + d[2]!) * q + d[3]!) * q + 1);
+  }
+  if (p > phigh) {
+    q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c[0]! * q + c[1]!) * q + c[2]!) * q + c[3]!) * q + c[4]!) * q + c[5]!)
+      / ((((d[0]! * q + d[1]!) * q + d[2]!) * q + d[3]!) * q + 1);
+  }
+  q = p - 0.5;
+  r = q * q;
+  return (((((a[0]! * r + a[1]!) * r + a[2]!) * r + a[3]!) * r + a[4]!) * r + a[5]!) * q
+    / (((((b[0]! * r + b[1]!) * r + b[2]!) * r + b[3]!) * r + b[4]!) * r + 1);
+}
+
+function estimatePortfolioRiskMetricsPct(
+  positions: Array<{ symbol: string; notional: number }>,
+  prices: Map<string, PricePoint[]>,
+  targetTs: number,
+  equity: number,
+): { dailyVar95Pct: number; dailyCvar95Pct: number } {
+  if (!(equity > 0) || positions.length === 0) {
+    return { dailyVar95Pct: 0, dailyCvar95Pct: 0 };
+  }
+  const variance = positions.reduce((sum, position) => {
+    const series = prices.get(position.symbol) || [];
+    const dailyVolPct = estimateSymbolDailyVolatilityPct(series, targetTs);
+    const weight = Math.abs(position.notional) / equity;
+    return sum + Math.pow(weight * (dailyVolPct / 100), 2);
+  }, 0);
+  const portfolioVol = Math.sqrt(Math.max(variance, 0));
+  const z95 = Math.abs(normalQuantile(0.05));
+  const cvar95Multiplier = 2.06;
+  return {
+    dailyVar95Pct: Number((portfolioVol * z95 * 100).toFixed(4)),
+    dailyCvar95Pct: Number((portfolioVol * cvar95Multiplier * 100).toFixed(4)),
+  };
+}
+
+function calculateTailLossPct(returns: number[], probability: number): { varPct: number; cvarPct: number } {
+  const clean = returns.filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
+  if (clean.length === 0) {
+    return { varPct: 0, cvarPct: 0 };
+  }
+  const index = Math.min(clean.length - 1, Math.max(0, Math.floor(clean.length * probability)));
+  const varValue = clean[index] ?? 0;
+  const tail = clean.slice(0, index + 1);
+  return {
+    varPct: Number((Math.abs(varValue) * 100).toFixed(2)),
+    cvarPct: Number((Math.abs(average(tail)) * 100).toFixed(2)),
+  };
+}
+
 function selectAdaptiveForwardReturns(
   forwardReturns: PortfolioAccountingForwardReturnLike[],
   ideaRuns: PortfolioAccountingIdeaRunLike[],
@@ -240,9 +373,9 @@ function selectAdaptiveForwardReturns(
 }
 
 function roleWeight(role: 'primary' | 'confirm' | 'hedge'): number {
-  if (role === 'primary') return 1;
-  if (role === 'confirm') return 0.72;
-  return 0.48;
+  if (role === 'primary') return 6;
+  if (role === 'confirm') return 1;
+  return 1;
 }
 
 function directionMultiplier(direction: InvestmentDirection): number {
@@ -267,6 +400,37 @@ interface OpenPosition {
   quantity: number;
   entryNotional: number;
   tradableNow: boolean;
+}
+
+const DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS: PortfolioAccountingRiskControls = {
+  grossExposureCapPct: 95,
+  minCashReservePct: 5,
+  maxSymbolExposurePct: 25,
+  maxThemeExposurePct: 60,
+  maxDailyVar95Pct: 8,
+  maxDailyCvar95Pct: 12,
+  drawdownGovernorPct: 12,
+  drawdownCooldownDays: 3,
+  targetPositionVolatilityPct: 5,
+};
+
+function normalizePortfolioAccountingRiskControls(
+  riskControls: Partial<PortfolioAccountingRiskControls> | null | undefined,
+): PortfolioAccountingRiskControls {
+  const safe = riskControls || {};
+  const clampPct = (value: unknown, fallback: number) =>
+    Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : fallback;
+  return {
+    grossExposureCapPct: clampPct(safe.grossExposureCapPct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.grossExposureCapPct),
+    minCashReservePct: clampPct(safe.minCashReservePct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.minCashReservePct),
+    maxSymbolExposurePct: clampPct(safe.maxSymbolExposurePct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.maxSymbolExposurePct),
+    maxThemeExposurePct: clampPct(safe.maxThemeExposurePct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.maxThemeExposurePct),
+    maxDailyVar95Pct: clampPct(safe.maxDailyVar95Pct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.maxDailyVar95Pct),
+    maxDailyCvar95Pct: clampPct(safe.maxDailyCvar95Pct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.maxDailyCvar95Pct),
+    drawdownGovernorPct: clampPct(safe.drawdownGovernorPct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.drawdownGovernorPct),
+    drawdownCooldownDays: Math.max(0, Math.round(clampPct(safe.drawdownCooldownDays, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.drawdownCooldownDays))),
+    targetPositionVolatilityPct: clampPct(safe.targetPositionVolatilityPct, DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.targetPositionVolatilityPct),
+  };
 }
 
 function buildDateRange(startTs: number, endTs: number): string[] {
@@ -304,13 +468,15 @@ export function computePortfolioAccountingSnapshot(args: {
   ideaRuns: PortfolioAccountingIdeaRunLike[];
   forwardReturns: PortfolioAccountingForwardReturnLike[];
   initialCapital?: number;
+  riskControls?: Partial<PortfolioAccountingRiskControls>;
 }): PortfolioAccountingSnapshot {
   const initialCapital = Number(args.initialCapital) > 0 ? Number(args.initialCapital) : 100;
+  const riskControls = normalizePortfolioAccountingRiskControls(args.riskControls);
   const prices = buildPriceSeries(args.frames);
   const selectedReturns = selectAdaptiveForwardReturns(args.forwardReturns, args.ideaRuns).filter((row) => typeof row.signedReturnPct === 'number');
   const selectedByKey = new Map(selectedReturns.map((record) => [`${record.ideaRunId}::${record.symbol}`, record] as const));
 
-  const trades: PortfolioAccountingTrade[] = [];
+  const plannedTrades: PortfolioAccountingTrade[] = [];
   for (const ideaRun of args.ideaRuns) {
     const activeSymbols = ideaRun.symbols.filter((symbol) => directionMultiplier(symbol.direction) !== 0);
     if (!activeSymbols.length) continue;
@@ -324,7 +490,7 @@ export function computePortfolioAccountingSnapshot(args: {
       const exitPrice = selected.exitPrice ?? (exitTimestamp ? findPriceAtOrBefore(prices.get(symbol.symbol) || [], asTs(exitTimestamp))?.price ?? null : null);
       if (!entryPrice || !Number.isFinite(entryPrice) || entryPrice <= 0) continue;
       const allocatedWeightPct = Number(((ideaRun.sizePct * roleWeight(symbol.role)) / totalRoleWeight).toFixed(4));
-      trades.push({
+      plannedTrades.push({
         id: `${ideaRun.id}:${symbol.symbol}:${selected.horizonHours}h`,
         ideaRunId: ideaRun.id,
         themeId: ideaRun.themeId,
@@ -340,13 +506,14 @@ export function computePortfolioAccountingSnapshot(args: {
         signedReturnPct: selected.signedReturnPct,
         costAdjustedSignedReturnPct: selected.costAdjustedSignedReturnPct,
         tradableNow: selected.tradableNow,
+        executionPenaltyPct: selected.executionPenaltyPct ?? null,
       });
     }
   }
 
   const entriesByDate = new Map<string, PortfolioAccountingTrade[]>();
   const exitsByDate = new Map<string, PortfolioAccountingTrade[]>();
-  for (const trade of trades) {
+  for (const trade of plannedTrades) {
     const entryDate = toDateKey(trade.entryTimestamp);
     const exitDate = trade.exitTimestamp ? toDateKey(trade.exitTimestamp) : null;
     const entryBucket = entriesByDate.get(entryDate) || [];
@@ -359,19 +526,41 @@ export function computePortfolioAccountingSnapshot(args: {
     }
   }
 
-  const frameDates = args.frames.map((frame) => toDateKey(frame.timestamp || frame.validTimeStart || frame.transactionTime || frame.knowledgeBoundary || nowIso()));
-  const tradeDates = trades.flatMap((trade) => [toDateKey(trade.entryTimestamp), trade.exitTimestamp ? toDateKey(trade.exitTimestamp) : null].filter((value): value is string => Boolean(value)));
-  const allDates = Array.from(new Set([...frameDates, ...tradeDates])).sort();
+  // Sort each date bucket by weightPct descending so that the highest-conviction
+  // ideas are allocated first. Without this, the gross-exposure cap could starve
+  // high-weight trades when lower-weight trades appear earlier in iteration order.
+  for (const [key, bucket] of entriesByDate) {
+    bucket.sort(
+      (a, b) =>
+        b.weightPct - a.weightPct
+        || (b.signedReturnPct ?? -Infinity) - (a.signedReturnPct ?? -Infinity),
+    );
+    entriesByDate.set(key, bucket);
+  }
+
+  const tradeDates = plannedTrades.flatMap((trade) => [toDateKey(trade.entryTimestamp), trade.exitTimestamp ? toDateKey(trade.exitTimestamp) : null].filter((value): value is string => Boolean(value)));
+  // Use trade dates as primary timeline; only fall back to frame dates if no trades exist
+  const timelineDates = tradeDates.length > 0
+    ? tradeDates
+    : args.frames.map((frame) => toDateKey(frame.timestamp || frame.validTimeStart || frame.transactionTime || frame.knowledgeBoundary || nowIso()));
+  const allDates = Array.from(new Set(timelineDates)).sort();
   const startTs = allDates.length > 0 ? endOfDayTs(allDates[0]!) : Date.now();
   const endTs = allDates.length > 0 ? endOfDayTs(allDates[allDates.length - 1]!) : startTs;
   const timeline = buildDateRange(startTs, endTs);
 
   const openPositions = new Map<string, OpenPosition>();
+  const executedTrades: PortfolioAccountingTrade[] = [];
   const equityCurve: PortfolioAccountingPoint[] = [];
   let cash = initialCapital;
   let maxConcurrentPositions = 0;
+  let sizingAdjustmentCount = 0;
+  let riskGuardTriggerCount = 0;
+  let forcedExitCount = 0;
+  let drawdownGovernorTriggerCount = 0;
+  let cooldownActiveUntilIndex = -1;
+  let peakNav = initialCapital;
 
-  for (const dateKey of timeline) {
+  for (const [dateIndex, dateKey] of timeline.entries()) {
     const dayTs = endOfDayTs(dateKey);
     const startingEquity = cash + Array.from(openPositions.values()).reduce((sum, position) => {
       const series = prices.get(position.symbol) || [];
@@ -379,13 +568,90 @@ export function computePortfolioAccountingSnapshot(args: {
       return sum + position.sign * position.quantity * price;
     }, 0);
 
+    // Track running notional for exposure cap (avoids O(n²) re-scan)
+    const grossExposureCap = Math.max(0, startingEquity * (riskControls.grossExposureCapPct / 100));
+    const minCashReserve = Math.max(0, startingEquity * (riskControls.minCashReservePct / 100));
+    const maxSymbolExposure = Math.max(0, startingEquity * (riskControls.maxSymbolExposurePct / 100));
+    const maxThemeExposure = Math.max(0, startingEquity * (riskControls.maxThemeExposurePct / 100));
+    const currentExposure = (matcher: (position: OpenPosition) => boolean): number =>
+      Array.from(openPositions.values()).reduce((sum, position) => {
+        if (!matcher(position)) return sum;
+        const series = prices.get(position.symbol) || [];
+        const price = findPriceAtOrBefore(series, dayTs)?.price ?? position.entryPrice;
+        return sum + Math.abs(position.sign * position.quantity * price);
+      }, 0);
+    const currentRiskPositions = (): Array<{ symbol: string; notional: number }> =>
+      Array.from(openPositions.values()).map((position) => {
+        const series = prices.get(position.symbol) || [];
+        const price = findPriceAtOrBefore(series, dayTs)?.price ?? position.entryPrice;
+        return {
+          symbol: position.symbol,
+          notional: Math.abs(position.sign * position.quantity * price),
+        };
+      });
+    let runningEntryNotional = currentExposure(() => true);
+
     for (const trade of entriesByDate.get(dateKey) || []) {
       if (openPositions.has(trade.id)) continue;
+      if (dateIndex <= cooldownActiveUntilIndex) {
+        riskGuardTriggerCount += 1;
+        continue;
+      }
       const sign = directionMultiplier(trade.direction);
       if (sign === 0) continue;
       const tradeEntryPrice = trade.entryPrice ?? findPriceAtOrBefore(prices.get(trade.symbol) || [], dayTs)?.price ?? null;
       if (!tradeEntryPrice || !Number.isFinite(tradeEntryPrice) || tradeEntryPrice <= 0) continue;
-      const notional = startingEquity * (trade.weightPct / 100);
+      const symbolSeries = prices.get(trade.symbol) || [];
+      const symbolDailyVolatilityPct = estimateSymbolDailyVolatilityPct(symbolSeries, dayTs);
+      const volatilityScaler = Math.max(
+        0.35,
+        Math.min(1.15, riskControls.targetPositionVolatilityPct / Math.max(symbolDailyVolatilityPct, 0.25)),
+      );
+      const impliedExecutionPenaltyPct = Math.max(0, Number(trade.executionPenaltyPct ?? 0));
+      const executionScaler = Math.max(0.45, Math.min(1, 1 - (impliedExecutionPenaltyPct / 2.5)));
+      const requestedNotional = Math.max(0, startingEquity * (trade.weightPct / 100) * volatilityScaler * executionScaler);
+      if (requestedNotional + 1e-9 < Math.max(0, startingEquity * (trade.weightPct / 100))) {
+        sizingAdjustmentCount += 1;
+      }
+      const remainingGrossBudget = Math.max(0, grossExposureCap - runningEntryNotional);
+      const remainingSymbolBudget = Math.max(0, maxSymbolExposure - currentExposure((position) => position.symbol === trade.symbol));
+      const remainingThemeBudget = Math.max(0, maxThemeExposure - currentExposure((position) => position.themeId === trade.themeId));
+      const remainingCashBudget = sign > 0 ? Math.max(0, cash - minCashReserve) : Number.POSITIVE_INFINITY;
+      const projectedRiskFor = (candidateNotional: number) =>
+        estimatePortfolioRiskMetricsPct(
+          [...currentRiskPositions(), { symbol: trade.symbol, notional: candidateNotional }],
+          prices,
+          dayTs,
+          startingEquity,
+        );
+      const riskLimitedNotional = (() => {
+        if (!(requestedNotional > 0)) return 0;
+        const fullRisk = projectedRiskFor(requestedNotional);
+        if (
+          fullRisk.dailyVar95Pct <= riskControls.maxDailyVar95Pct + 1e-9
+          && fullRisk.dailyCvar95Pct <= riskControls.maxDailyCvar95Pct + 1e-9
+        ) {
+          return requestedNotional;
+        }
+        const varScale = fullRisk.dailyVar95Pct > 0 ? riskControls.maxDailyVar95Pct / fullRisk.dailyVar95Pct : 1;
+        const cvarScale = fullRisk.dailyCvar95Pct > 0 ? riskControls.maxDailyCvar95Pct / fullRisk.dailyCvar95Pct : 1;
+        return Math.max(0, requestedNotional * Math.min(varScale, cvarScale));
+      })();
+      const notional = Math.max(
+        0,
+        Math.min(
+          riskLimitedNotional,
+          remainingGrossBudget,
+          remainingSymbolBudget,
+          remainingThemeBudget,
+          remainingCashBudget,
+        ),
+      );
+      if (notional + 1e-9 < requestedNotional) riskGuardTriggerCount += 1;
+      if (notional <= 0) continue;
+      const executedWeightPct = startingEquity > 0
+        ? Number(((notional / startingEquity) * 100).toFixed(4))
+        : 0;
       const quantity = notional / tradeEntryPrice;
       openPositions.set(trade.id, {
         id: trade.id,
@@ -395,7 +661,7 @@ export function computePortfolioAccountingSnapshot(args: {
         direction: trade.direction,
         sign,
         role: trade.role,
-        allocatedWeightPct: trade.weightPct,
+        allocatedWeightPct: executedWeightPct,
         entryTimestamp: trade.entryTimestamp,
         exitTimestamp: trade.exitTimestamp,
         entryPrice: tradeEntryPrice,
@@ -404,6 +670,12 @@ export function computePortfolioAccountingSnapshot(args: {
         entryNotional: notional,
         tradableNow: trade.tradableNow,
       });
+      executedTrades.push({
+        ...trade,
+        entryPrice: tradeEntryPrice,
+        weightPct: executedWeightPct,
+      });
+      runningEntryNotional += Math.abs(notional);
       cash -= sign * notional;
     }
 
@@ -418,8 +690,12 @@ export function computePortfolioAccountingSnapshot(args: {
       const position = openPositions.get(trade.id);
       if (!position) continue;
       const series = prices.get(position.symbol) || [];
-      const tradeExitPrice = trade.exitPrice ?? findPriceAtOrBefore(series, dayTs)?.price ?? position.entryPrice;
+      const seriesPrice = findPriceAtOrBefore(series, dayTs)?.price ?? null;
+      const tradeExitPrice = trade.exitPrice ?? seriesPrice ?? position.entryPrice;
       if (!tradeExitPrice || !Number.isFinite(tradeExitPrice)) continue;
+      if (trade.exitPrice == null && seriesPrice == null) {
+        console.warn(`[portfolio] price gap: using entryPrice fallback for ${position.symbol} at exit (trade=${trade.id})`);
+      }
       cash += position.sign * position.quantity * tradeExitPrice;
       openPositions.delete(trade.id);
     }
@@ -429,7 +705,26 @@ export function computePortfolioAccountingSnapshot(args: {
       const price = findPriceAtOrBefore(series, dayTs)?.price ?? position.entryPrice;
       return sum + position.sign * position.quantity * price;
     }, 0);
-    const nav = cash + markEquity;
+    let nav = cash + markEquity;
+    peakNav = Math.max(peakNav, nav);
+    const currentDrawdownPct = peakNav > 0 ? ((nav / peakNav) - 1) * 100 : 0;
+    if (
+      openPositions.size > 0
+      && riskControls.drawdownGovernorPct > 0
+      && currentDrawdownPct <= -Math.abs(riskControls.drawdownGovernorPct)
+    ) {
+      const forcedMarkEquity = Array.from(openPositions.values()).reduce((sum, position) => {
+        const series = prices.get(position.symbol) || [];
+        const price = findPriceAtOrBefore(series, dayTs)?.price ?? position.entryPrice;
+        return sum + position.sign * position.quantity * price;
+      }, 0);
+      forcedExitCount += openPositions.size;
+      drawdownGovernorTriggerCount += 1;
+      cooldownActiveUntilIndex = Math.max(cooldownActiveUntilIndex, dateIndex + riskControls.drawdownCooldownDays);
+      cash += forcedMarkEquity;
+      openPositions.clear();
+      nav = cash;
+    }
     const grossExposure = Array.from(openPositions.values()).reduce((sum, position) => {
       const series = prices.get(position.symbol) || [];
       const price = findPriceAtOrBefore(series, dayTs)?.price ?? position.entryPrice;
@@ -474,15 +769,15 @@ export function computePortfolioAccountingSnapshot(args: {
     });
   }
 
-  const weightedBase = trades.reduce((sum, trade) => sum + Math.max(0, trade.weightPct || 0), 0);
+  const weightedBase = executedTrades.reduce((sum, trade) => sum + Math.max(0, trade.weightPct || 0), 0);
   const weightedReturnPct = weightedBase > 0
-    ? trades.reduce((sum, trade) => sum + (trade.weightPct * (trade.signedReturnPct || 0)), 0) / weightedBase
+    ? executedTrades.reduce((sum, trade) => sum + (trade.weightPct * (trade.signedReturnPct || 0)), 0) / weightedBase
     : 0;
   const weightedCostAdjustedReturnPct = weightedBase > 0
-    ? trades.reduce((sum, trade) => sum + (trade.weightPct * (trade.costAdjustedSignedReturnPct || 0)), 0) / weightedBase
+    ? executedTrades.reduce((sum, trade) => sum + (trade.weightPct * (trade.costAdjustedSignedReturnPct || 0)), 0) / weightedBase
     : 0;
   const weightedHitRate = weightedBase > 0
-    ? (trades.reduce((sum, trade) => sum + ((trade.costAdjustedSignedReturnPct ?? trade.signedReturnPct ?? 0) > 0 ? trade.weightPct : 0), 0) / weightedBase) * 100
+    ? (executedTrades.reduce((sum, trade) => sum + ((trade.costAdjustedSignedReturnPct ?? trade.signedReturnPct ?? 0) > 0 ? trade.weightPct : 0), 0) / weightedBase) * 100
     : 0;
 
   const navValues = equityCurve.map((point) => point.nav);
@@ -492,9 +787,10 @@ export function computePortfolioAccountingSnapshot(args: {
   const startTsFinal = asTs(equityCurve[0]?.timestamp);
   const endTsFinal = asTs(equityCurve[equityCurve.length - 1]?.timestamp);
   const years = Math.max((endTsFinal - startTsFinal) / (365.25 * 24 * 60 * 60 * 1000), 1 / 365.25);
-  const cagrPct = navValues.length > 0
+  // Guard against extreme annualization for very short periods (< 30 days)
+  const cagrPct = navValues.length > 0 && years >= 30 / 365.25
     ? (Math.pow(navValues[navValues.length - 1]! / initialCapital, 1 / years) - 1) * 100
-    : 0;
+    : totalReturnPct;
   let peak = navValues[0] || initialCapital;
   let maxDrawdown = 0;
   for (const nav of navValues) {
@@ -502,6 +798,22 @@ export function computePortfolioAccountingSnapshot(args: {
     const drawdown = peak > 0 ? (nav / peak) - 1 : 0;
     maxDrawdown = Math.min(maxDrawdown, drawdown);
   }
+  // Compute actual average period between equity curve points to correctly
+  // annualize Sharpe. Using a hardcoded sqrt(252) assumes daily data; weekly or
+  // intraday series would produce nonsensical values.
+  const curveTimestamps = equityCurve.map((point) => asTs(point.timestamp));
+  let avgPeriodDays = 1; // default: treat as daily
+  if (curveTimestamps.length >= 2) {
+    const totalSpanMs = curveTimestamps[curveTimestamps.length - 1]! - curveTimestamps[0]!;
+    avgPeriodDays = Math.max(
+      1 / 24, // floor at 1 hour to prevent sqrt explosion for intraday curves
+      totalSpanMs / (curveTimestamps.length - 1) / (24 * 60 * 60 * 1000),
+    );
+  }
+  const annualizationFactor = Math.sqrt(365 / avgPeriodDays);
+  // Risk-free rate: 4.5% annual, prorated to the actual equity curve period
+  const periodRiskFreeRate = 0.045 * (avgPeriodDays / 365);
+
   const dailyReturns: number[] = [];
   for (let index = 1; index < navValues.length; index += 1) {
     const prev = navValues[index - 1]!;
@@ -509,12 +821,16 @@ export function computePortfolioAccountingSnapshot(args: {
     if (prev <= 0 || curr <= 0) continue;
     dailyReturns.push((curr / prev) - 1);
   }
-  const meanDaily = average(dailyReturns);
-  const stdDaily = dailyReturns.length > 1
-    ? Math.sqrt(average(dailyReturns.map((value) => (value - meanDaily) ** 2)))
+  const meanPeriod = average(dailyReturns);
+  const stdPeriod = dailyReturns.length > 1
+    ? Math.sqrt(average(dailyReturns.map((value) => (value - meanPeriod) ** 2)))
     : 0;
-  const sharpeRatio = stdDaily > 0 ? (meanDaily / stdDaily) * Math.sqrt(252) : 0;
-  const volatilityPct = stdDaily > 0 ? stdDaily * Math.sqrt(252) * 100 : 0;
+  const sharpeRatio = stdPeriod > 0 ? ((meanPeriod - periodRiskFreeRate) / stdPeriod) * annualizationFactor : 0;
+  const volatilityPct = stdPeriod > 0 ? stdPeriod * annualizationFactor * 100 : 0;
+  const tailLoss = calculateTailLossPct(dailyReturns, 0.05);
+  const worstPeriodReturnPct = dailyReturns.length > 0
+    ? Number((Math.min(...dailyReturns) * 100).toFixed(2))
+    : 0;
   const avgCashPct = average(equityCurve.map((point) => point.cashPct));
   const minCashPct = equityCurve.length > 0 ? Math.min(...equityCurve.map((point) => point.cashPct)) : 0;
   const avgGrossExposurePct = average(equityCurve.map((point) => point.grossExposurePct));
@@ -532,19 +848,27 @@ export function computePortfolioAccountingSnapshot(args: {
       weightedHitRate: Number(weightedHitRate.toFixed(2)),
       cagrPct: Number(cagrPct.toFixed(2)),
       maxDrawdownPct: Number((maxDrawdown * 100).toFixed(2)),
+      worstPeriodReturnPct,
       sharpeRatio: Number(sharpeRatio.toFixed(2)),
       volatilityPct: Number(volatilityPct.toFixed(2)),
+      dailyVar95Pct: tailLoss.varPct,
+      dailyCvar95Pct: tailLoss.cvarPct,
       avgCashPct: Number(avgCashPct.toFixed(2)),
       minCashPct: Number(minCashPct.toFixed(2)),
       avgGrossExposurePct: Number(avgGrossExposurePct.toFixed(2)),
       maxGrossExposurePct: Number(maxGrossExposurePct.toFixed(2)),
       avgNetExposurePct: Number(avgNetExposurePct.toFixed(2)),
       maxConcurrentPositions,
-      tradeCount: trades.length,
+      tradeCount: executedTrades.length,
+      plannedTradeCount: plannedTrades.length,
       selectedTradeCount: selectedReturns.length,
+      sizingAdjustmentCount,
+      riskGuardTriggerCount,
+      forcedExitCount,
+      drawdownGovernorTriggerCount,
       periodsPerYear: 252,
     },
     equityCurve,
-    trades,
+    trades: executedTrades,
   };
 }
