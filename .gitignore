@@ -64,3 +64,21 @@ third_party/
 site/.vitepress/.temp/
 site/.vitepress/cache/
 site/.vitepress/dist/
+
+# Backtest/analysis result files (large, regenerable)
+.tmp-*.json
+data/alpha-validation-result.json
+data/event-impact-report.json
+data/tech-trend-report.json
+data/learned_meta_weights.json
+
+# DuckDB databases (large binary, NAS is source of truth)
+*.duckdb
+*.duckdb.wal
+
+# Persistent cache (regenerable runtime state)
+data/persistent-cache/
+
+# Codex audit trails (contains API responses)
+codex-audit/
+data/codex-audit/
