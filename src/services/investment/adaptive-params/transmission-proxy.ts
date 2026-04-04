@@ -151,21 +151,126 @@ export function estimateMarketReaction(
   return { marketStress, transmissionStrength, reactionSignificance };
 }
 
+// ---------------------------------------------------------------------------
+// Credit transmission channel
+// ---------------------------------------------------------------------------
+
+export interface CreditSpreadInput {
+  hySpread: number;          // current HY spread (bps or ratio)
+  hySpread30dAvg: number;    // 30-day average
+  igSpread: number;          // current IG spread
+  igSpread30dAvg: number;    // 30-day average
+}
+
+export function computeCreditTransmissionProxy(input: CreditSpreadInput): TransmissionProxy {
+  const { hySpread, hySpread30dAvg, igSpread, igSpread30dAvg } = input;
+
+  // Z-score: how much wider are spreads vs 30d avg
+  const hyZScore = hySpread30dAvg > 0.01
+    ? (hySpread - hySpread30dAvg) / Math.max(hySpread30dAvg * 0.1, 0.01)
+    : 0;
+  const igZScore = igSpread30dAvg > 0.01
+    ? (igSpread - igSpread30dAvg) / Math.max(igSpread30dAvg * 0.1, 0.01)
+    : 0;
+
+  // Widening spreads = stress
+  const marketStress = clamp(
+    (clamp(hyZScore, 0, 5) / 5) * 0.6 + (clamp(igZScore, 0, 5) / 5) * 0.4,
+    0, 1,
+  );
+
+  // Transmission = absolute deviation from mean
+  const transmissionStrength = clamp(
+    (Math.abs(hyZScore) / 4) * 0.55 + (Math.abs(igZScore) / 4) * 0.45,
+    0, 1,
+  );
+
+  return { marketStress, transmissionStrength, reactionSignificance: 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Positioning transmission channel
+// ---------------------------------------------------------------------------
+
+export interface PositioningInput {
+  cotNetPct: number;       // COT net positioning as % of open interest
+  cotMomentum: number;     // 1w vs 4w momentum (from signal-history-buffer)
+  putCallRatio: number;    // CBOE total put/call ratio
+  putCallZScore: number;   // 30-day z-score of put/call
+}
+
+export function computePositioningProxy(input: PositioningInput): TransmissionProxy {
+  const { cotNetPct, cotMomentum, putCallRatio, putCallZScore } = input;
+
+  // Extreme put/call = market fear = high stress
+  // Normal PC ratio ~0.7-0.9, extreme >1.2
+  const pcStress = clamp((putCallRatio - 0.7) / 0.8, 0, 1);
+  const pcZStress = clamp(putCallZScore / 3, 0, 1);
+
+  const marketStress = clamp(pcStress * 0.5 + pcZStress * 0.5, 0, 1);
+
+  // COT extremes = institutions are positioned = transmission is active
+  const cotExtreme = clamp(Math.abs(cotNetPct) / 30, 0, 1); // ±30% as max
+  const cotMom = clamp(Math.abs(cotMomentum), 0, 1);
+
+  const transmissionStrength = clamp(
+    cotExtreme * 0.6 + cotMom * 0.4,
+    0, 1,
+  );
+
+  return { marketStress, transmissionStrength, reactionSignificance: 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Combined 4-channel transmission
+// ---------------------------------------------------------------------------
+
+export interface CombineProxiesOptions {
+  gdelt?: TransmissionProxy | null;
+  priceReaction?: TransmissionProxy | null;
+  credit?: TransmissionProxy | null;
+  positioning?: TransmissionProxy | null;
+}
+
 /**
- * Combine GDELT proxy and price-based reaction into a single transmission estimate.
+ * Combine up to 4 transmission channels into a single estimate.
+ * Channels that are null/undefined are excluded and weights rebalanced.
  */
 export function combineTransmissionProxies(
   gdelt: TransmissionProxy,
   priceReaction: TransmissionProxy,
+  options?: { credit?: TransmissionProxy | null; positioning?: TransmissionProxy | null },
 ): TransmissionProxy {
-  // Weighted average: price reaction is more direct evidence
+  const channels: { proxy: TransmissionProxy; stressW: number; txW: number }[] = [
+    { proxy: gdelt, stressW: 0.20, txW: 0.20 },
+    { proxy: priceReaction, stressW: 0.35, txW: 0.35 },
+  ];
+
+  if (options?.credit) {
+    channels.push({ proxy: options.credit, stressW: 0.25, txW: 0.25 });
+  }
+  if (options?.positioning) {
+    channels.push({ proxy: options.positioning, stressW: 0.20, txW: 0.20 });
+  }
+
+  // Rebalance weights to sum to 1
+  const totalStressW = channels.reduce((s, c) => s + c.stressW, 0);
+  const totalTxW = channels.reduce((s, c) => s + c.txW, 0);
+
+  let marketStress = 0;
+  let transmissionStrength = 0;
+  let maxReaction = 0;
+
+  for (const ch of channels) {
+    marketStress += ch.proxy.marketStress * (ch.stressW / totalStressW);
+    transmissionStrength += ch.proxy.transmissionStrength * (ch.txW / totalTxW);
+    maxReaction = Math.max(maxReaction, ch.proxy.reactionSignificance);
+  }
+
   return {
-    marketStress: clamp(gdelt.marketStress * 0.4 + priceReaction.marketStress * 0.6, 0, 1),
-    transmissionStrength: clamp(gdelt.transmissionStrength * 0.35 + priceReaction.transmissionStrength * 0.65, 0, 1),
-    reactionSignificance: clamp(
-      Math.max(gdelt.reactionSignificance, priceReaction.reactionSignificance),
-      0, 1,
-    ),
+    marketStress: clamp(marketStress, 0, 1),
+    transmissionStrength: clamp(transmissionStrength, 0, 1),
+    reactionSignificance: clamp(maxReaction, 0, 1),
   };
 }
 

@@ -1,4 +1,5 @@
 import type { InvestmentIdeaCard } from '../types';
+import type { SignalHistoryReader } from './signal-history-buffer';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,6 +41,22 @@ export interface MLFeatureVector {
   transmissionStress: number;
   volatilityRegime: number;
 
+  // Temporal features (8) — derived from signal-history-buffer
+  vixMomentum: number;            // 1d vs 7d VIX momentum
+  vixZScore: number;              // 30d z-score of VIX
+  stressMomentum: number;         // 1d vs 7d marketStress momentum
+  stressZScore: number;           // 30d z-score of marketStress
+  transmissionMomentum: number;   // 1d vs 7d transmissionStrength momentum
+  yieldSpreadMomentum: number;    // 7d vs 30d yield spread momentum
+  hawkesMomentum: number;         // short/mid Hawkes lambda ratio
+  hawkesTrend: number;            // mid/long Hawkes lambda ratio
+
+  // External data features (4) — credit, positioning, supply chain, geopolitical
+  creditStress: number;           // credit transmission proxy marketStress [0,1]
+  positioningSignal: number;      // positioning proxy transmissionStrength [0,1]
+  bdiMomentum: number;            // BDI 7d vs 30d momentum [0,1]
+  gprLevel: number;               // GPR proxy or official GPR [0,1]
+
   // Interaction features (4)
   confidenceXreality: number;
   transferXcluster: number;
@@ -52,7 +69,7 @@ export interface MLFeatureVector {
 // ---------------------------------------------------------------------------
 
 export const MLFeatureNames: string[] = [
-  // Signal
+  // Signal (13)
   'confidence',
   'confirmation',
   'reality',
@@ -66,14 +83,28 @@ export const MLFeatureNames: string[] = [
   'driftPenalty',
   'clusterConfidence',
   'evidenceSupport',
-  // Context
+  // Context (6)
   'marketStress',
   'regimeState',
   'shadowPenalty',
   'narrativeAlignment',
   'transmissionStress',
   'volatilityRegime',
-  // Interaction
+  // Temporal (8)
+  'vixMomentum',
+  'vixZScore',
+  'stressMomentum',
+  'stressZScore',
+  'transmissionMomentum',
+  'yieldSpreadMomentum',
+  'hawkesMomentum',
+  'hawkesTrend',
+  // External data (4)
+  'creditStress',
+  'positioningSignal',
+  'bdiMomentum',
+  'gprLevel',
+  // Interaction (4)
   'confidenceXreality',
   'transferXcluster',
   'coverageXfp',
@@ -84,7 +115,7 @@ export const MLFeatureNames: string[] = [
 // Feature extraction
 // ---------------------------------------------------------------------------
 
-interface ExtractMLFeaturesParams {
+export interface ExtractMLFeaturesParams {
   card: InvestmentIdeaCard;
   macroOverlay: { state: string; killSwitch: boolean };
   transmissionStress: number;
@@ -100,6 +131,15 @@ interface ExtractMLFeaturesParams {
     dollarIndex?: number;   // trade-weighted dollar (typically 90-120)
     oilPrice?: number;      // WTI crude (typically 20-120)
   } | null;
+  /** Optional signal history for temporal features (Phase 0) */
+  signalHistory?: SignalHistoryReader | null;
+  /** Optional multi-window Hawkes result */
+  hawkesMultiWindow?: { momentum: number; trend: number } | null;
+  /** Optional external data features (Phase 2) */
+  creditProxy?: { marketStress: number; transmissionStrength: number } | null;
+  positioningProxy?: { marketStress: number; transmissionStrength: number } | null;
+  bdiMomentum?: number | null;
+  gprLevel?: number | null;
 }
 
 function regimeStateValue(state: string): number {
@@ -182,6 +222,52 @@ export function extractMLFeatures(params: ExtractMLFeaturesParams): MLFeatureVec
     ? clamp((macro.vix - 12) / 50, 0, 1)   // VIX 12→0, 62→1
     : clamp(1 - safe(card.timeDecayWeight, 1), 0, 1);
 
+  // ---- Temporal features (from signal-history-buffer, fallback to 0.5 neutral) ----
+
+  const sh = params.signalHistory;
+
+  const vixMomentum = sh?.hasData?.('vix', 7)
+    ? clamp(sh.getMomentum('vix', 1, 7), -2, 2) / 4 + 0.5   // [-2,2] → [0,1]
+    : 0.5;
+  const vixZScore = sh?.hasData?.('vix', 30)
+    ? clamp(sh.getZScore('vix', 30), -3, 3) / 6 + 0.5        // [-3,3] → [0,1]
+    : 0.5;
+  const stressMomentum = sh?.hasData?.('marketStress', 7)
+    ? clamp(sh.getMomentum('marketStress', 1, 7), -2, 2) / 4 + 0.5
+    : 0.5;
+  const stressZScore = sh?.hasData?.('marketStress', 30)
+    ? clamp(sh.getZScore('marketStress', 30), -3, 3) / 6 + 0.5
+    : 0.5;
+  const transmissionMomentum = sh?.hasData?.('transmissionStrength', 7)
+    ? clamp(sh.getMomentum('transmissionStrength', 1, 7), -2, 2) / 4 + 0.5
+    : 0.5;
+  const yieldSpreadMomentum = sh?.hasData?.('yieldSpread', 30)
+    ? clamp(sh.getMomentum('yieldSpread', 7, 30), -2, 2) / 4 + 0.5
+    : 0.5;
+
+  const hw = params.hawkesMultiWindow;
+  const hawkesMomentum = hw != null
+    ? clamp(hw.momentum, 0, 5) / 5        // [0,5] → [0,1]
+    : 0.5;
+  const hawkesTrend = hw != null
+    ? clamp(hw.trend, 0, 5) / 5
+    : 0.5;
+
+  // ---- External data features (Phase 2, fallback to 0.5 neutral) ----
+
+  const creditStress = params.creditProxy != null
+    ? clamp(params.creditProxy.marketStress, 0, 1)
+    : 0.5;
+  const positioningSignal = params.positioningProxy != null
+    ? clamp(params.positioningProxy.transmissionStrength, 0, 1)
+    : 0.5;
+  const bdiMomentum = params.bdiMomentum != null
+    ? clamp(params.bdiMomentum, -2, 2) / 4 + 0.5  // [-2,2] → [0,1]
+    : 0.5;
+  const gprLevel = params.gprLevel != null
+    ? clamp(params.gprLevel, 0, 1)
+    : 0.5;
+
   // ---- Interaction features (products of [0,1] values) ----
 
   const confidenceXreality = confidence * reality;
@@ -209,6 +295,18 @@ export function extractMLFeatures(params: ExtractMLFeaturesParams): MLFeatureVec
     narrativeAlignment,
     transmissionStress,
     volatilityRegime,
+    vixMomentum,
+    vixZScore,
+    stressMomentum,
+    stressZScore,
+    transmissionMomentum,
+    yieldSpreadMomentum,
+    hawkesMomentum,
+    hawkesTrend,
+    creditStress,
+    positioningSignal,
+    bdiMomentum,
+    gprLevel,
     confidenceXreality,
     transferXcluster,
     coverageXfp,
@@ -241,6 +339,18 @@ export function featureVectorToArray(v: MLFeatureVector): number[] {
     v.narrativeAlignment,
     v.transmissionStress,
     v.volatilityRegime,
+    v.vixMomentum,
+    v.vixZScore,
+    v.stressMomentum,
+    v.stressZScore,
+    v.transmissionMomentum,
+    v.yieldSpreadMomentum,
+    v.hawkesMomentum,
+    v.hawkesTrend,
+    v.creditStress,
+    v.positioningSignal,
+    v.bdiMomentum,
+    v.gprLevel,
     v.confidenceXreality,
     v.transferXcluster,
     v.coverageXfp,

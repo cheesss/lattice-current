@@ -29,8 +29,7 @@ import { buildCoverageLedgerFromMappings } from './coverage-ledger';
 import { getActiveWeightProfileSync } from './experiment-registry';
 import { optimizeAdmissionThresholds } from './investment/adaptive-params/threshold-optimizer.js';
 import type { AdmissionThresholds } from './investment/adaptive-params/threshold-optimizer.js';
-import { createInitialMLState, extractMLTrainingSamples, trainEnsembleModels, buildPreTrainingQuery, convertPreTrainingRows, type MLWalkForwardState } from './investment/adaptive-params/ml-walk-forward.js';
-import { computeCPCV, permutationTest as runPermutationTest } from './investment/adaptive-params/cpcv.js';
+// ML walk-forward and CPCV removed — moved to legacy/backtest branch
 import { knnPredictionFromRagCases, type KNNPrediction } from './investment/adaptive-params/embedding-knn.js';
 import { computeGDELTTransmissionProxy, type GDELTDailyAgg, type TransmissionProxy } from './investment/adaptive-params/transmission-proxy.js';
 import {
@@ -1225,33 +1224,12 @@ function buildReplayGovernanceSummary(args: {
     return { state: 'shadow', score: Number(score.toFixed(2)), reasons } satisfies ReplayPromotionDecision;
   })();
 
-  // Real CPCV (López de Prado method)
-  let cpcvReal: ReplayGovernanceSummary['cpcvReal'] = null;
-  let permTestResult: ReplayGovernanceSummary['permutationTest'] = null;
-  if (foldMetrics.length >= 3) {
-    const foldReturnArrays = args.evaluationRuns.map(run => {
-      const curve = run.portfolioAccounting?.equityCurve;
-      if (!Array.isArray(curve)) return [];
-      return curve.map(p => Number(p.realizedReturnPct ?? 0) / 100).filter(v => Number.isFinite(v));
-    });
-    try {
-      const realCpcv = computeCPCV(foldReturnArrays, 5);
-      cpcvReal = { pbo: realCpcv.pbo, oosRankMedian: realCpcv.oosRankMedian, logitPBO: realCpcv.logitPBO, pathCount: realCpcv.pathCount };
-    } catch { /* skip on error */ }
-  }
-  if (realizedSeries.length >= 20) {
-    try {
-      const pt = runPermutationTest(realizedSeries, 200);
-      permTestResult = { observedSharpe: pt.observedSharpe, pValue: pt.pValue, nPermutations: pt.nPermutations };
-    } catch { /* skip on error */ }
-  }
-
   return {
     cpcv,
     dsr,
     pbo,
-    cpcvReal,
-    permutationTest: permTestResult,
+    cpcvReal: null,
+    permutationTest: null,
     promotion,
   };
 }
@@ -2045,7 +2023,7 @@ async function executeReplay(args: {
   seedState?: HistoricalReplayOptions['seedState'];
   windows?: WalkForwardWindow[];
   admissionThresholds?: AdmissionThresholds | null;
-  ensembleModels?: import('./investment/adaptive-params/ensemble-predictor').EnsembleModels | null;
+  ensembleModels?: unknown | null;
   mlNormalization?: { mean: number[]; std: number[] } | null;
 }): Promise<HistoricalReplayRun> {
   await ensureLoaded();
@@ -2925,25 +2903,6 @@ export async function runWalkForwardBacktest(
       const ideaRuns: BacktestIdeaRun[] = [];
       const forwardReturns: ForwardReturnRecord[] = [];
       let learnedThresholds: AdmissionThresholds | null = null;
-      let mlState: MLWalkForwardState = createInitialMLState();
-
-      // Pre-train ML models from labeled_outcomes (618k historical labels)
-      if (tuningFrames.length > 0) {
-        try {
-          const ragMod = await import('./investment/rag-retriever.js').catch(() => null);
-          const pool = (ragMod as { getRagPool?: () => { query: (t: string, v: (string | number)[]) => Promise<{ rows: unknown[] }> } | null } | null)?.getRagPool?.();
-          if (pool) {
-            const temporalBarrier = tuningFrames[0]?.timestamp ?? '';
-            const preQuery = buildPreTrainingQuery(temporalBarrier, 15000);
-            const preResult = await pool.query(preQuery.text, preQuery.values);
-            const preSamples = convertPreTrainingRows(preResult.rows as Parameters<typeof convertPreTrainingRows>[0]);
-            if (preSamples.length > 100) {
-              mlState = trainEnsembleModels(mlState, preSamples);
-              process.stderr.write(`[walk-forward:ml] Pre-trained on ${preSamples.length} labeled_outcomes (before ${temporalBarrier.slice(0, 10)})\n`);
-            }
-          }
-        } catch { /* pre-training is non-fatal */ }
-      }
 
       for (const [index, plan] of foldPlans.entries()) {
         const validateWindow = plan.evaluationWindows.find((window) => window.phase === 'validate') || null;
@@ -2995,12 +2954,6 @@ export async function runWalkForwardBacktest(
         }
         learnedThresholds = optimizeAdmissionThresholds(buildThresholdOptimizationSamples(validateRun));
 
-        // ── ML ensemble training (Phase 2) ──
-        {
-          const mlSamples = extractMLTrainingSamples(validateRun.ideaRuns, validateRun.forwardReturns);
-          mlState = trainEnsembleModels(mlState, mlSamples);
-        }
-
         if (testFrames.length > 0) {
           const testRun = await executeReplay({
             mode: 'walk-forward',
@@ -3017,8 +2970,8 @@ export async function runWalkForwardBacktest(
             recordAdaptation: false,
             investmentContext: options.investmentContext,
             admissionThresholds: learnedThresholds,
-            ensembleModels: mlState.ensemble,
-            mlNormalization: mlState.normalization,
+            ensembleModels: null,
+            mlNormalization: null,
           });
           evaluationRuns.push(testRun);
           evaluationFrames.push(...testFrames);
@@ -3056,11 +3009,6 @@ export async function runWalkForwardBacktest(
           investmentContext: options.investmentContext,
           admissionThresholds: learnedThresholds,
         });
-        // Re-train ML on full tuning data for final holdout evaluation
-        {
-          const finalMlSamples = extractMLTrainingSamples(finalTrainRun.ideaRuns, finalTrainRun.forwardReturns);
-          mlState = trainEnsembleModels(mlState, finalMlSamples);
-        }
         const lockedOosRun = await executeReplay({
           mode: 'walk-forward',
           label: `${label} / locked-oos`,
@@ -3076,8 +3024,8 @@ export async function runWalkForwardBacktest(
           recordAdaptation: false,
           investmentContext: options.investmentContext,
           admissionThresholds: learnedThresholds,
-          ensembleModels: mlState.ensemble,
-          mlNormalization: mlState.normalization,
+          ensembleModels: null,
+          mlNormalization: null,
         });
         lockedOosSummary = {
           frameCount: holdoutFrames.length,

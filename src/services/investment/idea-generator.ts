@@ -59,7 +59,7 @@ import { getMappingStats, getBanditState } from './idea-tracker';
 import { findSourceCredibility, inferRegion, reasonCountsFromMap, extractGraphTerms } from './normalizers';
 import { predictHitProbability } from './adaptive-params/weight-learner.js';
 import type { MetaWeights } from './adaptive-params/weight-learner.js';
-import { ensemblePredict } from './adaptive-params/ensemble-predictor.js';
+// ensemble-predictor removed — moved to legacy/backtest branch
 import type { KNNPrediction } from './adaptive-params/embedding-knn.js';
 import type { TransmissionProxy } from './adaptive-params/transmission-proxy.js';
 import { getSignificantPatterns } from '../pattern-discovery';
@@ -2206,7 +2206,7 @@ function applyMetaTradeAdmission(
     ragHitRate?: number | null;
     ragConfidence?: number;
     admissionThresholds?: ThemeAdmissionPolicy | null;
-    ensembleModels?: import('./adaptive-params/ensemble-predictor').EnsembleModels | null;
+    ensembleModels?: unknown | null;
     mlNormalization?: { mean: number[]; std: number[] } | null;
     knnPrediction?: KNNPrediction | null;
     gdeltProxy?: TransmissionProxy | null;
@@ -2376,31 +2376,8 @@ function applyMetaTradeAdmission(
     - shadowPenalty * 16
   ).toFixed(2));
 
-  // ── Continuous Conviction Score (Phase 1+2) ─────────────────
-  // Uses ML ensemble when available, otherwise falls back to weighted formula.
-  let continuousConviction: number;
-  const ensembleModels = options?.ensembleModels;
-  if (ensembleModels && (ensembleModels.elasticNet || ensembleModels.gbm || ensembleModels.bayesian)) {
-    // Unified 10-feature vector — identical to pre-training features
-    const themeStr = (card.themeId ?? '').toLowerCase();
-    // Source detection: 95% of articles are Guardian, so default to guardian=1
-    // In walk-forward, exact source isn't tracked per card, but Guardian dominates the dataset
-    const featureArray = [
-      1, // source_guardian (dominant source in dataset)
-      0, // source_nyt
-      themeStr === 'conflict' || themeStr.includes('defense') || themeStr.includes('escalation') ? 1 : 0,
-      themeStr === 'tech' || themeStr.includes('semiconductor') || themeStr.includes('cyber') ? 1 : 0,
-      themeStr === 'energy' || themeStr.includes('oil') || themeStr.includes('gas') ? 1 : 0,
-      themeStr === 'economy' || themeStr.includes('inflation') || themeStr.includes('trade') ? 1 : 0,
-      themeStr === 'politics' || themeStr.includes('sanction') || themeStr.includes('tariff') ? 1 : 0,
-      marketStressPrior,
-      transmissionStress,
-      clamp(card.conviction / 100, 0, 1),
-    ];
-    const prediction = ensemblePredict(ensembleModels, featureArray, options?.knnPrediction ?? null);
-    continuousConviction = clamp(prediction.continuousConviction, 0, 100);
-  } else {
-    continuousConviction = clamp(
+  // ── Continuous Conviction Score ─────────────────
+  const continuousConviction = clamp(
       metaHitProbability * 45
       + Math.max(0, metaExpectedReturnPct) * 8
       + (metaDecisionScore / 100) * 35
@@ -2408,7 +2385,6 @@ function applyMetaTradeAdmission(
       0,
       100,
     );
-  }
 
   const thresholdPolicy = options?.admissionThresholds ?? themePolicy?.admission;
   // Legacy threshold variables — retained for threshold-optimizer integration (Phase 2).
@@ -2480,7 +2456,7 @@ export function buildIdeaCards(
     ragHitRate?: number | null;
     ragConfidence?: number;
     admissionThresholds?: ThemeAdmissionPolicy | null;
-    ensembleModels?: import('./adaptive-params/ensemble-predictor').EnsembleModels | null;
+    ensembleModels?: unknown | null;
     mlNormalization?: { mean: number[]; std: number[] } | null;
     knnPrediction?: KNNPrediction | null;
     gdeltProxy?: TransmissionProxy | null;
