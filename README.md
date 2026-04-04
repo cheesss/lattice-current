@@ -1,6 +1,6 @@
 # Lattice Current
 
-Signal workspace for live risk, markets, infrastructure, and replay-driven research.
+Signal workspace for live risk, infrastructure, markets, and operator decision support.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -14,53 +14,55 @@ Lattice Current is a public research fork of a multi-variant intelligence platfo
 - AI-assisted summaries, deduction, and Q&A
 - map-based geopolitical, infrastructure, and market visualization
 - ontology and graph-based relation analysis
-- event-to-market transmission modeling
-- historical replay, walk-forward backtesting, and investment idea support
+- event and transmission analysis
+- replay and historical validation surfaces used to calibrate signal quality
 
-## What It Looks Like Now
+## Current direction
 
-Recent work shifted the project away from a classic "wall of panels" monitor toward a more deliberate workspace model:
+The main branch has shifted away from a backtest-first product identity.
 
-- `Live Workspace`: prioritized live signals instead of fully expanded raw news walls
-- `Briefing Desk`: decision briefs, current regime posture, and operational summaries
-- `Research Desk`: Codex-assisted research, automation governance, and candidate review
-- `Replay Studio`: web-runnable replay, walk-forward, data-pipeline visibility, and result interpretation
-- `Graph Studio`: ontology and relationship surfaces for structured reasoning
-- `Data Flow Ops`: freshness, lag, storage, retention, and pipeline health in one place
+The current emphasis is:
 
-The current codebase also includes shared persistence for intelligence fabric, browser-mode replay controls, portfolio accounting, regime-aware sizing, and coverage-aware historical reuse.
+- live signal intake
+- canonical event resolution
+- evidence quality and transmission analysis
+- operator-facing decision support
+- replay and NAS-backed historical validation as secondary calibration layers
 
-The same repository powers multiple variants:
+The heavy backtest-ML modules were removed from the main branch and preserved on `legacy/backtest`.
+
+## Workspace surfaces
+
+- `Live Workspace`: prioritized live signals instead of raw feed walls
+- `Briefing Desk`: decision briefs, current posture, and summary surfaces
+- `Research Desk`: graph, ontology, automation, and operator research workflow
+- `Replay Studio`: historical validation and storage sanity checks
+- `Data Flow Ops`: freshness, lag, storage, retention, and pipeline health
+
+The same repository still powers multiple variants:
 
 - `full`: geopolitics, conflict, infrastructure, intelligence
 - `tech`: AI, startups, cloud, cyber, technology ecosystems
 - `finance`: markets, macro, central banks, commodities, cross-asset analysis
 
-## Public Surfaces
-
-- Repository: `https://github.com/cheesss/lattice-current`
-- GitHub Pages docs: `https://cheesss.github.io/lattice-current/`
-
-No official hosted application deployment is represented by this fork. If you want a live surface, deploy your own instance from this repository.
-
 ## Highlights
 
 - Real-time monitoring across curated feeds, strategic assets, and market data
-- AI and statistical analysis layers for summaries, trend detection, and risk scoring
-- Ontology graph, transmission graph, and historical replay/backtest tooling
+- AI and statistical analysis layers for summaries, trend detection, and evidence handling
+- Ontology graph, transmission graph, and historical validation tooling
 - Desktop runtime with Tauri sidecar, local services, and offline-capable workflows
 - Single codebase with variant-aware data, panels, and build targets
 
-## Current Capability Areas
+## Capability areas
 
 - Signal intake: live feeds, OSINT, macro, market, and conflict-oriented datasets
-- Evidence handling: shared intelligence fabric, snapshot persistence, and data quality operations
+- Evidence handling: event resolution, source quality, and data quality operations
 - Research workflow: Codex-assisted expansion, automation governance, ontology and graph views
-- Replay workflow: historical fetch/import, replay, walk-forward, current-like checks, and portfolio accounting
-- Decision support: replay-backed briefs, defensive bias interpretation, and deployment guidance
+- Validation workflow: historical fetch/import, replay, and loader/storage verification
+- Decision support: operator briefs, transmission interpretation, and guarded recommendations
 - Operations: scheduler loops, pipeline heartbeats, retention, and blocker visibility
 
-## Repository Structure
+## Repository structure
 
 - `src/`: app shell, panels, services, analysis logic
 - `server/`: API handlers and domain services
@@ -69,7 +71,7 @@ No official hosted application deployment is represented by this fork. If you wa
 - `site/`: GitHub Pages documentation site
 - `scripts/`: build, packaging, and historical data tooling
 
-## Getting Started
+## Getting started
 
 ```bash
 npm install
@@ -95,16 +97,16 @@ npm run public:sync
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Algorithms: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 - AI and intelligence: [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md)
-- Investment usage: [docs/investment-usage-playbook.md](docs/investment-usage-playbook.md)
+- Decision-support playbook: [docs/investment-usage-playbook.md](docs/investment-usage-playbook.md)
 - Public sync workflow: [docs/public-sync.md](docs/public-sync.md)
 
-## Naming Note
+## Naming note
 
 This repository is branded as `Lattice Current`.
 
 Some deep technical documents and inherited storage keys still contain older internal identifiers. They reflect implementation lineage, not the public product name of this fork.
 
-## Licensing and Content Policy
+## Licensing and content policy
 
 The repository uses separate policies for code and content:
 
@@ -114,32 +116,11 @@ The repository uses separate policies for code and content:
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Trademarks: [TRADEMARKS.md](TRADEMARKS.md)
 
-Important:
-
-- source code is open under AGPL-3.0-only
-- third-party news content is not redistributed in full
-- screenshots and public docs should use sanitized examples
-- internal operational details, credentials, private feeds, and bypass techniques are intentionally omitted from public docs
-
-## Contribution Rule
+## Contribution rule
 
 If a change affects user-facing behavior, public APIs, product capabilities, or workflows, update either:
 
 - a feature page, or
-- an update/release note
+- an update note
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution expectations.
-
-## Public Repo Sync
-
-The repository includes a public-sync workflow for mirroring curated changes into a publication clone:
-
-```bash
-npm run public:sync
-```
-
-Use the dry run first when release changes touch docs, public assets, or publication policy:
-
-```bash
-npm run public:sync:dry
-```

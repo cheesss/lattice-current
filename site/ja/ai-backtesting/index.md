@@ -1,42 +1,55 @@
-﻿---
-title: AI・バックテスト
-summary: AI 層、投資ロジック、リプレイエンジンがどのように連携するかを説明します。
+---
+title: Signal Evaluation
+summary: AI、シグナル解釈、判断支援、リプレイ検証の関係を説明します。
 status: beta
 variants:
   - full
   - tech
   - finance
-updated: 2026-03-15
+updated: 2026-04-05
 owner: core
 ---
 
-# AI・バックテスト
+# Signal Evaluation
 
-このセクションでは、AI、投資ロジック、リプレイをどう統合しているかを説明する文書をまとめています。
+このセクションは、現在のブランチで AI、シグナル解釈、判断支援、リプレイ検証がどう結び付いているかを説明する文書をまとめます。
 
-## 主要アーティファクト
+## Core artifacts
 
-- [AI / バックテスト統合分析](https://github.com/cheesss/lattice-current/blob/main/docs/ai_backtest_analysis.md)
-- [改善計画: 60 の具体項目](https://github.com/cheesss/lattice-current/blob/main/docs/improvement_plan_60_points.md)
-- [UX / 可視化改善案](https://github.com/cheesss/lattice-current/blob/main/docs/ux_visualization_improvements.md)
-- [投資活用プレイブック](https://github.com/cheesss/lattice-current/blob/main/docs/investment-usage-playbook.md)
+- [ドキュメント索引](https://github.com/cheesss/lattice-current/blob/main/docs/DOCUMENTATION.md)
+- [アルゴリズム](https://github.com/cheesss/lattice-current/blob/main/docs/ALGORITHMS.md)
+- [AI Intelligence](https://github.com/cheesss/lattice-current/blob/main/docs/AI_INTELLIGENCE.md)
+- [判断支援プレイブック](https://github.com/cheesss/lattice-current/blob/main/docs/investment-usage-playbook.md)
+- [Temporal feature upgrade status](https://github.com/cheesss/lattice-current/blob/main/docs/TEMPORAL_FEATURE_UPGRADE_2026-04-05.md)
 
-## 統合フロー
+## Integrated flow
 
-1. ライブフィードと構造化サービスが現在のスナップショットを作る
-2. AI とグラフ層が証拠に基づくコンテキストを作る
-3. 投資ロジックがテーマを資産にマッピングしてアイデア候補を作る
-4. リプレイとウォークフォワード・バックテストが時間を通じて評価する
-5. 学習された prior が再びライブ意思決定支援に戻る
+1. live feeds and structured services create a current snapshot
+2. AI, event resolution, and graph layers build evidence-grounded context
+3. 判断支援ロジックがシグナルを候補に変換する
+4. リプレイと履歴検証がその候補の妥当性を確認する
+5. 検証結果が証拠品質と admission 品質を補正する
 
-## 現在の制限
+## Public mock workbench
 
-- 一部の確率レイヤーは実用上の近似に留まる
-- リプレイ品質は point-in-time データの完全性に依存する
-- learned sizing は adaptive prior と hard guardrail を混ぜている
+The public docs include a click-through mock replay workbench. It is not connected to private feeds, but it mirrors the product structure.
 
-## 次に読むページ
+- point-in-time datasets
+- replay and scenario comparison
+- operator decision posture
+- hot / warm / cold storage lifecycle
 
-- [アルゴリズム](/ja/algorithms)
-- [アーキテクチャ](/ja/architecture)
-- [機能 / 投資・リプレイ](/ja/features/investment-replay)
+<ReplayScenarioWorkbench locale="ja" />
+
+## Current limits
+
+- いくつかの確率レイヤーはまだ実用的近似です
+- リプレイ品質は point-in-time データの完全性に依存します
+- 現在の main ブランチは完全自動売買スタックではありません
+
+## Read next
+
+- [Algorithms](/ja/algorithms)
+- [Architecture](/ja/architecture)
+- [Features / Investment & Replay](/ja/features/investment-replay)
+- [Operations Console](/ja/playground)
