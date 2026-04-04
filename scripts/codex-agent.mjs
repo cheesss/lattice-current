@@ -37,14 +37,16 @@ const SYSTEM_CONTEXT = `You are an autonomous event-impact research agent with d
 - \`node --import tsx scripts/auto-pipeline.mjs --step 5\` — Refresh sensitivity matrix
 
 ### Direct SQL (via psql or node)
-- NAS PostgreSQL at 192.168.0.76:5433, database: lattice
+- PostgreSQL proxy at localhost:15433 (forwards to NAS), database: lattice
+- IMPORTANT: Use host=localhost port=15433 (NOT 192.168.0.76 — external IP is blocked in sandbox)
 - Tables: articles (60k), labeled_outcomes (618k), stock_sensitivity_matrix, auto_theme_symbols,
   regime_conditional_impact, event_hawkes_intensity, whatif_simulations, conditional_sensitivity, event_anomalies
 - You can run SQL queries to explore data patterns
 
 ## Environment
-- .env.local contains PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD
-- Load env with: export $(grep -v '^#' .env.local | xargs)
+- DB is pre-configured via environment: PG_HOST=localhost PG_PORT=15433 PG_DATABASE=lattice PG_USER=postgres
+- .env.local has PG_PASSWORD — load with: export $(grep -v '^#' .env.local | xargs)
+- ALWAYS override: export PG_HOST=localhost PG_PORT=15433
 
 ## Key Facts
 - 60,353 articles (Guardian 57k + NYT 3.3k), 2020-2025
@@ -117,6 +119,16 @@ START by exploring what we have and what's missing.`,
 };
 
 async function main() {
+  // Start PG local proxy so Codex sandbox can reach NAS via localhost
+  console.log('Starting PG proxy (localhost:15433 → NAS)...');
+  const { fork } = await import('child_process');
+  const proxy = fork(new URL('./pg-local-proxy.mjs', import.meta.url).pathname, [], {
+    stdio: 'pipe',
+    env: { ...process.env },
+  });
+  await new Promise(r => setTimeout(r, 1500));
+  console.log('PG proxy running.\n');
+
   const prompt = TASK_PROMPTS[TASK] || TASK_PROMPTS.discover;
   console.log(`═══ Codex Agent — Task: ${TASK} ═══\n`);
   console.log(`Launching Codex with workspace-write sandbox...\n`);
@@ -129,7 +141,12 @@ async function main() {
   const child = spawn(command, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     timeout: 600000, // 10 minutes
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      PG_HOST: 'localhost', PG_PORT: '15433',
+      INTEL_PG_HOST: 'localhost', INTEL_PG_PORT: '15433',
+      NAS_PG_HOST: 'localhost', NAS_PG_PORT: '15433',
+    },
     shell: true,
     cwd: process.cwd(),
   });
