@@ -47,6 +47,7 @@ import {
   InvestmentIdeasPanel,
   BacktestLabPanel,
   ResourceProfilerPanel,
+  EventIntelligencePanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { PositiveNewsFeedPanel } from '@/components/PositiveNewsFeedPanel';
@@ -62,6 +63,7 @@ import { focusInvestmentOnMap } from '@/services/investments-focus';
 import { buildDataQASnapshot } from '@/services/data-qa';
 import { getFabricBackedRuntimeView } from '@/services/intelligence-fabric';
 import { signalAggregator, type RegionalConvergence } from '@/services/signal-aggregator';
+import { getDensityMode, isPanelVisibleInDensity, onDensityChange, DENSITY_MODES } from '@/services/density-mode';
 import { debounce, saveToStorage } from '@/utils';
 import { escapeHtml } from '@/utils/sanitize';
 import {
@@ -115,6 +117,7 @@ export class PanelLayoutManager implements AppModule {
   private panelDragCleanupHandlers: Array<() => void> = [];
   private criticalBannerEl: HTMLElement | null = null;
   private readonly applyTimeRangeFilterDebounced: () => void;
+  private densityUnsubscribe: (() => void) | null = null;
 
   constructor(ctx: AppContext, callbacks: PanelLayoutCallbacks) {
     this.ctx = ctx;
@@ -126,9 +129,16 @@ export class PanelLayoutManager implements AppModule {
 
   init(): void {
     this.renderLayout();
+    // Re-apply panel visibility when density mode changes
+    this.densityUnsubscribe = onDensityChange(() => {
+      this.applyPanelSettings();
+      this.updateDensityToggleUI();
+    });
   }
 
   destroy(): void {
+    this.densityUnsubscribe?.();
+    this.densityUnsubscribe = null;
     this.ctx.analysisHubPage?.destroy();
     this.ctx.analysisHubPage = null;
     this.ctx.codexHubPage?.destroy();
@@ -215,6 +225,28 @@ export class PanelLayoutManager implements AppModule {
           </div>
         </div>
         <div class="header-right">
+          <div class="header-hub-quicknav" aria-label="Desk shortcuts">
+            <button class="hub-toggle-btn" id="analysisHubBtn" title="${APP_BRAND.hubs.analysis}">
+              <span class="hub-toggle-icon">A</span>
+              <span class="hub-toggle-label">${APP_BRAND.hubs.analysis}</span>
+            </button>
+            <button class="hub-toggle-btn" id="codexHubBtn" title="${APP_BRAND.hubs.codex}">
+              <span class="hub-toggle-icon">C</span>
+              <span class="hub-toggle-label">${APP_BRAND.hubs.codex}</span>
+            </button>
+            <button class="hub-toggle-btn" id="backtestHubBtn" title="${APP_BRAND.hubs.backtest}">
+              <span class="hub-toggle-icon">R</span>
+              <span class="hub-toggle-label">${APP_BRAND.hubs.backtest}</span>
+            </button>
+            <button class="hub-toggle-btn" id="ontologyGraphBtn" title="${APP_BRAND.hubs.ontology}">
+              <span class="hub-toggle-icon">G</span>
+              <span class="hub-toggle-label">${APP_BRAND.hubs.ontology}</span>
+            </button>
+          </div>
+          <button class="density-toggle-btn" id="densityToggleBtn" title="Toggle information density">
+            <span class="density-toggle-icon">${DENSITY_MODES.find(m => m.id === getDensityMode())?.icon ?? '▣'}</span>
+            <span class="density-toggle-label">${DENSITY_MODES.find(m => m.id === getDensityMode())?.label ?? 'Full'}</span>
+          </button>
           <button class="search-btn" id="searchBtn"><kbd>Ctrl+K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           <button class="theme-toggle-btn" id="headerThemeToggle" title="${t('header.toggleTheme')}">
@@ -409,17 +441,35 @@ export class PanelLayoutManager implements AppModule {
   }
 
   applyPanelSettings(): void {
+    const densityMode = getDensityMode();
     Object.entries(this.ctx.panelSettings).forEach(([key, config]) => {
+      // A panel is visible only if both: (1) user has it enabled, AND (2) density mode allows it.
+      const densityVisible = isPanelVisibleInDensity(key, densityMode);
+      const effectiveVisible = config.enabled && densityVisible;
+
       if (key === 'map') {
         const mapSection = document.getElementById('mapSection');
         if (mapSection) {
+          // Map is always visible in all density modes (included in all compact sets)
           mapSection.classList.toggle('hidden', !config.enabled);
         }
         return;
       }
       const panel = this.ctx.panels[key];
-      panel?.toggle(config.enabled);
+      panel?.toggle(effectiveVisible);
     });
+  }
+
+  private updateDensityToggleUI(): void {
+    const btn = document.getElementById('densityToggleBtn');
+    if (!btn) return;
+    const mode = getDensityMode();
+    const meta = DENSITY_MODES.find(m => m.id === mode);
+    const icon = btn.querySelector('.density-toggle-icon');
+    const label = btn.querySelector('.density-toggle-label');
+    if (icon) icon.textContent = meta?.icon ?? '▣';
+    if (label) label.textContent = meta?.label ?? 'Full';
+    btn.title = meta?.description ?? 'Toggle information density';
   }
 
   private createPanels(): void {
@@ -721,6 +771,8 @@ export class PanelLayoutManager implements AppModule {
         this.ctx.panels['cross-asset-tape'] = new CrossAssetTapePanel();
         this.ctx.panels['event-impact-screener'] = new EventImpactScreenerPanel();
         this.ctx.panels['country-exposure-matrix'] = new CountryExposureMatrixPanel();
+        const eventIntelPanel = new EventIntelligencePanel();
+        this.ctx.panels['event-intelligence'] = eventIntelPanel;
       }
     }
 

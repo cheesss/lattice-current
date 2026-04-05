@@ -59,3 +59,4 @@ export * from './CodexHubPage';
 export * from './OntologyGraphPage';
 export * from './TransmissionSankeyPanel';
 export * from './SignalRidgelinePanel';
+export * from './EventIntelligencePanel';

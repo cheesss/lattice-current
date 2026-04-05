@@ -48,6 +48,7 @@ export const DEFAULT_PANELS: Record<string, PanelConfig> = {
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+  'event-intelligence': { name: 'Event Intelligence', enabled: true, priority: 1 },
 };
 
 // Map layers for geopolitical view
