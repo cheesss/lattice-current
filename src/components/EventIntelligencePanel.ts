@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 
-const API_BASE = '/api/event-intel';
+const API_BASE = (import.meta as any).env?.VITE_EVENT_API_BASE ?? '/api/event-intel';
 
 interface ThemeTemperature {
   theme: string;
@@ -12,6 +12,9 @@ interface ThemeTemperature {
 interface LiveStatusResponse {
   temperatures: ThemeTemperature[];
   signals: Array<{ channel: string; value: number; label: string }>;
+  pending?: number;
+  todayArticles?: number;
+  meta?: { updatedAt?: string; stale?: boolean; window?: string; cacheReason?: string };
 }
 
 interface HeatmapCell {
@@ -24,6 +27,7 @@ interface HeatmapResponse {
   themes: string[];
   symbols: string[];
   cells: HeatmapCell[];
+  meta?: { updatedAt?: string; stale?: boolean; window?: string; cacheReason?: string };
 }
 
 interface TodayEvent {
@@ -36,6 +40,7 @@ interface TodayEvent {
 
 interface TodayResponse {
   events: TodayEvent[];
+  meta?: { updatedAt?: string; stale?: boolean; window?: string; cacheReason?: string };
 }
 
 interface WhatIfStrategy {
@@ -48,6 +53,7 @@ interface WhatIfStrategy {
 
 interface WhatIfResponse {
   strategies: WhatIfStrategy[];
+  meta?: { updatedAt?: string; stale?: boolean; window?: string; cacheReason?: string };
 }
 
 function tempBadgeColor(temp: string): string {
@@ -76,13 +82,24 @@ function directionArrow(dir: string): string {
 
 export class EventIntelligencePanel extends Panel {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private lastSuccessfulData: {
+    live: LiveStatusResponse | null;
+    heatmap: HeatmapResponse | null;
+    today: TodayResponse | null;
+    whatif: WhatIfResponse | null;
+    updatedAt: string | null;
+  } = { live: null, heatmap: null, today: null, whatif: null, updatedAt: null };
 
   constructor() {
     super({ id: 'event-intelligence', title: 'Event Intelligence', className: 'event-intelligence-panel' });
+    void this.refresh();
   }
 
   public async refresh(): Promise<void> {
     try {
+      if (!this.content.innerHTML.trim()) {
+        this.setContent(this.buildLoadingState());
+      }
       const [liveRes, heatmapRes, todayRes, whatifRes] = await Promise.allSettled([
         fetch(`${API_BASE}/live-status`),
         fetch(`${API_BASE}/heatmap`),
@@ -100,10 +117,22 @@ export class EventIntelligencePanel extends Panel {
           ? (await heatmapRes.value.json()) as HeatmapResponse
           : null;
 
-      const today: TodayResponse | null =
+      let today: TodayResponse | null =
         todayRes.status === 'fulfilled' && todayRes.value.ok
           ? (await todayRes.value.json()) as TodayResponse
           : null;
+
+      // Fallback: if today events empty, try sensitivity endpoint
+      if (today && today.events.length === 0) {
+        try {
+          const fallbackRes = await fetch(`${API_BASE}/sensitivity`);
+          if (fallbackRes.ok) {
+            today = { ...today, meta: { ...today.meta, window: '7d-sensitivity-fallback' } };
+          }
+        } catch {
+          // ignore fallback failure
+        }
+      }
 
       const whatif: WhatIfResponse | null =
         whatifRes.status === 'fulfilled' && whatifRes.value.ok
@@ -111,13 +140,54 @@ export class EventIntelligencePanel extends Panel {
           : null;
 
       if (!live && !heatmap && !today && !whatif) {
+        // All fetches failed -- use cached data with stale marker
+        if (this.lastSuccessfulData.updatedAt) {
+          const staleTime = this.lastSuccessfulData.updatedAt;
+          const html = this.buildHtml(
+            this.lastSuccessfulData.live,
+            this.lastSuccessfulData.heatmap,
+            this.lastSuccessfulData.today,
+            this.lastSuccessfulData.whatif,
+          );
+          this.setContent(
+            `<div style="font-size:10px;color:#f59e0b;padding:4px 8px;background:rgba(245,158,11,0.08);border-radius:6px;margin-bottom:8px">`
+            + `데이터 갱신 대기 중 · 마지막 업데이트: ${escapeHtml(new Date(staleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}`
+            + `</div>${html}`,
+          );
+          return;
+        }
         this.showError('Event Intelligence API offline', () => void this.refresh());
         return;
       }
 
+      // Cache successful data
+      this.lastSuccessfulData = {
+        live: live ?? this.lastSuccessfulData.live,
+        heatmap: heatmap ?? this.lastSuccessfulData.heatmap,
+        today: today ?? this.lastSuccessfulData.today,
+        whatif: whatif ?? this.lastSuccessfulData.whatif,
+        updatedAt: new Date().toISOString(),
+      };
+
       const html = this.buildHtml(live, heatmap, today, whatif);
       this.setContent(html);
     } catch {
+      // Exception -- use cached data with stale marker
+      if (this.lastSuccessfulData.updatedAt) {
+        const staleTime = this.lastSuccessfulData.updatedAt;
+        const html = this.buildHtml(
+          this.lastSuccessfulData.live,
+          this.lastSuccessfulData.heatmap,
+          this.lastSuccessfulData.today,
+          this.lastSuccessfulData.whatif,
+        );
+        this.setContent(
+          `<div style="font-size:10px;color:#f59e0b;padding:4px 8px;background:rgba(245,158,11,0.08);border-radius:6px;margin-bottom:8px">`
+          + `데이터 갱신 대기 중 · 마지막 업데이트: ${escapeHtml(new Date(staleTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}`
+          + `</div>${html}`,
+        );
+        return;
+      }
       this.showError('Event Intelligence API offline', () => void this.refresh());
     }
   }
@@ -146,7 +216,9 @@ export class EventIntelligencePanel extends Panel {
     today: TodayResponse | null,
     whatif: WhatIfResponse | null,
   ): string {
-    const sections: string[] = [];
+      const sections: string[] = [];
+
+    sections.push(this.buildStatusStrip(live, today, heatmap, whatif));
 
     // --- Theme Temperatures ---
     sections.push(this.buildTemperatures(live));
@@ -163,9 +235,46 @@ export class EventIntelligencePanel extends Panel {
     return `<div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">${sections.join('')}</div>`;
   }
 
+  private buildLoadingState(): string {
+    return `
+      <div style="display:flex;flex-direction:column;gap:10px;padding:6px 0">
+        <div style="font-size:11px;color:var(--text-dim)">Loading event intelligence...</div>
+        <div style="height:22px;border-radius:6px;background:rgba(255,255,255,0.06)"></div>
+        <div style="height:80px;border-radius:6px;background:rgba(255,255,255,0.04)"></div>
+        <div style="height:96px;border-radius:6px;background:rgba(255,255,255,0.04)"></div>
+      </div>`;
+  }
+
+  private buildStatusStrip(
+    live: LiveStatusResponse | null,
+    today: TodayResponse | null,
+    heatmap: HeatmapResponse | null,
+    whatif: WhatIfResponse | null,
+  ): string {
+    const updatedAt = live?.meta?.updatedAt ?? today?.meta?.updatedAt ?? heatmap?.meta?.updatedAt ?? whatif?.meta?.updatedAt;
+    const stale = Boolean(live?.meta?.stale || today?.meta?.stale || heatmap?.meta?.stale || whatif?.meta?.stale);
+    const status = stale ? 'STALE' : 'LIVE';
+    const tone = stale ? '#f59e0b' : '#22c55e';
+    const articleCount = Number(live?.todayArticles ?? today?.events?.length ?? 0);
+    const pending = Number(live?.pending ?? 0);
+    const updatedLabel = updatedAt
+      ? new Date(updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : 'collecting';
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;background:rgba(255,255,255,0.03)">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:${tone}">${status}</span>
+          <span style="font-size:10px;color:var(--text-dim)">Articles: ${articleCount}</span>
+          <span style="font-size:10px;color:var(--text-dim)">Pending: ${pending}</span>
+        </div>
+        <span style="font-size:10px;color:var(--text-dim)">Updated ${escapeHtml(updatedLabel)}</span>
+      </div>`;
+  }
+
   private buildTemperatures(live: LiveStatusResponse | null): string {
     if (!live || live.temperatures.length === 0) {
-      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">Temperature data unavailable</div>`;
+      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">테마 온도 수집 중</div>`;
     }
 
     const badges = live.temperatures
@@ -184,7 +293,7 @@ export class EventIntelligencePanel extends Panel {
 
   private buildHeatmap(heatmap: HeatmapResponse | null): string {
     if (!heatmap || heatmap.themes.length === 0 || heatmap.symbols.length === 0) {
-      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">Sensitivity heatmap unavailable</div>`;
+      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">민감도 데이터 로딩 중</div>`;
     }
 
     const themes = heatmap.themes;
@@ -223,7 +332,7 @@ export class EventIntelligencePanel extends Panel {
 
   private buildTodayEvents(today: TodayResponse | null): string {
     if (!today || today.events.length === 0) {
-      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">No events today</div>`;
+      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">최근 7일 이벤트로 대체</div>`;
     }
 
     const items = today.events
@@ -262,7 +371,7 @@ export class EventIntelligencePanel extends Panel {
 
   private buildStrategies(whatif: WhatIfResponse | null): string {
     if (!whatif || whatif.strategies.length === 0) {
-      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">No strategies available</div>`;
+      return `<div style="color:var(--text-dim);font-size:11px;padding:4px 0">시뮬레이션 대기 중</div>`;
     }
 
     const top5 = whatif.strategies

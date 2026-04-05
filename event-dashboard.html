@@ -118,11 +118,34 @@ td{padding:3px 6px;border-bottom:1px solid #111}
 
 <script>
 const API='http://localhost:46200/api';
-const f=url=>fetch(url).then(r=>r.json()).catch(()=>null);
 const fmt=(v,d=2)=>v!=null?Number(v).toFixed(d):'—';
 const pct=v=>v!=null?(Number(v)*100).toFixed(0)+'%':'—';
 const rc=v=>Number(v)>=0?'pos':'neg';
 const rf=v=>{const n=Number(v);return`<span class="${rc(v)}">${n>=0?'+':''}${n.toFixed(2)}%</span>`};
+
+function lsGet(key){try{return JSON.parse(localStorage.getItem('ei_'+key));}catch{return null;}}
+function lsSet(key,val){try{localStorage.setItem('ei_'+key,JSON.stringify(val));}catch{}}
+
+async function f(url,cacheKey){
+  try{
+    const r=await fetch(url);
+    const d=await r.json();
+    if(cacheKey)lsSet(cacheKey,{data:d,ts:new Date().toISOString()});
+    return{data:d,cached:false};
+  }catch{
+    if(cacheKey){
+      const c=lsGet(cacheKey);
+      if(c)return{data:c.data,cached:true,cachedAt:c.ts};
+    }
+    return{data:null,cached:false};
+  }
+}
+
+function cachedBadge(ts){
+  if(!ts)return'<span class="badge" style="color:var(--warn)">(cached)</span>';
+  const t=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  return`<span class="badge" style="color:var(--warn)">(cached ${t})</span>`;
+}
 
 async function refreshAll(){
   document.getElementById('last-update').textContent='Updating...';
@@ -131,15 +154,16 @@ async function refreshAll(){
 }
 
 async function loadStatus(){
-  const d=await f(API+'/live-status');
-  if(!d){document.getElementById('system-status').innerHTML='<span class="neg">API offline</span>';return}
+  const{data:d,cached,cachedAt}=await f(API+'/live-status','status');
+  if(!d){document.getElementById('system-status').innerHTML='<span class="neg">API offline · 수집 중...</span>';return}
+  const cb=cached?cachedBadge(cachedAt):'';
   let h=`<div style="font-size:11px">`;
-  h+=`<div>Articles today: <strong>${d.todayArticles||0}</strong></div>`;
+  h+=`<div>Articles today: <strong>${d.todayArticles||0}</strong> ${cb}</div>`;
   h+=`<div>Pending: <strong>${d.pending||0}</strong></div>`;
   h+=`<div>Signals: <strong>${(d.signals||[]).length}</strong> channels</div>`;
   h+=`</div>`;
   document.getElementById('system-status').innerHTML=h;
-  document.getElementById('status-badge').textContent=d.todayArticles>0?'LIVE':'IDLE';
+  document.getElementById('status-badge').textContent=cached?'CACHED':d.todayArticles>0?'LIVE':'IDLE';
 
   // Temperatures
   let th='';
@@ -147,7 +171,7 @@ async function loadStatus(){
     const cls=t.status==='HOT'?'tag-hot':t.status==='WARM'?'tag-warm':'tag-cool';
     th+=`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${t.theme}</span><span class="tag ${cls}">${t.status} ${fmt(t.temp,0)}</span></div>`;
   }
-  document.getElementById('temperatures').innerHTML=th||'No data';
+  document.getElementById('temperatures').innerHTML=th||'테마 온도 수집 중...';
 
   // Signals
   let sh='<table><tr><th>Signal</th><th>Value</th></tr>';
@@ -159,13 +183,15 @@ async function loadStatus(){
 }
 
 async function loadToday(){
-  const d=await f(API+'/today');
-  if(!d||d.length===0){document.getElementById('today-events').innerHTML='No events today. Waiting for real-time collection to start.';return}
-  let h='';
-  for(const e of d.slice(0,10)){
+  const{data:d,cached,cachedAt}=await f(API+'/today','today');
+  if(!d||d.length===0){document.getElementById('today-events').innerHTML='이벤트 수집 중... 최근 7일 이벤트로 대체 예정';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:6px">${cb}</div>`:'';
+  const items=Array.isArray(d)?d:(d.events||[]);
+  for(const e of items.slice(0,10)){
     h+=`<div class="event-row">`;
     h+=`<div class="event-title">${e.title||'Untitled'}</div>`;
-    h+=`<div class="event-meta">${e.source||''} · ${e.theme||''} · ${String(e.date||'').slice(0,10)}</div>`;
+    h+=`<div class="event-meta">${e.source||''} · ${e.theme||''} · ${String(e.date||e.publishedAt||'').slice(0,10)}</div>`;
     h+=`<div class="event-reactions">`;
     for(const r of(e.expectedReactions||[]).slice(0,5)){
       const cls=Number(r.avgReturn)>=0?'pos':'neg';
@@ -173,18 +199,20 @@ async function loadToday(){
     }
     h+=`</div></div>`;
   }
-  document.getElementById('today-events').innerHTML=h;
+  document.getElementById('today-events').innerHTML=h||'이벤트 수집 중...';
 }
 
 async function loadHeatmap(){
-  const d=await f(API+'/heatmap');
-  if(!d){document.getElementById('heatmap').innerHTML='No data';return}
+  const{data:d,cached,cachedAt}=await f(API+'/heatmap','heatmap');
+  if(!d){document.getElementById('heatmap').innerHTML='민감도 데이터 수집 중...';return}
   const themes=d.themes||[...new Set((d.data||[]).map(r=>r.theme))];
   const symbols=d.symbols||[...new Set((d.data||[]).map(r=>r.symbol))];
   const lookup={};
   for(const r of(d.data||[]))lookup[r.theme+':'+r.symbol]=r;
 
-  let h='<table><tr><th></th>';
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  h+='<table><tr><th></th>';
   for(const s of symbols.slice(0,12))h+=`<th style="text-align:center;font-size:10px">${s}</th>`;
   h+='</tr>';
   for(const t of themes){
@@ -204,9 +232,10 @@ async function loadHeatmap(){
 }
 
 async function loadTrends(){
-  const d=await f(API+'/trends');
-  if(!d){document.getElementById('trends').innerHTML='No data';return}
-  let h='';
+  const{data:d,cached,cachedAt}=await f(API+'/trends','trends');
+  if(!d){document.getElementById('trends').innerHTML='트렌드 수집 중...';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
   for(const t of(d||[]).sort((a,b)=>b.momentum-a.momentum)){
     const status=t.momentum>30?'SURGING':t.momentum>10?'GROWING':t.momentum>-10?'STABLE':'DECLINING';
     const cls=status==='SURGING'||status==='GROWING'?'tag-pos':status==='DECLINING'?'tag-neg':'tag-neutral';
@@ -226,12 +255,15 @@ async function loadTrends(){
 }
 
 async function loadWhatif(){
-  const d=await f(API+'/whatif//');
-  if(!d){document.getElementById('whatif').innerHTML='No data';return}
-  let h='<table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th></tr>';
-  for(const r of(d||[]).slice(0,8)){
-    h+=`<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${r.direction}</td>`;
-    h+=`<td class="${Number(r.sharpe_ratio)>=0?'pos':'neg'}">${fmt(r.sharpe_ratio)}</td>`;
+  const{data:d,cached,cachedAt}=await f(API+'/whatif//','whatif');
+  if(!d){document.getElementById('whatif').innerHTML='시뮬레이션 대기 중...';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  const items=Array.isArray(d)?d:(d.strategies||[]);
+  h+='<table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th></tr>';
+  for(const r of items.slice(0,8)){
+    h+=`<tr><td>${r.theme}</td><td><strong>${r.symbol||r.name||''}</strong></td><td>${r.direction||''}</td>`;
+    h+=`<td class="${Number(r.sharpe_ratio||r.sharpe||0)>=0?'pos':'neg'}">${fmt(r.sharpe_ratio||r.sharpe)}</td>`;
     h+=`<td>${pct(r.hit_rate)}</td></tr>`;
   }
   h+='</table>';
@@ -239,37 +271,43 @@ async function loadWhatif(){
 }
 
 async function loadAnomalies(){
-  const d=await f(API+'/anomalies');
-  if(!d){document.getElementById('anomalies').innerHTML='No data';return}
-  let h='';
+  const{data:d,cached,cachedAt}=await f(API+'/anomalies','anomalies');
+  if(!d){document.getElementById('anomalies').innerHTML='이상치 수집 중...';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
   for(const r of(d||[]).slice(0,5)){
     h+=`<div style="margin-bottom:6px;font-size:11px">`;
     h+=`<div><strong>${r.symbol}</strong> ${rf(r.forward_return_pct)} <span class="dim">z=${fmt(r.z_score,1)}</span></div>`;
     h+=`<div style="font-size:10px;color:var(--dim)">${String(r.event_date).slice(0,10)} · ${r.theme}</div>`;
     h+=`</div>`;
   }
-  document.getElementById('anomalies').innerHTML=h||'No anomalies';
+  document.getElementById('anomalies').innerHTML=h||'이상치 수집 중...';
 }
 
 async function loadCodex(){
-  const d=await f(API+'/codex-latest');
-  if(!d){document.getElementById('codex-latest').innerHTML='No discoveries';return}
-  let h='';
+  const{data:d,cached,cachedAt}=await f(API+'/codex-latest','codex');
+  if(!d){document.getElementById('codex-latest').innerHTML='Codex 수집 중...';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
   if(d.proposals?.length>0){
     for(const p of d.proposals.slice(0,4)){
       const s=p.status||'?';
       const dot=s==='executed'?'dot-green':s==='pending'?'dot-yellow':'dot-red';
       h+=`<div style="margin-bottom:4px"><span class="status-dot ${dot}"></span>${p.proposal_type}: ${JSON.stringify(p.payload||{}).slice(0,60)}</div>`;
     }
-  }else{h='No recent proposals';}
+  }else{h+='제안 수집 중...';}
   document.getElementById('codex-latest').innerHTML=h;
 }
 
 async function loadPending(){
-  const d=await f(API+'/pending');
-  if(!d||d.length===0){document.getElementById('pending').innerHTML='No pending validations';return}
-  let h='<table><tr><th>Symbol</th><th>Theme</th><th>Days</th></tr>';
-  for(const r of(d||[]).slice(0,6)){
+  const{data:d,cached,cachedAt}=await f(API+'/pending','pending');
+  if(!d||d.length===0){document.getElementById('pending').innerHTML='검증 대기 수집 중...';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  const items=Array.isArray(d)?d:(d.items||[]);
+  if(items.length===0){document.getElementById('pending').innerHTML=(cb||'')+'검증 대기 수집 중...';return}
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  h+='<table><tr><th>Symbol</th><th>Theme</th><th>Days</th></tr>';
+  for(const r of items.slice(0,6)){
     h+=`<tr><td><strong>${r.symbol}</strong></td><td>${r.theme}</td><td>${r.daysRemaining}d</td></tr>`;
   }
   h+='</table>';
@@ -277,11 +315,13 @@ async function loadPending(){
 }
 
 async function loadRegime(){
-  const d=await f(API+'/regime//');
-  if(!d||d.length===0){document.getElementById('regime').innerHTML='No regime data';return}
+  const{data:d,cached,cachedAt}=await f(API+'/regime//','regime');
+  if(!d||d.length===0){document.getElementById('regime').innerHTML='Regime 데이터 수집 중...';return}
   const byTheme={};
   for(const r of d){if(!byTheme[r.theme])byTheme[r.theme]=[];byTheme[r.theme].push(r)}
-  let h='<div class="grid3">';
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  h+='<div class="grid3">';
   for(const[theme,rows]of Object.entries(byTheme)){
     h+=`<div><strong>${theme}</strong><table><tr><th>Symbol</th><th>Regime</th><th>Return</th><th>Hit</th></tr>`;
     for(const r of rows.slice(0,8)){
