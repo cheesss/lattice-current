@@ -422,6 +422,27 @@ function snapshotRuntimeSecrets() {
   return { secrets, sources };
 }
 
+function isAutoPostgresSyncEnabled(env = process.env) {
+  return /^(1|true|yes|on)$/i.test(String(
+    env.LOCAL_INTELLIGENCE_AUTO_PG_SYNC
+    || env.BACKTEST_NAS_AUTO_SYNC
+    || '',
+  ));
+}
+
+function resolvePostgresSyncRequest(payload, env = process.env) {
+  if (payload?.postgresSync === false) {
+    return { enabled: false, config: null };
+  }
+  if (payload?.postgresSync === true) {
+    return { enabled: true, config: payload?.pgConfig || null };
+  }
+  if (isAutoPostgresSyncEnabled(env)) {
+    return { enabled: true, config: payload?.pgConfig || null };
+  }
+  return { enabled: false, config: null };
+}
+
 export function __setCodexRunnerForTests(fn) {
   codexRunnerOverride = (typeof fn === 'function') ? fn : null;
 }
@@ -818,18 +839,37 @@ function buildCodexDiscoveryPlannerPrompt({ origin = '', feedName = '', reason =
   const reasonLine = reason ? `Reason: ${reason}` : 'Reason: (none)';
   const topicsLine = topicHints.length > 0 ? topicHints.join(' | ') : '(none)';
   return [
-    'You are a source-discovery planner for RSS/Atom ingestion.',
+    'You are an expert OSINT analyst and data source curator for a geopolitical intelligence platform.',
     'Return strict JSON only. No markdown.',
-    'Find candidate search queries and likely feed/source URLs.',
-    'Focus on geopolitics, markets, technology, maritime, and security only.',
-    'Reject entertainment, spam, and low-quality rumor domains.',
-    'Schema:',
+    '',
+    '## Your Mission',
+    'Find high-quality RSS/Atom feeds and data sources for intelligence collection.',
+    'Prioritize sources that provide EARLY signals before mainstream media coverage.',
+    '',
+    '## Source Categories to Explore',
+    '1. Government/institutional feeds (defense ministries, central banks, regulatory agencies)',
+    '2. Think tank and research institution feeds (CSIS, IISS, Brookings, RAND)',
+    '3. Industry-specific trade publications (shipping, energy, defense, tech)',
+    '4. Regional/local media in conflict zones or key markets',
+    '5. Financial data providers with RSS (commodity exchanges, central bank speeches)',
+    '6. Niche expert blogs and newsletters with domain expertise',
+    '7. Academic and research preprint feeds (SSRN, arXiv for quant/econ)',
+    '',
+    '## Quality Criteria',
+    '- Reject entertainment, sports, celebrity, spam, and low-quality rumor sites',
+    '- Prefer sources with structured data (RSS/Atom/JSON feeds)',
+    '- Prefer sources updated at least daily',
+    '- Value sources that cover: geopolitics, macro, defense, energy, shipping, cyber, tech regulation',
+    '',
+    '## JSON Schema',
     '{',
-    '  "searchQueries": string[],',
-    '  "candidatePaths": string[],',
-    '  "discoveredTopics": [{"topic": string, "rationale": string, "relevanceScore": number}],',
-    '  "discoveredSources": [{"name": string, "url": string, "confidence": number, "reason": string, "category": string, "topics": string[]}]',
+    '  "searchQueries": ["query1", "query2"],',
+    '  "candidatePaths": ["/rss", "/feed", "/atom.xml"],',
+    '  "discoveredTopics": [{"topic": "string", "rationale": "string", "relevanceScore": 0-10}],',
+    '  "discoveredSources": [{"name": "string", "url": "string", "confidence": 0-100, "reason": "string", "category": "string", "topics": ["string"]}]',
     '}',
+    '',
+    '## Context',
     originLine,
     feedLine,
     reasonLine,
@@ -901,29 +941,50 @@ function buildCodexCandidateExpansionPrompt(payload) {
   }).join('\n');
 
   return [
-    'You are a candidate-expansion analyst for a macro and geopolitical investment engine.',
+    'You are an elite cross-asset strategist with expertise in thematic investing, macro trading, and geopolitical risk.',
     'Return strict JSON only. No markdown.',
-    'Goal: propose additional liquid symbols or ETFs that should be reviewed for this theme.',
-    'Do not repeat any symbol already in ExistingSymbols.',
-    'Prefer liquid U.S.-listed ETFs and large liquid equities unless a more direct proxy is clearly better.',
-    'Avoid illiquid microcaps, leveraged ETFs, options, or instruments without clear thematic linkage.',
-    'Schema:',
+    '',
+    '## Your Mission',
+    'Propose additional liquid tradeable instruments for this investment theme.',
+    'Think beyond obvious choices \u2014 the best alpha comes from non-consensus positions.',
+    '',
+    '## Expansion Strategies',
+    '1. DIRECT proxies: ETFs and equities directly exposed to the theme',
+    '2. SECOND-ORDER beneficiaries: Companies/sectors that benefit indirectly',
+    '3. LOSERS: Who gets hurt? These are SHORT candidates',
+    '4. HEDGES: What protects the portfolio if the thesis is wrong?',
+    '5. CROSS-ASSET: FX pairs, commodity futures ETFs, bond ETFs affected',
+    '6. VOLATILITY: VIX-related products, sector-specific vol ETFs',
+    '7. RELATIVE VALUE: Long/short pairs within the theme',
+    '8. GLOBAL: Non-US ETFs, EM exposure, country-specific funds',
+    '',
+    '## Rules',
+    '- Do NOT repeat any symbol in ExistingSymbols',
+    '- Prefer liquid U.S.-listed ETFs (>$100M AUM) and large-cap equities',
+    '- Include at least 2 SHORT or HEDGE positions',
+    '- Include at least 1 non-US or EM instrument',
+    '- Avoid leveraged ETFs (2x, 3x), penny stocks, or illiquid instruments',
+    '- Propose 6-12 instruments with clear directional reasoning',
+    '',
+    '## JSON Schema',
     '{',
     '  "proposals": [',
     '    {',
-    '      "symbol": "string",',
-    '      "assetName": "string",',
+    '      "symbol": "string (ticker)",',
+    '      "assetName": "string (full name)",',
     '      "assetKind": "etf|equity|commodity|fx|rate|crypto",',
     '      "sector": "string",',
     '      "commodity": "string|null",',
     '      "direction": "long|short|hedge|watch|pair",',
     '      "role": "primary|confirm|hedge",',
-    '      "confidence": 0,',
-    '      "reason": "string",',
-    '      "supportingSignals": ["string"]',
+    '      "confidence": 0-100,',
+    '      "reason": "1-2 sentences: why this instrument, what is the edge?",',
+    '      "supportingSignals": ["signal1", "signal2"]',
     '    }',
     '  ]',
     '}',
+    '',
+    '## Theme Context',
     `ThemeId: ${themeId || '(none)'}`,
     `ThemeLabel: ${themeLabel || '(none)'}`,
     `Thesis: ${thesis || '(none)'}`,
@@ -932,7 +993,7 @@ function buildCodexCandidateExpansionPrompt(payload) {
     `Commodities: ${commodities.join(', ') || '(none)'}`,
     `Triggers: ${triggers.join(', ') || '(none)'}`,
     `Invalidation: ${invalidation.join(' | ') || '(none)'}`,
-    `ExistingSymbols: ${existingSymbols.join(', ') || '(none)'}`,
+    `ExistingSymbols (do NOT repeat): ${existingSymbols.join(', ') || '(none)'}`,
     'TopMappings:',
     mappingLines || '(none)',
     'UserWatchlist:',
@@ -1420,7 +1481,20 @@ async function runIntelligenceJob(action, payload, context, timeoutMs = 120_000)
         return;
       }
       try {
-        resolve(out ? JSON.parse(out) : { ok: true });
+        const parsed = out ? JSON.parse(out) : { ok: true };
+        // Auto-spill: if the job wrote a large result to a temp file, load it
+        if (parsed._resultFile) {
+          try {
+            const full = JSON.parse(fs.readFileSync(parsed._resultFile, 'utf8'));
+            // Clean up temp file after reading
+            try { fs.unlinkSync(parsed._resultFile); } catch {}
+            resolve(full);
+          } catch (readErr) {
+            reject(new Error(`failed to read spilled result file ${parsed._resultFile}: ${readErr.message}`));
+          }
+          return;
+        }
+        resolve(parsed);
       } catch (error) {
         reject(new Error(`invalid intelligence job output: ${String(error?.message || error)}`));
       }
@@ -1429,6 +1503,79 @@ async function runIntelligenceJob(action, payload, context, timeoutMs = 120_000)
     child.stdin.write(JSON.stringify(payload || {}));
     child.stdin.end();
   });
+}
+
+function replayFrameSortValue(frame) {
+  const primary = Date.parse(
+    String(frame?.transactionTime || frame?.knowledgeBoundary || frame?.timestamp || ''),
+  );
+  if (Number.isFinite(primary)) return primary;
+  const fallback = Date.parse(String(frame?.timestamp || ''));
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
+function baseReplayFrameLoadOptions(frameLoadOptions, perDatasetMax) {
+  const base = frameLoadOptions && typeof frameLoadOptions === 'object'
+    ? { ...frameLoadOptions }
+    : {};
+  delete base.datasetId;
+  delete base.maxFrames;
+  delete base.latestFirst;
+  return {
+    ...base,
+    includeWarmup: base.includeWarmup !== false,
+    latestFirst: true,
+    maxFrames: perDatasetMax,
+  };
+}
+
+async function loadBalancedReplayFrames(context, automationStatus, payload, maxFrames, timeoutMs) {
+  if (Array.isArray(payload?.frames)) return payload.frames;
+  const explicitDatasetId = String(payload?.frameLoadOptions?.datasetId || '').trim();
+  if (explicitDatasetId) return null;
+
+  const enabledDatasets = Array.isArray(automationStatus?.result?.registry?.datasets)
+    ? automationStatus.result.registry.datasets.filter((dataset) => dataset?.enabled !== false)
+    : [];
+  if (enabledDatasets.length === 0) return null;
+
+  const perDatasetMax = Math.max(24, Math.ceil(maxFrames / Math.max(1, enabledDatasets.length)));
+  const sharedLoadOptions = baseReplayFrameLoadOptions(payload?.frameLoadOptions, perDatasetMax);
+  const mergedFrames = [];
+  const datasetIds = [];
+
+  for (const dataset of enabledDatasets) {
+    const datasetId = String(dataset?.id || '').trim();
+    if (!datasetId) continue;
+    const loaded = await runIntelligenceJob(
+      'load-frames',
+      {
+        options: {
+          ...sharedLoadOptions,
+          datasetId,
+        },
+      },
+      context,
+      timeoutMs,
+    ).catch(() => null);
+    const frames = Array.isArray(loaded?.frames) ? loaded.frames : [];
+    if (frames.length === 0) continue;
+    datasetIds.push(datasetId);
+    mergedFrames.push(...frames);
+  }
+
+  if (mergedFrames.length === 0) {
+    return {
+      frames: [],
+      datasetIds,
+    };
+  }
+
+  mergedFrames.sort((left, right) => replayFrameSortValue(left) - replayFrameSortValue(right));
+  return {
+    frames: mergedFrames.slice(-Math.max(1, maxFrames)),
+    datasetIds,
+  };
 }
 
 function canCompress(headers, body) {
@@ -4084,6 +4231,7 @@ async function dispatch(requestUrl, req, routes, context) {
     return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...makeCorsHeaders(req) } });
   }
 
+  // Global auth gate
   if (!shouldBypassTokenAuth(requestUrl)) {
     const authError = requireLocalApiToken(req, requestUrl, context);
     if (authError) {
@@ -4661,12 +4809,13 @@ async function dispatch(requestUrl, req, routes, context) {
         context,
         Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 10 * 60_000,
       );
+      const postgresSyncRequest = resolvePostgresSyncRequest(payload);
       let postgresSyncResult = null;
-      if (payload?.postgresSync && payload?.pgConfig && result?.result) {
+      if (postgresSyncRequest.enabled && result?.result) {
         postgresSyncResult = await runIntelligenceJob(
           'postgres-sync-dataset-bulk',
           {
-            config: payload.pgConfig,
+            config: postgresSyncRequest.config,
             dbPath: payload?.options?.dbPath,
             datasetId: result.result.datasetId,
             pageSize: payload?.postgresPageSize,
@@ -4710,11 +4859,12 @@ async function dispatch(requestUrl, req, routes, context) {
         if (payload?.archive !== false && replayResult?.run) {
           await archiveReplayRunToDuckDb(replayResult.run, context);
         }
+        const postgresSyncRequest = resolvePostgresSyncRequest(payload);
         let postgresSyncResult = null;
-        if (payload?.postgresSync && payload?.pgConfig && replayResult?.run) {
+        if (postgresSyncRequest.enabled && replayResult?.run) {
           postgresSyncResult = await runIntelligenceJob(
             'postgres-upsert-run',
-            { config: payload.pgConfig, run: replayResult.run },
+            { config: postgresSyncRequest.config, run: replayResult.run },
             context,
             60_000,
           );
@@ -4758,11 +4908,12 @@ async function dispatch(requestUrl, req, routes, context) {
         if (payload?.archive !== false && walkForwardResult?.run) {
           await archiveReplayRunToDuckDb(walkForwardResult.run, context);
         }
+        const postgresSyncRequest = resolvePostgresSyncRequest(payload);
         let postgresSyncResult = null;
-        if (payload?.postgresSync && payload?.pgConfig && walkForwardResult?.run) {
+        if (postgresSyncRequest.enabled && walkForwardResult?.run) {
           postgresSyncResult = await runIntelligenceJob(
             'postgres-upsert-run',
-            { config: payload.pgConfig, run: walkForwardResult.run },
+            { config: postgresSyncRequest.config, run: walkForwardResult.run },
             context,
             60_000,
           );
@@ -4887,21 +5038,31 @@ async function dispatch(requestUrl, req, routes, context) {
           ? payload.horizonsHours.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
           : Array.isArray(defaults.horizonsHours)
             ? defaults.horizonsHours.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0)
-            : [1, 4, 24, 72, 168];
+            : [4, 12, 24, 48, 72, 168, 336, 720];
         const maxFrames = Math.max(
           24,
           Number(payload?.maxFrames)
           || Math.round((replayWindowDays * 24) / bucketHours),
         );
+        const balancedReplayFrames = await loadBalancedReplayFrames(
+          context,
+          automationStatus,
+          payload,
+          maxFrames,
+          Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 10 * 60_000,
+        );
         const replayResult = await runIntelligenceJob(
           'run-replay',
           {
-            frameLoadOptions: {
-              includeWarmup: true,
-              latestFirst: true,
-              maxFrames,
-              ...(payload?.frameLoadOptions || {}),
-            },
+            frames: Array.isArray(balancedReplayFrames?.frames) ? balancedReplayFrames.frames : undefined,
+            frameLoadOptions: Array.isArray(balancedReplayFrames?.frames)
+              ? undefined
+              : {
+                  includeWarmup: true,
+                  latestFirst: true,
+                  maxFrames,
+                  ...(payload?.frameLoadOptions || {}),
+                },
             options: {
               label: String(payload?.label || 'Manual Hub Replay'),
               retainLearningState: false,
@@ -4919,15 +5080,18 @@ async function dispatch(requestUrl, req, routes, context) {
         }
         return {
           ...replayResult,
-          defaultsUsed: {
-            bucketHours,
-            replayWindowDays,
-            warmupFrameCount,
-            maxFrames,
-            horizonsHours,
-          },
-        };
-      });
+            defaultsUsed: {
+              bucketHours,
+              replayWindowDays,
+              warmupFrameCount,
+              maxFrames,
+              horizonsHours,
+              datasetIds: Array.isArray(balancedReplayFrames?.datasetIds)
+                ? balancedReplayFrames.datasetIds
+                : [],
+            },
+          };
+        });
       return json(result, 200);
     } catch (error) {
       const message = isDuckDbLockError(error) || isManualBacktestBusyError(error)
@@ -5081,6 +5245,89 @@ async function dispatch(requestUrl, req, routes, context) {
     return json({ ok: true, entry }, 200);
   }
 
+  if (requestUrl.pathname === '/api/local-intelligence-recommendations') {
+    if (req.method !== 'GET') return json({ error: 'GET required' }, 405);
+    try {
+      const result = await runIntelligenceJob('get-recommendations', {}, context, 30_000);
+      return json(result, 200);
+    } catch (error) {
+      return json({ ok: false, recommendations: [], correlationMatrix: { symbols: [], correlations: [] }, regime: null }, 200);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-theme-intensity') {
+    if (req.method !== 'GET') return json({ error: 'GET required' }, 405);
+    try {
+      const result = await runIntelligenceJob('get-theme-intensity', {}, context, 30_000);
+      return json(result, 200);
+    } catch (error) {
+      return json({ ok: false, themes: [], sankeyFlow: { events: [], themes: [], assets: [], links: [] } }, 200);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-impact-timeline') {
+    if (req.method !== 'GET') return json({ error: 'GET required' }, 405);
+    try {
+      const result = await runIntelligenceJob('get-impact-timeline', {}, context, 30_000);
+      return json(result, 200);
+    } catch (error) {
+      return json({ ok: false, events: [], overlaps: [], scrubberSnapshots: [] }, 200);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-scenario') {
+    if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
+    const body = await readBody(req);
+    if (!body) return json({ error: 'expected request body' }, 400);
+    let payload = null;
+    try { payload = JSON.parse(body.toString()); } catch { return json({ error: 'expected JSON body' }, 400); }
+    try {
+      const result = await runIntelligenceJob('run-scenario', payload, context, 30_000);
+      return json(result, 200);
+    } catch (error) {
+      return json({ ok: false, currentState: {}, scenarioState: {}, decayCurve: { currentBetaHours: 36, scenarioBetaHours: 36 } }, 200);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-intelligence-alerts') {
+    if (req.method === 'GET') {
+      const alertsPath = path.join(context.dataDir || os.tmpdir(), 'intelligence-alerts.json');
+      try {
+        const data = await fs.promises.readFile(alertsPath, 'utf8');
+        return json(JSON.parse(data), 200);
+      } catch {
+        return json({ alerts: [] }, 200);
+      }
+    }
+    if (req.method === 'PUT') {
+      const body = await readBody(req);
+      if (!body) return json({ error: 'expected request body' }, 400);
+      let payload = null;
+      try { payload = JSON.parse(body.toString()); } catch { return json({ error: 'expected JSON body' }, 400); }
+      const alertsPath = path.join(context.dataDir || os.tmpdir(), 'intelligence-alerts.json');
+      try {
+        let existing = { alerts: [] };
+        try { existing = JSON.parse(await fs.promises.readFile(alertsPath, 'utf8')); } catch {}
+        if (payload.alert) {
+          const newAlert = { ...payload.alert, id: 'alert-' + Date.now(), createdAt: new Date().toISOString(), enabled: true };
+          existing.alerts.push(newAlert);
+        }
+        if (payload.deleteId) {
+          existing.alerts = existing.alerts.filter(a => a.id !== payload.deleteId);
+        }
+        if (payload.toggleId) {
+          const alert = existing.alerts.find(a => a.id === payload.toggleId);
+          if (alert) alert.enabled = !alert.enabled;
+        }
+        await fs.promises.writeFile(alertsPath, JSON.stringify(existing, null, 2));
+        return json(existing, 200);
+      } catch (error) {
+        return json({ error: 'Failed to save alert' }, 500);
+      }
+    }
+    return json({ error: 'GET or PUT required' }, 405);
+  }
+
   if (requestUrl.pathname === '/api/local-validate-secret') {
     if (req.method !== 'POST') {
       return json({ error: 'POST required' }, 405);
@@ -5175,6 +5422,25 @@ export async function createLocalApiServer(options = {}) {
       return;
     }
 
+    // Event Intelligence API proxy — forward to dashboard API on port 46200
+    if (requestUrl.pathname.startsWith('/api/event-intel/') || requestUrl.pathname === '/api/event-intel') {
+      const targetPath = requestUrl.pathname.replace(/^\/api\/event-intel/, '/api') + requestUrl.search;
+      const targetUrl = 'http://127.0.0.1:46200' + targetPath;
+      try {
+        const proxyResp = await fetch(targetUrl, { signal: AbortSignal.timeout(10000) });
+        const body = await proxyResp.text();
+        res.writeHead(proxyResp.status, {
+          'Content-Type': proxyResp.headers.get('Content-Type') || 'application/json',
+          'Access-Control-Allow-Origin': getSidecarCorsOrigin(req),
+        });
+        res.end(body);
+      } catch (err) {
+        res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': getSidecarCorsOrigin(req) });
+        res.end(JSON.stringify({ error: 'Event Intelligence API unavailable' }));
+      }
+      return;
+    }
+
     const start = Date.now();
     const skipRecord = req.method === 'OPTIONS'
       || requestUrl.pathname === '/api/local-resource-stats'
@@ -5202,7 +5468,12 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-intelligence-backtest-runs'
       || requestUrl.pathname === '/api/local-intelligence-automation-status'
       || requestUrl.pathname === '/api/local-automation-ops-snapshot'
-      || requestUrl.pathname === '/api/local-intelligence-postgres';
+      || requestUrl.pathname === '/api/local-intelligence-postgres'
+      || requestUrl.pathname === '/api/local-intelligence-recommendations'
+      || requestUrl.pathname === '/api/local-intelligence-theme-intensity'
+      || requestUrl.pathname === '/api/local-intelligence-impact-timeline'
+      || requestUrl.pathname === '/api/local-intelligence-scenario'
+      || requestUrl.pathname === '/api/local-intelligence-alerts';
 
     try {
       const response = await dispatch(requestUrl, req, routes, context);
@@ -5286,6 +5557,73 @@ export async function createLocalApiServer(options = {}) {
       }
 
       context.logger.log(`[local-api] listening on http://127.0.0.1:${boundPort} (apiDir=${context.apiDir}, routes=${routes.length}, cloudFallback=${context.cloudFallback})`);
+
+      // --- Auto-scheduler: trigger intelligence automation on a configurable interval ---
+      const schedulerIntervalMs = 60 * 60 * 1000; // 1 hour
+      let schedulerTimer = null;
+
+      function startAutoScheduler() {
+        if (schedulerTimer) return;
+        // Run first cycle after 30 seconds (let server stabilize)
+        setTimeout(async () => {
+          try {
+            context.logger.log('[auto-scheduler] running first cycle');
+            const { spawn: spawnChild } = await import('node:child_process');
+            const child = spawnChild(process.execPath, ['--import', 'tsx', 'scripts/intelligence-scheduler.mjs', '--once'], {
+              cwd: context.resourceDir || process.cwd(),
+              stdio: 'ignore',
+              detached: true,
+            });
+            child.unref();
+          } catch (e) {
+            context.logger.warn('[auto-scheduler] first cycle failed:', e.message);
+          }
+        }, 30_000);
+
+        // Then repeat every hour
+        schedulerTimer = setInterval(async () => {
+          try {
+            const { spawn: spawnChild } = await import('node:child_process');
+            const child = spawnChild(process.execPath, ['--import', 'tsx', 'scripts/intelligence-scheduler.mjs', '--once'], {
+              cwd: context.resourceDir || process.cwd(),
+              stdio: 'ignore',
+              detached: true,
+            });
+            child.unref();
+          } catch (e) {
+            context.logger.warn('[auto-scheduler] cycle failed:', e.message);
+          }
+        }, schedulerIntervalMs);
+      }
+
+      // Check if intelligence-scheduler.mjs exists before starting
+      import('node:fs').then(fs => {
+        const schedulerPath = path.join(context.resourceDir || process.cwd(), 'scripts', 'intelligence-scheduler.mjs');
+        if (fs.existsSync(schedulerPath)) {
+          startAutoScheduler();
+          context.logger.log('[auto-scheduler] enabled, interval: ' + (schedulerIntervalMs / 60000) + 'm');
+        }
+
+        // Start data accumulator daemon (continuous data collection + backfill)
+        const accumulatorPath = path.join(context.resourceDir || process.cwd(), 'scripts', 'data-accumulator.mjs');
+        if (fs.existsSync(accumulatorPath)) {
+          setTimeout(async () => {
+            try {
+              const { spawn: spawnChild } = await import('node:child_process');
+              const accChild = spawnChild(process.execPath, ['--import', 'tsx', accumulatorPath], {
+                cwd: context.resourceDir || process.cwd(),
+                stdio: 'ignore',
+                detached: true,
+              });
+              accChild.unref();
+              context.logger.log('[auto-accumulator] started data accumulation daemon (pid ' + accChild.pid + ')');
+            } catch (e) {
+              context.logger.warn('[auto-accumulator] failed to start: ' + e.message);
+            }
+          }, 90_000); // 90s delay — let scheduler run first
+        }
+      });
+
       return { port: boundPort };
     },
     async close() {
@@ -5296,10 +5634,96 @@ export async function createLocalApiServer(options = {}) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Standalone dev mode: run sidecar without Tauri
+// Usage: node src-tauri/sidecar/local-api-server.mjs
+//        npm run sidecar:dev
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal .env parser — reads KEY=VALUE lines from a file, ignoring comments
+ * and blank lines. Does NOT override existing process.env values.
+ * No external dependencies required.
+ */
+function loadEnvFile(filePath) {
+  if (!existsSync(filePath)) return 0;
+  let loaded = 0;
+  try {
+    const raw = readFileSync(filePath, 'utf8');
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx <= 0) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let value = trimmed.slice(eqIdx + 1).trim();
+      // Strip surrounding quotes
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      if (!process.env[key] && value) {
+        process.env[key] = value;
+        loaded += 1;
+      }
+    }
+  } catch { /* ignore read errors */ }
+  return loaded;
+}
+
+/**
+ * Resolve project root from this script's location (src-tauri/sidecar/).
+ * Returns the directory containing package.json.
+ */
+function resolveProjectRoot() {
+  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+  // On Windows, pathname starts with /C:/... — strip leading slash
+  const normalizedDir = process.platform === 'win32'
+    ? scriptDir.replace(/^\/([A-Za-z]:)/, '$1')
+    : scriptDir;
+  // src-tauri/sidecar/ → project root is 2 levels up
+  const candidate = path.resolve(normalizedDir, '..', '..');
+  if (existsSync(path.join(candidate, 'package.json'))) return candidate;
+  // Fallback: cwd
+  return process.cwd();
+}
+
 if (isMainModule()) {
   try {
+    const projectRoot = resolveProjectRoot();
+
+    // Step 2: Load .env.local and .env from project root (API keys, config)
+    const envLocalLoaded = loadEnvFile(path.join(projectRoot, '.env.local'));
+    const envLoaded = loadEnvFile(path.join(projectRoot, '.env'));
+    if (envLocalLoaded + envLoaded > 0) {
+      console.log(`[sidecar:dev] loaded ${envLocalLoaded} keys from .env.local, ${envLoaded} from .env`);
+    }
+
+    // Step 3: Auto-resolve resourceDir to project root (so api/ directory is found)
+    if (!process.env.LOCAL_API_RESOURCE_DIR) {
+      process.env.LOCAL_API_RESOURCE_DIR = projectRoot;
+    }
+    if (!process.env.LOCAL_API_DATA_DIR) {
+      process.env.LOCAL_API_DATA_DIR = projectRoot;
+    }
+
+    // Step 4: Set standalone-dev mode — skips token auth requirement
+    if (!process.env.LOCAL_API_MODE) {
+      process.env.LOCAL_API_MODE = 'standalone-dev';
+    }
+    if (!process.env.LOCAL_API_TOKEN) {
+      // No token = requireLocalApiToken() returns null = auth bypassed in dev
+      console.log('[sidecar:dev] running without auth token (dev mode)');
+    }
+
+    console.log(`[sidecar:dev] project root: ${projectRoot}`);
+    console.log(`[sidecar:dev] api dir: ${process.env.LOCAL_API_RESOURCE_DIR}`);
+
     const app = await createLocalApiServer();
     await app.start();
+
+    console.log('[sidecar:dev] ready — Vite proxy will forward /api/local-* requests here');
+    console.log('[sidecar:dev] run "npm run dev" in another terminal, then open http://localhost:3000');
   } catch (error) {
     console.error('[local-api] startup failed', error);
     process.exit(1);

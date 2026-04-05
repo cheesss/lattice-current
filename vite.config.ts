@@ -173,7 +173,7 @@ function attachLocalProxyAuth(proxy: {
     }
   });
   proxy.on('error', (err: { message?: string }) => {
-    console.log('Local API proxy error:', err?.message ?? String(err));
+    console.warn('Local API proxy error:', err?.message ?? String(err));
   });
 }
 
@@ -596,6 +596,9 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   plugins: [
     htmlVariantPlugin(),
     polymarketPlugin(),
@@ -644,7 +647,13 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
-            handler: 'NetworkOnly',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-navigation',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 20, maxAgeSeconds: 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
           },
           {
             urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
@@ -1155,6 +1164,12 @@ export default defineConfig({
         target: 'https://api.gdeltproject.org',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gdelt/, ''),
+      },
+      // Event Intelligence analysis API (proxied to dashboard API server)
+      '/api/event-intel': {
+        target: 'http://127.0.0.1:46200',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/event-intel/, '/api'),
       },
       // Local sidecar endpoints for browser/dev runtime, including backtesting.
       '/api/local-': {

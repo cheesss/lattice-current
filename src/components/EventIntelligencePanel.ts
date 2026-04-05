@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 
-const API_BASE = 'http://localhost:46200';
+const API_BASE = '/api/event-intel';
 
 interface ThemeTemperature {
   theme: string;
@@ -84,10 +84,10 @@ export class EventIntelligencePanel extends Panel {
   public async refresh(): Promise<void> {
     try {
       const [liveRes, heatmapRes, todayRes, whatifRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/api/live-status`),
-        fetch(`${API_BASE}/api/heatmap`),
-        fetch(`${API_BASE}/api/today`),
-        fetch(`${API_BASE}/api/whatif`),
+        fetch(`${API_BASE}/live-status`),
+        fetch(`${API_BASE}/heatmap`),
+        fetch(`${API_BASE}/today`),
+        fetch(`${API_BASE}/whatif`),
       ]);
 
       const live: LiveStatusResponse | null =
