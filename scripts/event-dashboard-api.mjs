@@ -11,6 +11,11 @@
  *   GET /api/stock/:symbol        종목 프로파일
  *   GET /api/trends               기술 트렌드
  *   GET /api/anomalies            이상 반응
+ *   GET /api/today                오늘의 주요 이벤트 + 과거 반응
+ *   GET /api/heatmap              민감도 히트맵 데이터
+ *   GET /api/live-status          시스템 현황
+ *   GET /api/pending              대기중 outcome 상태
+ *   GET /api/codex-latest         최근 Codex 발견/제안
  *
  * Usage: node --import tsx scripts/event-dashboard-api.mjs
  */
@@ -167,6 +172,157 @@ const server = http.createServer(async (req, res) => {
         ORDER BY ABS(z_score) DESC LIMIT 30
       `, year ? [year] : []);
       json(res, r.rows);
+      return;
+    }
+
+    // ── /api/today ── Today's key events + historical reaction data
+    if (segments[0] === 'api' && segments[1] === 'today') {
+      const articlesR = await pool.query(`
+        SELECT id, title, source, published_at
+        FROM articles
+        WHERE published_at >= NOW() - INTERVAL '24 hours'
+        ORDER BY published_at DESC
+        LIMIT 50
+      `);
+      const themesR = await pool.query(`
+        SELECT article_id, theme
+        FROM auto_article_themes
+        WHERE article_id = ANY($1::int[])
+      `, [articlesR.rows.map(a => a.id)]);
+      const themeMap = {};
+      for (const t of themesR.rows) {
+        if (!themeMap[t.article_id]) themeMap[t.article_id] = [];
+        themeMap[t.article_id].push(t.theme);
+      }
+      const allThemes = [...new Set(themesR.rows.map(t => t.theme))];
+      const [sensR, hawkesR] = await Promise.all([
+        allThemes.length > 0
+          ? pool.query(`
+              SELECT theme, symbol, avg_return, hit_rate
+              FROM stock_sensitivity_matrix
+              WHERE theme = ANY($1::text[]) AND horizon = '2w'
+              ORDER BY theme, ABS(avg_return) DESC
+            `, [allThemes])
+          : { rows: [] },
+        allThemes.length > 0
+          ? pool.query(`
+              SELECT DISTINCT ON (theme) theme, normalized_temperature
+              FROM event_hawkes_intensity
+              WHERE theme = ANY($1::text[])
+              ORDER BY theme, event_date DESC
+            `, [allThemes])
+          : { rows: [] },
+      ]);
+      const sensByTheme = {};
+      for (const s of sensR.rows) {
+        if (!sensByTheme[s.theme]) sensByTheme[s.theme] = [];
+        sensByTheme[s.theme].push({ symbol: s.symbol, avgReturn: s.avg_return, hitRate: s.hit_rate });
+      }
+      const hawkesByTheme = {};
+      for (const h of hawkesR.rows) hawkesByTheme[h.theme] = h.normalized_temperature;
+      const result = articlesR.rows.map(a => {
+        const themes = themeMap[a.id] || [];
+        const primaryTheme = themes[0] || null;
+        return {
+          title: a.title,
+          source: a.source,
+          theme: primaryTheme,
+          date: a.published_at,
+          expectedReactions: primaryTheme ? (sensByTheme[primaryTheme] || []) : [],
+          hawkesTemp: primaryTheme ? (hawkesByTheme[primaryTheme] ?? null) : null,
+        };
+      });
+      json(res, result);
+      return;
+    }
+
+    // ── /api/heatmap ── Full sensitivity heatmap data
+    if (segments[0] === 'api' && segments[1] === 'heatmap') {
+      const r = await pool.query(`
+        SELECT theme, symbol, avg_return, hit_rate
+        FROM stock_sensitivity_matrix
+        WHERE horizon = '2w'
+        ORDER BY theme, symbol
+      `);
+      const themes = [...new Set(r.rows.map(d => d.theme))];
+      const symbols = [...new Set(r.rows.map(d => d.symbol))];
+      const data = r.rows.map(d => ({
+        theme: d.theme,
+        symbol: d.symbol,
+        avgReturn: d.avg_return,
+        hitRate: d.hit_rate,
+      }));
+      json(res, { themes, symbols, data });
+      return;
+    }
+
+    // ── /api/live-status ── Current system status
+    if (segments[0] === 'api' && segments[1] === 'live-status') {
+      const [signalsR, tempsR, pendingR, todayArticlesR] = await Promise.all([
+        pool.query(`
+          SELECT DISTINCT ON (signal_name) signal_name AS name, signal_value AS value, recorded_at AS "updatedAt"
+          FROM signal_history
+          ORDER BY signal_name, recorded_at DESC
+        `),
+        pool.query(`
+          SELECT DISTINCT ON (theme) theme, normalized_temperature AS temp,
+            CASE
+              WHEN normalized_temperature >= 0.8 THEN 'hot'
+              WHEN normalized_temperature >= 0.4 THEN 'warm'
+              ELSE 'cool'
+            END AS status
+          FROM event_hawkes_intensity
+          ORDER BY theme, event_date DESC
+        `),
+        pool.query(`SELECT COUNT(*)::int AS cnt FROM pending_outcomes WHERE status = 'waiting'`),
+        pool.query(`SELECT COUNT(*)::int AS cnt FROM articles WHERE published_at >= CURRENT_DATE`),
+      ]);
+      json(res, {
+        signals: signalsR.rows,
+        temperatures: tempsR.rows,
+        pending: pendingR.rows[0]?.cnt ?? 0,
+        todayArticles: todayArticlesR.rows[0]?.cnt ?? 0,
+      });
+      return;
+    }
+
+    // ── /api/pending ── Pending outcomes status
+    if (segments[0] === 'api' && segments[1] === 'pending') {
+      const r = await pool.query(`
+        SELECT
+          article_id AS "articleId",
+          theme,
+          symbol,
+          entry_price AS "entryPrice",
+          entry_date AS "entryDate",
+          target_date AS "targetDate",
+          GREATEST(0, (target_date::date - CURRENT_DATE)::int) AS "daysRemaining"
+        FROM pending_outcomes
+        WHERE status = 'waiting'
+        ORDER BY target_date ASC
+      `);
+      json(res, r.rows);
+      return;
+    }
+
+    // ── /api/codex-latest ── Latest Codex/analysis discoveries
+    if (segments[0] === 'api' && segments[1] === 'codex-latest') {
+      let discoveries = null;
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const filePath = path.resolve('data/codex-discoveries.json');
+        if (fs.existsSync(filePath)) {
+          discoveries = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        }
+      } catch { /* file not found or parse error — ignore */ }
+      const proposalsR = await pool.query(`
+        SELECT *
+        FROM codex_proposals
+        ORDER BY created_at DESC
+        LIMIT 20
+      `);
+      json(res, { discoveries, proposals: proposalsR.rows });
       return;
     }
 

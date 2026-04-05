@@ -3,278 +3,300 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lattice Event Intelligence Dashboard</title>
+<title>Lattice Event Intelligence</title>
 <style>
-  :root { --bg: #0a0f0a; --surface: #141a14; --border: #1e2e1e; --text: #e0e8e0; --dim: #6a7a6a; --accent: #4aff8a; --negative: #ff5a5a; --positive: #4aff8a; --warn: #ffaa33; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'SF Mono', 'Fira Code', monospace; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; }
-  .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
-  h1 { color: var(--accent); font-size: 18px; margin-bottom: 8px; }
-  h2 { color: var(--accent); font-size: 14px; margin: 20px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
-  .card-title { color: var(--accent); font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; color: var(--dim); padding: 4px 8px; border-bottom: 1px solid var(--border); font-weight: normal; }
-  td { padding: 4px 8px; border-bottom: 1px solid #111; }
-  .pos { color: var(--positive); }
-  .neg { color: var(--negative); }
-  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
-  .tag-surge { background: #1a3a1a; color: var(--positive); }
-  .tag-decline { background: #3a1a1a; color: var(--negative); }
-  .tag-stable { background: #1a1a2a; color: #6a8aff; }
-  .tag-regime { background: #2a1a2a; color: #aa6aff; font-size: 10px; }
-  .search-box { width: 100%; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-family: inherit; font-size: 13px; margin-bottom: 12px; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
-  .tab { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); color: var(--dim); cursor: pointer; border-radius: 4px 4px 0 0; font-family: inherit; font-size: 12px; }
-  .tab.active { color: var(--accent); border-bottom-color: var(--bg); background: var(--bg); }
-  .loading { color: var(--dim); padding: 20px; text-align: center; }
-  .chart-bar { display: flex; align-items: center; gap: 4px; margin: 2px 0; }
-  .chart-bar-fill { height: 14px; border-radius: 2px; min-width: 2px; }
-  .chart-bar-label { font-size: 11px; color: var(--dim); min-width: 40px; text-align: right; }
-  .chart-bar-value { font-size: 11px; min-width: 50px; }
-  #hawkes-chart { width: 100%; height: 200px; }
-  canvas { display: block; }
+:root{--bg:#0a0f0a;--surface:#141a14;--surface2:#1a221a;--border:#1e2e1e;--text:#e0e8e0;--dim:#6a7a6a;--accent:#4aff8a;--neg:#ff5a5a;--pos:#4aff8a;--warn:#ffaa33;--blue:#6a8aff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'SF Mono','Fira Code',monospace;background:var(--bg);color:var(--text);font-size:12px;line-height:1.5}
+.container{max-width:1600px;margin:0 auto;padding:12px}
+h1{color:var(--accent);font-size:16px;margin-bottom:4px}
+.subtitle{color:var(--dim);margin-bottom:12px;font-size:11px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px;min-height:60px}
+.card-title{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.card-title .badge{background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:10px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;color:var(--dim);padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal}
+td{padding:3px 6px;border-bottom:1px solid #111}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.warn{color:var(--warn)}.blue{color:var(--blue)}
+.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;margin:1px}
+.tag-hot{background:#2a1a0a;color:#ff8a33}.tag-warm{background:#1a1a0a;color:#ccaa33}.tag-cool{background:#0a1a2a;color:#6a8aff}
+.tag-pos{background:#0a2a0a;color:var(--pos)}.tag-neg{background:#2a0a0a;color:var(--neg)}.tag-neutral{background:#1a1a1a;color:var(--dim)}
+.heatmap-cell{width:100%;height:24px;display:flex;align-items:center;justify-content:center;border-radius:3px;font-size:10px;font-weight:bold}
+.sparkline{display:flex;align-items:end;gap:1px;height:30px}
+.sparkline-bar{flex:1;background:var(--accent);opacity:0.4;border-radius:1px;min-width:2px}
+.event-row{padding:6px;border-bottom:1px solid var(--border);cursor:pointer}
+.event-row:hover{background:var(--surface2)}
+.event-title{font-size:11px;color:var(--text);margin-bottom:2px}
+.event-meta{font-size:10px;color:var(--dim)}
+.event-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.reaction-chip{font-size:10px;padding:1px 4px;border-radius:2px;background:var(--surface2)}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}
+.dot-green{background:var(--pos)}.dot-yellow{background:var(--warn)}.dot-red{background:var(--neg)}.dot-gray{background:var(--dim)}
+.loading{color:var(--dim);padding:10px;text-align:center;font-size:11px}
+.section-title{color:var(--accent);font-size:13px;margin:14px 0 8px;border-bottom:1px solid var(--border);padding-bottom:3px}
+.refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:3px 10px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:10px}
+.refresh-btn:hover{background:var(--border)}
+#last-update{color:var(--dim);font-size:10px}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>LATTICE EVENT INTELLIGENCE</h1>
-  <p style="color:var(--dim);margin-bottom:16px">이벤트-종목 반응 분석 | 시장 상태별 민감도 | 기술 트렌드</p>
-
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('overview')">Overview</button>
-    <button class="tab" onclick="showTab('stock')">Stock Analysis</button>
-    <button class="tab" onclick="showTab('events')">Event Search</button>
-    <button class="tab" onclick="showTab('regime')">Regime Analysis</button>
-    <button class="tab" onclick="showTab('trends')">Tech Trends</button>
-    <button class="tab" onclick="showTab('anomalies')">Anomalies</button>
-    <button class="tab" onclick="showTab('whatif')">What-If</button>
-  </div>
-
-  <!-- Overview Tab -->
-  <div id="tab-overview">
-    <div class="grid">
-      <div class="card">
-        <div class="card-title">Sensitivity Matrix (2w)</div>
-        <div id="sensitivity-table" class="loading">Loading...</div>
-      </div>
-      <div class="card">
-        <div class="card-title">Best What-If Strategies</div>
-        <div id="whatif-overview" class="loading">Loading...</div>
-      </div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <h1>LATTICE EVENT INTELLIGENCE</h1>
+      <div class="subtitle">실시간 이벤트-종목 반응 분석 · 기술 트렌드 · 시장 상태</div>
     </div>
-    <div class="card" style="margin-top:16px">
-      <div class="card-title">Recent Anomalies</div>
-      <div id="anomalies-overview" class="loading">Loading...</div>
+    <div>
+      <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+      <span id="last-update"></span>
     </div>
   </div>
 
-  <!-- Stock Tab -->
-  <div id="tab-stock" style="display:none">
-    <input class="search-box" id="stock-input" placeholder="종목 심볼 입력 (예: NVDA, GLD, SPY)" onkeydown="if(event.key==='Enter')loadStock()">
-    <div id="stock-result"></div>
+  <!-- Row 1: Status + Temperatures + Signals -->
+  <div class="grid3" style="margin-top:10px">
+    <div class="card">
+      <div class="card-title">System Status <span class="badge" id="status-badge">-</span></div>
+      <div id="system-status" class="loading">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Issue Temperature</div>
+      <div id="temperatures" class="loading">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Signal History (Latest)</div>
+      <div id="signals" class="loading">Loading...</div>
+    </div>
   </div>
 
-  <!-- Event Search Tab -->
-  <div id="tab-events" style="display:none">
-    <input class="search-box" id="event-input" placeholder="이벤트 키워드 검색 (예: semiconductor, Ukraine, tariff)" onkeydown="if(event.key==='Enter')searchEvents()">
-    <div id="event-results"></div>
+  <!-- Row 2: Today's Events -->
+  <div class="section-title">Today's Key Events</div>
+  <div class="card">
+    <div id="today-events" class="loading">Loading events...</div>
   </div>
 
-  <!-- Regime Tab -->
-  <div id="tab-regime" style="display:none">
-    <div id="regime-data" class="loading">Loading...</div>
+  <!-- Row 3: Heatmap + Trends -->
+  <div class="grid2" style="margin-top:4px">
+    <div class="card">
+      <div class="card-title">Sensitivity Heatmap (2-week)</div>
+      <div id="heatmap" class="loading">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Technology Trends</div>
+      <div id="trends" class="loading">Loading...</div>
+    </div>
   </div>
 
-  <!-- Trends Tab -->
-  <div id="tab-trends" style="display:none">
-    <div id="trends-data" class="loading">Loading...</div>
+  <!-- Row 4: What-if + Anomalies + Codex + Pending -->
+  <div class="grid4" style="margin-top:4px">
+    <div class="card">
+      <div class="card-title">Best Strategies</div>
+      <div id="whatif" class="loading">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Anomalies</div>
+      <div id="anomalies" class="loading">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Codex Discoveries</div>
+      <div id="codex-latest" class="loading">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Pending Validation</div>
+      <div id="pending" class="loading">Loading...</div>
+    </div>
   </div>
 
-  <!-- Anomalies Tab -->
-  <div id="tab-anomalies" style="display:none">
-    <div id="anomalies-data" class="loading">Loading...</div>
-  </div>
-
-  <!-- What-If Tab -->
-  <div id="tab-whatif" style="display:none">
-    <div id="whatif-data" class="loading">Loading...</div>
+  <!-- Row 5: Regime Analysis -->
+  <div class="section-title">Regime-Conditional Impact</div>
+  <div class="card">
+    <div id="regime" class="loading">Loading...</div>
   </div>
 </div>
 
 <script>
-const API = 'http://localhost:46200/api';
+const API='http://localhost:46200/api';
+const f=url=>fetch(url).then(r=>r.json()).catch(()=>null);
+const fmt=(v,d=2)=>v!=null?Number(v).toFixed(d):'—';
+const pct=v=>v!=null?(Number(v)*100).toFixed(0)+'%':'—';
+const rc=v=>Number(v)>=0?'pos':'neg';
+const rf=v=>{const n=Number(v);return`<span class="${rc(v)}">${n>=0?'+':''}${n.toFixed(2)}%</span>`};
 
-function showTab(name) {
-  document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
-  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + name).style.display = 'block';
-  event.target.classList.add('active');
+async function refreshAll(){
+  document.getElementById('last-update').textContent='Updating...';
+  await Promise.all([loadStatus(),loadToday(),loadHeatmap(),loadTrends(),loadWhatif(),loadAnomalies(),loadCodex(),loadPending(),loadRegime()]);
+  document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
 }
 
-function fmt(v, d=2) { return v != null ? Number(v).toFixed(d) : 'n/a'; }
-function pct(v) { return v != null ? (Number(v)*100).toFixed(0)+'%' : 'n/a'; }
-function retClass(v) { return Number(v) >= 0 ? 'pos' : 'neg'; }
-function retFmt(v) { const n = Number(v); return `<span class="${retClass(v)}">${n>=0?'+':''}${n.toFixed(2)}%</span>`; }
+async function loadStatus(){
+  const d=await f(API+'/live-status');
+  if(!d){document.getElementById('system-status').innerHTML='<span class="neg">API offline</span>';return}
+  let h=`<div style="font-size:11px">`;
+  h+=`<div>Articles today: <strong>${d.todayArticles||0}</strong></div>`;
+  h+=`<div>Pending: <strong>${d.pending||0}</strong></div>`;
+  h+=`<div>Signals: <strong>${(d.signals||[]).length}</strong> channels</div>`;
+  h+=`</div>`;
+  document.getElementById('system-status').innerHTML=h;
+  document.getElementById('status-badge').textContent=d.todayArticles>0?'LIVE':'IDLE';
 
-async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
-
-// ── Overview ──
-async function loadOverview() {
-  // Sensitivity
-  const sens = await fetchJSON(API + '/sensitivity');
-  const twoWeek = sens.filter(r => r.horizon === '2w');
-  let html = '<table><tr><th>Theme</th><th>Symbol</th><th>AvgRet</th><th>Hit</th><th>Volatility</th></tr>';
-  for (const r of twoWeek.slice(0, 20)) {
-    html += `<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td><td>${fmt(r.volatility)}%</td></tr>`;
+  // Temperatures
+  let th='';
+  for(const t of(d.temperatures||[])){
+    const cls=t.status==='HOT'?'tag-hot':t.status==='WARM'?'tag-warm':'tag-cool';
+    th+=`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${t.theme}</span><span class="tag ${cls}">${t.status} ${fmt(t.temp,0)}</span></div>`;
   }
-  html += '</table>';
-  document.getElementById('sensitivity-table').innerHTML = html;
+  document.getElementById('temperatures').innerHTML=th||'No data';
 
-  // What-if
-  const whatif = await fetchJSON(API + '/whatif//');
-  let wh = '<table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th><th>AvgPnL</th></tr>';
-  for (const r of whatif.slice(0, 15)) {
-    wh += `<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${r.direction}</td><td>${fmt(r.sharpe_ratio)}</td><td>${pct(r.hit_rate)}</td><td>${retFmt(r.avg_pnl_pct)}</td></tr>`;
+  // Signals
+  let sh='<table><tr><th>Signal</th><th>Value</th></tr>';
+  for(const s of(d.signals||[]).slice(0,8)){
+    sh+=`<tr><td>${s.name}</td><td>${fmt(s.value,3)}</td></tr>`;
   }
-  wh += '</table>';
-  document.getElementById('whatif-overview').innerHTML = wh;
-
-  // Anomalies
-  const anom = await fetchJSON(API + '/anomalies');
-  let ah = '<table><tr><th>Date</th><th>Theme</th><th>Symbol</th><th>Actual</th><th>Expected</th><th>Z-Score</th></tr>';
-  for (const r of anom.slice(0, 10)) {
-    ah += `<tr><td>${String(r.event_date).slice(0,10)}</td><td>${r.theme}</td><td>${r.symbol}</td><td>${retFmt(r.forward_return_pct)}</td><td>${retFmt(r.expected_return)}</td><td><strong>${fmt(r.z_score,1)}</strong></td></tr>`;
-  }
-  ah += '</table>';
-  document.getElementById('anomalies-overview').innerHTML = ah;
+  sh+='</table>';
+  document.getElementById('signals').innerHTML=sh;
 }
 
-// ── Stock Analysis ──
-async function loadStock() {
-  const sym = document.getElementById('stock-input').value.toUpperCase();
-  if (!sym) return;
-  const data = await fetchJSON(API + '/stock/' + sym);
-  let html = '<h2>' + sym + ' Event Reaction Profile</h2>';
-
-  // Sensitivity by theme
-  html += '<div class="grid"><div class="card"><div class="card-title">Theme Sensitivity</div><table><tr><th>Theme</th><th>Horizon</th><th>AvgRet</th><th>Hit</th></tr>';
-  for (const r of data.sensitivity) html += `<tr><td>${r.theme}</td><td>${r.horizon}</td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td></tr>`;
-  html += '</table></div>';
-
-  // Regime
-  html += '<div class="card"><div class="card-title">Regime Conditional</div><table><tr><th>Theme</th><th>Regime</th><th>AvgRet</th><th>Hit</th><th>Mult</th></tr>';
-  for (const r of data.regime) html += `<tr><td>${r.theme}</td><td><span class="tag tag-regime">${r.regime}</span></td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td><td>${fmt(r.regime_multiplier)}x</td></tr>`;
-  html += '</table></div></div>';
-
-  // Patterns
-  html += '<div class="card" style="margin-top:12px"><div class="card-title">Reaction Pattern Distribution</div>';
-  const maxN = Math.max(...data.patterns.map(p => Number(p.n)));
-  for (const p of data.patterns) {
-    const w = (Number(p.n) / maxN * 100).toFixed(0);
-    const color = Number(p.avg_ret) >= 0 ? 'var(--positive)' : 'var(--negative)';
-    html += `<div class="chart-bar"><div class="chart-bar-label">${p.reaction_pattern}</div><div class="chart-bar-fill" style="width:${w}%;background:${color};opacity:0.5"></div><div class="chart-bar-value">${p.n} (${retFmt(p.avg_ret)})</div></div>`;
-  }
-  html += '</div>';
-
-  // What-if
-  html += '<div class="card" style="margin-top:12px"><div class="card-title">What-If Simulations</div><table><tr><th>Theme</th><th>Dir</th><th>Trades</th><th>Sharpe</th><th>Hit</th><th>VaR95</th><th>Total</th></tr>';
-  for (const r of data.whatif) html += `<tr><td>${r.theme}</td><td>${r.direction}</td><td>${r.simulated_trades}</td><td>${fmt(r.sharpe_ratio)}</td><td>${pct(r.hit_rate)}</td><td>${retFmt(r.var_95_pct)}</td><td>${retFmt(r.total_return_pct)}</td></tr>`;
-  html += '</table></div>';
-
-  document.getElementById('stock-result').innerHTML = html;
-}
-
-// ── Event Search ──
-async function searchEvents() {
-  const q = document.getElementById('event-input').value;
-  if (!q) return;
-  const data = await fetchJSON(API + '/event-search?q=' + encodeURIComponent(q));
-  let html = `<h2>"${q}" 관련 이벤트 (${data.length}건)</h2><table><tr><th>Date</th><th>Source</th><th>Theme</th><th>Symbol</th><th>Return</th><th>Pattern</th><th>Title</th></tr>`;
-  for (const r of data) {
-    html += `<tr><td>${String(r.event_date).slice(0,10)}</td><td>${r.source}</td><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${retFmt(r.forward_return_pct)}</td><td>${r.reaction_pattern||''}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</td></tr>`;
-  }
-  html += '</table>';
-  document.getElementById('event-results').innerHTML = html;
-}
-
-// ── Regime ──
-async function loadRegime() {
-  const data = await fetchJSON(API + '/regime//');
-  let html = '<h2>Regime-Conditional Impact (2w)</h2>';
-  const byTheme = {};
-  for (const r of data) { if (!byTheme[r.theme]) byTheme[r.theme] = []; byTheme[r.theme].push(r); }
-  for (const [theme, rows] of Object.entries(byTheme)) {
-    html += `<div class="card" style="margin-bottom:12px"><div class="card-title">${theme}</div><table><tr><th>Symbol</th><th>Regime</th><th>AvgRet</th><th>Hit</th><th>|Move|</th><th>Multiplier</th><th>N</th></tr>`;
-    for (const r of rows) html += `<tr><td><strong>${r.symbol}</strong></td><td><span class="tag tag-regime">${r.regime}</span></td><td>${retFmt(r.avg_return)}</td><td>${pct(r.hit_rate)}</td><td>${fmt(r.avg_abs_return)}%</td><td>${fmt(r.regime_multiplier)}x</td><td>${r.sample_size}</td></tr>`;
-    html += '</table></div>';
-  }
-  document.getElementById('regime-data').innerHTML = html;
-}
-
-// ── Trends ──
-async function loadTrends() {
-  const data = await fetchJSON(API + '/trends');
-  let html = '<h2>Technology Trend Tracker</h2><div class="grid-3">';
-  for (const t of data.sort((a,b) => b.momentum - a.momentum)) {
-    const status = t.momentum > 30 ? 'SURGING' : t.momentum > 10 ? 'GROWING' : t.momentum > -10 ? 'STABLE' : 'DECLINING';
-    const tagClass = status === 'SURGING' || status === 'GROWING' ? 'tag-surge' : status === 'DECLINING' ? 'tag-decline' : 'tag-stable';
-    html += `<div class="card"><div class="card-title">${t.name} <span class="tag ${tagClass}">${status}</span></div>`;
-    html += `<div style="margin:8px 0">Total: ${t.total} articles | Recent: ${fmt(t.recentAvg,0)}/mo | Momentum: <span class="${t.momentum>=0?'pos':'neg'}">${t.momentum>=0?'+':''}${fmt(t.momentum,0)}%</span></div>`;
-    // Mini sparkline
-    const timeline = t.timeline.slice(-24);
-    if (timeline.length > 0) {
-      const maxN = Math.max(...timeline.map(p => p.n));
-      html += '<div style="display:flex;align-items:end;gap:1px;height:40px">';
-      for (const p of timeline) {
-        const h = maxN > 0 ? (p.n / maxN * 38) : 0;
-        html += `<div style="flex:1;height:${h}px;background:var(--accent);opacity:0.4;border-radius:1px" title="${String(p.month).slice(0,7)}: ${p.n}"></div>`;
-      }
-      html += '</div>';
+async function loadToday(){
+  const d=await f(API+'/today');
+  if(!d||d.length===0){document.getElementById('today-events').innerHTML='No events today. Waiting for real-time collection to start.';return}
+  let h='';
+  for(const e of d.slice(0,10)){
+    h+=`<div class="event-row">`;
+    h+=`<div class="event-title">${e.title||'Untitled'}</div>`;
+    h+=`<div class="event-meta">${e.source||''} · ${e.theme||''} · ${String(e.date||'').slice(0,10)}</div>`;
+    h+=`<div class="event-reactions">`;
+    for(const r of(e.expectedReactions||[]).slice(0,5)){
+      const cls=Number(r.avgReturn)>=0?'pos':'neg';
+      h+=`<span class="reaction-chip"><strong>${r.symbol}</strong> <span class="${cls}">${rf(r.avgReturn)}</span> hit ${pct(r.hitRate)}</span>`;
     }
-    html += '</div>';
+    h+=`</div></div>`;
   }
-  html += '</div>';
-  document.getElementById('trends-data').innerHTML = html;
+  document.getElementById('today-events').innerHTML=h;
 }
 
-// ── Anomalies ──
-async function loadAnomalies() {
-  const data = await fetchJSON(API + '/anomalies');
-  let html = '<h2>Anomalous Reactions (|z-score| > 2.5)</h2><table><tr><th>Date</th><th>Theme</th><th>Symbol</th><th>Actual</th><th>Expected</th><th>Z-Score</th><th>Type</th><th>Event</th></tr>';
-  for (const r of data) {
-    html += `<tr><td>${String(r.event_date).slice(0,10)}</td><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${retFmt(r.forward_return_pct)}</td><td>${retFmt(r.expected_return)}</td><td><strong>${fmt(r.z_score,1)}</strong></td><td>${r.anomaly_type}</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title}</td></tr>`;
+async function loadHeatmap(){
+  const d=await f(API+'/heatmap');
+  if(!d){document.getElementById('heatmap').innerHTML='No data';return}
+  const themes=d.themes||[...new Set((d.data||[]).map(r=>r.theme))];
+  const symbols=d.symbols||[...new Set((d.data||[]).map(r=>r.symbol))];
+  const lookup={};
+  for(const r of(d.data||[]))lookup[r.theme+':'+r.symbol]=r;
+
+  let h='<table><tr><th></th>';
+  for(const s of symbols.slice(0,12))h+=`<th style="text-align:center;font-size:10px">${s}</th>`;
+  h+='</tr>';
+  for(const t of themes){
+    h+=`<tr><td style="font-weight:bold">${t}</td>`;
+    for(const s of symbols.slice(0,12)){
+      const r=lookup[t+':'+s];
+      if(!r){h+='<td style="text-align:center">·</td>';continue}
+      const hit=Number(r.hitRate||0.5);
+      const bg=hit>0.58?'#0a3a0a':hit>0.52?'#1a2a1a':hit<0.42?'#3a0a0a':hit<0.48?'#2a1a1a':'#1a1a1a';
+      const ret=Number(r.avgReturn||0);
+      h+=`<td style="text-align:center"><div class="heatmap-cell" style="background:${bg}" title="${t}→${s}: ${ret>=0?'+':''}${ret.toFixed(2)}% hit ${(hit*100).toFixed(0)}%">${(hit*100).toFixed(0)}</div></td>`;
+    }
+    h+='</tr>';
   }
-  html += '</table>';
-  document.getElementById('anomalies-data').innerHTML = html;
+  h+='</table><div style="font-size:9px;color:var(--dim);margin-top:4px">Cell = hit rate %. Green > 58%, Red < 42%</div>';
+  document.getElementById('heatmap').innerHTML=h;
 }
 
-// ── What-If ──
-async function loadWhatif() {
-  const data = await fetchJSON(API + '/whatif//');
-  let html = '<h2>What-If Simulations — "이 이벤트에 진입했으면?"</h2>';
-  html += '<table><tr><th>Theme</th><th>Symbol</th><th>Direction</th><th>Trades</th><th>Avg PnL</th><th>Hit Rate</th><th>Sharpe</th><th>VaR 95%</th><th>Max DD</th><th>Total Return</th></tr>';
-  for (const r of data) {
-    html += `<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${r.direction}</td><td>${r.simulated_trades}</td><td>${retFmt(r.avg_pnl_pct)}</td><td>${pct(r.hit_rate)}</td><td class="${Number(r.sharpe_ratio)>=0?'pos':'neg'}">${fmt(r.sharpe_ratio)}</td><td>${retFmt(r.var_95_pct)}</td><td>${retFmt(r.max_drawdown_pct)}</td><td>${retFmt(r.total_return_pct)}</td></tr>`;
+async function loadTrends(){
+  const d=await f(API+'/trends');
+  if(!d){document.getElementById('trends').innerHTML='No data';return}
+  let h='';
+  for(const t of(d||[]).sort((a,b)=>b.momentum-a.momentum)){
+    const status=t.momentum>30?'SURGING':t.momentum>10?'GROWING':t.momentum>-10?'STABLE':'DECLINING';
+    const cls=status==='SURGING'||status==='GROWING'?'tag-pos':status==='DECLINING'?'tag-neg':'tag-neutral';
+    h+=`<div style="margin-bottom:8px">`;
+    h+=`<div style="display:flex;justify-content:space-between"><strong>${t.name}</strong><span class="tag ${cls}">${status}</span></div>`;
+    h+=`<div style="font-size:10px;color:var(--dim)">${t.total} articles · ${fmt(t.recentAvg,0)}/mo · <span class="${t.momentum>=0?'pos':'neg'}">${t.momentum>=0?'+':''}${fmt(t.momentum,0)}%</span></div>`;
+    const tl=(t.timeline||[]).slice(-18);
+    if(tl.length>0){
+      const mx=Math.max(...tl.map(p=>p.n));
+      h+=`<div class="sparkline">`;
+      for(const p of tl)h+=`<div class="sparkline-bar" style="height:${mx>0?(p.n/mx*28):0}px" title="${String(p.month).slice(0,7)}: ${p.n}"></div>`;
+      h+=`</div>`;
+    }
+    h+=`</div>`;
   }
-  html += '</table>';
-  document.getElementById('whatif-data').innerHTML = html;
+  document.getElementById('trends').innerHTML=h;
 }
 
-// Initial load
-loadOverview();
-// Lazy load other tabs
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const name = tab.textContent.toLowerCase().replace(/[^a-z]/g, '').replace('stockanalysis','stock').replace('eventsearch','events').replace('regimeanalysis','regime').replace('techtrends','trends');
-    if (name === 'regime') loadRegime();
-    if (name === 'trends') loadTrends();
-    if (name === 'anomalies') loadAnomalies();
-    if (name === 'whatif') loadWhatif();
-  });
-});
+async function loadWhatif(){
+  const d=await f(API+'/whatif//');
+  if(!d){document.getElementById('whatif').innerHTML='No data';return}
+  let h='<table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th></tr>';
+  for(const r of(d||[]).slice(0,8)){
+    h+=`<tr><td>${r.theme}</td><td><strong>${r.symbol}</strong></td><td>${r.direction}</td>`;
+    h+=`<td class="${Number(r.sharpe_ratio)>=0?'pos':'neg'}">${fmt(r.sharpe_ratio)}</td>`;
+    h+=`<td>${pct(r.hit_rate)}</td></tr>`;
+  }
+  h+='</table>';
+  document.getElementById('whatif').innerHTML=h;
+}
+
+async function loadAnomalies(){
+  const d=await f(API+'/anomalies');
+  if(!d){document.getElementById('anomalies').innerHTML='No data';return}
+  let h='';
+  for(const r of(d||[]).slice(0,5)){
+    h+=`<div style="margin-bottom:6px;font-size:11px">`;
+    h+=`<div><strong>${r.symbol}</strong> ${rf(r.forward_return_pct)} <span class="dim">z=${fmt(r.z_score,1)}</span></div>`;
+    h+=`<div style="font-size:10px;color:var(--dim)">${String(r.event_date).slice(0,10)} · ${r.theme}</div>`;
+    h+=`</div>`;
+  }
+  document.getElementById('anomalies').innerHTML=h||'No anomalies';
+}
+
+async function loadCodex(){
+  const d=await f(API+'/codex-latest');
+  if(!d){document.getElementById('codex-latest').innerHTML='No discoveries';return}
+  let h='';
+  if(d.proposals?.length>0){
+    for(const p of d.proposals.slice(0,4)){
+      const s=p.status||'?';
+      const dot=s==='executed'?'dot-green':s==='pending'?'dot-yellow':'dot-red';
+      h+=`<div style="margin-bottom:4px"><span class="status-dot ${dot}"></span>${p.proposal_type}: ${JSON.stringify(p.payload||{}).slice(0,60)}</div>`;
+    }
+  }else{h='No recent proposals';}
+  document.getElementById('codex-latest').innerHTML=h;
+}
+
+async function loadPending(){
+  const d=await f(API+'/pending');
+  if(!d||d.length===0){document.getElementById('pending').innerHTML='No pending validations';return}
+  let h='<table><tr><th>Symbol</th><th>Theme</th><th>Days</th></tr>';
+  for(const r of(d||[]).slice(0,6)){
+    h+=`<tr><td><strong>${r.symbol}</strong></td><td>${r.theme}</td><td>${r.daysRemaining}d</td></tr>`;
+  }
+  h+='</table>';
+  document.getElementById('pending').innerHTML=h;
+}
+
+async function loadRegime(){
+  const d=await f(API+'/regime//');
+  if(!d||d.length===0){document.getElementById('regime').innerHTML='No regime data';return}
+  const byTheme={};
+  for(const r of d){if(!byTheme[r.theme])byTheme[r.theme]=[];byTheme[r.theme].push(r)}
+  let h='<div class="grid3">';
+  for(const[theme,rows]of Object.entries(byTheme)){
+    h+=`<div><strong>${theme}</strong><table><tr><th>Symbol</th><th>Regime</th><th>Return</th><th>Hit</th></tr>`;
+    for(const r of rows.slice(0,8)){
+      const cls=r.regime==='risk-off'?'tag-neg':r.regime==='risk-on'?'tag-pos':'tag-neutral';
+      h+=`<tr><td>${r.symbol}</td><td><span class="tag ${cls}">${r.regime}</span></td><td>${rf(r.avg_return)}</td><td>${pct(r.hit_rate)}</td></tr>`;
+    }
+    h+='</table></div>';
+  }
+  h+='</div>';
+  document.getElementById('regime').innerHTML=h;
+}
+
+// Auto-refresh every 60 seconds
+refreshAll();
+setInterval(refreshAll,60000);
 </script>
 </body>
 </html>
