@@ -369,6 +369,20 @@ export async function ingestArticle(
       }
     }
 
+    // Update Hawkes intensity for this theme (incremental)
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      // Increment today's article count
+      await db.query(`
+        INSERT INTO event_hawkes_intensity (theme, event_date, article_count, hawkes_intensity, normalized_temperature, is_surge)
+        VALUES ($1, $2::date, 1, 1, 0, false)
+        ON CONFLICT (theme, event_date) DO UPDATE SET
+          article_count = event_hawkes_intensity.article_count + 1,
+          hawkes_intensity = event_hawkes_intensity.hawkes_intensity + 1,
+          updated_at = NOW()
+      `, [theme, today]);
+    } catch { /* non-fatal */ }
+
     return { articleId, theme, pendingCount };
   } finally {
     client.release();

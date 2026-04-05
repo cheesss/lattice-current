@@ -123,6 +123,8 @@ import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { nameToCountryCode } from '@/services/country-geometry';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
+import { pushSignalFromMarketData, pushGdeltStress } from '@/services/signal-history-updater';
+import { ingestArticleBatch } from '@/services/article-ingestor';
 import { signalAggregator } from '@/services/signal-aggregator';
 import { updateAndCheck } from '@/services/temporal-baseline';
 import { fetchAllFires, flattenFires, computeRegionStats, toMapFires } from '@/services/wildfires';
@@ -190,10 +192,18 @@ import { fetchAllPositiveTopicIntelligence } from '@/services/gdelt-intel';
 import { fetchPositiveGeoEvents, geocodePositiveNewsItems } from '@/services/positive-events-geo';
 import { fetchKindnessData } from '@/services/kindness-data';
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
+import { getHydratedData } from '@/services/bootstrap';
 import {
   hydrateContextFromPersistedIntelligenceFabric,
   persistIntelligenceFabricSnapshotFromContext,
 } from '@/services/intelligence-fabric';
+import {
+  fetchOrefAlerts,
+  onOrefAlertsUpdate,
+  startOrefPolling,
+  stopOrefPolling,
+} from '@/services/oref-alerts';
+import { dispatchOrefBreakingAlert } from '@/services/breaking-news-alerts';
 import type { GlintFeedRecord, GlintNewsLocation } from '@/services/glint';
 
 const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
@@ -309,6 +319,7 @@ export class DataLoaderManager implements AppModule {
   private advancedIntelInFlight = false;
   private persistFabricHandle: ReturnType<typeof setTimeout> | null = null;
   private persistFabricInFlight = false;
+  private orefSirensInitialized = false;
   private readonly MAP_FLASH_COOLDOWN_MS = 10 * 60 * 1000;
   private readonly KEYWORD_LIFECYCLE_INTERVAL_MS = 12 * 60 * 1000;
   private readonly API_DISCOVERY_INTERVAL_MS = 20 * 60 * 1000;
@@ -338,6 +349,7 @@ export class DataLoaderManager implements AppModule {
     // Start background codex+playwright source hunt loop once runtime is up.
     startSourceAutonomyLoop();
     void triggerSourceAutonomyOnce(false);
+    void this.initOrefSirens();
   }
 
   destroy(): void {
@@ -348,6 +360,8 @@ export class DataLoaderManager implements AppModule {
     void this.persistIntelligenceFabric();
     this.stopGlintRealtime();
     stopSourceAutonomyLoop();
+    stopOrefPolling();
+    this.orefSirensInitialized = false;
     if (this.openbbStartupRetryHandle) {
       clearTimeout(this.openbbStartupRetryHandle);
       this.openbbStartupRetryHandle = null;
@@ -1916,6 +1930,13 @@ export class DataLoaderManager implements AppModule {
       outputCount = combinedItems.length;
 
       this.renderNewsForCategory(category, combinedItems);
+      // Ingest articles into analysis engine (non-blocking)
+      void ingestArticleBatch(combinedItems.map(item => ({
+        title: item.title || '',
+        source: item.source || category,
+        url: item.link || '',
+        publishedAt: item.pubDate?.toISOString() || new Date().toISOString(),
+      }))).catch(() => {});
       if (panel) {
         if (renderTimeout) {
           clearTimeout(renderTimeout);
@@ -2104,6 +2125,10 @@ export class DataLoaderManager implements AppModule {
     const heatmapPanel = this.ctx.panels['heatmap'] as HeatmapPanel | undefined;
     const commoditiesPanel = this.ctx.panels['commodities'] as CommoditiesPanel | undefined;
     const cryptoPanel = this.ctx.panels['crypto'] as CryptoPanel | undefined;
+
+    this.consumeHydratedMarketBootstrap();
+    this.consumeHydratedCommodityBootstrap();
+    this.consumeHydratedSectorBootstrap();
 
     const cryptoTargets = Object.values(CRYPTO_MAP).map((item) => ({
       symbol: `${item.symbol.toUpperCase()}-USD`,
@@ -2308,6 +2333,10 @@ export class DataLoaderManager implements AppModule {
   }
 
   private async loadMarketsFallbackOnly(): Promise<void> {
+    this.consumeHydratedMarketBootstrap();
+    this.consumeHydratedCommodityBootstrap();
+    this.consumeHydratedSectorBootstrap();
+
     try {
       const stocksResult = await fetchMultipleStocks(MARKET_SYMBOLS, {
         onBatch: (partialStocks) => {
@@ -2318,6 +2347,12 @@ export class DataLoaderManager implements AppModule {
 
       const finnhubConfigMsg = 'FINNHUB_API_KEY not configured - add in Settings';
       this.ctx.latestMarkets = stocksResult.data;
+      // Push market data to signal_history for analysis engine
+      for (const stock of stocksResult.data) {
+        if (stock.symbol && typeof stock.price === 'number') {
+          void pushSignalFromMarketData(stock.symbol, stock.price);
+        }
+      }
       (this.ctx.panels['markets'] as MarketPanel).renderMarkets(stocksResult.data, stocksResult.rateLimited);
 
       if (stocksResult.rateLimited && stocksResult.data.length === 0) {
@@ -2613,6 +2648,76 @@ export class DataLoaderManager implements AppModule {
       itemCount: hexes.length,
       errorMessage: payload ? undefined : 'GPS interference feed unavailable',
     });
+  }
+
+  // OREF sirens
+  private async initOrefSirens(): Promise<void> {
+    if (this.orefSirensInitialized) return;
+    this.orefSirensInitialized = true;
+
+    onOrefAlertsUpdate((data) => {
+      dispatchOrefBreakingAlert(data.alerts);
+    });
+
+    try {
+      const initialAlerts = await fetchOrefAlerts();
+      dispatchOrefBreakingAlert(initialAlerts.alerts);
+    } catch (error) {
+      console.warn('[Intelligence] OREF siren bootstrap failed:', error);
+    }
+
+    startOrefPolling();
+  }
+
+  // GPS/GNSS
+  private consumeHydratedMarketBootstrap(): void {
+    const hydratedMarkets = getHydratedData('marketQuotes') as
+      | { quotes?: Array<{ symbol: string; name?: string; display?: string; price?: number | null; change?: number | null; sparkline?: number[] }> }
+      | undefined;
+    if (hydratedMarkets?.quotes?.length) {
+      const mapped = hydratedMarkets.quotes
+        .map((quote) => ({
+          symbol: quote.symbol,
+          name: quote.name || quote.symbol,
+          display: quote.display || quote.symbol,
+          price: quote.price ?? null,
+          change: quote.change ?? null,
+          sparkline: quote.sparkline,
+        }))
+        .filter((quote) => quote.price != null || quote.change != null);
+      if (mapped.length > 0) {
+        this.ctx.latestMarkets = mapped;
+        (this.ctx.panels['markets'] as MarketPanel | undefined)?.renderMarkets(mapped);
+      }
+    }
+  }
+
+  private consumeHydratedCommodityBootstrap(): void {
+    const hydratedCommodities = getHydratedData('commodityQuotes') as
+      | { quotes?: Array<{ display?: string; symbol?: string; price?: number | null; change?: number | null; sparkline?: number[] }> }
+      | undefined;
+    if (hydratedCommodities?.quotes?.length) {
+      const mapped = hydratedCommodities.quotes.map((quote) => ({
+        display: quote.display || quote.symbol || 'Unknown',
+        price: quote.price ?? null,
+        change: quote.change ?? null,
+        sparkline: quote.sparkline,
+      }));
+      (this.ctx.panels['commodities'] as CommoditiesPanel | undefined)?.renderCommodities(mapped);
+    }
+  }
+
+  private consumeHydratedSectorBootstrap(): void {
+    const hydratedSectors = getHydratedData('sectors') as
+      | { quotes?: Array<{ name?: string; change?: number | null }> }
+      | undefined;
+    if (hydratedSectors?.quotes?.length) {
+      const mapped = hydratedSectors.quotes.map((quote) => ({
+        name: quote.name || 'Unknown',
+        change: quote.change ?? null,
+      }));
+      (this.ctx.panels['heatmap'] as HeatmapPanel | undefined)?.renderHeatmap(mapped);
+    }
   }
 
   private async loadResearchSignals(): Promise<void> {
@@ -3354,6 +3459,12 @@ export class DataLoaderManager implements AppModule {
 
       economicPanel?.setErrorState(false);
       economicPanel?.update(data);
+      // Push FRED data to signal_history for analysis engine
+      for (const item of data) {
+        if (item.id && typeof item.value === 'number') {
+          void pushSignalFromMarketData(item.id, item.value);
+        }
+      }
       this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
       dataFreshness.recordUpdate('economic', data.length);
     } catch {
@@ -3665,6 +3776,12 @@ export class DataLoaderManager implements AppModule {
       this.ctx.pizzintIndicator?.show();
       this.ctx.pizzintIndicator?.updateStatus(status);
       this.ctx.pizzintIndicator?.updateTensions(tensions);
+      // Push GDELT stress signals to signal_history
+      for (const t of tensions) {
+        if (typeof t.score === 'number') {
+          void pushGdeltStress(t.score, t.changePercent ?? 0, 1);
+        }
+      }
       this.ctx.statusPanel?.updateApi('PizzINT', { status: 'ok' });
       dataFreshness.recordUpdate('pizzint', Math.max(status.locationsMonitored, tensions.length));
     } catch (error) {
