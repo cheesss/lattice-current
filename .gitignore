@@ -82,3 +82,4 @@ data/persistent-cache/
 # Codex audit trails (contains API responses)
 codex-audit/
 data/codex-audit/
+.coverage/
