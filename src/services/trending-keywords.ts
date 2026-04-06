@@ -62,6 +62,8 @@ export interface TrendingConfig {
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+const MAX_SEEN_HEADLINES = 50_000;
+const SEEN_HEADLINES_PRUNE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 const ROLLING_WINDOW_MS = 2 * HOUR_MS;
 const BASELINE_WINDOW_MS = 7 * DAY_MS;
@@ -105,6 +107,7 @@ const autoSummaryRuns: number[] = [];
 
 let cachedConfig: TrendingConfig | null = null;
 let lastBaselineRefreshMs = 0;
+let lastSeenHeadlinesPruneMs = 0;
 
 function toTermKey(term: string): string {
   return term.trim().toLowerCase();
@@ -623,6 +626,30 @@ export function ingestHeadlines(headlines: TrendingHeadlineInput[]): void {
     }
     seenHeadlines.set(key, now);
 
+    // Periodically prune seenHeadlines to prevent unbounded growth
+    if (seenHeadlines.size > MAX_SEEN_HEADLINES && now - lastSeenHeadlinesPruneMs > SEEN_HEADLINES_PRUNE_INTERVAL_MS) {
+      lastSeenHeadlinesPruneMs = now;
+      const toRemove = Math.floor(seenHeadlines.size * 0.2);
+      let removed = 0;
+      for (const [k, seenAt] of seenHeadlines) {
+        if (removed >= toRemove) break;
+        if (now - seenAt > BASELINE_WINDOW_MS) {
+          seenHeadlines.delete(k);
+          removed++;
+        }
+      }
+      // If still over limit after removing stale entries, remove oldest 20%
+      if (seenHeadlines.size > MAX_SEEN_HEADLINES) {
+        let extraRemoved = 0;
+        const extraToRemove = Math.floor(seenHeadlines.size * 0.2);
+        for (const k of seenHeadlines.keys()) {
+          if (extraRemoved >= extraToRemove) break;
+          seenHeadlines.delete(k);
+          extraRemoved++;
+        }
+      }
+    }
+
     const termCandidates = buildBaseTermCandidates(headline.title);
     recordTermCandidates(termCandidates, headline, now, blockedTerms);
     pendingMLEnrichment.push({
@@ -678,4 +705,22 @@ export function unsuppressTrendingTerm(term: string): TrendingConfig {
 
 export function getTrackedTermCount(): number {
   return termFrequency.size;
+}
+
+export function __resetTrendingKeywordStateForTests(): void {
+  termFrequency.clear();
+  seenHeadlines.clear();
+  pendingSignals.splice(0, pendingSignals.length);
+  activeSpikeTerms.clear();
+  autoSummaryRuns.splice(0, autoSummaryRuns.length);
+  cachedConfig = null;
+  lastBaselineRefreshMs = 0;
+  lastSeenHeadlinesPruneMs = 0;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CONFIG_KEY);
+    }
+  } catch {
+    // ignore in non-browser tests
+  }
 }

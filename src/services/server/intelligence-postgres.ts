@@ -5,6 +5,8 @@ import type {
   HistoricalReplayFrameArchiveRow,
 } from '../importer/historical-stream-worker';
 import type { HistoricalReplayRun } from '../historical-intelligence';
+import { createStorageEnvelope, decodeStorageValue } from '../storage/storage-envelope';
+import { resolveSchemaVersion } from '../storage/schema-registry';
 
 export interface IntelligencePostgresConfig {
   connectionString?: string;
@@ -98,6 +100,16 @@ function replayRunSummary(run: HistoricalReplayRun): ReplayRunSummary {
   };
 }
 
+async function wrapJsonEnvelope(source: string, data: unknown): Promise<string> {
+  return JSON.stringify(await createStorageEnvelope(data, { source, ttlMs: 0 }));
+}
+
+async function unwrapJsonEnvelope<T>(source: string, payload: unknown): Promise<T | null> {
+  if (payload == null) return null;
+  const decoded = await decodeStorageValue<T>(payload, { source });
+  return decoded.data;
+}
+
 export async function initIntelligencePostgresSchema(
   config: IntelligencePostgresConfig,
 ): Promise<{ ok: true; schema: string }> {
@@ -143,6 +155,9 @@ export async function initIntelligencePostgresSchema(
         symbol TEXT,
         region TEXT,
         price DOUBLE PRECISION,
+        schema_version INTEGER NOT NULL DEFAULT 1,
+        archive_status TEXT NOT NULL DEFAULT 'warm',
+        archive_uri TEXT,
         payload JSONB NOT NULL DEFAULT '{}'::jsonb,
         metadata JSONB NOT NULL DEFAULT '{}'::jsonb
       )
@@ -196,6 +211,19 @@ export async function initIntelligencePostgresSchema(
         summary JSONB NOT NULL DEFAULT '{}'::jsonb,
         payload JSONB NOT NULL DEFAULT '{}'::jsonb,
         windows JSONB,
+        snapshot_uri TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ${s}.data_lifecycle_log (
+        id BIGSERIAL PRIMARY KEY,
+        dataset_id TEXT,
+        record_id TEXT,
+        stage TEXT NOT NULL,
+        status TEXT NOT NULL,
+        message TEXT,
+        archive_uri TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
@@ -373,8 +401,8 @@ export async function upsertHistoricalReplayRunToPostgres(
         `
         INSERT INTO ${s}.backtest_runs (
           backtest_run_id, label, mode, started_at, completed_at, temporal_mode,
-          frame_count, warmup_frame_count, evaluation_frame_count, summary, payload, windows
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          frame_count, warmup_frame_count, evaluation_frame_count, summary, payload, windows, snapshot_uri
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       `,
         [
           run.id,
@@ -391,8 +419,9 @@ export async function upsertHistoricalReplayRunToPostgres(
             summaryLines: run.summaryLines,
             horizonsHours: run.horizonsHours,
           }),
-          JSON.stringify(run),
-          JSON.stringify(run.windows || null),
+          await wrapJsonEnvelope('backtest-run', run),
+          run.windows ? await wrapJsonEnvelope('backtest-run-window', run.windows) : null,
+          null,
         ],
       );
 
@@ -429,96 +458,115 @@ export async function upsertHistoricalReplayRunToPostgres(
         );
       }
 
-      for (const result of run.forwardReturns) {
-        await client.query(
-          `
-          INSERT INTO ${s}.forward_returns (
-            forward_return_id, backtest_run_id, idea_run_id, symbol, direction,
-            horizon_hours, entry_timestamp, exit_timestamp, entry_price, exit_price,
-            raw_return_pct, signed_return_pct
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-        `,
-          [
-            result.id,
-            run.id,
-            result.ideaRunId,
-            result.symbol,
-            result.direction,
-            result.horizonHours,
-            result.entryTimestamp,
-            result.exitTimestamp,
-            result.entryPrice,
-            result.exitPrice,
-            result.rawReturnPct,
-            result.signedReturnPct,
-          ],
-        );
+      {
+        const CHUNK = 500;
+        for (let c = 0; c < run.forwardReturns.length; c += CHUNK) {
+          const chunk = run.forwardReturns.slice(c, c + CHUNK);
+          const values: unknown[] = [];
+          const placeholders: string[] = [];
+          let idx = 1;
+          for (const result of chunk) {
+            placeholders.push(
+              `($${idx},$${idx + 1},$${idx + 2},$${idx + 3},$${idx + 4},$${idx + 5},$${idx + 6},$${idx + 7},$${idx + 8},$${idx + 9},$${idx + 10},$${idx + 11})`,
+            );
+            values.push(
+              result.id, run.id, result.ideaRunId, result.symbol, result.direction,
+              result.horizonHours, result.entryTimestamp, result.exitTimestamp,
+              result.entryPrice, result.exitPrice, result.rawReturnPct, result.signedReturnPct,
+            );
+            idx += 12;
+          }
+          await client.query(
+            `INSERT INTO ${s}.forward_returns (
+              forward_return_id, backtest_run_id, idea_run_id, symbol, direction,
+              horizon_hours, entry_timestamp, exit_timestamp, entry_price, exit_price,
+              raw_return_pct, signed_return_pct
+            ) VALUES ${placeholders.join(',')}`,
+            values,
+          );
+        }
       }
 
-      for (const profile of run.sourceProfiles) {
-        await client.query(
-          `
-          INSERT INTO ${s}.source_scores (
-            source_id, posterior_alpha, posterior_beta, posterior_accuracy_score,
-            credibility_score, feed_health_score, propaganda_risk_score, updated_at, properties
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-          ON CONFLICT (source_id) DO UPDATE SET
-            posterior_alpha = EXCLUDED.posterior_alpha,
-            posterior_beta = EXCLUDED.posterior_beta,
-            posterior_accuracy_score = EXCLUDED.posterior_accuracy_score,
-            credibility_score = EXCLUDED.credibility_score,
-            feed_health_score = EXCLUDED.feed_health_score,
-            propaganda_risk_score = EXCLUDED.propaganda_risk_score,
-            updated_at = EXCLUDED.updated_at,
-            properties = EXCLUDED.properties
-        `,
-          [
-            profile.id,
-            profile.posteriorAlpha,
-            profile.posteriorBeta,
-            profile.posteriorAccuracyScore,
-            profile.credibilityScore,
-            profile.feedHealthScore,
-            profile.propagandaRiskScore,
-            new Date(profile.lastEvaluatedAt).toISOString(),
-            JSON.stringify(profile),
-          ],
-        );
+      {
+        const CHUNK = 500;
+        for (let c = 0; c < run.sourceProfiles.length; c += CHUNK) {
+          const chunk = run.sourceProfiles.slice(c, c + CHUNK);
+          const values: unknown[] = [];
+          const placeholders: string[] = [];
+          let idx = 1;
+          for (const profile of chunk) {
+            placeholders.push(
+              `($${idx},$${idx + 1},$${idx + 2},$${idx + 3},$${idx + 4},$${idx + 5},$${idx + 6},$${idx + 7},$${idx + 8})`,
+            );
+            values.push(
+              profile.id, profile.posteriorAlpha, profile.posteriorBeta,
+              profile.posteriorAccuracyScore, profile.credibilityScore,
+              profile.feedHealthScore, profile.propagandaRiskScore,
+              new Date(profile.lastEvaluatedAt).toISOString(), JSON.stringify(profile),
+            );
+            idx += 9;
+          }
+          if (placeholders.length > 0) {
+            await client.query(
+              `INSERT INTO ${s}.source_scores (
+                source_id, posterior_alpha, posterior_beta, posterior_accuracy_score,
+                credibility_score, feed_health_score, propaganda_risk_score, updated_at, properties
+              ) VALUES ${placeholders.join(',')}
+              ON CONFLICT (source_id) DO UPDATE SET
+                posterior_alpha = EXCLUDED.posterior_alpha,
+                posterior_beta = EXCLUDED.posterior_beta,
+                posterior_accuracy_score = EXCLUDED.posterior_accuracy_score,
+                credibility_score = EXCLUDED.credibility_score,
+                feed_health_score = EXCLUDED.feed_health_score,
+                propaganda_risk_score = EXCLUDED.propaganda_risk_score,
+                updated_at = EXCLUDED.updated_at,
+                properties = EXCLUDED.properties`,
+              values,
+            );
+          }
+        }
       }
 
-      for (const stat of run.mappingStats) {
-        await client.query(
-          `
-          INSERT INTO ${s}.mapping_stats (
-            mapping_id, theme_id, symbol, direction, alpha, beta, posterior_win_rate,
-            ema_return_pct, ema_holding_days, observations, updated_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-          ON CONFLICT (mapping_id) DO UPDATE SET
-            theme_id = EXCLUDED.theme_id,
-            symbol = EXCLUDED.symbol,
-            direction = EXCLUDED.direction,
-            alpha = EXCLUDED.alpha,
-            beta = EXCLUDED.beta,
-            posterior_win_rate = EXCLUDED.posterior_win_rate,
-            ema_return_pct = EXCLUDED.ema_return_pct,
-            ema_holding_days = EXCLUDED.ema_holding_days,
-            observations = EXCLUDED.observations,
-            updated_at = EXCLUDED.updated_at
-        `,
-          [
-            stat.id,
-            stat.themeId,
-            stat.symbol,
-            stat.direction,
-            stat.alpha,
-            stat.beta,
-            stat.posteriorWinRate,
-            stat.emaReturnPct,
-            stat.emaHoldingDays,
-            stat.observations,
-            stat.lastUpdatedAt,
-          ],
-        );
+      {
+        const CHUNK = 500;
+        for (let c = 0; c < run.mappingStats.length; c += CHUNK) {
+          const chunk = run.mappingStats.slice(c, c + CHUNK);
+          const values: unknown[] = [];
+          const placeholders: string[] = [];
+          let idx = 1;
+          for (const stat of chunk) {
+            placeholders.push(
+              `($${idx},$${idx + 1},$${idx + 2},$${idx + 3},$${idx + 4},$${idx + 5},$${idx + 6},$${idx + 7},$${idx + 8},$${idx + 9},$${idx + 10})`,
+            );
+            values.push(
+              stat.id, stat.themeId, stat.symbol, stat.direction,
+              stat.alpha, stat.beta, stat.posteriorWinRate,
+              stat.emaReturnPct, stat.emaHoldingDays, stat.observations,
+              stat.lastUpdatedAt,
+            );
+            idx += 11;
+          }
+          if (placeholders.length > 0) {
+            await client.query(
+              `INSERT INTO ${s}.mapping_stats (
+                mapping_id, theme_id, symbol, direction, alpha, beta, posterior_win_rate,
+                ema_return_pct, ema_holding_days, observations, updated_at
+              ) VALUES ${placeholders.join(',')}
+              ON CONFLICT (mapping_id) DO UPDATE SET
+                theme_id = EXCLUDED.theme_id,
+                symbol = EXCLUDED.symbol,
+                direction = EXCLUDED.direction,
+                alpha = EXCLUDED.alpha,
+                beta = EXCLUDED.beta,
+                posterior_win_rate = EXCLUDED.posterior_win_rate,
+                ema_return_pct = EXCLUDED.ema_return_pct,
+                ema_holding_days = EXCLUDED.ema_holding_days,
+                observations = EXCLUDED.observations,
+                updated_at = EXCLUDED.updated_at`,
+              values,
+            );
+          }
+        }
       }
 
       await client.query('COMMIT');
@@ -550,9 +598,9 @@ export async function bulkSyncHistoricalRawItemsToPostgres(
           INSERT INTO ${s}.historical_raw_items (
             id, dataset_id, provider, source_kind, source_id, item_kind,
             valid_time_start, valid_time_end, transaction_time, knowledge_boundary,
-            headline, link, symbol, region, price, payload, metadata
+            headline, link, symbol, region, price, schema_version, archive_status, archive_uri, payload, metadata
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
           )
           ON CONFLICT (id) DO UPDATE SET
             dataset_id = EXCLUDED.dataset_id,
@@ -569,6 +617,9 @@ export async function bulkSyncHistoricalRawItemsToPostgres(
             symbol = EXCLUDED.symbol,
             region = EXCLUDED.region,
             price = EXCLUDED.price,
+            schema_version = EXCLUDED.schema_version,
+            archive_status = EXCLUDED.archive_status,
+            archive_uri = EXCLUDED.archive_uri,
             payload = EXCLUDED.payload,
             metadata = EXCLUDED.metadata
         `,
@@ -588,8 +639,11 @@ export async function bulkSyncHistoricalRawItemsToPostgres(
             record.symbol,
             record.region,
             record.price,
-            JSON.stringify(record.payload || {}),
-            JSON.stringify(record.metadata || {}),
+            resolveSchemaVersion('historical-raw-item'),
+            'warm',
+            null,
+            await wrapJsonEnvelope('historical-raw-item', record.payload || {}),
+            await wrapJsonEnvelope('historical-raw-item', record.metadata || {}),
           ],
         );
       }
@@ -655,7 +709,7 @@ export async function bulkSyncHistoricalReplayFramesToPostgres(
             frame.newsCount,
             frame.clusterCount,
             frame.marketCount,
-            JSON.stringify(frame.payload),
+            await wrapJsonEnvelope('historical-replay-frame', frame.payload),
           ],
         );
       }
@@ -730,7 +784,7 @@ export async function getHistoricalReplayRunFromPostgres(
     );
     if (result.rowCount === 0) return null;
     const payload = result.rows[0]?.payload;
-    return payload ? (payload as HistoricalReplayRun) : null;
+    return await unwrapJsonEnvelope<HistoricalReplayRun>('backtest-run', payload);
   });
 }
 

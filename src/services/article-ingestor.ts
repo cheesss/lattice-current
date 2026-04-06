@@ -45,6 +45,12 @@ export interface IngestorStats {
   recentThemes: string[];
 }
 
+interface SensitivityTarget {
+  theme: string;
+  symbol: string;
+  horizon: string;
+}
+
 // ---------------------------------------------------------------------------
 // Configuration helpers
 // ---------------------------------------------------------------------------
@@ -110,6 +116,7 @@ function getPool(): pg.Pool {
   }
 
   pool = new pg.Pool(config);
+  pool.on('error', (err) => console.error('[pool] idle client error:', err.message));
   poolCacheKey = key;
   return pool;
 }
@@ -272,6 +279,103 @@ async function createPendingOutcomes(
   }
 
   return created;
+}
+
+async function refreshSensitivityMatrixForTargets(
+  client: pg.PoolClient,
+  targets: SensitivityTarget[],
+): Promise<void> {
+  const uniqueTargets = Array.from(new Map(
+    targets
+      .filter((target) => target.theme && target.symbol && target.horizon)
+      .map((target) => [`${target.theme}|${target.symbol}|${target.horizon}`, target]),
+  ).values());
+
+  if (uniqueTargets.length === 0) return;
+
+  const values: unknown[] = [];
+  const tuples = uniqueTargets.map((target, index) => {
+    const offset = index * 3;
+    values.push(target.theme, target.symbol, target.horizon);
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3})`;
+  }).join(', ');
+
+  await client.query(`
+    WITH targets(theme, symbol, horizon) AS (
+      VALUES ${tuples}
+    ),
+    theme_returns AS (
+      SELECT
+        lo.theme,
+        lo.symbol,
+        lo.horizon,
+        COUNT(*)::int AS sample_size,
+        AVG(lo.forward_return_pct::numeric)::double precision AS avg_return,
+        STDDEV(lo.forward_return_pct::numeric)::double precision AS return_vol,
+        AVG(lo.hit::int::numeric)::double precision AS hit_rate
+      FROM labeled_outcomes lo
+      JOIN targets t
+        ON t.theme = lo.theme
+       AND t.symbol = lo.symbol
+       AND t.horizon = lo.horizon
+      GROUP BY lo.theme, lo.symbol, lo.horizon
+    ),
+    symbol_baselines AS (
+      SELECT
+        lo.symbol,
+        lo.horizon,
+        AVG(lo.forward_return_pct::numeric)::double precision AS baseline_return,
+        STDDEV(lo.forward_return_pct::numeric)::double precision AS baseline_vol
+      FROM labeled_outcomes lo
+      JOIN (
+        SELECT DISTINCT symbol, horizon
+        FROM targets
+      ) th
+        ON th.symbol = lo.symbol
+       AND th.horizon = lo.horizon
+      GROUP BY lo.symbol, lo.horizon
+    )
+    INSERT INTO stock_sensitivity_matrix (
+      theme,
+      symbol,
+      horizon,
+      sample_size,
+      avg_return,
+      hit_rate,
+      return_vol,
+      sensitivity_zscore,
+      baseline_return,
+      baseline_vol
+    )
+    SELECT
+      tr.theme,
+      tr.symbol,
+      tr.horizon,
+      tr.sample_size,
+      tr.avg_return,
+      tr.hit_rate,
+      tr.return_vol,
+      CASE
+        WHEN COALESCE(sb.baseline_vol, 0) > 0.01
+          THEN (tr.avg_return - sb.baseline_return) / sb.baseline_vol
+        ELSE 0
+      END AS sensitivity_zscore,
+      sb.baseline_return,
+      sb.baseline_vol
+    FROM theme_returns tr
+    JOIN symbol_baselines sb
+      ON sb.symbol = tr.symbol
+     AND sb.horizon = tr.horizon
+    ON CONFLICT (theme, symbol, horizon) DO UPDATE SET
+      sample_size = EXCLUDED.sample_size,
+      avg_return = EXCLUDED.avg_return,
+      hit_rate = EXCLUDED.hit_rate,
+      return_vol = EXCLUDED.return_vol,
+      sensitivity_zscore = EXCLUDED.sensitivity_zscore,
+      baseline_return = EXCLUDED.baseline_return,
+      baseline_vol = EXCLUDED.baseline_vol,
+      updated_at = NOW()
+  `, values);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +552,7 @@ export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
   const db = getPool();
   const client = await db.connect();
   let completed = 0;
+  const refreshedTargets: SensitivityTarget[] = [];
 
   try {
     await ensureSchema(client);
@@ -522,6 +627,12 @@ export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
         // labeled_outcomes insert failure — still mark pending as resolved
       }
 
+      refreshedTargets.push({
+        theme: row.theme,
+        symbol: row.symbol,
+        horizon: row.horizon,
+      });
+
       // Update pending_outcomes
       await client.query(`
         UPDATE pending_outcomes
@@ -530,6 +641,14 @@ export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
       `, [exitPrice, forwardReturnPct, row.id]);
 
       completed++;
+    }
+
+    if (refreshedTargets.length > 0) {
+      try {
+        await refreshSensitivityMatrixForTargets(client, refreshedTargets);
+      } catch (error) {
+        console.error('[article-ingestor] refreshSensitivityMatrixForTargets failed:', error);
+      }
     }
 
     // Count remaining

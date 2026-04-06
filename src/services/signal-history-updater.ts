@@ -62,6 +62,7 @@ function getPool(): pg.Pool {
   }
 
   pool = new pg.Pool(config);
+  pool.on('error', (err) => console.error('[pool] idle client error:', err.message));
   poolCacheKey = key;
   return pool;
 }

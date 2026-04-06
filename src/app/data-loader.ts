@@ -123,8 +123,7 @@ import { mlWorker } from '@/services/ml-worker';
 import { clusterNewsHybrid } from '@/services/clustering';
 import { nameToCountryCode } from '@/services/country-geometry';
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
-import { pushSignalFromMarketData, pushGdeltStress } from '@/services/signal-history-updater';
-import { ingestArticleBatch } from '@/services/article-ingestor';
+import { pushMarketSignalsBatch, pushGdeltStressBatch, ingestArticleBatch } from '@/services/analysis-runtime-bridge';
 import { signalAggregator } from '@/services/signal-aggregator';
 import { updateAndCheck } from '@/services/temporal-baseline';
 import { fetchAllFires, flattenFires, computeRegionStats, toMapFires } from '@/services/wildfires';
@@ -898,7 +897,7 @@ export class DataLoaderManager implements AppModule {
     this.keywordRefreshInFlight = true;
     try {
       const candidates = this.buildKeywordCandidateBatch();
-      const llmCandidates = await this.extractLlmKeywordCandidates().catch(() => []);
+      const llmCandidates = await this.extractLlmKeywordCandidates().catch((e) => { console.warn('[data-loader] extractLlmKeywordCandidates failed:', e?.message); return []; });
       candidates.push(...llmCandidates);
       if (candidates.length > 0) {
         await upsertKeywordCandidates(candidates.slice(0, 420));
@@ -928,7 +927,7 @@ export class DataLoaderManager implements AppModule {
 
   private async runApiDiscoveryCycle(force = false): Promise<void> {
     if (!canUseLocalAgentEndpoints() || !await hasLocalAgentEndpointSupport()) {
-      this.ctx.intelligenceCache.apiSources = await listApiSourceRegistry().catch(() => []);
+      this.ctx.intelligenceCache.apiSources = await listApiSourceRegistry().catch((e) => { console.warn('[data-loader] listApiSourceRegistry failed:', e?.message); return []; });
       this.lastApiDiscoveryRunAt = Date.now();
       return;
     }
@@ -989,7 +988,7 @@ export class DataLoaderManager implements AppModule {
       console.warn('[data-loader] api discovery cycle failed', error);
     } finally {
       this.lastApiDiscoveryRunAt = Date.now();
-      this.ctx.intelligenceCache.apiSources = await listApiSourceRegistry().catch(() => []);
+      this.ctx.intelligenceCache.apiSources = await listApiSourceRegistry().catch((e) => { console.warn('[data-loader] listApiSourceRegistry (finally) failed:', e?.message); return []; });
       this.apiDiscoveryInFlight = false;
     }
   }
@@ -1027,15 +1026,15 @@ export class DataLoaderManager implements AppModule {
 
       const rawNetworkCaptures = findings.flatMap((finding) => finding.networkCaptures ?? []);
       if (rawNetworkCaptures.length > 0) {
-        const captures = await ingestNetworkDiscoveryCaptures(rawNetworkCaptures, 'multimodal').catch(() => []);
+        const captures = await ingestNetworkDiscoveryCaptures(rawNetworkCaptures, 'multimodal').catch((e) => { console.warn('[data-loader] ingestNetworkDiscoveryCaptures failed:', e?.message); return []; });
         if (captures.length > 0) {
           await registerApiDiscoveryCandidates(
             networkCapturesToApiDiscoveryCandidates(captures),
-          ).catch(() => {});
+          ).catch((e) => { console.warn('[data-loader] registerApiDiscoveryCandidates failed:', e?.message); });
         }
       }
 
-      this.ctx.intelligenceCache.networkDiscoveries = await listNetworkDiscoveryCaptures(64).catch(() => []);
+      this.ctx.intelligenceCache.networkDiscoveries = await listNetworkDiscoveryCaptures(64).catch((e) => { console.warn('[data-loader] listNetworkDiscoveryCaptures failed:', e?.message); return []; });
       this.lastMultimodalExtractionAt = Date.now();
     } catch (error) {
       console.warn('[data-loader] multimodal extraction failed', error);
@@ -1064,12 +1063,12 @@ export class DataLoaderManager implements AppModule {
           feature: 'source-credibility',
           inputCount: this.ctx.allNews.length,
         },
-        async () => recomputeSourceCredibility(this.ctx.allNews, this.ctx.latestClusters).catch(() => []),
+        async () => recomputeSourceCredibility(this.ctx.allNews, this.ctx.latestClusters).catch((e) => { console.warn('[data-loader] recomputeSourceCredibility failed:', e?.message); return []; }),
         (result) => ({ outputCount: result.length }),
       );
       this.ctx.intelligenceCache.sourceCredibility = credibility;
 
-      const healingSuggestions = await listSourceHealingSuggestions(48).catch(() => []);
+      const healingSuggestions = await listSourceHealingSuggestions(48).catch((e) => { console.warn('[data-loader] listSourceHealingSuggestions failed:', e?.message); return []; });
       this.ctx.intelligenceCache.sourceHealingSuggestions = healingSuggestions;
 
       if (this.ctx.latestMarkets.length > 0 || this.ctx.latestClusters.length > 0) {
@@ -1106,12 +1105,12 @@ export class DataLoaderManager implements AppModule {
             this.ctx.intelligenceCache.graphRagSummary,
           ).catch(() => null),
         );
-        this.ctx.intelligenceCache.graphTimeslices = await listGraphTimeslices(18).catch(() => []);
+        this.ctx.intelligenceCache.graphTimeslices = await listGraphTimeslices(18).catch((e) => { console.warn('[data-loader] listGraphTimeslices failed:', e?.message); return []; });
       } else {
-        this.ctx.intelligenceCache.graphTimeslices = await listGraphTimeslices(18).catch(() => []);
+        this.ctx.intelligenceCache.graphTimeslices = await listGraphTimeslices(18).catch((e) => { console.warn('[data-loader] listGraphTimeslices failed:', e?.message); return []; });
       }
 
-      this.ctx.intelligenceCache.ontologyEntities = await listCanonicalEntities(180).catch(() => []);
+      this.ctx.intelligenceCache.ontologyEntities = await listCanonicalEntities(180).catch((e) => { console.warn('[data-loader] listCanonicalEntities failed:', e?.message); return []; });
       this.ctx.intelligenceCache.ontologyGraph = await measureResourceOperation(
         'graph:ontology-snapshot',
         {
@@ -1134,7 +1133,7 @@ export class DataLoaderManager implements AppModule {
       });
       if (this.ctx.intelligenceCache.ontologyGraph) {
         await recordOntologySnapshotEvent(this.ctx.intelligenceCache.ontologyGraph).catch(() => null);
-        this.ctx.intelligenceCache.ontologyLedger = await listOntologyLedgerEvents(80).catch(() => []);
+        this.ctx.intelligenceCache.ontologyLedger = await listOntologyLedgerEvents(80).catch((e) => { console.warn('[data-loader] listOntologyLedgerEvents failed:', e?.message); return []; });
         const replayAnchor = this.ctx.intelligenceCache.ontologyLedger
           ?.filter((event) => event.type === 'snapshot-built')
           ?.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[1]
@@ -1144,10 +1143,10 @@ export class DataLoaderManager implements AppModule {
           ? await replayOntologyStateAt(replayAnchor.timestamp).catch(() => null)
           : null;
       } else {
-        this.ctx.intelligenceCache.ontologyLedger = await listOntologyLedgerEvents(80).catch(() => []);
+        this.ctx.intelligenceCache.ontologyLedger = await listOntologyLedgerEvents(80).catch((e) => { console.warn('[data-loader] listOntologyLedgerEvents failed:', e?.message); return []; });
         this.ctx.intelligenceCache.ontologyReplayState = null;
       }
-      this.ctx.intelligenceCache.networkDiscoveries = await listNetworkDiscoveryCaptures(80).catch(() => []);
+      this.ctx.intelligenceCache.networkDiscoveries = await listNetworkDiscoveryCaptures(80).catch((e) => { console.warn('[data-loader] listNetworkDiscoveryCaptures failed:', e?.message); return []; });
       this.ctx.intelligenceCache.multiHopInferences = await measureResourceOperation(
         'graph:multi-hop-inference',
         {
@@ -1164,7 +1163,7 @@ export class DataLoaderManager implements AppModule {
         (result) => ({ outputCount: result.length }),
       );
       if (!this.ctx.intelligenceCache.sourceCredibility?.length) {
-        this.ctx.intelligenceCache.sourceCredibility = await listSourceCredibilityProfiles(60).catch(() => []);
+        this.ctx.intelligenceCache.sourceCredibility = await listSourceCredibilityProfiles(60).catch((e) => { console.warn('[data-loader] listSourceCredibilityProfiles failed:', e?.message); return []; });
       }
       this.ctx.intelligenceCache.investmentIntelligence = await measureResourceOperation(
         'analytics:investment-intelligence',
@@ -2126,9 +2125,9 @@ export class DataLoaderManager implements AppModule {
     const commoditiesPanel = this.ctx.panels['commodities'] as CommoditiesPanel | undefined;
     const cryptoPanel = this.ctx.panels['crypto'] as CryptoPanel | undefined;
 
-    this.consumeHydratedMarketBootstrap();
-    this.consumeHydratedCommodityBootstrap();
-    this.consumeHydratedSectorBootstrap();
+    this.consumeHydratedMarketBootstrap?.();
+    this.consumeHydratedCommodityBootstrap?.();
+    this.consumeHydratedSectorBootstrap?.();
 
     const cryptoTargets = Object.values(CRYPTO_MAP).map((item) => ({
       symbol: `${item.symbol.toUpperCase()}-USD`,
@@ -2333,9 +2332,9 @@ export class DataLoaderManager implements AppModule {
   }
 
   private async loadMarketsFallbackOnly(): Promise<void> {
-    this.consumeHydratedMarketBootstrap();
-    this.consumeHydratedCommodityBootstrap();
-    this.consumeHydratedSectorBootstrap();
+    this.consumeHydratedMarketBootstrap?.();
+    this.consumeHydratedCommodityBootstrap?.();
+    this.consumeHydratedSectorBootstrap?.();
 
     try {
       const stocksResult = await fetchMultipleStocks(MARKET_SYMBOLS, {
@@ -2348,11 +2347,14 @@ export class DataLoaderManager implements AppModule {
       const finnhubConfigMsg = 'FINNHUB_API_KEY not configured - add in Settings';
       this.ctx.latestMarkets = stocksResult.data;
       // Push market data to signal_history for analysis engine
-      for (const stock of stocksResult.data) {
-        if (stock.symbol && typeof stock.price === 'number') {
-          void pushSignalFromMarketData(stock.symbol, stock.price);
-        }
-      }
+      void pushMarketSignalsBatch(
+        stocksResult.data
+          .filter((stock) => stock.symbol && typeof stock.price === 'number')
+          .map((stock) => ({
+            symbol: stock.symbol,
+            price: stock.price as number,
+          })),
+      ).catch(() => {});
       (this.ctx.panels['markets'] as MarketPanel).renderMarkets(stocksResult.data, stocksResult.rateLimited);
 
       if (stocksResult.rateLimited && stocksResult.data.length === 0) {
@@ -3460,11 +3462,14 @@ export class DataLoaderManager implements AppModule {
       economicPanel?.setErrorState(false);
       economicPanel?.update(data);
       // Push FRED data to signal_history for analysis engine
-      for (const item of data) {
-        if (item.id && typeof item.value === 'number') {
-          void pushSignalFromMarketData(item.id, item.value);
-        }
-      }
+      void pushMarketSignalsBatch(
+        data
+          .filter((item) => item.id && typeof item.value === 'number')
+          .map((item) => ({
+            symbol: item.id,
+            price: item.value as number,
+          })),
+      ).catch(() => {});
       this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
       dataFreshness.recordUpdate('economic', data.length);
     } catch {
@@ -3777,11 +3782,15 @@ export class DataLoaderManager implements AppModule {
       this.ctx.pizzintIndicator?.updateStatus(status);
       this.ctx.pizzintIndicator?.updateTensions(tensions);
       // Push GDELT stress signals to signal_history
-      for (const t of tensions) {
-        if (typeof t.score === 'number') {
-          void pushGdeltStress(t.score, t.changePercent ?? 0, 1);
-        }
-      }
+      void pushGdeltStressBatch(
+        tensions
+          .filter((t) => typeof t.score === 'number')
+          .map((t) => ({
+            goldstein: t.score as number,
+            tone: t.changePercent ?? 0,
+            eventCount: 1,
+          })),
+      ).catch(() => {});
       this.ctx.statusPanel?.updateApi('PizzINT', { status: 'ok' });
       dataFreshness.recordUpdate('pizzint', Math.max(status.locationsMonitored, tensions.length));
     } catch (error) {

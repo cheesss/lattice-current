@@ -1,3 +1,9 @@
+// ── Re-exports from sub-modules (canonical extraction targets) ──
+// Consumers can now import from:
+//   ./portfolio-execution/allocation        — buildDeployClusterPlan, allocateDeployBudget, zipfRankShares
+//   ./portfolio-execution/execution-controls — applyPortfolioExecutionControls, deployFloorPctForCard
+//   ./portfolio-execution/sizing            — buildThemeExposureCaps, inferDynamicMaxPositionWeight
+
 import type { InvestmentIdeaCard, InvestmentIdeaSymbol, InvestmentAssetKind } from './types';
 import type { MacroRiskOverlay } from '../macro-risk-overlay';
 import type { AutonomyAction } from '../autonomy-constraints';
@@ -16,8 +22,8 @@ import {
   buildRecentReturnSeries,
   estimateMacroStressProbability,
   summarizeInstrumentMix,
-} from './idea-generator';
-import { estimateLaggedNormalizedMutualInformation } from '../math-models/normalized-mutual-information';
+  buildCoreOrbitalExecutionPlan,
+} from './shared-ranking';
 import {
   getReplayAdaptationSnapshotSync,
   getReplayThemeProfileFromSnapshot,
@@ -226,13 +232,7 @@ function weightedStdDev(values: number[], weights: number[]): number {
   return Math.sqrt(weightedVariance / totalWeight);
 }
 
-function isCoreInstrumentSymbol(symbol: InvestmentIdeaSymbol): boolean {
-  if (symbol.role === 'hedge') return false;
-  return symbol.assetKind === 'etf'
-    || symbol.assetKind === 'rate'
-    || symbol.assetKind === 'commodity'
-    || symbol.assetKind === 'fx';
-}
+// isCoreInstrumentSymbol – imported from ./shared-ranking
 
 function estimateAverageAbsoluteVolatility(series: number[]): number {
   if (!series.length) return 0;
@@ -313,8 +313,8 @@ function buildHrpfClusterCaps(
   }
   const usableClusterIds = clusterIds.filter((clusterId) => seriesByCluster.has(clusterId));
   if (usableClusterIds.length <= 1) return fallbackCaps;
-  const minSampleSize = Math.min(...usableClusterIds.map((clusterId) => seriesByCluster.get(clusterId)!.length));
-  const alignedSeries = usableClusterIds.map((clusterId) => seriesByCluster.get(clusterId)!.slice(-minSampleSize));
+  const minSampleSize = Math.min(...usableClusterIds.map((clusterId) => (seriesByCluster.get(clusterId) ?? []).length));
+  const alignedSeries = usableClusterIds.map((clusterId) => (seriesByCluster.get(clusterId) ?? []).slice(-minSampleSize));
   const correlationMatrix = alignedSeries.map((leftSeries) =>
     alignedSeries.map((rightSeries, index) => {
       if (leftSeries === rightSeries) return 1;
@@ -1243,7 +1243,7 @@ export function applyPortfolioExecutionControls(
 ): InvestmentIdeaCard[] {
   if (!cards.length) return cards;
   const instrumentAwareCards: InvestmentIdeaCard[] = cards.map((card): InvestmentIdeaCard => {
-    const plan = buildCoreOrbitalExecutionPlan(card, macroOverlay);
+    const plan = buildCoreOrbitalExecutionPlan(card, macroOverlay, computeOnlineRankingAdjustment);
     if (!plan.reasons.length && plan.symbols.length === card.symbols.length) {
       return card;
     }
@@ -1637,8 +1637,8 @@ function computeCorrelationAwareSizingPenalty(symbols: string[]): {
     uniqueSymbols.map((rightSymbol) => {
       if (leftSymbol === rightSymbol) return 1;
       return pearsonCorrelation(
-        seriesBySymbol.get(leftSymbol)!.slice(-sampleSize),
-        seriesBySymbol.get(rightSymbol)!.slice(-sampleSize),
+        (seriesBySymbol.get(leftSymbol) ?? []).slice(-sampleSize),
+        (seriesBySymbol.get(rightSymbol) ?? []).slice(-sampleSize),
       );
     }),
   );
@@ -1792,143 +1792,4 @@ function calibrateCapitalBudget(
   };
 }
 
-function buildCoreOrbitalExecutionPlan(
-  card: InvestmentIdeaCard,
-  macroOverlay: MacroRiskOverlay,
-): {
-  symbols: InvestmentIdeaSymbol[];
-  reasons: string[];
-  coreShare: number;
-  orbitalPenalty: number;
-  retainedOrbitalCount: number;
-  benchmarkSymbol: string | null;
-} {
-  const nonHedge = card.symbols.filter((symbol: InvestmentIdeaSymbol) => symbol.role !== 'hedge');
-  const coreSymbols = nonHedge.filter(isCoreInstrumentSymbol);
-  const orbitalSymbols = nonHedge.filter((symbol: InvestmentIdeaSymbol) => symbol.assetKind === 'equity');
-  if (!coreSymbols.length || !orbitalSymbols.length) {
-    const mix = summarizeInstrumentMix(card.symbols);
-    return {
-      symbols: card.symbols.slice(),
-      reasons: [],
-      coreShare: mix.coreShare,
-      orbitalPenalty: 0,
-      retainedOrbitalCount: mix.orbitalCount,
-      benchmarkSymbol: coreSymbols[0]?.symbol || null,
-    };
-  }
-
-  const benchmarkSymbol = coreSymbols
-    .slice()
-    .sort((left: InvestmentIdeaSymbol, right: InvestmentIdeaSymbol) =>
-      Number(right.liquidityScore || 0) - Number(left.liquidityScore || 0)
-      || Number(right.banditScore || 0) - Number(left.banditScore || 0)
-      || (left.role === 'primary' ? -1 : 1),
-    )[0]?.symbol || coreSymbols[0]?.symbol || null;
-  const online = computeOnlineRankingAdjustment(card, macroOverlay);
-  const stressProbability = estimateMacroStressProbability(macroOverlay);
-  const scoredOrbital = orbitalSymbols
-    .map((symbol: InvestmentIdeaSymbol) => ({
-      symbol,
-      alignment: benchmarkSymbol ? estimateCoreOrbitalAlignmentScore(benchmarkSymbol, symbol) : 0.5,
-    }))
-    .sort((left: { symbol: InvestmentIdeaSymbol; alignment: number }, right: { symbol: InvestmentIdeaSymbol; alignment: number }) =>
-      right.alignment - left.alignment
-      || Number(right.symbol.liquidityScore || 0) - Number(left.symbol.liquidityScore || 0)
-      || Number(right.symbol.banditScore || 0) - Number(left.symbol.banditScore || 0),
-    );
-  const averageAlignment = average(scoredOrbital.map((item: { symbol: InvestmentIdeaSymbol; alignment: number }) => item.alignment));
-  const negativeCurrent = clamp(Math.abs(Math.min(0, online.currentReturnPct)) / 2.5, 0, 2.4);
-  const negativeDrift = clamp(Math.abs(Math.min(0, online.drift)) / 1.25, 0, 2.6);
-  const hitPenalty = clamp((50 - online.currentHitRate) / 18, 0, 1.4);
-  const lambda = 1.05 + negativeCurrent * 0.55 + negativeDrift * 0.72 + hitPenalty * 0.35;
-  const orbitalGate = clamp(
-    Math.exp(-lambda * stressProbability * Math.max(0.24, 1.08 - averageAlignment)),
-    0,
-    1,
-  );
-  const hardGate =
-    stressProbability >= 0.78
-    || (stressProbability >= 0.6 && (online.drift <= -0.45 || online.currentReturnPct <= -0.8))
-    || (stressProbability >= 0.55 && averageAlignment < 0.42);
-  const maxOrbitalCount = hardGate
-    ? 0
-    : stressProbability >= 0.68
-      ? 0
-      : stressProbability >= 0.5
-        ? 1
-        : stressProbability >= 0.32
-          ? 1
-          : 2;
-  const minAlignment = stressProbability >= 0.6
-    ? 0.62
-    : stressProbability >= 0.45
-      ? 0.56
-      : 0.48;
-  const retainedOrbital = hardGate || orbitalGate < 0.2
-    ? []
-    : scoredOrbital
-      .filter((item: { symbol: InvestmentIdeaSymbol; alignment: number }) => item.alignment >= minAlignment)
-      .slice(0, maxOrbitalCount)
-      .map((item: { symbol: InvestmentIdeaSymbol; alignment: number }) => item.symbol);
-  const retainedKeys = new Set(
-    [...coreSymbols, ...retainedOrbital, ...card.symbols.filter((symbol: InvestmentIdeaSymbol) => symbol.role === 'hedge')]
-      .map((symbol: InvestmentIdeaSymbol) => `${symbol.symbol}:${symbol.role}`),
-  );
-  const filteredSymbols = card.symbols.filter((symbol: InvestmentIdeaSymbol) => retainedKeys.has(`${symbol.symbol}:${symbol.role}`));
-  const retainedShare = orbitalSymbols.length > 0 ? retainedOrbital.length / orbitalSymbols.length : 1;
-  const orbitalPenalty = Number(clamp(
-    (1 - retainedShare) * 0.7
-    + Math.max(0, 0.55 - averageAlignment) * 0.75
-    + stressProbability * 0.18,
-    0,
-    1,
-  ).toFixed(4));
-  const reasons: string[] = [];
-  if (retainedOrbital.length < orbitalSymbols.length) {
-    reasons.push(
-      hardGate
-        ? `Stress-aware ETF-first gating removed single-name confirm legs and kept ${coreSymbols.map((symbol: InvestmentIdeaSymbol) => symbol.symbol).join(', ')} as the cluster core.`
-        : `Core-orbital filtering retained ${retainedOrbital.length}/${orbitalSymbols.length} single-name legs behind ETF core ${coreSymbols.map((symbol: InvestmentIdeaSymbol) => symbol.symbol).join(', ')}.`,
-    );
-  }
-  if (benchmarkSymbol && averageAlignment < 0.52) {
-    reasons.push(`Single-name legs showed weak ETF alignment (${(averageAlignment * 100).toFixed(0)}%), so idiosyncratic risk was suppressed.`);
-  }
-  const filteredMix = summarizeInstrumentMix(filteredSymbols);
-  return {
-    symbols: filteredSymbols.length ? filteredSymbols : card.symbols.slice(),
-    reasons,
-    coreShare: filteredMix.coreShare,
-    orbitalPenalty,
-    retainedOrbitalCount: retainedOrbital.length,
-    benchmarkSymbol,
-  };
-}
-
-function estimateCoreOrbitalAlignmentScore(
-  benchmarkSymbol: string,
-  candidateSymbol: InvestmentIdeaSymbol,
-): number {
-  const benchmarkSeries = buildRecentReturnSeries(benchmarkSymbol);
-  const candidateSeries = buildRecentReturnSeries(candidateSymbol.symbol);
-  const sampleSize = Math.min(benchmarkSeries.length, candidateSeries.length);
-  if (sampleSize < 8) {
-    const liquidity = clamp((Number(candidateSymbol.liquidityScore) || 58) / 100, 0.25, 1);
-    const bandit = clamp((Number(candidateSymbol.banditScore) || 55) / 100, 0.2, 1);
-    return Number((0.58 * liquidity + 0.42 * bandit).toFixed(4));
-  }
-
-  const benchmark = benchmarkSeries.slice(-sampleSize);
-  const candidate = candidateSeries.slice(-sampleSize);
-  const corr = clamp((pearsonCorrelation(benchmark, candidate) + 1) / 2, 0, 1);
-  const nmi = estimateLaggedNormalizedMutualInformation(benchmark, candidate, { maxLag: 3 });
-  const liquidity = clamp((Number(candidateSymbol.liquidityScore) || 58) / 100, 0.25, 1);
-  const bandit = clamp((Number(candidateSymbol.banditScore) || 55) / 100, 0.2, 1);
-  return Number((
-    corr * 0.34
-    + nmi.supportScore * 0.34
-    + liquidity * 0.18
-    + bandit * 0.14
-  ).toFixed(4));
-}
+// buildCoreOrbitalExecutionPlan, estimateCoreOrbitalAlignmentScore – imported from ./shared-ranking
