@@ -4,6 +4,7 @@ import { t } from '@/services/i18n';
 import { h, replaceChildren } from '@/utils/dom-utils';
 import {
   getIntelTopics,
+  listIntelTopics,
   fetchTopicIntelligence,
   formatArticleDate,
   extractDomain,
@@ -13,7 +14,8 @@ import {
 } from '@/services/gdelt-intel';
 
 export class GdeltIntelPanel extends Panel {
-  private activeTopic: IntelTopic = getIntelTopics()[0]!;
+  private topics: IntelTopic[] = getIntelTopics();
+  private activeTopic: IntelTopic = this.topics[0]!;
   private topicData = new Map<string, TopicIntelligence>();
   private tabsEl: HTMLElement | null = null;
 
@@ -26,12 +28,13 @@ export class GdeltIntelPanel extends Panel {
       infoTooltip: t('components.gdeltIntel.infoTooltip'),
     });
     this.createTabs();
+    void this.hydrateTopics();
     this.loadActiveTopic();
   }
 
   private createTabs(): void {
     this.tabsEl = h('div', { className: 'panel-tabs' },
-      ...getIntelTopics().map(topic =>
+      ...this.topics.map(topic =>
         h('button', {
           className: `panel-tab ${topic.id === this.activeTopic.id ? 'active' : ''}`,
           dataset: { topicId: topic.id },
@@ -45,6 +48,21 @@ export class GdeltIntelPanel extends Panel {
     );
 
     this.element.insertBefore(this.tabsEl, this.content);
+  }
+
+  private async hydrateTopics(): Promise<void> {
+    try {
+      const topics = await listIntelTopics();
+      if (!topics.length) return;
+      const currentTopicId = this.activeTopic?.id;
+      this.topics = topics;
+      this.activeTopic = topics.find((topic) => topic.id === currentTopicId) || topics[0]!;
+      this.tabsEl?.remove();
+      this.createTabs();
+      await this.loadActiveTopic();
+    } catch {
+      // Keep the built-in topic list if runtime registry hydration fails.
+    }
   }
 
   private selectTopic(topic: IntelTopic): void {

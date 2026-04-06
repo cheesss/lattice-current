@@ -22,6 +22,7 @@ import type { ETFFlowsPanel } from '@/components/ETFFlowsPanel';
 import type { MacroSignalsPanel } from '@/components/MacroSignalsPanel';
 import type { StrategicPosturePanel } from '@/components/StrategicPosturePanel';
 import type { StrategicRiskPanel } from '@/components/StrategicRiskPanel';
+import type { EventIntelligencePanel } from '@/components/EventIntelligencePanel';
 import { isDesktopRuntime, waitForSidecarReady } from '@/services/runtime';
 import { BETA_MODE } from '@/config/beta';
 import { trackEvent, trackDeeplinkOpened } from '@/services/analytics';
@@ -29,7 +30,7 @@ import { preloadCountryGeometry, getCountryNameByCode } from '@/services/country
 import { initI18n } from '@/services/i18n';
 
 import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount } from '@/config/feeds';
-import { fetchBootstrapData } from '@/services/bootstrap';
+import { fetchBootstrapData, getBootstrapHydrationStatus } from '@/services/bootstrap';
 import { DesktopUpdater } from '@/app/desktop-updater';
 import { CountryIntelManager } from '@/app/country-intel';
 import { SearchManager } from '@/app/search-manager';
@@ -155,6 +156,50 @@ export class App {
           }
           localStorage.setItem(TECH_INSIGHTS_MIGRATION_KEY, 'done');
         }
+      }
+
+      const SIGNAL_FIRST_PANEL_MIGRATION_KEY = 'worldmonitor-signal-first-v2.6';
+      if (!localStorage.getItem(SIGNAL_FIRST_PANEL_MIGRATION_KEY) && currentVariant !== 'happy') {
+        const promoteToPrimary = currentVariant === 'full'
+          ? ['live-news', 'insights', 'strategic-posture', 'strategic-risk', 'cii', 'gdelt-intel', 'event-intelligence', 'macro-signals', 'signal-ridgeline', 'transmission-sankey', 'source-ops']
+          : currentVariant === 'finance'
+            ? ['live-news', 'insights', 'markets', 'cross-asset-tape', 'event-intelligence', 'macro-signals', 'signal-ridgeline', 'transmission-sankey', 'source-ops']
+            : ['live-news', 'insights', 'event-intelligence', 'markets', 'macro-signals', 'signal-ridgeline', 'transmission-sankey', 'source-ops'];
+        const demoteToValidation = ['backtest-lab', 'resource-profiler', 'data-qa'];
+
+        let touchedPanelSettings = false;
+        for (const key of [...promoteToPrimary, ...demoteToValidation, 'investment-workflow', 'investment-ideas', 'dataflow-ops']) {
+          const defaults = DEFAULT_PANELS[key];
+          if (!defaults) continue;
+          const next = {
+            ...(panelSettings[key] ?? defaults),
+            name: defaults.name,
+            priority: defaults.priority,
+            enabled: defaults.enabled,
+          };
+          if (JSON.stringify(panelSettings[key]) !== JSON.stringify(next)) {
+            panelSettings[key] = next;
+            touchedPanelSettings = true;
+          }
+        }
+        if (touchedPanelSettings) {
+          saveToStorage(STORAGE_KEYS.panels, panelSettings);
+        }
+
+        const savedOrder = localStorage.getItem(PANEL_ORDER_KEY);
+        if (savedOrder) {
+          try {
+            const order: string[] = JSON.parse(savedOrder);
+            const preferred = promoteToPrimary.filter((key) => order.includes(key));
+            const filtered = order.filter((key) => !preferred.includes(key));
+            const nextOrder = [...preferred, ...filtered];
+            localStorage.setItem(PANEL_ORDER_KEY, JSON.stringify(nextOrder));
+            console.log('[App] Applied signal-first panel order migration (v2.6)');
+          } catch {
+            // invalid saved order; default order will apply
+          }
+        }
+        localStorage.setItem(SIGNAL_FIRST_PANEL_MIGRATION_KEY, 'done');
       }
     }
 
@@ -409,6 +454,28 @@ export class App {
 
     // Phase 1: Layout (creates map + panels — they'll find hydrated data)
     this.panelLayout.init();
+    const bootstrapStatus = getBootstrapHydrationStatus();
+    if (bootstrapStatus.coldStart || bootstrapStatus.fallbackUsed) {
+      document.documentElement.dataset.bootstrapState = 'warming';
+      this.state.statusPanel?.updateFeed('Bootstrap Warmup', {
+        status: 'warning',
+        itemCount: bootstrapStatus.fetchedKeys,
+        errorMessage: [
+          'Cold-start fallback active. Live data collection is still in progress.',
+          bootstrapStatus.missingKeyNames.length > 0
+            ? `Missing: ${bootstrapStatus.missingKeyNames.slice(0, 6).join(', ')}${bootstrapStatus.missingKeyNames.length > 6 ? '...' : ''}.`
+            : '',
+          bootstrapStatus.staleKeyNames.length > 0
+            ? `Stale LKG: ${bootstrapStatus.staleKeyNames.slice(0, 4).join(', ')}${bootstrapStatus.staleKeyNames.length > 4 ? '...' : ''}.`
+            : '',
+          bootstrapStatus.fallbackGeneratedAt
+            ? `Fallback snapshot: ${bootstrapStatus.fallbackGeneratedAt}.`
+            : '',
+        ].filter(Boolean).join(' '),
+      });
+    } else {
+      document.documentElement.dataset.bootstrapState = 'ready';
+    }
     await this.dataLoader.hydratePersistedIntelligenceFabric();
 
     const mobileGeoCoords = await geoCoordsPromise;
@@ -625,6 +692,13 @@ export class App {
       () => (this.state.panels['macro-signals'] as MacroSignalsPanel).fetchData(),
       3 * 60_000,
       () => !!this.state.panels['macro-signals']
+    );
+    this.refreshScheduler.scheduleRefresh(
+      'event-intelligence',
+      () => (this.state.panels['event-intelligence'] as EventIntelligencePanel).refresh(),
+      60_000,
+      () => !!this.state.panels['event-intelligence'],
+      'event-intelligence',
     );
     this.refreshScheduler.scheduleRefresh(
       'strategic-posture',

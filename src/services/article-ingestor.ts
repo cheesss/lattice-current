@@ -99,8 +99,34 @@ function resolveOllamaModel(): string {
 
 let pool: pg.Pool | null = null;
 let poolCacheKey = '';
+let consecutiveFailures = 0;
+let disabledUntil = 0;
+let lastPoolError = '';
+const CIRCUIT_BREAKER_FAILS = Math.max(1, Number(process.env.ARTICLE_INGESTOR_POOL_CIRCUIT_FAILS || 3));
+const CIRCUIT_BREAKER_OPEN_MS = Math.max(60_000, Number(process.env.ARTICLE_INGESTOR_POOL_CIRCUIT_OPEN_MS || (5 * 60 * 1000)));
 
-function getPool(): pg.Pool {
+function recordPoolFailure(error: unknown): void {
+  consecutiveFailures += 1;
+  lastPoolError = String((error as Error)?.message || error || 'pool failure');
+  if (consecutiveFailures >= CIRCUIT_BREAKER_FAILS) {
+    disabledUntil = Date.now() + CIRCUIT_BREAKER_OPEN_MS;
+    console.warn(`[article-ingestor] pool circuit open for ${Math.round(CIRCUIT_BREAKER_OPEN_MS / 1000)}s: ${lastPoolError}`);
+    if (pool) {
+      void pool.end().catch(() => { /* ignore */ });
+      pool = null;
+      poolCacheKey = '';
+    }
+  }
+}
+
+function recordPoolSuccess(): void {
+  consecutiveFailures = 0;
+  disabledUntil = 0;
+  lastPoolError = '';
+}
+
+function getPool(): pg.Pool | null {
+  if (Date.now() < disabledUntil) return null;
   const config = resolveNasPgConfig();
   const key = JSON.stringify({
     host: config.host,
@@ -116,7 +142,7 @@ function getPool(): pg.Pool {
   }
 
   pool = new pg.Pool(config);
-  pool.on('error', (err) => console.error('[pool] idle client error:', err.message));
+  pool.on('error', (err) => recordPoolFailure(err));
   poolCacheKey = key;
   return pool;
 }
@@ -127,6 +153,14 @@ export async function closeIngestorPool(): Promise<void> {
   pool = null;
   poolCacheKey = '';
   await ref.end().catch(() => { /* ignore */ });
+}
+
+export function getArticleIngestorCircuitState(): { consecutiveFailures: number; disabledUntil: number; lastError: string } {
+  return {
+    consecutiveFailures,
+    disabledUntil,
+    lastError: lastPoolError,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -394,6 +428,13 @@ export async function ingestArticle(
   article: IngestArticleInput,
 ): Promise<IngestArticleResult> {
   const db = getPool();
+  if (!db) {
+    return {
+      articleId: -1,
+      theme: article.theme ?? 'unknown',
+      pendingCount: 0,
+    };
+  }
   const client = await db.connect();
 
   try {
@@ -421,6 +462,7 @@ export async function ingestArticle(
         [article.title],
       );
       const existingRow = existing.rows[0];
+      recordPoolSuccess();
       return {
         articleId: existingRow?.id ?? -1,
         theme: existingRow?.theme ?? article.theme ?? 'unknown',
@@ -487,7 +529,11 @@ export async function ingestArticle(
       `, [theme, today]);
     } catch { /* non-fatal */ }
 
+    recordPoolSuccess();
     return { articleId, theme, pendingCount };
+  } catch (error) {
+    recordPoolFailure(error);
+    throw error;
   } finally {
     client.release();
   }
@@ -504,6 +550,9 @@ export async function ingestArticleBatch(
 
   // Pre-check which titles already exist to skip them early
   const db = getPool();
+  if (!db) {
+    return { ingested, skippedDuplicates: articles.length };
+  }
   const client = await db.connect();
   let existingTitles: Set<string>;
 
@@ -515,7 +564,11 @@ export async function ingestArticleBatch(
       'SELECT title FROM articles WHERE title = ANY($1::text[])',
       [titles],
     );
+    recordPoolSuccess();
     existingTitles = new Set(existing.rows.map((r) => r.title));
+  } catch (error) {
+    recordPoolFailure(error);
+    throw error;
   } finally {
     client.release();
   }
@@ -550,6 +603,9 @@ export async function ingestArticleBatch(
  */
 export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
   const db = getPool();
+  if (!db) {
+    return { completed: 0, remaining: 0 };
+  }
   const client = await db.connect();
   let completed = 0;
   const refreshedTargets: SensitivityTarget[] = [];
@@ -657,7 +713,11 @@ export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
     );
     const remaining = Number(remainingResult.rows[0]?.count ?? 0);
 
+    recordPoolSuccess();
     return { completed, remaining };
+  } catch (error) {
+    recordPoolFailure(error);
+    throw error;
   } finally {
     client.release();
   }
@@ -668,10 +728,18 @@ export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
  */
 export async function getIngestorStats(): Promise<IngestorStats> {
   const db = getPool();
+  if (!db) {
+    return {
+      totalArticles: 0,
+      todayArticles: 0,
+      pendingOutcomes: 0,
+      recentThemes: [],
+    };
+  }
   const client = await db.connect();
 
-  try {
-    const [totalRes, todayRes, pendingRes, themesRes] = await Promise.all([
+    try {
+      const [totalRes, todayRes, pendingRes, themesRes] = await Promise.all([
       client.query<{ count: string }>('SELECT COUNT(*) AS count FROM articles'),
       client.query<{ count: string }>(
         `SELECT COUNT(*) AS count FROM articles WHERE published_at >= CURRENT_DATE`,
@@ -684,24 +752,26 @@ export async function getIngestorStats(): Promise<IngestorStats> {
          WHERE updated_at >= NOW() - INTERVAL '7 days'
          ORDER BY auto_theme
          LIMIT 20`,
-      ),
-    ]);
+        ),
+      ]);
 
-    return {
-      totalArticles: Number(totalRes.rows[0]?.count ?? 0),
-      todayArticles: Number(todayRes.rows[0]?.count ?? 0),
-      pendingOutcomes: Number(pendingRes.rows[0]?.count ?? 0),
-      recentThemes: themesRes.rows.map((r) => r.theme),
-    };
-  } catch {
-    // Graceful fallback if tables don't exist yet
-    return {
-      totalArticles: 0,
-      todayArticles: 0,
-      pendingOutcomes: 0,
-      recentThemes: [],
-    };
-  } finally {
-    client.release();
-  }
+      recordPoolSuccess();
+      return {
+        totalArticles: Number(totalRes.rows[0]?.count ?? 0),
+        todayArticles: Number(todayRes.rows[0]?.count ?? 0),
+        pendingOutcomes: Number(pendingRes.rows[0]?.count ?? 0),
+        recentThemes: themesRes.rows.map((r) => r.theme),
+      };
+    } catch (error) {
+      recordPoolFailure(error);
+      // Graceful fallback if tables don't exist yet
+      return {
+        totalArticles: 0,
+        todayArticles: 0,
+        pendingOutcomes: 0,
+        recentThemes: [],
+      };
+    } finally {
+      client.release();
+    }
 }

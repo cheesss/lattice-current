@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "generatedAt": "2026-03-24T00:00:00.000Z",
+    "source": "static-fallback",
+    "keyCount": 5
+  },
+  "data": {
+    "marketQuotes": {
+      "quotes": [
+        { "symbol": "SPY", "name": "S&P 500 ETF", "display": "S&P 500", "price": null, "change": null },
+        { "symbol": "QQQ", "name": "Nasdaq 100 ETF", "display": "Nasdaq 100", "price": null, "change": null }
+      ],
+      "origin": "fallback"
+    },
+    "commodityQuotes": {
+      "quotes": [
+        { "symbol": "GC=F", "display": "Gold", "price": null, "change": null },
+        { "symbol": "CL=F", "display": "Crude Oil", "price": null, "change": null }
+      ],
+      "origin": "fallback"
+    },
+    "sectors": {
+      "quotes": [
+        { "name": "Technology", "change": null },
+        { "name": "Energy", "change": null },
+        { "name": "Financials", "change": null }
+      ],
+      "origin": "fallback"
+    },
+    "serviceStatuses": {
+      "statuses": [],
+      "origin": "fallback"
+    },
+    "insights": {
+      "brief": "Cold-start fallback active. Live data collection is still warming up.",
+      "generatedAt": "2026-03-24T00:00:00.000Z",
+      "origin": "fallback"
+    }
+  }
+}

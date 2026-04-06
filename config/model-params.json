@@ -1,0 +1,74 @@
+{
+  "hmm": {
+    "transitionPriorStrength": 12,
+    "onlineDiscount": 0.992,
+    "stabilityBias": { "base": 0.55, "scale": 260, "floor": 0.55, "cap": 0.86 },
+    "switchBias": { "base": 0.22, "scale": 320, "floor": 0.18, "cap": 0.48 },
+    "blendWeights": { "stability": 0.58, "switch": 0.42 },
+    "confidence": { "w1": 34, "w2": 52, "w3": 28, "w4": 9, "w5": 10, "floor": 28, "cap": 96 },
+    "onlineWeightScale": 24,
+    "onlineWeightExponent": 0.6
+  },
+  "conviction": {
+    "discountFactor": 0.995,
+    "learningRate": 0.08
+  },
+  "bandit": {
+    "discountFactor": 0.995,
+    "explorationScale": 0.7
+  },
+  "risk": {
+    "maxGrossExposurePct": 150,
+    "maxNetExposurePct": 80,
+    "maxSinglePositionPct": 12
+  },
+  "degradation": {
+    "minDataSufficiency": 0.3,
+    "maxModelStaleness": 0.7
+  },
+  "portfolioOptimizer": {
+    "regime": {
+      "riskOff": { "maxClusters": 2, "budgetPct": 12, "grossCapPct": 16 },
+      "balanced": { "maxClusters": 3, "budgetPct": 24, "grossCapPct": 20 },
+      "riskOn": { "maxClusters": 4, "budgetPct": 36, "grossCapPct": 30 },
+      "budgetBaseHigh": 44
+    },
+    "thresholds": {
+      "readinessBaseline": 45,
+      "defaultSampleSize": 48,
+      "hitRateNeutral": 50,
+      "defensiveTrigger": 55,
+      "percentileCap": 100
+    },
+    "weights": {
+      "familyShare": 0.5,
+      "hedgeRole": 0.3,
+      "direction": 0.2,
+      "utilityShrinkageBase": 0.35,
+      "sampleReliabilityWeight": 0.65,
+      "robustGapPenalty": 0.7,
+      "hitPenaltyWeight": 0.62,
+      "flipRateWeight": 0.95,
+      "regimeDispersionWeight": 0.72,
+      "watchDirection": 0.55
+    },
+    "penalties": {
+      "downsideMagnitude": 0.26,
+      "volatilityLossWeight": 0.42,
+      "driftLossMultiplier": 0.78,
+      "replayGapLoss": 1.05,
+      "concentrationBoost": 1.35,
+      "negativeDriftPenalty": 1.45,
+      "clusterFloor": 0.82,
+      "stressMultiplierHigh": 0.76
+    },
+    "maxCompositeReturnPoints": 48,
+    "minSampleSize": 8,
+    "defaultHitRate": 50,
+    "temperatureDefault": 1,
+    "defensiveMultipliers": { "familyShare": 0.5, "hedgeRole": 0.3, "direction": 0.2 },
+    "coreAssetKinds": ["etf", "rate", "commodity", "fx"],
+    "onlineWeightScale": 24,
+    "onlineWeightExponent": 0.6
+  }
+}

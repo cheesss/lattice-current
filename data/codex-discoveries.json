@@ -1,0 +1,378 @@
+{
+  "generatedAt": "2026-04-04T23:05:00+09:00",
+  "analysisMode": "live-postgres-proxy",
+  "status": {
+    "liveNasPostgresReachable": true,
+    "host": "localhost",
+    "port": 15433,
+    "database": "lattice"
+  },
+  "sources": [
+    "node --import tsx scripts/query-event-impact.mjs sensitivity",
+    "node --import tsx scripts/query-event-impact.mjs explain politics GLD",
+    "node --import tsx scripts/query-event-impact.mjs explain conflict XLE",
+    "node --import tsx scripts/query-event-impact.mjs compare GLD TLT",
+    "postgres.public.stock_sensitivity_matrix",
+    "postgres.public.labeled_outcomes",
+    "postgres.public.conditional_sensitivity",
+    "postgres.public.regime_conditional_impact"
+  ],
+  "matrixRanking": {
+    "method": "2w horizon, sample_size >= 500, ranked by hit_rate and checked against avg_return",
+    "mostPredictivePairs": [
+      {
+        "theme": "economy",
+        "symbol": "SPY",
+        "sampleSize": 10331,
+        "avgReturnPct": 0.5064,
+        "hitRate": 0.6216
+      },
+      {
+        "theme": "politics",
+        "symbol": "SPY",
+        "sampleSize": 7669,
+        "avgReturnPct": 0.3869,
+        "hitRate": 0.6186
+      },
+      {
+        "theme": "tech",
+        "symbol": "QQQ",
+        "sampleSize": 8666,
+        "avgReturnPct": 0.7006,
+        "hitRate": 0.6071
+      },
+      {
+        "theme": "tech",
+        "symbol": "NVDA",
+        "sampleSize": 8666,
+        "avgReturnPct": 2.6307,
+        "hitRate": 0.6049
+      },
+      {
+        "theme": "politics",
+        "symbol": "GLD",
+        "sampleSize": 7669,
+        "avgReturnPct": 1.0394,
+        "hitRate": 0.6018
+      }
+    ],
+    "leastPredictivePairs": [
+      {
+        "theme": "politics",
+        "symbol": "TLT",
+        "sampleSize": 7669,
+        "avgReturnPct": -0.4739,
+        "hitRate": 0.4109
+      },
+      {
+        "theme": "economy",
+        "symbol": "TLT",
+        "sampleSize": 10331,
+        "avgReturnPct": -0.5102,
+        "hitRate": 0.4177
+      },
+      {
+        "theme": "conflict",
+        "symbol": "TLT",
+        "sampleSize": 12830,
+        "avgReturnPct": -0.5717,
+        "hitRate": 0.4185
+      },
+      {
+        "theme": "energy",
+        "symbol": "UNG",
+        "sampleSize": 7849,
+        "avgReturnPct": -0.4073,
+        "hitRate": 0.471
+      },
+      {
+        "theme": "economy",
+        "symbol": "UUP",
+        "sampleSize": 1549,
+        "avgReturnPct": -0.5291,
+        "hitRate": 0.4797
+      }
+    ]
+  },
+  "patterns": [
+    {
+      "id": "politics-gold-is-a-late-cycle-spike",
+      "title": "Politics -> GLD is not stable; it turns into a late-cycle surge in 2024-2025",
+      "validated": true,
+      "evidence": {
+        "pair2w": {
+          "avgReturnPct": 1.0394,
+          "hitRate": 0.6018,
+          "sampleSize": 7669
+        },
+        "annualBreakdown": [
+          {
+            "year": 2021,
+            "sampleSize": 1383,
+            "avgReturnPct": 0.5062,
+            "hitRate": 0.6038
+          },
+          {
+            "year": 2022,
+            "sampleSize": 1477,
+            "avgReturnPct": -0.2674,
+            "hitRate": 0.3676
+          },
+          {
+            "year": 2023,
+            "sampleSize": 1770,
+            "avgReturnPct": 0.8874,
+            "hitRate": 0.5746
+          },
+          {
+            "year": 2024,
+            "sampleSize": 1664,
+            "avgReturnPct": 1.2557,
+            "hitRate": 0.6641
+          },
+          {
+            "year": 2025,
+            "sampleSize": 1375,
+            "avgReturnPct": 2.9133,
+            "hitRate": 0.8109
+          }
+        ],
+        "topQuarters": [
+          {
+            "quarter": "2025-Q1",
+            "sampleSize": 353,
+            "avgReturnPct": 3.4093,
+            "hitRate": 1.0
+          },
+          {
+            "quarter": "2024-Q3",
+            "sampleSize": 428,
+            "avgReturnPct": 3.6392,
+            "hitRate": 0.9977
+          },
+          {
+            "quarter": "2025-Q4",
+            "sampleSize": 354,
+            "avgReturnPct": 4.1467,
+            "hitRate": 0.9859
+          }
+        ]
+      },
+      "interpretation": "In this dataset, political-event gold reactions are regime-dependent rather than constant. The signal breaks in 2022, then accelerates sharply in 2024-2025. The inference is that policy uncertainty became a much stronger safe-haven driver late in the sample."
+    },
+    {
+      "id": "risk-off-breaks-the-bond-hedge",
+      "title": "Risk-off regimes amplify TLT downside instead of producing the expected safe-haven bid",
+      "validated": true,
+      "evidence": {
+        "overallLeastPredictiveSet": [
+          {
+            "theme": "politics",
+            "symbol": "TLT",
+            "avgReturnPct": -0.4739,
+            "hitRate": 0.4109
+          },
+          {
+            "theme": "economy",
+            "symbol": "TLT",
+            "avgReturnPct": -0.5102,
+            "hitRate": 0.4177
+          },
+          {
+            "theme": "conflict",
+            "symbol": "TLT",
+            "avgReturnPct": -0.5717,
+            "hitRate": 0.4185
+          }
+        ],
+        "riskOffRows": [
+          {
+            "theme": "conflict",
+            "regime": "risk-off",
+            "sampleSize": 1463,
+            "avgReturnPct": -1.3944,
+            "hitRate": 0.3329
+          },
+          {
+            "theme": "economy",
+            "regime": "risk-off",
+            "sampleSize": 1080,
+            "avgReturnPct": -1.1828,
+            "hitRate": 0.3389
+          },
+          {
+            "theme": "politics",
+            "regime": "risk-off",
+            "sampleSize": 717,
+            "avgReturnPct": -1.3002,
+            "hitRate": 0.304
+          }
+        ],
+        "worstQuartersPoliticsTLT": [
+          {
+            "quarter": "2024-Q4",
+            "sampleSize": 403,
+            "avgReturnPct": -3.1366,
+            "hitRate": 0.0347
+          },
+          {
+            "quarter": "2024-Q1",
+            "sampleSize": 444,
+            "avgReturnPct": -2.5281,
+            "hitRate": 0.045
+          },
+          {
+            "quarter": "2022-Q2",
+            "sampleSize": 382,
+            "avgReturnPct": -2.9895,
+            "hitRate": 0.123
+          }
+        ]
+      },
+      "interpretation": "The surprising result is that event-driven bond exposure behaves like a duration selloff proxy, not a crisis hedge. This is an inference from the stored regime table: when the system labels the backdrop as risk-off, bond reactions get more negative, not less."
+    },
+    {
+      "id": "positive-energy-tone-is-bearish",
+      "title": "Positive-tone energy coverage is consistently contrarian for energy equities and gas",
+      "validated": true,
+      "evidence": {
+        "toneSentiment2w": [
+          {
+            "theme": "energy",
+            "symbol": "XLE",
+            "condition": "positive",
+            "sampleSize": 302,
+            "avgReturnPct": -1.9165,
+            "hitRate": 0.2152
+          },
+          {
+            "theme": "energy",
+            "symbol": "COP",
+            "condition": "positive",
+            "sampleSize": 302,
+            "avgReturnPct": -1.3741,
+            "hitRate": 0.3642
+          },
+          {
+            "theme": "energy",
+            "symbol": "CVX",
+            "condition": "positive",
+            "sampleSize": 302,
+            "avgReturnPct": -1.3718,
+            "hitRate": 0.5099
+          },
+          {
+            "theme": "energy",
+            "symbol": "UNG",
+            "condition": "positive",
+            "sampleSize": 302,
+            "avgReturnPct": -4.1458,
+            "hitRate": 0.3113
+          }
+        ],
+        "contrastRows": [
+          {
+            "theme": "energy",
+            "symbol": "XLE",
+            "condition": "neutral",
+            "sampleSize": 1055,
+            "avgReturnPct": 0.984,
+            "hitRate": 0.564
+          },
+          {
+            "theme": "energy",
+            "symbol": "USO",
+            "condition": "very_negative",
+            "sampleSize": 27834,
+            "avgReturnPct": 0.7826,
+            "hitRate": 0.5543
+          },
+          {
+            "theme": "conflict",
+            "symbol": "XLE",
+            "condition": "positive",
+            "sampleSize": 439,
+            "avgReturnPct": -1.7671,
+            "hitRate": 0.2437
+          }
+        ]
+      },
+      "interpretation": "The non-obvious pattern is that optimistic energy language often marks relief or normalization rather than upside pressure. This interpretation is inferred from the tone bins: positive-tone rows underperform both neutral and very-negative bins across multiple energy-linked symbols."
+    },
+    {
+      "id": "geopolitical-oil-beats-generic-energy",
+      "title": "Geopolitical energy shock channels are stronger than generic energy coverage",
+      "validated": true,
+      "evidence": {
+        "pairComparison": [
+          {
+            "theme": "conflict",
+            "symbol": "XLE",
+            "sampleSize": 12830,
+            "avgReturnPct": 0.455,
+            "hitRate": 0.5527
+          },
+          {
+            "theme": "energy",
+            "symbol": "XLE",
+            "sampleSize": 7849,
+            "avgReturnPct": 0.1921,
+            "hitRate": 0.5258
+          },
+          {
+            "theme": "conflict",
+            "symbol": "USO",
+            "sampleSize": 12830,
+            "avgReturnPct": 0.5813,
+            "hitRate": 0.5567
+          },
+          {
+            "theme": "energy",
+            "symbol": "USO",
+            "sampleSize": 7849,
+            "avgReturnPct": 0.758,
+            "hitRate": 0.5515
+          }
+        ],
+        "regimeAmplification": [
+          {
+            "theme": "conflict",
+            "symbol": "XLE",
+            "regime": "risk-off",
+            "sampleSize": 1463,
+            "avgReturnPct": 1.4362,
+            "hitRate": 0.6473
+          },
+          {
+            "theme": "conflict",
+            "symbol": "XLE",
+            "regime": "risk-on",
+            "sampleSize": 4974,
+            "avgReturnPct": 0.0128,
+            "hitRate": 0.5137
+          },
+          {
+            "theme": "conflict",
+            "symbol": "XLE",
+            "condition": "high_conflict",
+            "avgReturnPct": 0.4459,
+            "hitRate": 0.5526,
+            "sampleSize": 51649
+          },
+          {
+            "theme": "conflict",
+            "symbol": "XLE",
+            "condition": "medium_tension",
+            "avgReturnPct": 0.1685,
+            "hitRate": 0.5188,
+            "sampleSize": 1064
+          }
+        ]
+      },
+      "interpretation": "Energy ETFs respond more cleanly when the catalyst is geopolitical stress than when the coverage is simply tagged energy. The strongest version of the signal appears when conflict is both high-intensity and embedded in a risk-off regime."
+    }
+  ],
+  "conclusion": {
+    "summary": "The strongest 2-week average pair by hit rate is economy -> SPY, while TLT is the clear weak spot across politics, economy, and conflict. The non-obvious edges are regime-driven: political gold only becomes dominant late in the sample, risk-off breaks the bond hedge, positive-tone energy coverage is contrarian, and conflict-linked energy shocks outperform generic energy news."
+  }
+}

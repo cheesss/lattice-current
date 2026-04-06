@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
 import { loadEnvFile, CHROME_UA, getRedisCredentials, runSeed } from './_seed-utils.mjs';
 import { clusterItems, selectTopStories } from './_clustering.mjs';
 
@@ -7,10 +11,14 @@ loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'news:insights:v1';
 const DIGEST_KEY = 'news:digest:v1:full:en';
-const CACHE_TTL = 600; // 10 min (2x the 5-min cron interval)
+const CACHE_TTL = 600;
 const MAX_HEADLINES = 10;
 const MAX_HEADLINE_LEN = 500;
 const GROQ_MODEL = 'llama-3.1-8b-instant';
+const LKG_TTL_MS = 24 * 60 * 60 * 1000;
+const LLM_BREAKER_THRESHOLD = 3;
+const LLM_BREAKER_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+const LLM_BREAKER_PATH = path.join(os.tmpdir(), 'lattice-current-insights-llm-breaker.json');
 
 const TASK_NARRATION = /^(we need to|i need to|let me|i'll |i should|i will |the task is|the instructions|according to the rules|so we need to|okay[,.]\s*(i'll|let me|so|we need|the task|i should|i will)|sure[,.]\s*(i'll|let me|so|we need|the task|i should|i will|here)|first[, ]+(i|we|let)|to summarize (the headlines|the task|this)|my task (is|was|:)|step \d)/i;
 const PROMPT_ECHO = /^(summarize the top story|summarize the key|rules:|here are the rules|the top story is likely)/i;
@@ -18,8 +26,8 @@ const PROMPT_ECHO = /^(summarize the top story|summarize the key|rules:|here are
 function stripReasoningPreamble(text) {
   const trimmed = text.trim();
   if (TASK_NARRATION.test(trimmed) || PROMPT_ECHO.test(trimmed)) {
-    const lines = trimmed.split('\n').filter(l => l.trim());
-    const clean = lines.filter(l => !TASK_NARRATION.test(l.trim()) && !PROMPT_ECHO.test(l.trim()));
+    const lines = trimmed.split('\n').filter((line) => line.trim());
+    const clean = lines.filter((line) => !TASK_NARRATION.test(line.trim()) && !PROMPT_ECHO.test(line.trim()));
     return clean.join('\n').trim() || trimmed;
   }
   return trimmed;
@@ -34,36 +42,83 @@ function sanitizeTitle(title) {
     .trim();
 }
 
-async function readDigestFromRedis() {
+async function readJsonKey(key) {
   const { url, token } = getRedisCredentials();
-  const resp = await fetch(`${url}/get/${encodeURIComponent(DIGEST_KEY)}`, {
+  const resp = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5_000),
   });
   if (!resp.ok) return null;
   const data = await resp.json();
   return data.result ? JSON.parse(data.result) : null;
+}
+
+async function readDigestFromRedis() {
+  return readJsonKey(DIGEST_KEY);
 }
 
 async function readExistingInsights() {
-  const { url, token } = getRedisCredentials();
-  const resp = await fetch(`${url}/get/${encodeURIComponent(CANONICAL_KEY)}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(5_000),
-  });
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  return data.result ? JSON.parse(data.result) : null;
+  return readJsonKey(CANONICAL_KEY);
 }
 
-// Provider config — mirrors server/worldmonitor/news/v1/_shared.ts getProviderCredentials()
+async function readLlmBreakerState() {
+  try {
+    const raw = await readFile(LLM_BREAKER_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object'
+      ? parsed
+      : { consecutiveFailures: 0, openUntil: 0, lastError: '' };
+  } catch {
+    return { consecutiveFailures: 0, openUntil: 0, lastError: '' };
+  }
+}
+
+async function writeLlmBreakerState(state) {
+  await mkdir(path.dirname(LLM_BREAKER_PATH), { recursive: true });
+  await writeFile(LLM_BREAKER_PATH, JSON.stringify(state, null, 2), 'utf8');
+}
+
+async function isLlmBreakerOpen() {
+  const state = await readLlmBreakerState();
+  return Number(state.openUntil || 0) > Date.now();
+}
+
+async function markLlmSuccess() {
+  await writeLlmBreakerState({
+    consecutiveFailures: 0,
+    openUntil: 0,
+    lastError: '',
+    updatedAt: Date.now(),
+  });
+}
+
+async function markLlmFailure(message) {
+  const state = await readLlmBreakerState();
+  const consecutiveFailures = Number(state.consecutiveFailures || 0) + 1;
+  await writeLlmBreakerState({
+    consecutiveFailures,
+    openUntil: consecutiveFailures >= LLM_BREAKER_THRESHOLD ? Date.now() + LLM_BREAKER_COOLDOWN_MS : 0,
+    lastError: String(message || '').slice(0, 240),
+    updatedAt: Date.now(),
+  });
+}
+
+function buildKeywordFallbackBrief(headlines) {
+  const selected = headlines.slice(0, 3).map((headline) => sanitizeTitle(headline)).filter(Boolean);
+  if (selected.length === 0) return '';
+  return selected
+    .map((headline, index) => `${index === 0 ? 'Lead' : index === 1 ? 'Also' : 'Watch'}: ${headline}.`)
+    .join(' ')
+    .slice(0, 280);
+}
+
 const LLM_PROVIDERS = [
   {
     name: 'groq',
     envKey: 'GROQ_API_KEY',
     apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
     model: GROQ_MODEL,
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
     timeout: 15_000,
   },
   {
@@ -71,7 +126,7 @@ const LLM_PROVIDERS = [
     envKey: 'OPENROUTER_API_KEY',
     apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
     model: 'google/gemini-2.5-flash',
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'WorldMonitor', 'User-Agent': CHROME_UA }),
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'WorldMonitor', 'User-Agent': CHROME_UA }),
     timeout: 20_000,
   },
   {
@@ -79,11 +134,11 @@ const LLM_PROVIDERS = [
     envKey: 'OLLAMA_API_URL',
     apiUrlFn: (baseUrl) => new URL('/v1/chat/completions', baseUrl).toString(),
     model: () => process.env.OLLAMA_MODEL || 'llama3.1:8b',
-    headers: (_key) => {
-      const h = { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA };
+    headers: () => {
+      const headers = { 'Content-Type': 'application/json', 'User-Agent': CHROME_UA };
       const apiKey = process.env.OLLAMA_API_KEY;
-      if (apiKey) h['Authorization'] = `Bearer ${apiKey}`;
-      return h;
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      return headers;
     },
     extraBody: { think: false },
     timeout: 25_000,
@@ -91,7 +146,12 @@ const LLM_PROVIDERS = [
 ];
 
 async function callLLM(headlines) {
-  const headlineText = headlines.map((h, i) => `${i + 1}. ${h}`).join('\n');
+  if (await isLlmBreakerOpen()) {
+    console.warn('  LLM circuit breaker open — using keyword fallback');
+    return null;
+  }
+
+  const headlineText = headlines.map((headline, index) => `${index + 1}. ${headline}`).join('\n');
   const dateContext = `Current date: ${new Date().toISOString().split('T')[0]}. Provide geopolitical context appropriate for the current date.`;
 
   const systemPrompt = `${dateContext}
@@ -155,6 +215,7 @@ Rules:
         continue;
       }
 
+      await markLlmSuccess();
       return { text, model: json.model || model, provider: provider.name };
     } catch (err) {
       console.warn(`  ${provider.name} failed: ${err.message}`);
@@ -162,6 +223,7 @@ Rules:
     }
   }
 
+  await markLlmFailure('all providers failed');
   return null;
 }
 
@@ -179,7 +241,7 @@ function categorizeStory(title) {
   ];
 
   for (const { keywords, cat, threat } of categories) {
-    if (keywords.some(kw => lower.includes(kw))) {
+    if (keywords.some((keyword) => lower.includes(keyword))) {
       return { category: cat, threatLevel: threat };
     }
   }
@@ -200,26 +262,33 @@ async function warmDigestCache() {
   }
 }
 
+function withStaleness(payload) {
+  const generatedTs = Date.parse(String(payload?.generatedAt || ''));
+  const staleWarning = Number.isFinite(generatedTs) ? (Date.now() - generatedTs > LKG_TTL_MS) : true;
+  return {
+    ...payload,
+    staleWarning,
+    lkgExpiresAt: Number.isFinite(generatedTs) ? new Date(generatedTs + LKG_TTL_MS).toISOString() : new Date(Date.now() + LKG_TTL_MS).toISOString(),
+  };
+}
+
 async function fetchInsights() {
   let digest = await readDigestFromRedis();
   if (!digest) {
     console.log('  Digest not in Redis, warming cache via RPC...');
     await warmDigestCache();
-    // Wait for RPC write to propagate to Redis
-    await new Promise(r => setTimeout(r, 3_000));
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
     digest = await readDigestFromRedis();
   }
   if (!digest) {
-    // LKG fallback: reuse existing insights if digest is unavailable
     const existing = await readExistingInsights();
     if (existing?.topStories?.length) {
       console.log('  Digest unavailable — reusing existing insights (LKG)');
-      return existing;
+      return withStaleness(existing);
     }
     throw new Error('No news digest found in Redis');
   }
 
-  // Digest shape: { categories: { politics: { items: [...] }, ... }, feedStatuses, generatedAt }
   let items;
   if (Array.isArray(digest)) {
     items = digest;
@@ -239,26 +308,23 @@ async function fetchInsights() {
 
   console.log(`  Digest items: ${items.length}`);
 
-  const normalizedItems = items.map(item => ({
+  const normalizedItems = items.map((item) => ({
     title: sanitizeTitle(item.title || item.headline || ''),
     source: item.source || item.feed || '',
     link: item.link || item.url || '',
     pubDate: item.pubDate || item.publishedAt || item.date || new Date().toISOString(),
     isAlert: item.isAlert || false,
     tier: item.tier,
-  })).filter(item => item.title.length > 10);
+  })).filter((item) => item.title.length > 10);
 
   const clusters = clusterItems(normalizedItems);
   console.log(`  Clusters: ${clusters.length}`);
 
   const topStories = selectTopStories(clusters, 8);
   console.log(`  Top stories: ${topStories.length}`);
-
   if (topStories.length === 0) throw new Error('No top stories after scoring');
 
-  const headlines = topStories
-    .slice(0, MAX_HEADLINES)
-    .map(s => sanitizeTitle(s.primaryTitle));
+  const headlines = topStories.slice(0, MAX_HEADLINES).map((story) => sanitizeTitle(story.primaryTitle));
 
   let worldBrief = '';
   let briefProvider = '';
@@ -273,13 +339,16 @@ async function fetchInsights() {
     console.log(`  Brief generated via ${briefProvider} (${briefModel})`);
   } else {
     status = 'degraded';
-    console.warn('  No LLM available — publishing degraded (stories without brief)');
+    worldBrief = buildKeywordFallbackBrief(headlines);
+    briefProvider = 'fallback-keyword';
+    briefModel = 'top3-headlines';
+    console.warn('  No LLM available — publishing degraded fallback brief');
   }
 
-  const multiSourceCount = clusters.filter(c => c.sourceCount >= 2).length;
-  const fastMovingCount = 0; // velocity not available in digest items
+  const multiSourceCount = clusters.filter((cluster) => cluster.sourceCount >= 2).length;
+  const fastMovingCount = 0;
 
-  const enrichedStories = topStories.map(story => {
+  const enrichedStories = topStories.map((story) => {
     const { category, threatLevel } = categorizeStory(story.primaryTitle);
     return {
       primaryTitle: story.primaryTitle,
@@ -294,7 +363,7 @@ async function fetchInsights() {
     };
   });
 
-  const payload = {
+  const payload = withStaleness({
     worldBrief,
     briefProvider,
     briefModel,
@@ -304,14 +373,13 @@ async function fetchInsights() {
     clusterCount: clusters.length,
     multiSourceCount,
     fastMovingCount,
-  };
+  });
 
-  // LKG preservation: don't overwrite "ok" with "degraded"
   if (status === 'degraded') {
     const existing = await readExistingInsights();
     if (existing?.status === 'ok') {
       console.log('  LKG preservation: existing payload is "ok", skipping degraded overwrite');
-      return existing;
+      return withStaleness(existing);
     }
   }
 
@@ -325,9 +393,8 @@ function validate(data) {
 runSeed('news', 'insights', CANONICAL_KEY, fetchInsights, {
   validateFn: validate,
   ttlSeconds: CACHE_TTL,
-  sourceVersion: 'digest-clustering-v1',
+  sourceVersion: 'digest-clustering-v2',
 }).catch((err) => {
   console.error('FATAL:', err.message || err);
-  // Exit gracefully for cron — health endpoint flags stale data via seed-meta.
   process.exit(0);
 });

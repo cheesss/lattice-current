@@ -1,7 +1,6 @@
 import type { AutonomyThresholds } from './types';
 import { DEFAULT_AUTONOMY } from './types';
-
-function clamp(v: number, min: number, max: number): number { return Math.max(min, Math.min(max, v)); }
+import { clamp } from './math-utils';
 
 function percentile(sorted: number[], p: number): number {
   const idx = Math.max(0, Math.ceil(sorted.length * p) - 1);

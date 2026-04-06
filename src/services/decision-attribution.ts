@@ -17,6 +17,10 @@ function round(value: number): number {
   return Number(value.toFixed(2));
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function sortComponents(components: AttributionComponent[]): AttributionComponent[] {
   return components.slice().sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
 }
@@ -37,47 +41,56 @@ export function buildIdeaAttribution(args: {
   falsePositiveRisk: number;
   marketMovePct: number | null;
 }): IdeaAttributionBreakdown {
+  const corroboration = clamp(args.corroborationQuality / 100, 0, 1);
+  const recentEvidence = clamp(args.recentEvidenceScore / 100, 0, 1);
+  const reality = clamp(args.realityScore / 100, 0, 1);
+  const graph = clamp(args.graphSignalScore / 100, 0, 1);
+  const transferEntropy = clamp(args.transferEntropy, 0, 1);
+  const bandit = clamp((args.banditScore + 1.5) / 3, 0, 1);
+  const regime = clamp((args.regimeMultiplier - 1) / 0.5, -1, 1);
+  const contradiction = clamp(args.contradictionPenalty / 30, 0, 1);
+  const falsePositive = clamp(args.falsePositiveRisk / 100, 0, 1);
   const components: AttributionComponent[] = [
     {
       key: 'corroboration',
       label: 'Cross-source corroboration',
-      contribution: round((args.corroborationQuality - 50) * 0.28),
+      contribution: round((corroboration - 0.5) * 22),
       explanation: 'Measures whether multiple sources agree on the event with sufficient diversity.',
     },
     {
       key: 'recentEvidence',
       label: 'Recent evidence',
-      contribution: round((args.recentEvidenceScore - 50) * 0.22 - args.stalePenalty * 0.35),
+      contribution: round((recentEvidence - 0.5) * 16 - args.stalePenalty * 0.25),
       explanation: 'Rewards fresh realized samples and penalizes stale priors.',
     },
     {
       key: 'reality',
       label: 'Execution reality',
-      contribution: round((args.realityScore - 50) * 0.24),
+      contribution: round((reality - 0.5) * 18),
       explanation: 'Rewards liquid, tradable setups and penalizes spread/slippage friction.',
     },
     {
       key: 'regime',
       label: 'Macro regime fit',
-      contribution: round((args.regimeMultiplier - 1) * 22 - args.macroPenalty * 0.45),
+      contribution: round(regime * 14 - args.macroPenalty * 0.35),
       explanation: 'Measures whether the idea fits the active top-down market regime and kill-switch state.',
     },
     {
       key: 'graph',
       label: 'Graph propagation',
-      contribution: round((args.graphSignalScore - 50) * 0.18),
+      contribution: round((graph - 0.5) * 14),
       explanation: 'Rewards multi-hop propagation support across entities, sectors, and transmission edges.',
     },
     {
       key: 'learning',
       label: 'Adaptive learning',
-      contribution: round(args.transferEntropy * 12 + args.banditScore * 3.5),
+      contribution: round((transferEntropy - 0.4) * 10 + (bandit - 0.5) * 10),
       explanation: 'Combines transmission lead-lag structure with bandit exploration/exploitation confidence.',
     },
     {
       key: 'contradiction',
       label: 'Contradiction penalty',
-      contribution: round(-args.contradictionPenalty * 0.7 - args.falsePositiveRisk * 0.18),
+      contribution: round(-(contradiction * 16 + falsePositive * 12)),
       explanation: 'Penalizes conflicting headlines, rumor language, and false-positive risk.',
     },
     {

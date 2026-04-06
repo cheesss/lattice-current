@@ -24,13 +24,11 @@ async function fetchEarthquakes() {
       id: String(f.id || ''),
       place: String(f.properties?.place || ''),
       magnitude: f.properties?.mag ?? 0,
-      depthKm: f.geometry?.coordinates?.[2] ?? 0,
-      location: {
-        latitude: f.geometry?.coordinates?.[1] ?? 0,
-        longitude: f.geometry?.coordinates?.[0] ?? 0,
-      },
-      occurredAt: f.properties?.time ?? 0,
-      sourceUrl: String(f.properties?.url || ''),
+      depth: f.geometry?.coordinates?.[2] ?? 0,
+      lat: f.geometry?.coordinates?.[1] ?? 0,
+      lon: f.geometry?.coordinates?.[0] ?? 0,
+      time: new Date(Number(f.properties?.time ?? Date.now())).toISOString(),
+      url: String(f.properties?.url || ''),
     }));
 
   return { earthquakes };

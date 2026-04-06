@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-04-04T15:49:33.465Z",
+  "results": [
+    {
+      "type": "add-symbol",
+      "status": "success",
+      "summary": "VIXY/politics: 1256 prices, 128 outcomes, hit=43%, avg=0.28%, validated=false",
+      "symbol": "VIXY",
+      "theme": "politics",
+      "direction": "long",
+      "priceCount": 1256,
+      "outcomeCount": 128,
+      "hitRate": 0.42857142857142855,
+      "avgRet": 0.2761116413015398,
+      "sampleSize": 42,
+      "validated": false
+    },
+    {
+      "type": "add-symbol",
+      "status": "success",
+      "summary": "LNG/energy: 1256 prices, 94 outcomes, hit=47%, avg=-0.25%, validated=true",
+      "symbol": "LNG",
+      "theme": "energy",
+      "direction": "long",
+      "priceCount": 1256,
+      "outcomeCount": 94,
+      "hitRate": 0.4666666666666667,
+      "avgRet": -0.2544338387782791,
+      "sampleSize": 30,
+      "validated": true
+    },
+    {
+      "type": "add-symbol",
+      "status": "success",
+      "summary": "AAL/politics: 1256 prices, 120 outcomes, hit=33%, avg=-0.38%, validated=false",
+      "symbol": "AAL",
+      "theme": "politics",
+      "direction": "short",
+      "priceCount": 1256,
+      "outcomeCount": 120,
+      "hitRate": 0.3333333333333333,
+      "avgRet": -0.37760805936124353,
+      "sampleSize": 39,
+      "validated": false
+    }
+  ]
+}

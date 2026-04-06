@@ -36,7 +36,7 @@ The heavy backtest-ML modules were removed from the main branch and preserved on
 - `Live Workspace`: prioritized live signals instead of raw feed walls
 - `Briefing Desk`: decision briefs, current posture, and summary surfaces
 - `Research Desk`: graph, ontology, automation, and operator research workflow
-- `Replay Studio`: historical validation and storage sanity checks
+- `Replay Studio`: historical validation and storage sanity checks, not the primary product surface
 - `Data Flow Ops`: freshness, lag, storage, retention, and pipeline health
 
 The same repository still powers multiple variants:
@@ -94,6 +94,7 @@ npm run public:sync
 ## Documentation
 
 - Technical docs index: [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)
+- User guide: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Algorithms: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 - AI and intelligence: [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md)

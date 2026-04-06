@@ -41,6 +41,7 @@ import {
   trackMapLayerToggle,
   trackPanelToggled,
 } from '@/services/analytics';
+import { cycleDensityMode } from '@/services/density-mode';
 import { invokeTauri } from '@/services/tauri-bridge';
 import { dataFreshness } from '@/services/data-freshness';
 import { mlWorker } from '@/services/ml-worker';
@@ -84,6 +85,7 @@ export class EventHandlerManager implements AppModule {
   private boundNewsMapFocusHandler: ((e: Event) => void) | null = null;
   private boundOpenCodexHubHandler: ((e: Event) => void) | null = null;
   private boundOpenHubRequestHandler: ((e: Event) => void) | null = null;
+  private boundHubVisibilityHandler: ((e: Event) => void) | null = null;
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -219,6 +221,10 @@ export class EventHandlerManager implements AppModule {
       window.removeEventListener('wm:open-hub', this.boundOpenHubRequestHandler);
       this.boundOpenHubRequestHandler = null;
     }
+    if (this.boundHubVisibilityHandler) {
+      window.removeEventListener('wm:hub-visibility', this.boundHubVisibilityHandler);
+      this.boundHubVisibilityHandler = null;
+    }
     if (this.boundHotkeyHandler) {
       document.removeEventListener('keydown', this.boundHotkeyHandler);
       this.boundHotkeyHandler = null;
@@ -230,6 +236,26 @@ export class EventHandlerManager implements AppModule {
   }
 
   private setupEventListeners(): void {
+    const syncHubQuickNav = (active: 'analysis' | 'codex' | 'backtest' | 'ontology' | null): void => {
+      const buttonMap: Record<string, 'analysis' | 'codex' | 'backtest' | 'ontology'> = {
+        analysisHubBtn: 'analysis',
+        codexHubBtn: 'codex',
+        backtestHubBtn: 'backtest',
+        ontologyGraphBtn: 'ontology',
+      };
+      Object.entries(buttonMap).forEach(([id, hub]) => {
+        const button = document.getElementById(id);
+        button?.classList.toggle('active', active === hub);
+      });
+    };
+
+    const resolveVisibleHub = (): 'analysis' | 'codex' | 'ontology' | null => {
+      if (this.ctx.analysisHubPage?.isVisible()) return 'analysis';
+      if (this.ctx.codexHubPage?.isVisible()) return 'codex';
+      if (this.ctx.ontologyGraphPage?.isVisible()) return 'ontology';
+      return null;
+    };
+
     const openHub = (hub: 'analysis' | 'codex' | 'backtest' | 'ontology'): void => {
       const hideOverlayHubs = (): void => {
         this.ctx.analysisHubPage?.hide();
@@ -240,21 +266,26 @@ export class EventHandlerManager implements AppModule {
       if (hub === 'analysis') {
         const alreadyVisible = this.ctx.analysisHubPage?.isVisible() ?? false;
         hideOverlayHubs();
+        syncHubQuickNav(alreadyVisible ? null : 'analysis');
         if (!alreadyVisible) this.ctx.analysisHubPage?.show();
         return;
       }
       if (hub === 'codex') {
         const alreadyVisible = this.ctx.codexHubPage?.isVisible() ?? false;
         hideOverlayHubs();
+        syncHubQuickNav(alreadyVisible ? null : 'codex');
         if (!alreadyVisible) this.ctx.codexHubPage?.show();
         return;
       }
       if (hub === 'backtest') {
+        syncHubQuickNav('backtest');
         void openBacktestHubWindow();
+        window.setTimeout(() => syncHubQuickNav(null), 1400);
         return;
       }
       const alreadyVisible = this.ctx.ontologyGraphPage?.isVisible() ?? false;
       hideOverlayHubs();
+      syncHubQuickNav(alreadyVisible ? null : 'ontology');
       if (!alreadyVisible) this.ctx.ontologyGraphPage?.show();
     };
 
@@ -303,6 +334,16 @@ export class EventHandlerManager implements AppModule {
     };
     window.addEventListener('wm:open-hub', this.boundOpenHubRequestHandler);
 
+    if (this.boundHubVisibilityHandler) {
+      window.removeEventListener('wm:hub-visibility', this.boundHubVisibilityHandler);
+    }
+    this.boundHubVisibilityHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{ hub?: string; visible?: boolean }>).detail;
+      if (!detail || (detail.hub !== 'analysis' && detail.hub !== 'codex' && detail.hub !== 'ontology')) return;
+      syncHubQuickNav(detail.visible ? detail.hub : resolveVisibleHub());
+    };
+    window.addEventListener('wm:hub-visibility', this.boundHubVisibilityHandler);
+
     document.getElementById('copyLinkBtn')?.addEventListener('click', async () => {
       const shareUrl = this.getShareUrl();
       if (!shareUrl) return;
@@ -337,6 +378,11 @@ export class EventHandlerManager implements AppModule {
       setTheme(next);
       this.updateHeaderThemeIcon();
       trackThemeChanged(next);
+    });
+
+    // Density mode toggle
+    document.getElementById('densityToggleBtn')?.addEventListener('click', () => {
+      cycleDensityMode();
     });
 
     this.ctx.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {

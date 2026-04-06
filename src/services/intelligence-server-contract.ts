@@ -265,7 +265,7 @@ export const INTELLIGENCE_SERVER_API_CONTRACT: IntelligenceApiContract[] = [
     method: 'POST',
     path: '/api/intelligence/v1/walk-forward',
     description: 'Run train/validate/test walk-forward replay over ordered frames.',
-    requestShape: '{ label?: string, frames: HistoricalReplayFrame[], horizonsHours?: number[], trainRatio?: number, validateRatio?: number, retainLearningState?: boolean }',
+    requestShape: '{ label?: string, frames: HistoricalReplayFrame[], horizonsHours?: number[], trainRatio?: number, validateRatio?: number, foldCount?: number, retainLearningState?: boolean }',
     responseShape: 'HistoricalReplayRun',
   },
   {

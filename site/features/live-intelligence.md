@@ -6,7 +6,7 @@ variants:
   - full
   - tech
   - finance
-updated: 2026-03-15
+updated: 2026-03-31
 owner: core
 ---
 
@@ -43,7 +43,7 @@ To reduce context switching across news feeds, maps, and separate market tools.
 ## Algorithms involved
 
 - signal aggregation
-- source credibility
+- source credibility with copy-amplification discounts on corroboration
 - convergence and instability scoring
 - ontology graph enrichment
 

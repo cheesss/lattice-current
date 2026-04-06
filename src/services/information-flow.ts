@@ -110,11 +110,29 @@ function directionFromScore(score: number): 'source-leading' | 'target-leading' 
   return 'neutral';
 }
 
+// LRU cache for flow computation — avoids redundant NMI/TE across consecutive frames
+const FLOW_CACHE_MAX = 2000;
+const flowCache = new Map<string, DirectionalFlowSummary>();
+
+function flowCacheKey(src: TimedFlowPoint[], tgt: TimedFlowPoint[], opts: { bucketMs?: number; maxLag?: number; minBuckets?: number }): string {
+  // Fast fingerprint: lengths + first/last values + options
+  const sv = src.length > 0 ? `${src.length}:${src[0]!.value}:${src[src.length - 1]!.value}` : '0';
+  const tv = tgt.length > 0 ? `${tgt.length}:${tgt[0]!.value}:${tgt[tgt.length - 1]!.value}` : '0';
+  return `${sv}|${tv}|${opts.bucketMs ?? 0}:${opts.maxLag ?? 4}:${opts.minBuckets ?? 0}`;
+}
+
+export function clearFlowCache(): void {
+  flowCache.clear();
+}
+
 export function estimateDirectionalFlowSummary(
   sourcePoints: TimedFlowPoint[],
   targetPoints: TimedFlowPoint[],
   options: { bucketMs?: number; maxLag?: number; minBuckets?: number } = {},
 ): DirectionalFlowSummary {
+  const cacheKey = flowCacheKey(sourcePoints, targetPoints, options);
+  const cached = flowCache.get(cacheKey);
+  if (cached) return cached;
   const alignment = alignTimedSeries(sourcePoints, targetPoints, options);
   const sourceSeries = alignment.source;
   const targetSeries = alignment.target;
@@ -144,7 +162,7 @@ export function estimateDirectionalFlowSummary(
     100,
   );
 
-  return {
+  const result: DirectionalFlowSummary = {
     sourceToTargetNmi: forwardNmi.normalized,
     targetToSourceNmi: reverseNmi.normalized,
     sourceToTargetTe: forwardTe.normalized,
@@ -158,4 +176,13 @@ export function estimateDirectionalFlowSummary(
     sampleSize: alignment.sampleSize,
     bucketMs: alignment.bucketMs,
   };
+
+  // LRU eviction: drop oldest entry when cache is full
+  if (flowCache.size >= FLOW_CACHE_MAX) {
+    const firstKey = flowCache.keys().next().value;
+    if (firstKey !== undefined) flowCache.delete(firstKey);
+  }
+  flowCache.set(cacheKey, result);
+
+  return result;
 }

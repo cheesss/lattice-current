@@ -40,6 +40,8 @@ const SECRET_ANALYTICS_NAMES: Record<RuntimeSecretKey, string> = {
   EIA_API_KEY: 'eia',
   CLOUDFLARE_API_TOKEN: 'cloudflare',
   ACLED_ACCESS_TOKEN: 'acled',
+  ACLED_EMAIL: 'acled_email',
+  ACLED_PASSWORD: 'acled_password',
   URLHAUS_AUTH_KEY: 'urlhaus',
   OTX_API_KEY: 'otx',
   ABUSEIPDB_API_KEY: 'abuseipdb',
@@ -138,9 +140,12 @@ type PostHogInstance = {
 let posthogInstance: PostHogInstance | null = null;
 let initPromise: Promise<void> | null = null;
 
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
+const RUNTIME_ENV = ((import.meta as { env?: Record<string, unknown> } | undefined)?.env || {}) as Record<string, unknown>;
+const POSTHOG_KEY = typeof RUNTIME_ENV.VITE_POSTHOG_KEY === 'string'
+  ? RUNTIME_ENV.VITE_POSTHOG_KEY
+  : undefined;
 const POSTHOG_HOST = isDesktopRuntime()
-  ? ((import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com')
+  ? ((typeof RUNTIME_ENV.VITE_POSTHOG_HOST === 'string' ? RUNTIME_ENV.VITE_POSTHOG_HOST : undefined) || 'https://us.i.posthog.com')
   : '/ingest'; // Reverse proxy through own domain to bypass ad blockers
 
 // ── Public API ──
@@ -196,7 +201,7 @@ export async function initAnalytics(): Promise<void> {
       }
 
       posthog.register(superProps);
-      posthogInstance = posthog as unknown as PostHogInstance;
+      posthogInstance = posthog as PostHogInstance;
 
       // Fire $pageview manually after full init — auto capture_pageview: true
       // fires during init() before super props are registered, and silently

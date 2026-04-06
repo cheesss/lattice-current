@@ -7,6 +7,8 @@ import type { ExperimentRegistrySnapshot } from '../experiment-registry';
 import type { HiddenCandidateDiscovery } from '../graph-propagation';
 import type { DatasetProposal } from '../dataset-discovery';
 import type { CoverageLedgerSnapshot } from '../coverage-ledger';
+import type { KNNPrediction } from './adaptive-params/embedding-knn.js';
+import type { TransmissionProxy } from './adaptive-params/transmission-proxy.js';
 
 export type InvestmentAssetKind = 'etf' | 'equity' | 'commodity' | 'fx' | 'rate' | 'crypto';
 export type InvestmentDirection = 'long' | 'short' | 'hedge' | 'watch' | 'pair';
@@ -659,6 +661,42 @@ export interface ThemeAdmissionPolicy {
   watchExpectedReturnPct?: number;
   rejectScore?: number;
   watchScore?: number;
+}
+
+export interface MacroIndicatorSnapshot {
+  vix?: number;
+  yieldSpread?: number;
+  dollarIndex?: number;
+  oilPrice?: number;
+}
+
+export interface SignalContextSnapshot {
+  vix: number | null;
+  yieldSpread: number | null;
+  creditSpread: number | null;
+  gdeltStress: number | null;
+  transmissionStrength: number | null;
+  capturedAt: string | null;
+}
+
+export interface IdeaGenerationRuntimeContext {
+  rag: {
+    hitRate: number | null;
+    confidence: number;
+    knnPrediction: KNNPrediction | null;
+  };
+  admission: {
+    thresholds: ThemeAdmissionPolicy | null;
+  };
+  ml: {
+    ensembleModels: unknown | null;
+    normalization: { mean: number[]; std: number[] } | null;
+  };
+  signal: {
+    transmissionProxy: TransmissionProxy | null;
+    macroIndicators: MacroIndicatorSnapshot | null;
+    signalSnapshot: SignalContextSnapshot | null;
+  };
 }
 
 export interface ThemeNarrativePolicy {

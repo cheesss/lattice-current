@@ -193,12 +193,25 @@ async function main() {
       EXTRACT(YEAR FROM a.published_at)::int as year,
       COALESCE(g.avg_goldstein, 0)::float as goldstein,
       COALESCE(g.avg_tone, 0)::float as tone,
-      COALESCE(g.event_count, 0)::int as event_count
+      COALESCE(g.event_count, 0)::int as event_count,
+      sh_hy.value::float as hy_spread,
+      sh_vix.value::float as vix_level,
+      sh_bdi.value::float as bdi_level,
+      sh_gpr.value::float as gpr_level,
+      cot.net_pct::float as cot_sp500,
+      pc.total_ratio::float as putcall_ratio
     FROM labeled_outcomes lo
     JOIN articles a ON lo.article_id = a.id
     LEFT JOIN gdelt_daily_agg g ON g.date = DATE(a.published_at)
       AND g.cameo_root IN ('14','17','18','19','20')
       AND g.country = 'US'
+    LEFT JOIN signal_history sh_hy ON sh_hy.signal_name='hy_credit_spread' AND DATE(sh_hy.ts)=DATE(a.published_at)
+    LEFT JOIN signal_history sh_vix ON sh_vix.signal_name='vix' AND DATE(sh_vix.ts)=DATE(a.published_at)
+    LEFT JOIN signal_history sh_bdi ON sh_bdi.signal_name='bdi' AND DATE(sh_bdi.ts)=DATE(a.published_at)
+    LEFT JOIN signal_history sh_gpr ON sh_gpr.signal_name='gpr' AND DATE(sh_gpr.ts)=DATE(a.published_at)
+    LEFT JOIN positioning_cot cot ON cot.asset='sp500'
+      AND cot.report_date=(SELECT MAX(report_date) FROM positioning_cot WHERE asset='sp500' AND report_date<=DATE(a.published_at))
+    LEFT JOIN positioning_putcall pc ON pc.date=DATE(a.published_at)
     WHERE lo.horizon = $1
     ORDER BY a.published_at
   `, [HORIZON]);
@@ -221,6 +234,13 @@ async function main() {
     is_politics: rows.map(r => r.theme === 'politics' ? 1 : 0),
     dow_sin: rows.map(r => Math.sin(2 * Math.PI * Number(r.dow) / 7)),
     month_sin: rows.map(r => Math.sin(2 * Math.PI * Number(r.month) / 12)),
+    // Phase 2 features
+    hy_spread: rows.map(r => Number(r.hy_spread) || 0),
+    vix_level: rows.map(r => Number(r.vix_level) || 0),
+    bdi_level: rows.map(r => Math.log1p(Number(r.bdi_level) || 0)),
+    gpr_level: rows.map(r => Number(r.gpr_level) || 0),
+    cot_sp500: rows.map(r => Number(r.cot_sp500) || 0),
+    putcall_ratio: rows.map(r => Number(r.putcall_ratio) || 0),
   };
 
   const aucResults = {};

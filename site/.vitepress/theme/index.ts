@@ -12,6 +12,9 @@ import OperationsConsoleDemo from './components/OperationsConsoleDemo.vue';
 import InteractiveGlobeHero from './components/InteractiveGlobeHero.vue';
 import AppGradeGlobeShowcase from './components/AppGradeGlobeShowcase.vue';
 import AppGradeFlatMapShowcase from './components/AppGradeFlatMapShowcase.vue';
+import ReplayScenarioWorkbench from './components/ReplayScenarioWorkbench.vue';
+import SignalLandingHero from './components/SignalLandingHero.vue';
+import ImmersiveMainLanding from './components/ImmersiveMainLanding.vue';
 
 const theme: Theme = {
   ...DefaultTheme,
@@ -28,6 +31,9 @@ const theme: Theme = {
     app.component('InteractiveGlobeHero', InteractiveGlobeHero);
     app.component('AppGradeGlobeShowcase', AppGradeGlobeShowcase);
     app.component('AppGradeFlatMapShowcase', AppGradeFlatMapShowcase);
+    app.component('ReplayScenarioWorkbench', ReplayScenarioWorkbench);
+    app.component('SignalLandingHero', SignalLandingHero);
+    app.component('ImmersiveMainLanding', ImmersiveMainLanding);
   }
 };
 

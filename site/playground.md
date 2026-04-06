@@ -18,12 +18,20 @@ This page is intentionally hands-on. Everything below runs on mock data so visit
 
 <OperationsConsoleDemo locale="en" />
 
+## Replay and scenario workbench
+
+The console above focuses on the operator surface. The workbench below focuses on historical replay, storage lifecycle, and scenario comparison with mock datasets that mirror the real replay stack.
+
+<ReplayScenarioWorkbench locale="en" />
+
 ## What this demonstrates
 
 - 2D regional map with clickable hotspots and layer toggles
 - country relations, regional guidance, and recent event cards
 - hub switching across analysis, Codex, ontology, backtest, and resource views
 - replay steps and scenario controls that change the same region's posture
+- mock historical backtests over ACLED, GDELT, FRED, and market baskets
+- hot / warm / cold storage flow that matches the current retention architecture
 
 ## Limits
 

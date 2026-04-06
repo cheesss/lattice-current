@@ -1,0 +1,289 @@
+import {
+  ClusteredEvent,
+  MarketData,
+} from '@/types';
+import { EventMarketTransmissionSnapshot } from '../event-market-transmission';
+import { SourceCredibilityProfile } from '../source-credibility';
+import { ScheduledReport } from '../scheduled-reports';
+import { KeywordGraphSnapshot } from '../keyword-registry';
+import {
+  ReplayAdaptationSnapshot,
+  getReplayAdaptationSnapshot,
+  recordCurrentThemePerformance,
+} from '../replay-adaptation';
+import { buildMacroRiskOverlay } from '../macro-risk-overlay';
+import { buildShadowControlState } from '../autonomy-constraints';
+import {
+  getActiveWeightProfileSync,
+  getExperimentRegistrySnapshot,
+  summarizeWeightProfile,
+} from '../experiment-registry';
+import { discoverHiddenGraphCandidates } from '../graph-propagation';
+import { proposeDatasetsForThemes } from '../dataset-discovery';
+import { buildCoverageLedgerFromMappings } from '../coverage-ledger';
+import { logSourceOpsEvent } from '../source-ops-log';
+import {
+  InvestmentIntelligenceSnapshot,
+  InvestmentIntelligenceContext,
+} from './types';
+import { UNIVERSE_ASSET_CATALOG, POSITION_RULES } from './constants';
+import * as S from './module-state';
+import { average, nowIso } from './utils';
+import { getThemeRule, getEffectiveThemeAssets } from './theme-registry';
+import {
+  buildEventCandidates,
+  buildDirectMappings,
+  applyAdaptiveConfirmationLayer,
+  buildIdeaCards,
+  buildSensitivityRows,
+  buildHistoricalAnalogs,
+  createCurrentHistoryEntries,
+  mergeHistory,
+  parseReportHistory,
+  buildCurrentThemePerformanceMetrics,
+  buildRollingThemePerformanceMetrics,
+  buildDatasetThemeInputs,
+} from './idea-generator';
+import {
+  updateMappingPerformanceStats,
+  buildEventBacktests,
+  enrichIdeaCards,
+  autoTriageIdeaCards,
+} from './mapping-performance';
+import { updateTrackedIdeas, appendMarketHistory } from './idea-tracker';
+import {
+  buildCandidateExpansionReviews,
+  applyUniverseExpansionPolicy,
+  evaluateCandidateReviewProbation,
+  buildCoverageGaps,
+  buildUniverseCoverageSummary,
+} from './universe-expansion';
+import { ensureLoaded, persist } from './learning-state-io';
+import { buildWorkflow } from './diagnostics';
+
+export async function recomputeInvestmentIntelligence(args: {
+  clusters: ClusteredEvent[];
+  markets: MarketData[];
+  transmission: EventMarketTransmissionSnapshot | null;
+  sourceCredibility: SourceCredibilityProfile[];
+  reports: ScheduledReport[];
+  keywordGraph?: KeywordGraphSnapshot | null;
+  timestamp?: string;
+  context?: InvestmentIntelligenceContext;
+  replayAdaptation?: ReplayAdaptationSnapshot | null;
+  recordCurrentThemePerformance?: boolean;
+}): Promise<InvestmentIntelligenceSnapshot> {
+  await ensureLoaded();
+  const timestamp = args.timestamp || nowIso();
+  const context = args.context || 'live';
+  appendMarketHistory(args.markets, timestamp);
+  const shadowControl = buildShadowControlState(S.trackedIdeas, timestamp);
+  const weightProfile = getActiveWeightProfileSync();
+  const replayAdaptation = args.replayAdaptation === undefined
+    ? await getReplayAdaptationSnapshot()
+    : args.replayAdaptation;
+  const macroOverlay = buildMacroRiskOverlay({
+    regime: args.transmission?.regime ?? null,
+    markets: args.markets,
+    clusters: args.clusters,
+    weightProfile,
+  });
+  const rollingBacktests = buildEventBacktests(S.trackedIdeas);
+  const rollingThemePerformance = buildRollingThemePerformanceMetrics(S.trackedIdeas, rollingBacktests, timestamp);
+
+  const { kept, falsePositive } = buildEventCandidates({
+    clusters: args.clusters,
+    transmission: args.transmission,
+    sourceCredibility: args.sourceCredibility,
+  });
+  const effectiveThemes = Array.from(new Set(kept.flatMap((candidate) => {
+    // Note: findMatchingThemes is in theme-registry, imported above
+    const rule = getThemeRule(candidate.id);
+    return rule ? [rule] : [];
+  })))
+    .map((theme) => ({
+      id: theme.id,
+      label: theme.label,
+      triggers: theme.triggers.slice(),
+      sectors: theme.sectors.slice(),
+      commodities: theme.commodities.slice(),
+    }));
+  const hiddenCandidates = discoverHiddenGraphCandidates({
+    themes: effectiveThemes,
+    candidates: kept.map((candidate) => ({
+      id: candidate.id,
+      title: candidate.title,
+      text: candidate.text,
+      region: candidate.region,
+      reasons: candidate.reasons,
+      matchedSymbols: candidate.matchedSymbols,
+    })),
+    assetCatalog: UNIVERSE_ASSET_CATALOG.map((asset) => ({
+      symbol: asset.symbol,
+      name: asset.name,
+      assetKind: asset.assetKind,
+      sector: asset.sector,
+      commodity: asset.commodity,
+      direction: asset.direction,
+      role: asset.role,
+      themeIds: asset.themeIds.slice(),
+      aliases: asset.aliases?.slice(),
+    })),
+    keywordGraph: args.keywordGraph ?? null,
+    transmission: args.transmission,
+    existingThemeSymbols: Object.fromEntries(
+      effectiveThemes.map((theme) => {
+        const rule = getThemeRule(theme.id);
+        return [theme.id, rule ? getEffectiveThemeAssets(rule).map((asset) => asset.symbol) : []];
+      }),
+    ),
+  });
+
+  const rawMappings = buildDirectMappings({
+    candidates: kept,
+    markets: args.markets,
+    transmission: args.transmission,
+    timestamp,
+    autonomy: shadowControl,
+    keywordGraph: args.keywordGraph ?? null,
+    weightProfile,
+    macroOverlay,
+  });
+  const provisionalCoverageLedger = buildCoverageLedgerFromMappings(rawMappings);
+  const mappings = applyAdaptiveConfirmationLayer(rawMappings, replayAdaptation, provisionalCoverageLedger, {
+    context,
+    referenceTimestamp: timestamp,
+    currentThemePerformance: rollingThemePerformance,
+  });
+  const coverageLedger = buildCoverageLedgerFromMappings(mappings);
+  const preIdeaCards = buildIdeaCards(mappings, [], macroOverlay, replayAdaptation);
+  let currentHistory = mergeHistory(S.currentHistory, parseReportHistory(args.reports));
+  const analogs = buildHistoricalAnalogs({ history: currentHistory, ideaCards: preIdeaCards });
+  currentHistory = mergeHistory(currentHistory, createCurrentHistoryEntries(preIdeaCards, mappings, timestamp));
+  S.setCurrentHistory(currentHistory);
+  const baseIdeaCards = buildIdeaCards(mappings, analogs, macroOverlay, replayAdaptation);
+  const executionControlledIdeaCards = applyPortfolioExecutionControls(baseIdeaCards, macroOverlay);
+  const tracked = updateMappingPerformanceStats(updateTrackedIdeas(executionControlledIdeaCards, args.markets, timestamp));
+  const backtests = buildEventBacktests(tracked);
+  const updatedReplayAdaptation = args.recordCurrentThemePerformance === false
+    ? replayAdaptation
+    : await recordCurrentThemePerformance(
+      buildCurrentThemePerformanceMetrics(mappings, tracked, backtests),
+    );
+  const reviews = evaluateCandidateReviewProbation({
+    reviews: applyUniverseExpansionPolicy(buildCandidateExpansionReviews({ candidates: kept, markets: args.markets }), S.universeExpansionPolicy),
+    activeCandidates: kept,
+    mappings,
+    backtests,
+    policy: S.universeExpansionPolicy,
+  });
+  S.setCandidateReviews(new Map(reviews.map((review) => [review.id, review] as const)));
+  const sensitivity = buildSensitivityRows(mappings, backtests, tracked);
+  const enrichedIdeaCards = enrichIdeaCards(executionControlledIdeaCards, tracked, backtests);
+  const ideaTriage = autoTriageIdeaCards(enrichedIdeaCards);
+  const ideaCards = ideaTriage.kept;
+  const autonomy = {
+    ...buildShadowControlState(tracked, timestamp),
+    deployCount: ideaCards.filter((card) => card.autonomyAction === 'deploy').length,
+    shadowCount: ideaCards.filter((card) => card.autonomyAction === 'shadow').length,
+    watchCount: ideaCards.filter((card) => card.autonomyAction === 'watch').length,
+    abstainCount: enrichedIdeaCards.filter((card) => card.autonomyAction === 'abstain').length,
+    realityBlockedCount: mappings.filter((item) => item.realityScore < 42 || !item.tradableNow).length,
+    recentEvidenceWeakCount: mappings.filter((item) => item.recentEvidenceScore < 36 || item.stalePenalty >= 12).length,
+  };
+  const workflow = buildWorkflow({
+    falsePositive,
+    mappings,
+    ideaCards,
+    analogs,
+    sensitivity,
+    trackedIdeas: tracked,
+    backtests,
+    autonomy,
+    replayAdaptation: updatedReplayAdaptation,
+  });
+  const coverageGaps = buildCoverageGaps({ candidates: kept, reviews });
+  const universeCoverage = buildUniverseCoverageSummary({ candidates: kept, mappings, reviews, gaps: coverageGaps });
+  const datasetAutonomyInputs = buildDatasetThemeInputs(kept, ideaCards, coverageGaps);
+  const datasetProposals = proposeDatasetsForThemes({
+    themes: datasetAutonomyInputs,
+    existingDatasets: [],
+    policy: {
+      mode: S.universeExpansionPolicy.mode,
+      maxRegistrationsPerCycle: 2,
+      maxEnabledDatasets: 12,
+    },
+  });
+  const experimentRegistry = getExperimentRegistrySnapshot();
+  const topThemes = Array.from(new Set(ideaCards.map((card) => card.title))).slice(0, 8);
+  const openTracked = tracked.filter((idea) => idea.status === 'open').length;
+  const closedTracked = tracked.filter((idea) => idea.status === 'closed').length;
+  const learnedMappings = Array.from(S.mappingStats.values()).filter((entry) => entry.observations > 0).length;
+
+  const currentSnapshot: InvestmentIntelligenceSnapshot = {
+    generatedAt: timestamp,
+    regime: args.transmission?.regime ?? null,
+    macroOverlay,
+    topThemes,
+    workflow,
+    directMappings: mappings,
+    sectorSensitivity: sensitivity,
+    analogs,
+    backtests,
+    positionSizingRules: POSITION_RULES,
+    ideaCards,
+    trackedIdeas: tracked,
+    falsePositive,
+    universePolicy: S.universeExpansionPolicy,
+    universeCoverage,
+    coverageGaps,
+    candidateReviews: reviews,
+    autonomy,
+    hiddenCandidates,
+    experimentRegistry,
+    datasetAutonomy: {
+      mode: S.universeExpansionPolicy.mode,
+      proposals: datasetProposals,
+    },
+    coverageLedger,
+    summaryLines: [
+      `${ideaCards.length} idea cards generated across ${sensitivity.length} sector channels.`,
+      `${mappings.length} direct stock or ETF mappings survived ${falsePositive.rejected} false-positive rejects.`,
+      `${backtests.length} price-based backtest rows, ${openTracked} open tracked ideas, ${closedTracked} closed samples, and ${learnedMappings} learned mapping priors available.`,
+      `${ideaTriage.suppressedCount} low-quality idea cards were auto-suppressed before the operator view.`,
+      `Autonomy=${autonomy.rollbackLevel} shadow=${autonomy.shadowMode ? 'on' : 'off'} deploy=${autonomy.deployCount} shadowOnly=${autonomy.shadowCount} watch=${autonomy.watchCount} abstain=${autonomy.abstainCount}.`,
+      `Macro overlay=${macroOverlay.state} gauge=${macroOverlay.riskGauge} topDown=${macroOverlay.topDownAction} killSwitch=${macroOverlay.killSwitch ? 'on' : 'off'} netCap=${macroOverlay.netExposureCapPct}% grossCap=${macroOverlay.grossExposureCapPct}%.`,
+      `Recent shadow hit-rate=${autonomy.recentHitRate}% avg=${autonomy.recentAvgReturnPct}% drawdown=${autonomy.recentDrawdownPct}% stale=${autonomy.staleIdeaCount}.`,
+      `${autonomy.realityBlockedCount} mappings failed reality gates and ${autonomy.recentEvidenceWeakCount} mappings were penalized for weak recent evidence.`,
+      `${mappings.filter((mapping) => (mapping.informationFlowScore || 0) >= 55).length} mappings carry positive information-flow support and ${mappings.filter((mapping) => (mapping.knowledgeGraphScore || 0) >= 60).length} have strong KG evidence.`,
+      updatedReplayAdaptation
+        ? `Replay adaptation: ${updatedReplayAdaptation.themeProfiles.length} themes with learned horizons, quality=${updatedReplayAdaptation.workflow.qualityScore}, execution=${updatedReplayAdaptation.workflow.executionScore}, coverage=${updatedReplayAdaptation.workflow.coverageScore}.`
+        : 'Replay adaptation has not been learned yet.',
+      updatedReplayAdaptation && updatedReplayAdaptation.themeProfiles.length > 0
+        ? `Top learned horizons: ${updatedReplayAdaptation.themeProfiles.slice(0, 4).map((profile) => `${profile.themeId}:${profile.timeframe}`).join(' | ')}.`
+        : 'Top learned horizons: unavailable.',
+      `Coverage ledger: density=${coverageLedger.globalCoverageDensity} completeness=${coverageLedger.globalCompletenessScore} themeEntries=${coverageLedger.themeEntries.length}.`,
+      `${ideaCards.filter((card) => (card.portfolioCrowdingPenalty || 0) > 0.2).length} cards were trimmed by RMT crowding and execution plan score averaged ${Math.round(average(ideaCards.map((card) => card.executionPlanScore || 0)))}.`,
+      `${universeCoverage.dynamicApprovedCount} approved expansion candidates, ${universeCoverage.openReviewCount} open review items, and ${universeCoverage.gapCount} current coverage gaps tracked.`,
+      `Universe policy=${S.universeExpansionPolicy.mode} scoreThreshold=${S.universeExpansionPolicy.minAutoApproveScore} codexFloor=${S.universeExpansionPolicy.minCodexConfidence} requireMarketData=${S.universeExpansionPolicy.requireMarketData ? 'yes' : 'no'} sectorCap=${S.universeExpansionPolicy.maxAutoApprovalsPerSectorPerTheme} kindCap=${S.universeExpansionPolicy.maxAutoApprovalsPerAssetKindPerTheme}.`,
+      `${hiddenCandidates.length} hidden graph candidates are currently being tracked and ${datasetProposals.length} dataset proposals are queued for guarded registration.`,
+      `Self-tuning profile: ${summarizeWeightProfile(experimentRegistry.activeProfile).join(', ')}.`,
+      `${analogs.length} analog checkpoints and ${workflow.filter((step) => step.status === 'ready').length} ready workflow stages available.`,
+      `Regime=${args.transmission?.regime?.label || 'unknown'} confidence=${args.transmission?.regime?.confidence ?? 0}.`,
+    ],
+  };
+
+  S.setCurrentSnapshot(currentSnapshot);
+  await persist();
+  await logSourceOpsEvent({
+    kind: 'report',
+    action: 'generated',
+    actor: 'system',
+    title: 'Investment intelligence updated',
+    detail: `ideas=${ideaCards.length} mappings=${mappings.length} backtests=${backtests.length} priors=${learnedMappings} open=${openTracked} closed=${closedTracked} rejects=${falsePositive.rejected}`,
+    status: 'ok',
+    category: 'investment',
+  });
+
+  return currentSnapshot;
+}

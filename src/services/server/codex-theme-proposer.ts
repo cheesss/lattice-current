@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import type { InvestmentThemeDefinition } from '../investment-intelligence';
 import type { CodexThemeProposal, ThemeDiscoveryQueueItem } from '../theme-discovery';
@@ -13,7 +13,32 @@ interface CodexExecResult {
   stderr: string;
 }
 
+interface CodexQualityMetrics {
+  totalCalls: number;
+  parseSuccess: number;
+  parseFail: number;
+  validationErrors: number;
+  confidenceSum: number;
+  lastCallAt: string | null;
+  lastWarnings: string[];
+}
+
+interface NormalizedProposalResult {
+  proposal: CodexThemeProposal | null;
+  validationWarnings: string[];
+}
+
 const CODEX_TIMEOUT_MS = 95_000;
+const CODEX_QUALITY_PATH = path.resolve('data', 'codex-quality.json');
+const codexMetrics: CodexQualityMetrics = {
+  totalCalls: 0,
+  parseSuccess: 0,
+  parseFail: 0,
+  validationErrors: 0,
+  confidenceSum: 0,
+  lastCallAt: null,
+  lastWarnings: [],
+};
 
 function normalize(value: string): string {
   return String(value || '')
@@ -81,6 +106,11 @@ function parseJsonObject(rawText: string): Record<string, unknown> | null {
     }
     return null;
   }
+}
+
+async function persistCodexQualityMetrics(): Promise<void> {
+  await mkdir(path.dirname(CODEX_QUALITY_PATH), { recursive: true });
+  await writeFile(CODEX_QUALITY_PATH, JSON.stringify(getCodexQualityMetrics(), null, 2));
 }
 
 function getSafeEnv(): NodeJS.ProcessEnv {
@@ -273,7 +303,8 @@ function normalizeRole(value: unknown): CodexThemeProposal['assets'][number]['ro
   return 'primary';
 }
 
-function normalizeProposal(raw: Record<string, unknown>, queueItem: ThemeDiscoveryQueueItem): CodexThemeProposal | null {
+function normalizeProposal(raw: Record<string, unknown>, queueItem: ThemeDiscoveryQueueItem): NormalizedProposalResult {
+  const validationWarnings: string[] = [];
   const assets = Array.isArray(raw.assets)
     ? raw.assets
       .map((asset) => ({
@@ -288,11 +319,25 @@ function normalizeProposal(raw: Record<string, unknown>, queueItem: ThemeDiscove
       .filter((asset) => asset.symbol)
       .slice(0, 8)
     : [];
-  if (assets.length === 0) return null;
+  if (assets.length === 0) {
+    validationWarnings.push('no valid assets after normalization');
+    return { proposal: null, validationWarnings };
+  }
+
+  const rawConfidence = Number(raw.confidence);
+  const normalizedConfidence = Math.max(25, Math.min(95, Number(raw.confidence) || queueItem.signalScore));
+  if (Number.isFinite(rawConfidence) && rawConfidence !== normalizedConfidence) {
+    validationWarnings.push(`confidence clamped: ${rawConfidence} -> ${normalizedConfidence}`);
+  }
+  if (!Array.isArray(raw.triggers) || raw.triggers.length === 0) {
+    validationWarnings.push('triggers missing; fallback hints used');
+  }
+
   return {
+    proposal: {
     id: slugify(String(raw.id || queueItem.topicKey)),
     label: String(raw.label || queueItem.label).trim() || queueItem.label,
-    confidence: Math.max(25, Math.min(95, Number(raw.confidence) || queueItem.signalScore)),
+    confidence: normalizedConfidence,
     reason: String(raw.reason || `Codex proposed a reusable theme for ${queueItem.label}.`).slice(0, 280),
     triggers: Array.isArray(raw.triggers) ? raw.triggers.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean).slice(0, 18) : queueItem.hints.slice(0, 8),
     sectors: Array.isArray(raw.sectors) ? raw.sectors.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean).slice(0, 8) : [],
@@ -314,6 +359,27 @@ function normalizeProposal(raw: Record<string, unknown>, queueItem: ThemeDiscove
       ? raw.suggestedGdeltKeywords.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean).slice(0, 12)
       : [],
     assets,
+    validationWarnings,
+  },
+    validationWarnings,
+  };
+}
+
+export function getCodexQualityMetrics() {
+  const avgConfidence = codexMetrics.parseSuccess > 0
+    ? codexMetrics.confidenceSum / codexMetrics.parseSuccess
+    : 0;
+  return {
+    totalCalls: codexMetrics.totalCalls,
+    parseSuccess: codexMetrics.parseSuccess,
+    parseFail: codexMetrics.parseFail,
+    validationErrors: codexMetrics.validationErrors,
+    avgConfidence: Number(avgConfidence.toFixed(4)),
+    parseSuccessRate: codexMetrics.totalCalls > 0
+      ? Number((codexMetrics.parseSuccess / codexMetrics.totalCalls).toFixed(4))
+      : 0,
+    lastCallAt: codexMetrics.lastCallAt,
+    lastWarnings: codexMetrics.lastWarnings.slice(),
   };
 }
 
@@ -327,12 +393,33 @@ export async function proposeThemeWithCodex(
     return null;
   }
   const prompt = buildThemePrompt(queueItem, knownThemes, evidence);
+  codexMetrics.totalCalls += 1;
+  codexMetrics.lastCallAt = new Date().toISOString();
   const result = await runCodexCli(buildExecArgs(prompt), CODEX_TIMEOUT_MS);
   if (result.code !== 0) {
+    codexMetrics.parseFail += 1;
+    codexMetrics.lastWarnings = [`codex exec failed: ${String(result.stderr || result.stdout || `exit ${result.code}`).trim().slice(0, 160)}`];
+    await persistCodexQualityMetrics().catch(() => {});
     return null;
   }
   const message = parseCodexJsonOutput(result.stdout || '') || result.stdout;
   const parsed = parseJsonObject(message);
-  if (!parsed) return null;
-  return normalizeProposal(parsed, queueItem);
+  if (!parsed) {
+    codexMetrics.parseFail += 1;
+    codexMetrics.lastWarnings = ['unable to parse codex JSON output'];
+    await persistCodexQualityMetrics().catch(() => {});
+    return null;
+  }
+  const normalized = normalizeProposal(parsed, queueItem);
+  codexMetrics.lastWarnings = normalized.validationWarnings.slice();
+  codexMetrics.validationErrors += normalized.validationWarnings.length;
+  if (!normalized.proposal) {
+    codexMetrics.parseFail += 1;
+    await persistCodexQualityMetrics().catch(() => {});
+    return null;
+  }
+  codexMetrics.parseSuccess += 1;
+  codexMetrics.confidenceSum += normalized.proposal.confidence;
+  await persistCodexQualityMetrics().catch(() => {});
+  return normalized.proposal;
 }

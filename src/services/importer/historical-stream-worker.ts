@@ -1,6 +1,11 @@
+// ── Re-exports from sub-modules (canonical extraction targets) ──
+// Consumers can now import from:
+//   ./stream-parser — JSON stream handling, provider-specific record builders
+//   ./frame-builder — HistoricalReplayFrame assembly logic
+//   ./coverage-ledger — temporal validation, market record logic, frame filtering
 
 import { createReadStream } from 'node:fs';
-import { mkdir, open, readFile, rm } from 'node:fs/promises';
+import { mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -10,11 +15,13 @@ import streamArrayPackage from 'stream-json/streamers/StreamArray';
 import type { ClusteredEvent, MarketData, NewsItem } from '@/types';
 import type { HistoricalReplayFrame } from '../historical-intelligence';
 import { inferCoverageFamilies } from '../coverage-ledger';
+import { buildCanonicalEventClusters } from './event-resolver';
 
 const { parser: createJsonParser } = streamJsonPackage as { parser: () => NodeJS.ReadWriteStream };
 const { pick } = pickPackage as { pick: (options: { filter: string }) => NodeJS.ReadWriteStream };
 const { streamArray } = streamArrayPackage as { streamArray: () => NodeJS.ReadWriteStream };
-const DUCKDB_LOCK_TTL_MINUTES = 180;
+const DUCKDB_LOCK_TTL_MINUTES = 45;
+const IMPORT_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
 type DuckDbConnection = {
   run: (sql: string, params?: Record<string, unknown>) => Promise<unknown>;
@@ -105,6 +112,16 @@ export interface HistoricalFrameLoadOptions {
   knowledgeBoundaryCeiling?: string;
 }
 
+interface HistoricalPostgresFrameLoadOptions extends HistoricalFrameLoadOptions {
+  pgConfig?: {
+    host: string;
+    port: number;
+    database: string;
+    user: string;
+    password: string;
+  };
+}
+
 interface MaterializedFrameRow {
   id: string;
   datasetId: string;
@@ -120,6 +137,17 @@ interface MaterializedFrameRow {
   newsCount: number;
   clusterCount: number;
   marketCount: number;
+}
+
+interface HistoricalImportCheckpoint {
+  filePath: string;
+  fileSize: number;
+  fileMtimeMs: number;
+  datasetId: string;
+  provider: string;
+  phase: 'raw-complete';
+  rawRecordCount: number;
+  updatedAt: string;
 }
 
 class DuckDbPathLockError extends Error {
@@ -140,6 +168,14 @@ function getDuckDbLockPath(dbPath: string): string {
   const digest = createHash('sha1').update(normalized).digest('hex').slice(0, 16);
   const fileName = `${path.basename(normalized)}.${digest}.lock.json`;
   return path.join(path.dirname(normalized), fileName);
+}
+
+function getImportCheckpointPath(dbPath: string, filePath: string): string {
+  const digest = createHash('sha1')
+    .update(`${normalizeDuckDbPath(dbPath)}::${path.resolve(filePath)}`)
+    .digest('hex')
+    .slice(0, 16);
+  return path.join(path.dirname(normalizeDuckDbPath(dbPath)), `${path.basename(filePath)}.${digest}.checkpoint.json`);
 }
 
 async function acquireDuckDbPathLock(
@@ -169,14 +205,24 @@ async function acquireDuckDbPathLock(
   };
 
   if (!(await tryCreate())) {
-    let existing: { expiresAt?: string } | null = null;
+    let existing: { expiresAt?: string; pid?: number } | null = null;
     try {
-      existing = JSON.parse(await readFile(lockPath, 'utf8')) as { expiresAt?: string };
+      existing = JSON.parse(await readFile(lockPath, 'utf8')) as { expiresAt?: string; pid?: number };
     } catch {
       existing = null;
     }
 
-    if (existing?.expiresAt && asTs(existing.expiresAt) < Date.now()) {
+    const pidLooksDead = (() => {
+      if (!existing?.pid || existing.pid === process.pid) return false;
+      try {
+        process.kill(existing.pid, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    })();
+
+    if ((existing?.expiresAt && asTs(existing.expiresAt) < Date.now()) || pidLooksDead) {
       await rm(lockPath, { force: true });
       if (!(await tryCreate())) return null;
     } else {
@@ -218,6 +264,10 @@ const DEFAULT_DB_PATH = path.resolve('data', 'historical', 'intelligence-history
 const DEFAULT_BUCKET_HOURS = 6;
 const DEFAULT_NEWS_LOOKBACK_HOURS = 24;
 const DEFAULT_CHUNK_SIZE = 500;
+const DEFAULT_POSTGRES_FRAME_BUCKET_HOURS = 12;
+const POSTGRES_NEWS_PROVIDERS = ['guardian', 'nyt', 'gdelt-doc', 'gdelt-agg', 'rss-feed', 'acled'] as const;
+const POSTGRES_MARKET_PROVIDERS = ['yahoo-chart', 'coingecko'] as const;
+const POSTGRES_MACRO_PROVIDERS = ['fred'] as const;
 
 let duckDbModulePromise: Promise<typeof import('@duckdb/node-api')> | null = null;
 const connectionCache = new Map<string, Promise<DuckDbConnection>>();
@@ -280,13 +330,47 @@ function toIso(value: unknown, fallback?: string): string {
     return new Date(scaled).toISOString();
   }
   if (fallback) return fallback;
-  return new Date(0).toISOString();
+  return '';
 }
 
 function asTs(value: string | null | undefined): number {
   if (!value) return 0;
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : 0;
+}
+
+function validateTemporalRecord(record: HistoricalRawReplayRecord): { ok: boolean; reason?: string } {
+  const now = Date.now();
+  const validTs = asTs(record.validTimeStart);
+  const transactionTs = asTs(record.transactionTime);
+  const knowledgeTs = asTs(record.knowledgeBoundary);
+
+  if (!validTs || !transactionTs || !knowledgeTs) {
+    return { ok: false, reason: 'invalid-timestamp' };
+  }
+  if (validTs > now + IMPORT_FUTURE_TOLERANCE_MS) {
+    return { ok: false, reason: 'future-valid-time' };
+  }
+  if (validTs > transactionTs) {
+    return { ok: false, reason: 'valid-after-transaction' };
+  }
+  if (knowledgeTs < transactionTs) {
+    return { ok: false, reason: 'knowledge-before-transaction' };
+  }
+  return { ok: true };
+}
+
+function shouldReplaceMarketRecord(
+  candidate: HistoricalRawReplayRecord,
+  current: HistoricalRawReplayRecord,
+): boolean {
+  const candidateKnowledge = asTs(candidate.knowledgeBoundary);
+  const currentKnowledge = asTs(current.knowledgeBoundary);
+  if (candidateKnowledge !== currentKnowledge) return candidateKnowledge > currentKnowledge;
+  const candidateTransaction = asTs(candidate.transactionTime);
+  const currentTransaction = asTs(current.transactionTime);
+  if (candidateTransaction !== currentTransaction) return candidateTransaction > currentTransaction;
+  return asTs(candidate.validTimeStart) >= asTs(current.validTimeStart);
 }
 
 function toNumber(value: unknown): number | null {
@@ -1560,7 +1644,7 @@ function buildNewsItem(record: HistoricalRawReplayRecord): NewsItem {
   };
 }
 
-function buildSimpleClusters(newsItems: NewsItem[]): ClusteredEvent[] {
+function buildSimpleClusters(newsItems: NewsItem[], _newsRecords?: HistoricalRawReplayRecord[]): ClusteredEvent[] {
   const groups = new Map<string, NewsItem[]>();
   for (const item of newsItems) {
     const key = normalizeTitle(item.title, 'untitled').toLowerCase();
@@ -1601,12 +1685,301 @@ function buildSimpleClusters(newsItems: NewsItem[]): ClusteredEvent[] {
   });
 }
 
+function countTimeSkewWarnings(newsItems: NewsItem[], skewMs = 30 * 60 * 1000): number {
+  const buckets = new Map<string, number[]>();
+  for (const item of newsItems) {
+    const key = normalizeTitle(item.title, 'untitled').toLowerCase();
+    const ts = item.pubDate?.getTime?.() ?? NaN;
+    if (!Number.isFinite(ts)) continue;
+    const bucket = buckets.get(key) || [];
+    bucket.push(ts);
+    buckets.set(key, bucket);
+  }
+  let warnings = 0;
+  for (const values of buckets.values()) {
+    if (values.length < 2) continue;
+    const minTs = Math.min(...values);
+    const maxTs = Math.max(...values);
+    if ((maxTs - minTs) > skewMs) warnings += 1;
+  }
+  return warnings;
+}
+
 function serializeFrame(frame: HistoricalReplayFrame): string {
   return JSON.stringify(frame);
 }
 
 function reviveFrame(payloadJson: string): HistoricalReplayFrame {
   return JSON.parse(payloadJson) as HistoricalReplayFrame;
+}
+
+type PgRowShape = {
+  id?: unknown;
+  dataset_id?: unknown;
+  provider?: unknown;
+  source_kind?: unknown;
+  source_id?: unknown;
+  item_kind?: unknown;
+  valid_time_start?: unknown;
+  valid_time_end?: unknown;
+  transaction_time?: unknown;
+  knowledge_boundary?: unknown;
+  headline?: unknown;
+  link?: unknown;
+  symbol?: unknown;
+  region?: unknown;
+  price?: unknown;
+  payload_json?: unknown;
+  metadata_json?: unknown;
+};
+
+function parsePostgresJsonObject(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function parsePostgresRawRow(row: PgRowShape): HistoricalRawReplayRecord {
+  return {
+    id: String(row.id || ''),
+    datasetId: String(row.dataset_id || ''),
+    provider: String(row.provider || 'historical'),
+    sourceKind: String(row.source_kind || 'api') as HistoricalRawReplayRecord['sourceKind'],
+    sourceId: String(row.source_id || row.provider || ''),
+    itemKind: String(row.item_kind || 'news') as HistoricalRawKind,
+    validTimeStart: toIso(row.valid_time_start || nowIso(), nowIso()),
+    validTimeEnd: row.valid_time_end ? toIso(row.valid_time_end) : null,
+    transactionTime: toIso(row.transaction_time || row.valid_time_start || nowIso(), nowIso()),
+    knowledgeBoundary: toIso(
+      row.knowledge_boundary || row.transaction_time || row.valid_time_start || nowIso(),
+      nowIso(),
+    ),
+    headline: row.headline ? String(row.headline) : null,
+    link: row.link ? String(row.link) : null,
+    symbol: row.symbol ? String(row.symbol) : null,
+    region: row.region ? String(row.region) : null,
+    price: toNumber(row.price),
+    payload: parsePostgresJsonObject(row.payload_json),
+    metadata: parsePostgresJsonObject(row.metadata_json),
+  };
+}
+
+function buildPostgresSourceClusters(
+  newsItems: NewsItem[],
+  newsRecords: HistoricalRawReplayRecord[],
+): ClusteredEvent[] {
+  return buildCanonicalEventClusters(newsItems, newsRecords);
+}
+
+function filterLoadedFrames(
+  frames: HistoricalReplayFrame[],
+  options: HistoricalFrameLoadOptions,
+): HistoricalReplayFrame[] {
+  let filtered = options.includeWarmup ? frames.slice() : frames.filter((frame) => !frame.warmup);
+  if (options.startTransactionTime) {
+    const startTs = asTs(toIso(options.startTransactionTime));
+    filtered = filtered.filter((frame) => asTs(frame.transactionTime || frame.timestamp) >= startTs);
+  }
+  if (options.endTransactionTime) {
+    const endTs = asTs(toIso(options.endTransactionTime));
+    filtered = filtered.filter((frame) => asTs(frame.transactionTime || frame.timestamp) <= endTs);
+  }
+  if (options.knowledgeBoundaryCeiling) {
+    const ceilingTs = asTs(toIso(options.knowledgeBoundaryCeiling));
+    filtered = filtered.filter((frame) => asTs(frame.knowledgeBoundary || frame.timestamp) <= ceilingTs);
+  }
+  if (options.latestFirst) filtered = filtered.slice().reverse();
+  if (typeof options.maxFrames === 'number' && options.maxFrames > 0) {
+    filtered = filtered.slice(0, Math.floor(options.maxFrames));
+  }
+  return options.latestFirst ? filtered.slice().reverse() : filtered;
+}
+
+function materializeReplayFramesFromRawRecords(args: {
+  records: HistoricalRawReplayRecord[];
+  bucketHours: number;
+  datasetId?: string;
+  sourceVersion?: string | null;
+  clusterBuilder?: (newsItems: NewsItem[], newsRecords: HistoricalRawReplayRecord[]) => ClusteredEvent[];
+}): HistoricalReplayFrame[] {
+  const bucketHours = Math.max(1, Math.floor(args.bucketHours) || DEFAULT_POSTGRES_FRAME_BUCKET_HOURS);
+  const bucketMs = bucketHours * 60 * 60 * 1000;
+  const sortedRecords = args.records
+    .slice()
+    .sort((left, right) =>
+      asTs(left.validTimeStart) - asTs(right.validTimeStart)
+      || asTs(left.transactionTime) - asTs(right.transactionTime)
+      || left.id.localeCompare(right.id));
+  if (sortedRecords.length === 0) return [];
+
+  const buckets = new Map<number, HistoricalRawReplayRecord[]>();
+  for (const record of sortedRecords) {
+    const bucketKey = Math.floor(asTs(record.validTimeStart) / bucketMs) * bucketMs;
+    const bucket = buckets.get(bucketKey) || [];
+    bucket.push(record);
+    buckets.set(bucketKey, bucket);
+  }
+
+  const bucketKeys = Array.from(buckets.keys()).sort((left, right) => left - right);
+  const latestMarketBySymbol = new Map<string, HistoricalRawReplayRecord>();
+  const warmupFrameCount = Math.ceil(bucketKeys.length * 0.1);
+  const clusterBuilder = args.clusterBuilder || buildSimpleClusters;
+
+  return bucketKeys.map((bucketKey, index) => {
+    const bucketRecords = buckets.get(bucketKey) || [];
+    const newsRecords = bucketRecords.filter((record) => record.itemKind === 'news');
+    const marketRecords = bucketRecords.filter((record) => record.itemKind === 'market');
+    for (const record of marketRecords) {
+      const symbol = record.symbol || record.headline || record.id;
+      const current = latestMarketBySymbol.get(symbol);
+      if (!current || shouldReplaceMarketRecord(record, current)) {
+        latestMarketBySymbol.set(symbol, record);
+      }
+    }
+    const news = newsRecords.map(buildNewsItem);
+    const clusters = clusterBuilder(news, newsRecords);
+    const markets = Array.from(latestMarketBySymbol.entries()).map(([symbol, record]) => ({
+      symbol,
+      name: record.headline || record.symbol || record.id,
+      display: record.symbol || record.headline || record.id,
+      price: record.price ?? null,
+      change: 0,
+    })) as MarketData[];
+    const bucketStart = new Date(bucketKey).toISOString();
+    const bucketEnd = new Date(bucketKey + bucketMs).toISOString();
+    const transactionTime = bucketRecords.reduce((latest, record) =>
+      asTs(record.transactionTime) > asTs(latest) ? record.transactionTime : latest, bucketEnd);
+    const knowledgeBoundary = bucketRecords.reduce((latest, record) =>
+      asTs(record.knowledgeBoundary) > asTs(latest) ? record.knowledgeBoundary : latest, transactionTime);
+    const datasetId = args.datasetId || bucketRecords.find((record) => record.datasetId)?.datasetId || 'postgres-raw-items';
+    const providerCounts = Object.fromEntries(
+      bucketRecords.reduce((counts, record) => {
+        const key = String(record.provider || 'unknown').trim().toLowerCase();
+        counts.set(key, (counts.get(key) || 0) + 1);
+        return counts;
+      }, new Map<string, number>()),
+    );
+
+    return {
+      id: stableId([datasetId, bucketStart, bucketHours]),
+      timestamp: bucketStart,
+      validTimeStart: bucketStart,
+      validTimeEnd: bucketEnd,
+      transactionTime,
+      knowledgeBoundary,
+      datasetId,
+      sourceVersion: args.sourceVersion || null,
+      warmup: index < warmupFrameCount,
+      news,
+      clusters,
+      markets,
+      metadata: {
+        provider: 'postgres-raw-items',
+        bucketHours,
+        frameNewsCount: news.length,
+        frameMarketCount: markets.length,
+        providerCountsJson: JSON.stringify(providerCounts),
+      },
+    } satisfies HistoricalReplayFrame;
+  });
+}
+
+export async function loadHistoricalReplayFramesFromPostgres(
+  options: HistoricalPostgresFrameLoadOptions = {},
+): Promise<HistoricalReplayFrame[]> {
+  const { Client } = await import('pg');
+  const password = String(
+    options.pgConfig?.password
+    || process.env.INTEL_PG_PASSWORD
+    || process.env.NAS_PG_PASSWORD
+    || process.env.PG_PASSWORD
+    || process.env.PGPASSWORD
+    || '',
+  ).trim();
+  if (!password) {
+    throw new Error(
+      '[historical-stream-worker] Missing PostgreSQL password for NAS frame load. Set pgConfig.password or INTEL_PG_PASSWORD / NAS_PG_PASSWORD / PG_PASSWORD.',
+    );
+  }
+
+  const client = new Client({
+    host: options.pgConfig?.host || process.env.PG_HOST || process.env.INTEL_PG_HOST || '192.168.0.76',
+    port: Number(options.pgConfig?.port || process.env.PG_PORT || 5433),
+    database: options.pgConfig?.database || process.env.PG_DATABASE || process.env.PGDATABASE || 'lattice',
+    user: options.pgConfig?.user || process.env.PG_USER || process.env.PGUSER || 'postgres',
+    password,
+  });
+
+  const buildQuery = (providers: readonly string[]) => {
+    const params: unknown[] = [providers];
+    const clauses = ['provider = ANY($1::text[])'];
+    const effectiveTransactionExpr = 'COALESCE(transaction_time, valid_time_start)';
+    const effectiveKnowledgeExpr = 'COALESCE(knowledge_boundary, transaction_time, valid_time_start)';
+    if (options.datasetId) {
+      params.push(options.datasetId);
+      clauses.push(`dataset_id = $${params.length}`);
+    }
+    if (options.startTransactionTime) {
+      params.push(toIso(options.startTransactionTime));
+      clauses.push(`${effectiveTransactionExpr} >= $${params.length}`);
+    }
+    if (options.endTransactionTime) {
+      params.push(toIso(options.endTransactionTime));
+      clauses.push(`${effectiveTransactionExpr} <= $${params.length}`);
+    }
+    if (options.knowledgeBoundaryCeiling) {
+      params.push(toIso(options.knowledgeBoundaryCeiling));
+      clauses.push(`${effectiveKnowledgeExpr} <= $${params.length}`);
+    }
+    return {
+      text: `
+        SELECT
+          id, dataset_id, provider, source_kind, source_id, item_kind,
+          valid_time_start, valid_time_end, transaction_time, knowledge_boundary,
+          headline, link, symbol, region, price, payload_json, metadata_json
+        FROM raw_items
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY valid_time_start ASC, ${effectiveTransactionExpr} ASC, id ASC
+      `,
+      values: params,
+    };
+  };
+
+  try {
+    await client.connect();
+    const newsQuery = buildQuery(POSTGRES_NEWS_PROVIDERS);
+    const marketQuery = buildQuery(POSTGRES_MARKET_PROVIDERS);
+    const macroQuery = buildQuery(POSTGRES_MACRO_PROVIDERS);
+    const newsResult = await client.query(newsQuery.text, newsQuery.values);
+    const marketResult = await client.query(marketQuery.text, marketQuery.values);
+    const macroResult = await client.query(macroQuery.text, macroQuery.values);
+    const records = [
+      ...newsResult.rows,
+      ...marketResult.rows,
+      ...macroResult.rows,
+    ].map(parsePostgresRawRow);
+    const frames = materializeReplayFramesFromRawRecords({
+      records,
+      bucketHours: DEFAULT_POSTGRES_FRAME_BUCKET_HOURS,
+      datasetId: options.datasetId,
+      sourceVersion: 'postgres-raw-items',
+      clusterBuilder: buildPostgresSourceClusters,
+    });
+    return filterLoadedFrames(frames, options);
+  } finally {
+    await client.end().catch(() => {});
+  }
 }
 
 export async function processHistoricalDump(
@@ -1623,6 +1996,8 @@ export async function processHistoricalDump(
   const dbPath = options.dbPath || DEFAULT_DB_PATH;
   const providerHint = options.provider;
   const datasetIdHint = options.datasetId;
+  const fileStats = await stat(filePath);
+  const checkpointPath = getImportCheckpointPath(dbPath, filePath);
   const releaseDbLock = await acquireDuckDbPathLock(dbPath);
   if (!releaseDbLock) {
     throw new DuckDbPathLockError(
@@ -1643,6 +2018,14 @@ export async function processHistoricalDump(
     let firstTransactionTime: string | null = null;
     let lastTransactionTime: string | null = null;
     let datasetRawReset = false;
+    let invalidRecordCount = 0;
+    let invalidTemporalCount = 0;
+    let checkpoint: HistoricalImportCheckpoint | null = null;
+    try {
+      checkpoint = JSON.parse(await readFile(checkpointPath, 'utf8')) as HistoricalImportCheckpoint;
+    } catch {
+      checkpoint = null;
+    }
 
     const maybeResetDatasetRaw = async () => {
       if (datasetRawReset || !datasetId) return;
@@ -1653,9 +2036,20 @@ export async function processHistoricalDump(
 
   const flushChunk = async (records: HistoricalRawReplayRecord[]) => {
     if (records.length === 0) return;
-    await appendRawRecordsToDuckDb(records, dbPath);
-    rawRecordCount += records.length;
+    const validRecords: HistoricalRawReplayRecord[] = [];
     for (const record of records) {
+      const validation = validateTemporalRecord(record);
+      if (!validation.ok) {
+        invalidRecordCount += 1;
+        invalidTemporalCount += 1;
+        continue;
+      }
+      validRecords.push(record);
+    }
+    if (validRecords.length === 0) return;
+    await appendRawRecordsToDuckDb(validRecords, dbPath);
+    rawRecordCount += validRecords.length;
+    for (const record of validRecords) {
       firstValidTime = minIso(firstValidTime, record.validTimeStart);
       lastValidTime = maxIso(lastValidTime, record.validTimeStart);
       firstTransactionTime = minIso(firstTransactionTime, record.transactionTime);
@@ -1663,7 +2057,24 @@ export async function processHistoricalDump(
     }
   };
 
-  if (ext === '.jsonl' || ext === '.ndjson') {
+  const canReuseRawStage = Boolean(
+    checkpoint
+    && checkpoint.phase === 'raw-complete'
+    && checkpoint.filePath === path.resolve(filePath)
+    && checkpoint.fileSize === fileStats.size
+    && checkpoint.fileMtimeMs === fileStats.mtimeMs,
+  );
+
+  if (canReuseRawStage) {
+    datasetId = checkpoint?.datasetId || datasetId;
+    provider = checkpoint?.provider || provider;
+    const corpusStats = await readHistoricalRawCorpusStatsForDataset(connection, datasetId);
+    rawRecordCount = corpusStats.rawRecordCount;
+    firstValidTime = corpusStats.firstValidTime;
+    lastValidTime = corpusStats.lastValidTime;
+    firstTransactionTime = corpusStats.firstTransactionTime;
+    lastTransactionTime = corpusStats.lastTransactionTime;
+  } else if (ext === '.jsonl' || ext === '.ndjson') {
     const fileStream = createReadStream(filePath);
     const rl = readline.createInterface({
       input: fileStream,
@@ -1765,6 +2176,19 @@ export async function processHistoricalDump(
     }
   }
 
+    if (!canReuseRawStage) {
+      await writeFile(checkpointPath, JSON.stringify({
+        filePath: path.resolve(filePath),
+        fileSize: fileStats.size,
+        fileMtimeMs: fileStats.mtimeMs,
+        datasetId,
+        provider,
+        phase: 'raw-complete',
+        rawRecordCount,
+        updatedAt: nowIso(),
+      } satisfies HistoricalImportCheckpoint, null, 2));
+    }
+
     const frameRows: MaterializedFrameRow[] = [];
     const newsLookbackMs = newsLookbackHours * 60 * 60 * 1000;
     const bucketMs = bucketHours * 60 * 60 * 1000;
@@ -1775,6 +2199,7 @@ export async function processHistoricalDump(
     let activeBucketRecords: HistoricalRawReplayRecord[] = [];
     const newsWindow: HistoricalRawReplayRecord[] = [];
     const latestMarketBySymbol = new Map<string, HistoricalRawReplayRecord>();
+    let mergeConflictCount = 0;
 
   const finalizeActiveBucket = () => {
     if (activeBucketKey === null || activeBucketRecords.length === 0) return;
@@ -1794,6 +2219,7 @@ export async function processHistoricalDump(
         return validTs <= bucketEndTs && validTs >= bucketEndTs - newsLookbackMs;
       })
       .map(buildNewsItem);
+    const timeSkewWarningCount = countTimeSkewWarnings(visibleNews);
     const clusters = buildSimpleClusters(visibleNews);
     const latestMarketEntries = Array.from(latestMarketBySymbol.entries());
     const marketTimestampBySymbol = Object.fromEntries(
@@ -1802,6 +2228,7 @@ export async function processHistoricalDump(
     const marketKnowledgeBoundaryBySymbol = Object.fromEntries(
       latestMarketEntries.map(([symbol, record]) => [symbol, record.knowledgeBoundary]),
     );
+    const mergedSources = Array.from(new Set(activeBucketRecords.map((record) => record.sourceId || record.provider))).slice(0, 24);
     const markets = latestMarketEntries.map(([symbol, record]) => ({
       symbol,
       name: record.headline || record.symbol || record.id,
@@ -1852,6 +2279,9 @@ export async function processHistoricalDump(
         bucketTimeMode,
         frameNewsCount: visibleNews.length,
         frameMarketCount: markets.length,
+        mergeConflictCount,
+        mergedSourcesJson: JSON.stringify(mergedSources),
+        timeSkewWarningCount,
         maxMarketKnowledgeBoundary,
         marketTimestampJson: JSON.stringify(marketTimestampBySymbol),
         marketKnowledgeBoundaryJson: JSON.stringify(marketKnowledgeBoundaryBySymbol),
@@ -1876,6 +2306,7 @@ export async function processHistoricalDump(
     });
 
     activeBucketRecords = [];
+    mergeConflictCount = 0;
     bucketIndex += 1;
   };
 
@@ -1904,7 +2335,14 @@ export async function processHistoricalDump(
         } else if (record.itemKind === 'market') {
           const symbol = record.symbol || record.headline || record.id;
           const current = latestMarketBySymbol.get(symbol);
-          if (!current || asTs(record.validTimeStart) >= asTs(current.validTimeStart)) {
+          if (current && (
+            current.price !== record.price
+            || current.sourceId !== record.sourceId
+            || current.validTimeStart !== record.validTimeStart
+          )) {
+            mergeConflictCount += 1;
+          }
+          if (!current || shouldReplaceMarketRecord(record, current)) {
             latestMarketBySymbol.set(symbol, record);
           }
           maxMarketKnowledgeBoundary = Math.max(
@@ -1947,12 +2385,16 @@ export async function processHistoricalDump(
         currentImportLastValidTime: lastValidTime,
         currentImportFirstTransactionTime: firstTransactionTime,
         currentImportLastTransactionTime: lastTransactionTime,
+        invalidRecordCount,
+        invalidTemporalCount,
         sourceArtifactCount: Array.isArray(options.sourceArtifactPaths)
           ? options.sourceArtifactPaths.length
           : 1,
-        sourceArtifactPaths: Array.isArray(options.sourceArtifactPaths)
-          ? options.sourceArtifactPaths.slice()
-          : [filePath],
+        sourceArtifactPathsJson: JSON.stringify(
+          Array.isArray(options.sourceArtifactPaths)
+            ? options.sourceArtifactPaths.slice()
+            : [filePath],
+        ),
       },
     };
     await upsertDatasetSummary(summary, dbPath);
@@ -1971,6 +2413,7 @@ export async function processHistoricalDump(
       firstTransactionTime: corpusStats.firstTransactionTime,
       lastTransactionTime: corpusStats.lastTransactionTime,
     };
+    await rm(checkpointPath, { force: true });
   } finally {
     await releaseDbLock();
   }

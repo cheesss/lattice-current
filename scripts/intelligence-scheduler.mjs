@@ -26,6 +26,16 @@ function parseArgs(argv) {
   return args;
 }
 
+// Global safety timeout — kill the process if it hangs (5 min for --once, 0 for daemon)
+const isOnceMode = process.argv.includes('--once') || process.argv.includes('once');
+if (isOnceMode) {
+  const TIMEOUT_MS = Number(process.env.SCRIPT_TIMEOUT_MS || 5 * 60 * 1000);
+  setTimeout(() => {
+    process.stderr.write('[intelligence-scheduler] global timeout reached, forcing exit\n');
+    process.exit(1);
+  }, TIMEOUT_MS).unref();
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const automation = await import('../src/services/server/intelligence-automation.ts');

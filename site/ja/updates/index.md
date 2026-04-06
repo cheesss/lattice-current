@@ -12,6 +12,7 @@ owner: core
 
 # 更新
 
+- [2026-03: Replay hardening, storage lifecycle, and public mock workbench](/ja/updates/2026-03-replay-hardening-and-public-workbench)
 - [2026-03: Codex Ops パネルと起動/キュー診断](/ja/updates/2026-03-codex-ops-panel)
 - [2026-03: 制約付き自律性、現実反映リプレイ、shadow rollback](/ja/updates/2026-03-constrained-autonomy)
 - [2026-03: アプリ級グローブと 2D マップをホームに移設](/ja/updates/2026-03-home-map-surfaces)

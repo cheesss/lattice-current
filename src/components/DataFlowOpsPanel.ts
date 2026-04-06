@@ -10,6 +10,7 @@ import {
   type DataFlowOpsSnapshot,
   type DataFlowOpsStatusTone,
 } from '@/services/data-flow-ops';
+import type { LocalRuntimeObservabilityTask } from '@/services/intelligence-automation-remote';
 import { escapeHtml } from '@/utils/sanitize';
 
 function asTs(value?: string | null): number {
@@ -125,6 +126,19 @@ function renderDatasetRow(dataset: DataFlowOpsDatasetRow): string {
         <div>${escapeHtml(blockerText)}</div>
         ${dataset.lastError ? `<div class="dataflow-ops-fix">Last error: ${escapeHtml(dataset.lastError)}</div>` : ''}
       </td>
+    </tr>
+  `;
+}
+
+function renderObservabilityTaskRow(task: LocalRuntimeObservabilityTask): string {
+  return `
+    <tr>
+      <td>${escapeHtml(task.name)}</td>
+      <td>${statusChip(task.status)}</td>
+      <td>${escapeHtml(fmtMinutes(task.intervalMinutes))}</td>
+      <td>${escapeHtml(fmtAgo(task.lastRunAt))}</td>
+      <td>${task.lagMinutes == null ? '-' : `${task.lagMinutes}m`}</td>
+      <td>${task.error ? escapeHtml(task.error) : task.stale ? 'Stale heartbeat' : 'OK'}</td>
     </tr>
   `;
 }
@@ -249,6 +263,9 @@ export class DataFlowOpsPanel extends Panel {
           </tr>
         `).join('')
       : '<tr><td colspan="4">Local service status unavailable.</td></tr>';
+    const observabilityTaskRows = snapshot.observability?.daemon?.tasks?.length
+      ? snapshot.observability.daemon.tasks.map((task) => renderObservabilityTaskRow(task)).join('')
+      : '<tr><td colspan="6">Runtime observability data unavailable.</td></tr>';
 
     this.content.innerHTML = `
       <div class="source-ops-root dataflow-ops-shell">
@@ -303,10 +320,16 @@ export class DataFlowOpsPanel extends Panel {
               <div class="source-ops-summary-row"><span>Heartbeat</span><strong>${escapeHtml(fmtMinutes(snapshot.pipeline.heartbeatLagMinutes))}</strong></div>
             </div>
             <div class="source-ops-summary-card">
-              <div class="source-ops-summary-title">Backtest Readiness</div>
+              <div class="source-ops-summary-title">Signal Readiness</div>
               <div class="source-ops-summary-row"><span>Coverage</span><strong>${fmtPct(snapshot.coverage.coverage.globalCompletenessScore)}</strong></div>
-              <div class="source-ops-summary-row"><span>Replay quality</span><strong>${fmtPct(snapshot.backtestOps?.derived.qualityScore ?? null)}</strong></div>
-              <div class="source-ops-summary-row"><span>Execution</span><strong>${fmtPct(snapshot.backtestOps?.derived.executionScore ?? null)}</strong></div>
+              <div class="source-ops-summary-row"><span>Current ideas</span><strong>${snapshot.currentSnapshot.ideaCards}</strong></div>
+              <div class="source-ops-summary-row"><span>Tracked ideas</span><strong>${snapshot.currentSnapshot.trackedIdeas}</strong></div>
+            </div>
+            <div class="source-ops-summary-card">
+              <div class="source-ops-summary-title">Observability</div>
+              <div class="source-ops-summary-row"><span>Status</span><strong>${escapeHtml(String(snapshot.observability?.summary?.status || 'unknown').toUpperCase())}</strong></div>
+              <div class="source-ops-summary-row"><span>Score</span><strong>${fmtPct(snapshot.observability?.summary?.observabilityScore ?? null)}</strong></div>
+              <div class="source-ops-summary-row"><span>Failing / stale</span><strong>${Number(snapshot.observability?.summary?.failingTaskCount || 0)} / ${Number(snapshot.observability?.summary?.staleTaskCount || 0)}</strong></div>
             </div>
             <div class="source-ops-summary-card">
               <div class="source-ops-summary-title">What This Means Now</div>
@@ -398,6 +421,29 @@ export class DataFlowOpsPanel extends Panel {
             </div>
           </section>
         </div>
+
+        <section class="source-ops-section">
+          <div class="source-ops-section-title">Runtime Observability</div>
+          <div class="source-ops-table-wrap">
+            <table class="source-ops-table">
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Status</th>
+                  <th>Cadence</th>
+                  <th>Last run</th>
+                  <th>Lag</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>${observabilityTaskRows}</tbody>
+            </table>
+          </div>
+          <div class="source-ops-meta dataflow-ops-meta">
+            <span>Daemon file: ${escapeHtml(snapshot.observability?.daemon?.statePath || 'unavailable')}</span>
+            <span>Dashboard healthy: ${snapshot.observability?.summary?.dashboardHealthy ? 'yes' : 'no'}</span>
+          </div>
+        </section>
       </div>
     `;
   }

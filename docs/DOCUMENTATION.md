@@ -33,6 +33,7 @@ Use these first. They describe the current branch, not historical experiments.
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
 | [./ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime, data, and storage architecture |
+| [./USER_GUIDE.md](./USER_GUIDE.md) | Operator-oriented quick start and runtime usage |
 | [./ALGORITHMS.md](./ALGORITHMS.md) | Active signal, evidence, and admission logic |
 | [./AI_INTELLIGENCE.md](./AI_INTELLIGENCE.md) | LLM, RAG, narrative, and operator-support layers |
 | [./investment-usage-playbook.md](./investment-usage-playbook.md) | Practical operator workflow |

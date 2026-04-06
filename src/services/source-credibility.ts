@@ -3,7 +3,44 @@ import { estimateDirectionalFlowSummary, type TimedFlowPoint } from './informati
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { listSourceRegistrySnapshot } from './source-registry';
 import { logSourceOpsEvent } from './source-ops-log';
-import { runTruthDiscovery, type TruthClaim } from './math-models/truth-discovery';
+import { runTruthDiscovery, type TruthClaim, type TruthDiscoveryResult } from './math-models/truth-discovery';
+import { buildSourceDependenceDiagnostics } from './source-dependence';
+
+// Lazy worker pool for truth discovery offloading
+interface TruthWorkerReq { claims: TruthClaim[]; options: Parameters<typeof runTruthDiscovery>[1] }
+type NodeWorkerPoolLike<Req, Res> = {
+  exec: (payload: Req, timeoutMs?: number) => Promise<Res>;
+};
+
+let truthWorkerPool: NodeWorkerPoolLike<TruthWorkerReq, TruthDiscoveryResult> | null = null;
+
+async function getTruthWorkerPool(): Promise<NodeWorkerPoolLike<TruthWorkerReq, TruthDiscoveryResult>> {
+  if (!truthWorkerPool) {
+    if (typeof window !== 'undefined') {
+      throw new Error('node worker pool unavailable in browser runtime');
+    }
+    const modulePath = '../utils/node-worker-pool';
+    const { NodeWorkerPool } = await import(/* @vite-ignore */ modulePath);
+    const workerPath = new URL('./math-models/truth-discovery.worker.ts', import.meta.url);
+    truthWorkerPool = new NodeWorkerPool(workerPath, { size: 2, name: 'truth-discovery' });
+  }
+  return truthWorkerPool!;
+}
+
+async function runTruthDiscoveryAsync(
+  claims: TruthClaim[],
+  options: Parameters<typeof runTruthDiscovery>[1],
+): Promise<TruthDiscoveryResult> {
+  // For small inputs, run synchronously to avoid serialization overhead
+  if (claims.length < 10) return runTruthDiscovery(claims, options);
+  try {
+    const pool = await getTruthWorkerPool();
+    return await pool.exec({ claims, options }, 15_000);
+  } catch {
+    // Fallback to sync on worker failure
+    return runTruthDiscovery(claims, options);
+  }
+}
 
 export interface SourceCredibilityProfile {
   id: string;
@@ -21,6 +58,15 @@ export interface SourceCredibilityProfile {
   propagandaRiskScore: number;
   linguisticRiskScore: number;
   networkCoordinationRiskScore: number;
+  independentCorroborationScore?: number;
+  dependentCorroborationScore?: number;
+  copyAmplificationRiskScore?: number;
+  dependenceTrustScore?: number;
+  sourceNoveltyScore?: number;
+  temporalLeadScore?: number;
+  averageLeadMinutes?: number | null;
+  topPeerSource?: string | null;
+  sourceFamily?: string;
   articleCount: number;
   corroboratedClusterCount: number;
   highImpactCount: number;
@@ -340,6 +386,8 @@ function buildTruthClaims(
       observations: candidateSources.map((sourceId) => ({
         sourceId,
         value: observedSources.has(sourceId) ? 1 : 0,
+        timestamp: cluster.lastUpdated || cluster.firstSeen || null,
+        weight: 1 + Math.min(1.5, cluster.sourceCount * 0.08) + (cluster.isAlert ? 0.2 : 0),
       })),
     });
   }
@@ -349,6 +397,7 @@ function buildTruthClaims(
 export async function recomputeSourceCredibility(
   news: NewsItem[],
   clusters: ClusteredEvent[],
+  options?: { skipPersist?: boolean },
 ): Promise<SourceCredibilityProfile[]> {
   await ensureLoaded();
   const registry = await listSourceRegistrySnapshot().catch(() => null);
@@ -365,11 +414,14 @@ export async function recomputeSourceCredibility(
 
   const topicProfiles = buildSourceTopicProfiles(grouped);
   const coordinationRiskMap = buildCoordinationRiskMap(clusters);
+  const dependenceDiagnostics = buildSourceDependenceDiagnostics(clusters, grouped);
   const truthClaims = buildTruthClaims(clusters, grouped, topicProfiles);
-  const truthDiscovery = runTruthDiscovery(
+  const truthDiscovery = await runTruthDiscoveryAsync(
     truthClaims,
     {
-      iterations: 6,
+      iterations: 12,
+      timeDecayLambda: 0.06,
+      convergenceEpsilon: 1e-4,
       seedReliability: Object.fromEntries(
         Array.from(profiles.entries()).map(([id, profile]) => [id, Math.max(0.52, (profile.posteriorAccuracyScore || 55) / 100)]),
       ),
@@ -418,6 +470,7 @@ export async function recomputeSourceCredibility(
     );
 
     const previous = profiles.get(normalizedSource);
+    const dependence = dependenceDiagnostics.get(normalizedSource);
     const priorCredibility = previous?.credibilityScore ?? 55;
     const priorAccuracy = previous?.historicalAccuracyScore ?? 55;
     const pseudoSuccess = corroboratedClusterCount + Math.min(4, highImpactCount * 0.35) + Math.min(2, articleCount * 0.08);
@@ -472,20 +525,56 @@ export async function recomputeSourceCredibility(
     const linguisticRiskScore = computeLinguisticRisk(items);
     const networkCoordinationRiskScore = coordinationRiskMap.get(normalizedSource) ?? previous?.networkCoordinationRiskScore ?? 18;
     const basePropagandaRisk = propagandaRisk(source, domain);
+    const independentCorroborationScore = boundedScore(
+      dependence?.independentCorroborationSharePct ?? previous?.independentCorroborationScore ?? 45,
+      45,
+    );
+    const dependentCorroborationScore = boundedScore(
+      dependence?.dependentCorroborationSharePct ?? previous?.dependentCorroborationScore ?? 55,
+      55,
+    );
+    const copyAmplificationRiskScore = boundedScore(
+      dependence?.copyAmplificationRiskScore ?? previous?.copyAmplificationRiskScore ?? 32,
+      32,
+    );
+    const sourceNoveltyScore = boundedScore(
+      dependence?.noveltyScore ?? previous?.sourceNoveltyScore ?? 36,
+      36,
+    );
+    const temporalLeadScore = boundedScore(
+      dependence?.temporalLeadScore ?? previous?.temporalLeadScore ?? 34,
+      34,
+    );
+    const dependenceTrustScore = boundedScore(
+      22
+      + independentCorroborationScore * 0.30
+      + sourceNoveltyScore * 0.16
+      + temporalLeadScore * 0.14
+      + Math.max(0, 100 - copyAmplificationRiskScore) * 0.24
+      + Math.max(0, 100 - dependentCorroborationScore) * 0.08
+      + Math.max(0, 100 - networkCoordinationRiskScore) * 0.06,
+      48,
+    );
     const propagandaRiskScore = boundedScore(
       basePropagandaRisk * 0.34
       + networkCoordinationRiskScore * 0.34
       + linguisticRiskScore * 0.18
+      + copyAmplificationRiskScore * 0.10
+      + Math.max(0, 60 - dependenceTrustScore) * 0.04
       + Math.max(0, 65 - truthAgreementScore) * 0.14,
       basePropagandaRisk,
     );
+    const corrDiscount = copyAmplificationRiskScore > 60
+      ? clamp((copyAmplificationRiskScore - 60) / 80, 0, 0.4)
+      : 0;
+    const adjustedCorrScore = corroborationScore * (1 - corrDiscount);
     const baseCredibility = boundedScore(
-      corroborationScore * 0.22
-      + historicalAccuracyScore * 0.14
-      + posteriorAccuracyScore * 0.12
-      + truthAgreementScore * 0.14
-      + emReliabilityScore * 0.14
-      + feedHealthScore * 0.14
+      adjustedCorrScore * 0.22
+      + historicalAccuracyScore * 0.12
+      + posteriorAccuracyScore * 0.10
+      + truthAgreementScore * 0.12
+      + emReliabilityScore * 0.12
+      + feedHealthScore * 0.12
       + (100 - propagandaRiskScore) * 0.10,
       priorCredibility,
     );
@@ -505,6 +594,27 @@ export async function recomputeSourceCredibility(
     if (emReliabilityScore >= 70) notes.push('EM truth discovery rates source as above baseline');
     if (articleCount >= 12) notes.push('High article volume in current snapshot');
     if (flow.direction === 'source-leading' && flow.flowScore >= 60) notes.push('Directional lead-lag support observed');
+    if ((dependence?.independentCorroborationSharePct ?? 0) >= 55) {
+      notes.push(`Independent corroboration ${Math.round(dependence!.independentCorroborationSharePct)}% of corroborated clusters.`);
+    }
+    if ((dependence?.copyAmplificationRiskScore ?? 0) >= 62) {
+      notes.push(`Copy amplification risk ${dependence!.copyAmplificationRiskScore}; peer sync dominates corroboration.`);
+    }
+    if (dependenceTrustScore >= 62) {
+      notes.push(`Dependence-adjusted trust ${dependenceTrustScore}; corroboration quality remains resilient after copy-risk discounting.`);
+    }
+    if (dependenceTrustScore <= 42) {
+      notes.push(`Dependence-adjusted trust ${dependenceTrustScore}; corroboration is weak after dependence discounting.`);
+    }
+    if ((dependence?.noveltyScore ?? 0) >= 60) {
+      notes.push(`Novelty score ${dependence!.noveltyScore}; source vocabulary is less derivative than peers.`);
+    }
+    if ((dependence?.temporalLeadScore ?? 0) >= 62 && dependence?.averageLeadMinutes != null) {
+      notes.push(`Lead signal score ${dependence.temporalLeadScore}; average lead ${dependence.averageLeadMinutes.toFixed(1)} minutes.`);
+    }
+    for (const note of dependence?.notes || []) {
+      if (!notes.includes(note)) notes.push(note);
+    }
 
     nextProfiles.push({
       id: normalizedSource,
@@ -522,6 +632,15 @@ export async function recomputeSourceCredibility(
       propagandaRiskScore,
       linguisticRiskScore,
       networkCoordinationRiskScore,
+      independentCorroborationScore,
+      dependentCorroborationScore,
+      copyAmplificationRiskScore,
+      dependenceTrustScore,
+      sourceNoveltyScore,
+      temporalLeadScore,
+      averageLeadMinutes: dependence?.averageLeadMinutes ?? previous?.averageLeadMinutes ?? null,
+      topPeerSource: dependence?.topPeerSource ?? previous?.topPeerSource ?? null,
+      sourceFamily: dependence?.sourceFamily ?? previous?.sourceFamily ?? undefined,
       articleCount,
       corroboratedClusterCount,
       highImpactCount,
@@ -540,7 +659,7 @@ export async function recomputeSourceCredibility(
   for (const profile of nextProfiles) {
     profiles.set(profile.id, profile);
   }
-  await persist();
+  if (!options?.skipPersist) await persist();
   await logSourceOpsEvent({
     kind: 'credibility',
     action: 'recomputed',
@@ -551,6 +670,17 @@ export async function recomputeSourceCredibility(
     category: 'source-credibility',
   });
   return nextProfiles;
+}
+
+/**
+ * Batch mode: compute source credibility from ALL news/clusters at once.
+ * Single Truth Discovery EM run on full dataset → better convergence than per-frame.
+ */
+export async function batchComputeSourceCredibility(
+  allNews: NewsItem[],
+  allClusters: ClusteredEvent[],
+): Promise<SourceCredibilityProfile[]> {
+  return recomputeSourceCredibility(allNews, allClusters, { skipPersist: true });
 }
 
 export async function listSourceCredibilityProfiles(limit = 60): Promise<SourceCredibilityProfile[]> {

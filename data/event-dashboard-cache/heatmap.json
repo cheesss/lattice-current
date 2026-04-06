@@ -1,0 +1,112 @@
+{
+  "themes": [
+    "conflict",
+    "economy",
+    "energy",
+    "politics",
+    "tech"
+  ],
+  "symbols": [
+    "GLD",
+    "ITA",
+    "TLT",
+    "USO",
+    "XLE",
+    "DBC",
+    "SPY",
+    "UUP",
+    "CIBR",
+    "NVDA"
+  ],
+  "cells": [
+    {
+      "theme": "conflict",
+      "symbol": "GLD",
+      "hitRate": 0.590958690568979
+    },
+    {
+      "theme": "conflict",
+      "symbol": "ITA",
+      "hitRate": 0.5511301636788777
+    },
+    {
+      "theme": "conflict",
+      "symbol": "TLT",
+      "hitRate": 0.4184723304754482
+    },
+    {
+      "theme": "conflict",
+      "symbol": "USO",
+      "hitRate": 0.556664068589244
+    },
+    {
+      "theme": "conflict",
+      "symbol": "XLE",
+      "hitRate": 0.5526890101325019
+    },
+    {
+      "theme": "economy",
+      "symbol": "DBC",
+      "hitRate": 0.5735166005226987
+    },
+    {
+      "theme": "economy",
+      "symbol": "SPY",
+      "hitRate": 0.6216242377311005
+    },
+    {
+      "theme": "economy",
+      "symbol": "TLT",
+      "hitRate": 0.41767495886167844
+    },
+    {
+      "theme": "economy",
+      "symbol": "UUP",
+      "hitRate": 0.47966429954809553
+    },
+    {
+      "theme": "energy",
+      "symbol": "USO",
+      "hitRate": 0.5515352274175054
+    },
+    {
+      "theme": "energy",
+      "symbol": "XLE",
+      "hitRate": 0.5257994648999873
+    },
+    {
+      "theme": "politics",
+      "symbol": "GLD",
+      "hitRate": 0.6017733733211631
+    },
+    {
+      "theme": "politics",
+      "symbol": "SPY",
+      "hitRate": 0.618594340852784
+    },
+    {
+      "theme": "politics",
+      "symbol": "TLT",
+      "hitRate": 0.4108749511018386
+    },
+    {
+      "theme": "politics",
+      "symbol": "UUP",
+      "hitRate": 0.4809384164222874
+    },
+    {
+      "theme": "tech",
+      "symbol": "CIBR",
+      "hitRate": 0.5940456958227556
+    },
+    {
+      "theme": "tech",
+      "symbol": "NVDA",
+      "hitRate": 0.6048926840526194
+    }
+  ],
+  "meta": {
+    "updatedAt": "2026-04-05T17:22:30.559Z",
+    "stale": false
+  }
+}

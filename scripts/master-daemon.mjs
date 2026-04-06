@@ -1,213 +1,396 @@
 #!/usr/bin/env node
-/**
- * master-daemon.mjs — Main automation daemon
- *
- * Runs continuously and orchestrates all pipeline tasks on a schedule.
- *
- * Schedule:
- *   15min  — signal refresh (VIX/FRED), article check (RSS)
- *   1h     — auto-pipeline (step 3+5), conditional_sensitivity refresh
- *   6h     — master-pipeline (step 0+1), proposal-executor
- *   daily  — pending_outcomes check, full rebuild, daily report
- *
- * Usage:
- *   node --import tsx scripts/master-daemon.mjs              # run forever
- *   node --import tsx scripts/master-daemon.mjs --once       # run all tasks once and exit
- *   node --import tsx scripts/master-daemon.mjs --task signal-refresh   # single task only
- */
 
 import pg from 'pg';
 import { execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+import { createLogger } from './_shared/structured-logger.mjs';
+import {
+  MIN_15_MS,
+  HOUR_1_MS,
+  HOUR_6_MS,
+  DAY_1_MS,
+} from './_shared/daemon-contract.mjs';
+import { runBackup } from './_shared/pg-backup.mjs';
+import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
+import { sendAlert } from './_shared/alert-notifier.mjs';
 
 loadOptionalEnvFile();
-const { Client } = pg;
-const PG_CONFIG = resolveNasPgConfig();
 
-// ── CLI args ────────────────────────────────────────────────
+const { Client } = pg;
 const ONCE = process.argv.includes('--once');
 const TASK_ONLY = process.argv.includes('--task')
   ? process.argv[process.argv.indexOf('--task') + 1]
   : null;
 
-// ── Intervals (ms) ─────────────────────────────────────────
-const MIN_15 = 15 * 60 * 1000;
-const HOUR_1 = 60 * 60 * 1000;
-const HOUR_6 = 6 * 60 * 60 * 1000;
-const DAY_1  = 24 * 60 * 60 * 1000;
-
-// ── State file ──────────────────────────────────────────────
+const CIRCUIT_BREAKER_FAILS = Number(process.env.DAEMON_CIRCUIT_BREAKER_FAILS || 3);
+const CIRCUIT_BREAKER_COOLDOWN_MS = Number(process.env.DAEMON_CIRCUIT_BREAKER_COOLDOWN_MS || (30 * 60 * 1000));
+const DASHBOARD_HEALTH_URL = String(process.env.EVENT_DASHBOARD_API_URL || 'http://127.0.0.1:46200/api/health').trim();
+const DASHBOARD_RESTART_CMD = String(process.env.EVENT_DASHBOARD_RESTART_CMD || '').trim();
+const DB_RESTART_CMD = String(process.env.DB_RESTART_CMD || '').trim();
 const STATE_PATH = 'data/daemon-state.json';
+const logger = createLogger('master-daemon');
+
+const runningTasks = new Set();
+let pgConfig = null;
+let pgConfigError = null;
+
+function getPgConfig() {
+  if (!pgConfig && !pgConfigError) {
+    try {
+      pgConfig = resolveNasPgConfig();
+    } catch (error) {
+      pgConfigError = error;
+    }
+  }
+  if (!pgConfig) {
+    throw pgConfigError;
+  }
+  return pgConfig;
+}
+
+function log(message) {
+  logger.info(message);
+}
+
+function ensureDataDir() {
+  if (!existsSync('data')) mkdirSync('data', { recursive: true });
+}
 
 function loadState() {
   try {
     if (existsSync(STATE_PATH)) {
       return JSON.parse(readFileSync(STATE_PATH, 'utf-8'));
     }
-  } catch { /* corrupted state — start fresh */ }
-  return { lastRun: {}, taskResults: {} };
+  } catch {
+    // corrupted state: start fresh
+  }
+
+  return {
+    lastRun: {},
+    taskResults: {},
+    failures: {},
+    health: {},
+  };
 }
 
 function saveState(state) {
   try {
-    if (!existsSync('data')) mkdirSync('data', { recursive: true });
+    ensureDataDir();
     writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
-  } catch (e) {
-    log(`Failed to save state: ${e.message}`);
+  } catch (error) {
+    log(`failed to save daemon state: ${error.message}`);
   }
 }
 
-// ── Logging ─────────────────────────────────────────────────
-function log(msg) {
-  const ts = new Date().toISOString();
-  process.stderr.write(`[${ts}] ${msg}\n`);
-}
-
-// ── Shell runner ────────────────────────────────────────────
-function run(cmd, timeoutMs = 300_000) {
-  log(`  $ ${cmd}`);
+function run(command, timeoutMs = 300_000) {
+  logger.info('running shell command', { command, timeoutMs });
   try {
-    execSync(cmd, {
+    execSync(command, {
       stdio: 'pipe',
       timeout: timeoutMs,
       env: { ...process.env },
       cwd: process.cwd(),
+      windowsHide: true,
     });
-    return true;
-  } catch (e) {
-    log(`  WARN non-fatal: ${(e.message || '').slice(0, 120)}`);
-    return false;
+    logger.metric('shell.success_count', 1);
+    return { ok: true, error: '' };
+  } catch (error) {
+    const message = String(error?.message || error).slice(0, 200);
+    logger.warn('shell command failed', { command, timeoutMs, error: message });
+    logger.metric('shell.error_count', 1);
+    return { ok: false, error: message };
   }
 }
-
-// ── Task guard: skip if another invocation is still within cooldown ──
-const runningTasks = new Set();
 
 function shouldRun(taskName, intervalMs, state) {
   if (runningTasks.has(taskName)) {
-    log(`  skip ${taskName} — previous run still in progress`);
+    log(`  skip ${taskName}: previous run still in progress`);
     return false;
   }
-  const last = state.lastRun[taskName] || 0;
-  return Date.now() - last >= intervalMs;
+
+  const failure = state.failures?.[taskName];
+  if (failure?.disabledUntil && Date.now() < failure.disabledUntil) {
+    log(`  skip ${taskName}: circuit open until ${new Date(failure.disabledUntil).toISOString()}`);
+    return false;
+  }
+
+  const lastRun = state.lastRun?.[taskName] || 0;
+  return Date.now() - lastRun >= intervalMs;
 }
 
-function markDone(taskName, state, ok) {
+function computeCircuitBackoffMs(intervalMs, consecutiveFailures) {
+  if (consecutiveFailures < CIRCUIT_BREAKER_FAILS) return 0;
+  const exponent = Math.max(0, consecutiveFailures - CIRCUIT_BREAKER_FAILS);
+  return Math.min(
+    Math.max(intervalMs, CIRCUIT_BREAKER_COOLDOWN_MS) * Math.pow(2, exponent),
+    6 * HOUR_1_MS,
+  );
+}
+
+async function markDone(taskName, intervalMs, state, ok, error = '') {
   state.lastRun[taskName] = Date.now();
-  state.taskResults[taskName] = { ok, at: new Date().toISOString() };
+  const previous = state.failures?.[taskName] || { consecutive: 0, disabledUntil: 0, lastError: '' };
+  const nextConsecutive = ok ? 0 : previous.consecutive + 1;
+  const backoffMs = ok ? 0 : computeCircuitBackoffMs(intervalMs, nextConsecutive);
+  const nextFailure = ok
+    ? { consecutive: 0, disabledUntil: 0, lastError: '' }
+    : {
+      consecutive: nextConsecutive,
+      disabledUntil: backoffMs > 0
+        ? Date.now() + backoffMs
+        : 0,
+      lastError: error,
+    };
+
+  state.failures[taskName] = nextFailure;
+  state.taskResults[taskName] = {
+    ok,
+    at: new Date().toISOString(),
+    error,
+    consecutiveFailures: nextFailure.consecutive,
+  };
   saveState(state);
+
+  if (!ok && backoffMs > 0 && previous.disabledUntil !== nextFailure.disabledUntil) {
+    await sendAlert('warning', 'daemon circuit breaker tripped', {
+      task: taskName,
+      consecutiveFailures: nextFailure.consecutive,
+      backoffMs,
+      error,
+    }).catch(() => {});
+  }
 }
 
-// ═════════════════════════════════════════════════════════════
-// TASK DEFINITIONS
-// ═════════════════════════════════════════════════════════════
+async function runTask(state, taskName, intervalMs, handler) {
+  if (!ONCE && !shouldRun(taskName, intervalMs, state)) return;
 
-// ── 15-min tasks ────────────────────────────────────────────
-
-async function taskSignalRefresh(state) {
-  const name = 'signal-refresh';
-  if (!ONCE && !shouldRun(name, MIN_15, state)) return;
-  runningTasks.add(name);
-  log('>> signal-refresh: updating VIX/FRED in signal_history');
+  runningTasks.add(taskName);
   let ok = false;
-  try {
-    const client = new Client(PG_CONFIG);
-    await client.connect();
+  let errorMessage = '';
+  const startedAt = Date.now();
 
-    // Upsert latest VIX value from market_quotes if available
+  try {
+    const result = await handler();
+    ok = result?.ok !== false;
+    errorMessage = result?.error || '';
+  } catch (error) {
+    ok = false;
+    errorMessage = String(error?.message || error);
+    log(`>> ${taskName} FAILED: ${errorMessage}`);
+  } finally {
+    const durationMs = Date.now() - startedAt;
+    logger.metric('task.duration_ms', durationMs, { task: taskName });
+    logger.metric(ok ? 'task.success_count' : 'task.error_count', 1, { task: taskName });
+    logger.info('task completed', {
+      task: taskName,
+      ok,
+      durationMs,
+      error: errorMessage || null,
+    });
+    await markDone(taskName, intervalMs, state, ok, errorMessage);
+    runningTasks.delete(taskName);
+  }
+}
+
+async function taskSignalRefresh() {
+  log('>> signal-refresh: updating VIX/FRED in signal_history');
+  const client = new Client(getPgConfig());
+  await client.connect();
+  try {
     await client.query(`
       INSERT INTO signal_history (signal_name, ts, value)
       SELECT 'vix', NOW(), last_price
       FROM market_quotes
       WHERE symbol = '^VIX'
-      ORDER BY fetched_at DESC LIMIT 1
+      ORDER BY fetched_at DESC
+      LIMIT 1
       ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-    `).catch(() => log('  signal_history VIX upsert skipped (table may not exist)'));
+    `).catch(() => log('  VIX refresh skipped: market_quotes missing or empty'));
 
-    // Upsert latest FRED values if available
     await client.query(`
       INSERT INTO signal_history (signal_name, ts, value)
       SELECT 'fred_' || series_id, NOW(), value
       FROM fred_observations
       WHERE observation_date = (SELECT MAX(observation_date) FROM fred_observations)
       ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-    `).catch(() => log('  signal_history FRED upsert skipped (table may not exist)'));
+    `).catch(() => log('  FRED refresh skipped: fred_observations missing or empty'));
 
-    await client.end();
-    ok = true;
     log('>> signal-refresh: done');
-  } catch (e) {
-    log(`>> signal-refresh FAILED: ${e.message}`);
+    return { ok: true };
   } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
+    await client.end();
   }
 }
 
-async function taskArticleCheck(state) {
-  const name = 'article-check';
-  if (!ONCE && !shouldRun(name, MIN_15, state)) return;
-  runningTasks.add(name);
-  log('>> article-check: scanning RSS feeds for new articles');
-  let ok = false;
+async function taskArticleCheck() {
+  log('>> article-check: checking article freshness');
+  const client = new Client(getPgConfig());
+  await client.connect();
   try {
-    // Placeholder: in production, call fetchCategoryFeeds or a dedicated RSS script
-    // For now, check articles table for staleness as a health indicator
-    const client = new Client(PG_CONFIG);
-    await client.connect();
-    const res = await client.query(`
-      SELECT COUNT(*) AS total,
-             MAX(published_at) AS latest,
-             COUNT(*) FILTER (WHERE published_at > NOW() - INTERVAL '1 day') AS last_24h
+    const { rows } = await client.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        MAX(published_at) AS latest,
+        COUNT(*) FILTER (WHERE published_at > NOW() - INTERVAL '1 day')::int AS last_24h
       FROM articles
     `);
-    const row = res.rows[0];
-    log(`  articles total=${row.total}, latest=${row.latest}, last_24h=${row.last_24h}`);
-    if (Number(row.last_24h) === 0) {
-      log('  WARN: no articles in last 24h — feeds may be stale');
-    }
+    const summary = rows[0] || { total: 0, latest: null, last_24h: 0 };
+    log(`  articles total=${summary.total}, latest=${summary.latest}, last_24h=${summary.last_24h}`);
+    logger.metric('articles.last_24h', Number(summary.last_24h || 0));
+    logger.metric('articles.total', Number(summary.total || 0));
+    return { ok: true, error: Number(summary.last_24h) === 0 ? 'no recent articles in last 24h' : '' };
+  } finally {
     await client.end();
-    ok = true;
-    log('>> article-check: done');
-  } catch (e) {
-    log(`>> article-check FAILED: ${e.message}`);
-  } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
   }
 }
 
-// ── 1-hour tasks ────────────────────────────────────────────
-
-async function taskAutoPipeline(state) {
-  const name = 'auto-pipeline';
-  if (!ONCE && !shouldRun(name, HOUR_1, state)) return;
-  runningTasks.add(name);
-  log('>> auto-pipeline: running step 3 + step 5 (limit 200)');
-  let ok = false;
+async function taskDashboardHealth(state) {
+  log(`>> dashboard-health: checking ${DASHBOARD_HEALTH_URL}`);
   try {
-    ok = run('node --import tsx scripts/auto-pipeline.mjs --step 3 --step 5 --limit 200', 600_000);
-    log(`>> auto-pipeline: ${ok ? 'done' : 'completed with warnings'}`);
-  } catch (e) {
-    log(`>> auto-pipeline FAILED: ${e.message}`);
-  } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
+    const response = await fetch(DASHBOARD_HEALTH_URL, { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    state.health.dashboard = {
+      ok: true,
+      checkedAt: new Date().toISOString(),
+      payload,
+    };
+    logger.metric('dashboard.healthy', 1);
+    saveState(state);
+    return { ok: true };
+  } catch (error) {
+    const message = String(error?.message || error);
+    state.health.dashboard = {
+      ok: false,
+      checkedAt: new Date().toISOString(),
+      error: message,
+    };
+    logger.metric('dashboard.healthy', 0);
+    saveState(state);
+
+    if (DASHBOARD_RESTART_CMD) {
+      log(`  dashboard-health: restart command triggered`);
+      const restart = run(DASHBOARD_RESTART_CMD, 120_000);
+      return { ok: restart.ok, error: restart.error || message };
+    }
+
+    return { ok: false, error: message };
   }
 }
 
-async function taskSensitivityRefresh(state) {
-  const name = 'sensitivity-refresh';
-  if (!ONCE && !shouldRun(name, HOUR_1, state)) return;
-  runningTasks.add(name);
-  log('>> sensitivity-refresh: incremental conditional_sensitivity update');
-  let ok = false;
+async function taskDbHealth(state) {
+  log('>> db-health: checking NAS PostgreSQL');
+  const config = getPgConfig();
+  const client = new Client(config);
   try {
-    const client = new Client(PG_CONFIG);
     await client.connect();
+    const result = await client.query(`
+      SELECT
+        current_database() AS database_name,
+        now() AS server_time,
+        version() AS server_version
+    `);
+    const row = result.rows[0] || {};
+    state.health.database = {
+      ok: true,
+      connected: true,
+      checkedAt: new Date().toISOString(),
+      database: String(row.database_name || ''),
+      serverTime: new Date(String(row.server_time || new Date().toISOString())).toISOString(),
+      version: String(row.server_version || ''),
+    };
+    saveState(state);
+    return { ok: true };
+  } catch (error) {
+    const message = String(error?.message || error || 'database health failed');
+    state.health.database = {
+      ok: false,
+      connected: false,
+      checkedAt: new Date().toISOString(),
+      error: message,
+    };
+    saveState(state);
+    await sendAlert('critical', 'NAS database unreachable', {
+      host: config.host,
+      port: config.port,
+      error: message,
+    }).catch(() => {});
 
-    // Refresh conditional_sensitivity for themes with new outcomes in the last hour
+    if (DB_RESTART_CMD) {
+      const restart = run(DB_RESTART_CMD, 120_000);
+      return { ok: restart.ok, error: restart.error || message };
+    }
+    return { ok: false, error: message };
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+async function taskDailyBackup(state) {
+  log('>> daily-backup: creating PostgreSQL backup');
+  const result = await runBackup(getPgConfig(), {
+    backupDir: 'data/backups',
+    retentionDays: 7,
+  });
+  state.health.lastBackup = {
+    ...result,
+    checkedAt: new Date().toISOString(),
+  };
+  saveState(state);
+  if (!result.ok) {
+    await sendAlert('critical', 'postgres backup failed', {
+      error: result.error,
+    }).catch(() => {});
+  }
+  return result;
+}
+
+async function taskDuckdbSync() {
+  log('>> duckdb-sync: syncing NAS historical data to DuckDB cache');
+  const result = run('node --import tsx scripts/sync-nas-to-duckdb.mjs --batch-size 500', 1_200_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskDataQuality(state) {
+  log('>> data-quality: computing data freshness and integrity report');
+  const client = new Client(getPgConfig());
+  await client.connect();
+  try {
+    const report = await computeDataQualityMetrics(client);
+    state.health.dataQuality = {
+      ...report,
+      checkedAt: new Date().toISOString(),
+    };
+    saveState(state);
+    if (report.overall < 0.6) {
+      logger.warn('data quality degraded', report);
+      await sendAlert('warning', 'data quality degraded', {
+        overall: report.overall,
+        articleFreshness: report.articleFreshness,
+        signalFreshness: report.signalFreshness,
+        outcomeCompleteness: report.outcomeCompleteness,
+      }).catch(() => {});
+    }
+    return { ok: report.overall >= 0.35, error: report.overall >= 0.35 ? '' : 'critical data quality degradation' };
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+async function taskAutoPipeline() {
+  log('>> auto-pipeline: running step 3 + step 5');
+  const result = run('node --import tsx scripts/auto-pipeline.mjs --step 3 --step 5 --limit 200', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskSensitivityRefresh() {
+  log('>> sensitivity-refresh: touching recently updated themes');
+  const client = new Client(getPgConfig());
+  await client.connect();
+  try {
     const updated = await client.query(`
       UPDATE conditional_sensitivity cs
       SET updated_at = NOW()
@@ -220,272 +403,165 @@ async function taskSensitivityRefresh(state) {
     `).catch(() => ({ rowCount: 0 }));
 
     log(`  conditional_sensitivity rows touched: ${updated.rowCount || 0}`);
+    return { ok: true };
+  } finally {
     await client.end();
-    ok = true;
-    log('>> sensitivity-refresh: done');
-  } catch (e) {
-    log(`>> sensitivity-refresh FAILED: ${e.message}`);
-  } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
   }
 }
 
-// ── 6-hour tasks ────────────────────────────────────────────
-
-async function taskMasterPipeline(state) {
-  const name = 'master-pipeline';
-  if (!ONCE && !shouldRun(name, HOUR_6, state)) return;
-  runningTasks.add(name);
-  log('>> master-pipeline: running step 0 + step 1 (no-codex)');
-  let ok = false;
-  try {
-    ok = run('node --import tsx scripts/master-pipeline.mjs --no-codex --step 0 --step 1', 600_000);
-    log(`>> master-pipeline: ${ok ? 'done' : 'completed with warnings'}`);
-  } catch (e) {
-    log(`>> master-pipeline FAILED: ${e.message}`);
-  } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
-  }
+async function taskMasterPipeline() {
+  log('>> master-pipeline: running steps 0 + 1 without codex');
+  const result = run('node --import tsx scripts/master-pipeline.mjs --no-codex --step 0 --step 1', 600_000);
+  return { ok: result.ok, error: result.error };
 }
 
-async function taskExecutor(state) {
-  const name = 'executor';
-  if (!ONCE && !shouldRun(name, HOUR_6, state)) return;
-  runningTasks.add(name);
+async function taskExecutor() {
   log('>> executor: running proposal-executor');
-  let ok = false;
+  const result = run('node --import tsx scripts/proposal-executor.mjs', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskPendingCheck() {
+  log('>> pending-check: resolving due pending_outcomes');
+  const { checkPendingOutcomes } = await import('../src/services/article-ingestor.ts');
+  const { closeIngestorPool } = await import('../src/services/article-ingestor.ts');
   try {
-    ok = run('node --import tsx scripts/proposal-executor.mjs', 300_000);
-    log(`>> executor: ${ok ? 'done' : 'completed with warnings'}`);
-  } catch (e) {
-    log(`>> executor FAILED: ${e.message}`);
+    const summary = await checkPendingOutcomes();
+    log(`  pending-check resolved=${summary.resolvedCount || 0}, scanned=${summary.checkedCount || 0}`);
+    return { ok: true };
   } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
+    await closeIngestorPool().catch(() => {});
   }
 }
 
-// ── Daily tasks ─────────────────────────────────────────────
-
-async function taskPendingCheck(state) {
-  const name = 'pending-check';
-  if (!ONCE && !shouldRun(name, DAY_1, state)) return;
-  runningTasks.add(name);
-  log('>> pending-check: checking pending_outcomes where target_date <= now');
-  let ok = false;
-  try {
-    const client = new Client(PG_CONFIG);
-    await client.connect();
-
-    const res = await client.query(`
-      SELECT COUNT(*) AS due
-      FROM pending_outcomes
-      WHERE target_date <= NOW() AND resolved_at IS NULL
-    `).catch(() => ({ rows: [{ due: 0 }] }));
-
-    const due = Number(res.rows[0]?.due || 0);
-    log(`  pending_outcomes due for resolution: ${due}`);
-
-    if (due > 0) {
-      // Mark them for processing — the auto-pipeline step 5 handles actual resolution
-      log(`  ${due} pending outcomes ready — will be resolved in next auto-pipeline run`);
-    }
-
-    await client.end();
-    ok = true;
-    log('>> pending-check: done');
-  } catch (e) {
-    log(`>> pending-check FAILED: ${e.message}`);
-  } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
-  }
-}
-
-async function taskFullRebuild(state) {
-  const name = 'full-rebuild';
-  if (!ONCE && !shouldRun(name, DAY_1, state)) return;
-  runningTasks.add(name);
-  log('>> full-rebuild: running full master-pipeline (no-codex)');
-  let ok = false;
-  try {
-    ok = run('node --import tsx scripts/master-pipeline.mjs --no-codex', 1_200_000);
-    log(`>> full-rebuild: ${ok ? 'done' : 'completed with warnings'}`);
-  } catch (e) {
-    log(`>> full-rebuild FAILED: ${e.message}`);
-  } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
-  }
+async function taskFullRebuild() {
+  log('>> full-rebuild: running full master-pipeline without codex');
+  const result = run('node --import tsx scripts/master-pipeline.mjs --no-codex', 1_200_000);
+  return { ok: result.ok, error: result.error };
 }
 
 async function taskDailyReport(state) {
-  const name = 'daily-report';
-  if (!ONCE && !shouldRun(name, DAY_1, state)) return;
-  runningTasks.add(name);
-  log('>> daily-report: generating daily report');
-  let ok = false;
+  log('>> daily-report: generating report');
+  const client = new Client(getPgConfig());
+  await client.connect();
   try {
-    const client = new Client(PG_CONFIG);
-    await client.connect();
-
     const today = new Date().toISOString().slice(0, 10);
-
     const [articles, outcomes, signals, proposals, pending] = await Promise.all([
       client.query(`
-        SELECT COUNT(*) AS total,
-               COUNT(*) FILTER (WHERE published_at > NOW() - INTERVAL '1 day') AS new_24h
+        SELECT COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE published_at > NOW() - INTERVAL '1 day')::int AS new_24h
         FROM articles
       `).catch(() => ({ rows: [{ total: 0, new_24h: 0 }] })),
       client.query(`
-        SELECT COUNT(*) AS total,
-               COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') AS new_24h
+        SELECT COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day')::int AS new_24h
         FROM labeled_outcomes
       `).catch(() => ({ rows: [{ total: 0, new_24h: 0 }] })),
       client.query(`
-        SELECT signal_name, MAX(ts) AS latest, COUNT(*) AS points
+        SELECT signal_name, MAX(ts) AS latest, COUNT(*)::int AS points
         FROM signal_history
         GROUP BY signal_name
         ORDER BY signal_name
       `).catch(() => ({ rows: [] })),
       client.query(`
-        SELECT status, COUNT(*) AS cnt
+        SELECT status, COUNT(*)::int AS cnt
         FROM codex_proposals
         GROUP BY status
       `).catch(() => ({ rows: [] })),
       client.query(`
-        SELECT COUNT(*) AS total,
-               COUNT(*) FILTER (WHERE target_date <= NOW() AND resolved_at IS NULL) AS overdue
+        SELECT COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE target_date <= NOW() AND resolved_at IS NULL)::int AS overdue
         FROM pending_outcomes
       `).catch(() => ({ rows: [{ total: 0, overdue: 0 }] })),
     ]);
 
+    ensureDataDir();
     const report = {
       date: today,
-      generated_at: new Date().toISOString(),
+      generatedAt: new Date().toISOString(),
       articles: articles.rows[0],
-      labeled_outcomes: outcomes.rows[0],
+      labeledOutcomes: outcomes.rows[0],
       signals: signals.rows,
       proposals: proposals.rows,
-      pending_outcomes: pending.rows[0],
-      daemon_state: {
-        lastRun: state.lastRun,
-        taskResults: state.taskResults,
-      },
+      pendingOutcomes: pending.rows[0],
+      daemonState: state,
     };
 
-    if (!existsSync('data')) mkdirSync('data', { recursive: true });
-    const reportPath = `data/daily-report-${today}.json`;
-    writeFileSync(reportPath, JSON.stringify(report, null, 2));
-    log(`  report written to ${reportPath}`);
-
-    await client.end();
-    ok = true;
-    log('>> daily-report: done');
-  } catch (e) {
-    log(`>> daily-report FAILED: ${e.message}`);
+    writeFileSync(`data/daily-report-${today}.json`, JSON.stringify(report, null, 2));
+    return { ok: true };
   } finally {
-    markDone(name, state, ok);
-    runningTasks.delete(name);
+    await client.end();
   }
 }
 
-// ═════════════════════════════════════════════════════════════
-// TASK REGISTRY
-// ═════════════════════════════════════════════════════════════
-
 const TASKS = {
-  // 15-min
-  'signal-refresh':      { fn: taskSignalRefresh,      interval: MIN_15, group: '15min' },
-  'article-check':       { fn: taskArticleCheck,        interval: MIN_15, group: '15min' },
-  // 1-hour
-  'auto-pipeline':       { fn: taskAutoPipeline,        interval: HOUR_1, group: '1h' },
-  'sensitivity-refresh': { fn: taskSensitivityRefresh,  interval: HOUR_1, group: '1h' },
-  // 6-hour
-  'master-pipeline':     { fn: taskMasterPipeline,      interval: HOUR_6, group: '6h' },
-  'executor':            { fn: taskExecutor,             interval: HOUR_6, group: '6h' },
-  // daily
-  'pending-check':       { fn: taskPendingCheck,         interval: DAY_1,  group: 'daily' },
-  'full-rebuild':        { fn: taskFullRebuild,          interval: DAY_1,  group: 'daily' },
-  'daily-report':        { fn: taskDailyReport,          interval: DAY_1,  group: 'daily' },
+  'signal-refresh': { interval: MIN_15_MS, fn: taskSignalRefresh },
+  'article-check': { interval: MIN_15_MS, fn: taskArticleCheck },
+  'dashboard-health': { interval: MIN_15_MS, fn: taskDashboardHealth },
+  'db-health': { interval: MIN_15_MS, fn: taskDbHealth },
+  'auto-pipeline': { interval: HOUR_1_MS, fn: taskAutoPipeline },
+  'sensitivity-refresh': { interval: HOUR_1_MS, fn: taskSensitivityRefresh },
+  'master-pipeline': { interval: HOUR_6_MS, fn: taskMasterPipeline },
+  'executor': { interval: HOUR_6_MS, fn: taskExecutor },
+  'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync },
+  'data-quality': { interval: HOUR_6_MS, fn: taskDataQuality },
+  'pending-check': { interval: DAY_1_MS, fn: taskPendingCheck },
+  'full-rebuild': { interval: DAY_1_MS, fn: taskFullRebuild },
+  'daily-backup': { interval: DAY_1_MS, fn: taskDailyBackup },
+  'daily-report': { interval: DAY_1_MS, fn: taskDailyReport },
 };
 
-// ═════════════════════════════════════════════════════════════
-// MAIN LOOP
-// ═════════════════════════════════════════════════════════════
-
 async function runAllTasks(state) {
-  for (const [name, task] of Object.entries(TASKS)) {
-    if (TASK_ONLY && name !== TASK_ONLY) continue;
-    try {
-      await task.fn(state);
-    } catch (e) {
-      log(`TASK ${name} threw unexpected error: ${e.message}`);
-    }
+  for (const [taskName, task] of Object.entries(TASKS)) {
+    if (TASK_ONLY && TASK_ONLY !== taskName) continue;
+    await runTask(state, taskName, task.interval, () => task.fn(state));
   }
 }
 
 async function main() {
-  console.error('');
-  console.error('Master Daemon Started');
-  console.error('  15min: signal refresh, article check');
-  console.error('  1h:    auto-pipeline, sensitivity refresh');
-  console.error('  6h:    master-pipeline, executor');
-  console.error('  daily: pending check, full rebuild, report');
-  console.error('');
-
-  if (TASK_ONLY) {
-    if (!TASKS[TASK_ONLY]) {
-      console.error(`Unknown task: ${TASK_ONLY}`);
-      console.error(`Available: ${Object.keys(TASKS).join(', ')}`);
-      process.exit(1);
-    }
-    console.error(`Running single task: ${TASK_ONLY}`);
-  }
-
-  if (ONCE) {
-    console.error('Mode: --once (run all tasks once and exit)\n');
-  }
+  process.stderr.write('\nMaster Daemon Started\n');
+  process.stderr.write('  15min: signal refresh, article check, dashboard health, db health\n');
+  process.stderr.write('  1h:    auto-pipeline, sensitivity refresh\n');
+  process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality\n');
+  process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report\n\n');
 
   const state = loadState();
 
-  if (ONCE) {
-    await runAllTasks(state);
-    log('All tasks completed. Exiting (--once mode).');
-    return;
+  process.on('unhandledRejection', (error) => {
+    log(`unhandledRejection: ${String(error?.stack || error?.message || error)}`);
+  });
+  process.on('uncaughtExceptionMonitor', (error) => {
+    log(`uncaughtExceptionMonitor: ${String(error?.stack || error?.message || error)}`);
+  });
+
+  process.on('SIGINT', () => {
+    log('received SIGINT, shutting down');
+    saveState(loadState());
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    log('received SIGTERM, shutting down');
+    saveState(loadState());
+    process.exit(0);
+  });
+
+  if (TASK_ONLY && !TASKS[TASK_ONLY]) {
+    process.stderr.write(`Unknown task: ${TASK_ONLY}\nAvailable: ${Object.keys(TASKS).join(', ')}\n`);
+    process.exit(1);
   }
 
-  // Run immediately on startup
   await runAllTasks(state);
+  if (ONCE) return;
 
-  // Then schedule via setInterval
-  // 15-min tick: runs 15-min tasks and checks all others
-  const tickInterval = setInterval(async () => {
-    const current = loadState();
-    await runAllTasks(current);
-  }, MIN_15);
+  setInterval(async () => {
+    const currentState = loadState();
+    await runAllTasks(currentState);
+  }, MIN_15_MS);
 
-  // Keep process alive and handle graceful shutdown
-  process.on('SIGINT', () => {
-    log('Received SIGINT — shutting down gracefully');
-    clearInterval(tickInterval);
-    saveState(loadState());
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', () => {
-    log('Received SIGTERM — shutting down gracefully');
-    clearInterval(tickInterval);
-    saveState(loadState());
-    process.exit(0);
-  });
-
-  log('Daemon running. Press Ctrl+C to stop.');
+  log('daemon running');
 }
 
-main().catch((e) => {
-  console.error(`Daemon fatal error: ${e.stack || e.message || e}`);
+main().catch((error) => {
+  process.stderr.write(`${String(error?.stack || error?.message || error)}\n`);
   process.exit(1);
 });

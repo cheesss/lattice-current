@@ -7,10 +7,13 @@ import { deletePersistentCache, getPersistentCache, setPersistentCache } from '.
 import { dataFreshness } from './data-freshness';
 import { ingestHeadlines } from './trending-keywords';
 import { getCurrentLanguage } from './i18n';
+import { clearProviderCooldown, getProviderCooldownState, setProviderCooldown } from './provider-guard';
 import { onFeedFetchFailure, onFeedFetchSuccess, resolveFeedUrlForFetch } from './source-healer';
 
 // Per-feed circuit breaker: track failures and cooldowns
 const FEED_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes after failure
+const FEED_RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes after 429
+const FEED_BLOCKED_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours for hard-denied feeds
 const MAX_FAILURES = 2; // failures before cooldown
 const MAX_CACHE_ENTRIES = 100; // Prevent unbounded growth
 const FEED_SCOPE_SEPARATOR = '::';
@@ -37,6 +40,10 @@ function fromSerializable(items: Array<Omit<NewsItem, 'pubDate'> & { pubDate: st
 
 function getFeedScope(feedName: string, lang: string): string {
   return `${feedName}${FEED_SCOPE_SEPARATOR}${lang}`;
+}
+
+function getFeedCooldownKey(feedScope: string): string {
+  return `rss:${feedScope}`;
 }
 
 function parseFeedScope(feedScope: string): { feedName: string; lang: string } {
@@ -108,19 +115,33 @@ function isFeedOnCooldown(feedScope: string): boolean {
   return false;
 }
 
-function recordFeedFailure(feedScope: string): void {
+function classifyFeedFailure(reason: string): { cooldownMs: number; count: number; tone: 'blocked' | 'rate-limit' | 'transient' } {
+  if (/HTTP 40[136]|HTTP 451|Forbidden|Unauthorized/i.test(reason)) {
+    return { cooldownMs: FEED_BLOCKED_COOLDOWN_MS, count: MAX_FAILURES, tone: 'blocked' };
+  }
+  if (/HTTP 429|Too Many Requests|rate limit/i.test(reason)) {
+    return { cooldownMs: FEED_RATE_LIMIT_COOLDOWN_MS, count: MAX_FAILURES, tone: 'rate-limit' };
+  }
+  return { cooldownMs: FEED_COOLDOWN_MS, count: 1, tone: 'transient' };
+}
+
+function recordFeedFailure(feedScope: string, reason = ''): void {
   const state = feedFailures.get(feedScope) || { count: 0, cooldownUntil: 0 };
-  state.count++;
+  const failureClass = classifyFeedFailure(reason);
+  state.count += failureClass.count;
   if (state.count >= MAX_FAILURES) {
-    state.cooldownUntil = Date.now() + FEED_COOLDOWN_MS;
+    state.cooldownUntil = Date.now() + failureClass.cooldownMs;
     const { feedName, lang } = parseFeedScope(feedScope);
-    console.warn(`[RSS] ${feedName} (${lang}) on cooldown for 5 minutes after ${state.count} failures`);
+    const cooldownMinutes = Math.round(failureClass.cooldownMs / 60_000);
+    console.warn(`[RSS] ${feedName} (${lang}) on cooldown for ${cooldownMinutes} minutes after ${failureClass.tone} failure`);
   }
   feedFailures.set(feedScope, state);
+  setProviderCooldown(getFeedCooldownKey(feedScope), failureClass.cooldownMs, reason || failureClass.tone);
 }
 
 function recordFeedSuccess(feedScope: string): void {
   feedFailures.delete(feedScope);
+  clearProviderCooldown(getFeedCooldownKey(feedScope));
 }
 
 export function getFeedFailures(): Map<string, { count: number; cooldownUntil: number }> {
@@ -240,6 +261,10 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
   if (feedCache.size > MAX_CACHE_ENTRIES / 2) cleanupCaches();
   const currentLang = getCurrentLanguage();
   const feedScope = getFeedScope(feed.name, currentLang);
+  const persistentCooldown = getProviderCooldownState(getFeedCooldownKey(feedScope));
+  if (persistentCooldown && !feedFailures.has(feedScope)) {
+    feedFailures.set(feedScope, { count: MAX_FAILURES, cooldownUntil: persistentCooldown.until });
+  }
 
   if (isFeedOnCooldown(feedScope)) {
     const cached = feedCache.get(feedScope);
@@ -272,7 +297,7 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
     const parseError = doc.querySelector('parsererror');
     if (parseError) {
       console.warn(`Parse error for ${feed.name}`);
-      recordFeedFailure(feedScope);
+      recordFeedFailure(feedScope, 'XML parse error');
       void onFeedFetchFailure(feed.name, currentLang, selectedUrl || url, 'XML parse error').catch(() => { });
       const persistent = await loadPersistentFeed(feedScope);
       return cached?.items || persistent || [];
@@ -345,17 +370,21 @@ export async function fetchFeed(feed: Feed): Promise<NewsItem[]> {
 
     return parsed;
   } catch (e) {
-    recordFeedFailure(feedScope);
     const reason = e instanceof Error ? e.message : 'fetch failed';
+    recordFeedFailure(feedScope, reason);
     const fallbackUrl = typeof feed.url === 'string' ? feed.url : (feed.url[currentLang] || feed.url.en || '');
     void onFeedFetchFailure(feed.name, currentLang, selectedUrl || fallbackUrl, reason).catch(() => { });
     const persistent = await loadPersistentFeed(feedScope);
     const fallbackItems = cached?.items || persistent || [];
     if (fallbackItems.length > 0) {
-      console.warn(`[RSS] Failed to fetch ${feed.name}; serving ${cached?.items?.length ? 'memory' : 'persistent'} fallback`, e);
+      console.warn(`[RSS] Failed to fetch ${feed.name}; serving ${cached?.items?.length ? 'memory' : 'persistent'} fallback (${reason})`);
       return fallbackItems;
     }
-    console.error(`Failed to fetch ${feed.name}:`, e);
+    if (/HTTP 40[136]|HTTP 429|Too Many Requests|Forbidden|Unauthorized/i.test(reason)) {
+      console.warn(`[RSS] ${feed.name} unavailable (${reason}); no cached fallback available`);
+    } else {
+      console.error(`Failed to fetch ${feed.name}:`, e);
+    }
     return [];
   }
 }

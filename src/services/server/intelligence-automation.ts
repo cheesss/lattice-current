@@ -71,6 +71,11 @@ import {
   scoreCoverageGain,
 } from '../coverage-ledger';
 
+// ── Re-exports from sub-modules (canonical extraction targets) ──
+// Consumers can now import retry helpers from ./retry-utilities
+// and dataset-registry types/functions from ./dataset-registry directly.
+// The orchestration cycle is re-exported from ./automation-orchestrator.
+
 type HistoricalProvider = 'fred' | 'alfred' | 'gdelt-doc' | 'coingecko' | 'acled' | 'yahoo-chart' | 'rss-feed';
 type AutomationJobKind = 'fetch' | 'import' | 'replay' | 'walk-forward' | 'theme-discovery' | 'theme-proposer' | 'candidate-expansion' | 'source-automation' | 'keyword-lifecycle' | 'dataset-discovery' | 'self-tuning' | 'retention';
 type ThemeAutomationMode = 'manual' | 'guarded-auto' | 'full-auto';
@@ -113,6 +118,7 @@ export interface ThemeAutomationPolicy {
   minPromotionScore: number;
   maxOverlapWithKnownThemes: number;
   maxPromotionsPerDay: number;
+  maxCodexCallsPerCycle: number;
 }
 
 export interface CandidateAutomationPolicy {
@@ -276,6 +282,30 @@ function median(values: number[]): number {
   return ranked.length % 2 === 0
     ? (ranked[middle - 1]! + ranked[middle]!) / 2
     : ranked[middle]!;
+}
+
+interface CodexCallBudget {
+  maxCalls: number;
+  usedCalls: number;
+  skippedCalls: number;
+}
+
+function createCodexCallBudget(maxCalls: number): CodexCallBudget {
+  return {
+    maxCalls: Math.max(0, Math.floor(maxCalls)),
+    usedCalls: 0,
+    skippedCalls: 0,
+  };
+}
+
+function reserveCodexCall(budget: CodexCallBudget, label: string): boolean {
+  if (budget.usedCalls >= budget.maxCalls) {
+    budget.skippedCalls += 1;
+    process.stderr.write(`[automation:codex-budget] skipped ${label}; budget ${budget.usedCalls}/${budget.maxCalls}\n`);
+    return false;
+  }
+  budget.usedCalls += 1;
+  return true;
 }
 
 function slugify(value: string): string {
@@ -521,6 +551,7 @@ function createDefaultRegistry(): IntelligenceAutomationRegistry {
       minPromotionScore: 55,
       maxOverlapWithKnownThemes: 0.62,
       maxPromotionsPerDay: 1,
+      maxCodexCallsPerCycle: 5,
     },
     sourceAutomation: normalizeSourceAutomationPolicy(),
     candidateAutomation: {
@@ -711,6 +742,7 @@ function normalizeRegistry(raw?: Partial<IntelligenceAutomationRegistry> | null)
         : fallback.themeAutomation.mode,
       minPromotionScore: Math.max(40, Math.min(98, Number(raw?.themeAutomation?.minPromotionScore) || fallback.themeAutomation.minPromotionScore)),
       maxOverlapWithKnownThemes: Math.max(0.2, Math.min(0.95, Number(raw?.themeAutomation?.maxOverlapWithKnownThemes) || fallback.themeAutomation.maxOverlapWithKnownThemes)),
+      maxCodexCallsPerCycle: Math.max(0, Math.min(25, Number(raw?.themeAutomation?.maxCodexCallsPerCycle) || fallback.themeAutomation.maxCodexCallsPerCycle)),
     },
     sourceAutomation: normalizeSourceAutomationPolicy(raw?.sourceAutomation),
     candidateAutomation: {
@@ -2049,6 +2081,7 @@ async function runDatasetDiscoverySweep(args: {
   registry: IntelligenceAutomationRegistry;
   state: IntelligenceAutomationState;
   registryPath?: string;
+  codexBudget?: CodexCallBudget;
 }): Promise<{ proposals: DatasetProposal[]; registered: DatasetProposal[] }> {
   if (!args.registry.datasetAutomation.enabled) {
     return { proposals: [], registered: [] };
@@ -2085,6 +2118,9 @@ async function runDatasetDiscoverySweep(args: {
   }
 
   for (const themeInput of themeInputs.slice(0, args.registry.datasetAutomation.codexTopThemesPerCycle)) {
+    if (args.codexBudget && !reserveCodexCall(args.codexBudget, `dataset:${themeInput.themeId}`)) {
+      continue;
+    }
     const codexProposals = await proposeDatasetsWithCodex(
       themeInput,
       buildDatasetProposalEvidence({
@@ -2184,6 +2220,7 @@ async function runDatasetDiscoverySweep(args: {
 async function runCandidateExpansionSweep(args: {
   registry: IntelligenceAutomationRegistry;
   state: IntelligenceAutomationState;
+  codexBudget?: CodexCallBudget;
 }): Promise<{ themeIds: string[]; acceptedAny: boolean }> {
   if (!args.registry.candidateAutomation.enabled) {
     return { themeIds: [], acceptedAny: false };
@@ -2233,6 +2270,9 @@ async function runCandidateExpansionSweep(args: {
   for (const themeId of candidateThemes) {
     const theme = getInvestmentThemeDefinition(themeId);
     if (!theme) continue;
+    if (args.codexBudget && !reserveCodexCall(args.codexBudget, `candidate:${themeId}`)) {
+      continue;
+    }
     const proposals = await runWithRetry(themeId, 'candidate-expansion', Math.max(1, args.registry.defaults.maxRetries - 1), async () => (
       proposeCandidatesWithCodex({
         theme,
@@ -2302,6 +2342,7 @@ export async function runIntelligenceAutomationCycle(args: {
   const promotedThemes: string[] = [];
   const candidateThemes: string[] = [];
   const registeredDatasets: string[] = [];
+  const codexBudget = createCodexCallBudget(registry.themeAutomation.maxCodexCallsPerCycle);
   const enabledDatasets = registry.datasets.filter((dataset) => dataset.enabled);
   const datasetSummaryMap = new Map(
     (await listHistoricalDatasets(registry.defaults.dbPath).catch(() => []))
@@ -2793,6 +2834,9 @@ export async function runIntelligenceAutomationCycle(args: {
               techTrends = evidence.techTrends;
             }
           } catch { /* non-fatal */ }
+          if (!reserveCodexCall(codexBudget, `theme:${queueItem.topicKey}`)) {
+            return null;
+          }
           return proposeThemeWithCodex(
             queueItem,
             knownThemes,
@@ -2895,7 +2939,7 @@ export async function runIntelligenceAutomationCycle(args: {
     completedDatasets,
     touchedDatasets: Array.from(touchedDatasets),
   });
-  const candidateExpansion = await runCandidateExpansionSweep({ registry, state });
+  const candidateExpansion = await runCandidateExpansionSweep({ registry, state, codexBudget });
   candidateThemes.push(...candidateExpansion.themeIds);
   await flushAutomationState(state, statePath, registry.defaults.retentionDays);
 
@@ -2942,6 +2986,7 @@ export async function runIntelligenceAutomationCycle(args: {
     registry,
     state,
     registryPath: args.registryPath,
+    codexBudget,
   });
   registeredDatasets.push(...datasetDiscovery.registered.map((item) => item.id));
   await flushAutomationState(state, statePath, registry.defaults.retentionDays);

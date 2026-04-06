@@ -8,6 +8,7 @@ import type { HappyContentCategory } from './positive-classifier';
 import { PositiveEventsServiceClient } from '@/generated/client/worldmonitor/positive_events/v1/service_client';
 import { inferGeoHubsFromTitle } from './geo-hub-index';
 import { createCircuitBreaker } from '@/utils';
+import { getHydratedData } from '@/services/bootstrap';
 
 export interface PositiveGeoEvent {
   lat: number;
@@ -33,6 +34,20 @@ const breaker = createCircuitBreaker<PositiveGeoEvent[]>({
  * Returns instantly from IndexedDB cache on subsequent loads.
  */
 export async function fetchPositiveGeoEvents(): Promise<PositiveGeoEvent[]> {
+  const hydrated = getHydratedData('positiveGeoEvents') as
+    | { events?: Array<{ latitude: number; longitude: number; name: string; category?: string; count: number; timestamp: number }> }
+    | undefined;
+  if (hydrated?.events?.length) {
+    return hydrated.events.map((event) => ({
+      lat: event.latitude,
+      lon: event.longitude,
+      name: event.name,
+      category: (event.category || 'humanity-kindness') as HappyContentCategory,
+      count: event.count,
+      timestamp: event.timestamp,
+    }));
+  }
+
   return breaker.execute(async () => {
     const response = await client.listPositiveGeoEvents({});
     return response.events.map(event => ({

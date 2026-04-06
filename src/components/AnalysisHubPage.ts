@@ -57,6 +57,16 @@ function alertPriorityClass(priority: UnifiedAlert['priority']): string {
   return `analysis-priority-${priority}`;
 }
 
+function syncAnalysisHubVisibility(visible: boolean): void {
+  const activeSelector = '.analysis-hub-overlay.active, .codex-hub-overlay.active, .ontology-graph-overlay.active';
+  window.dispatchEvent(new CustomEvent('wm:hub-visibility', {
+    detail: { hub: 'analysis', visible },
+  }));
+  queueMicrotask(() => {
+    document.body.classList.toggle('hub-active', Boolean(document.querySelector(activeSelector)));
+  });
+}
+
 export class AnalysisHubPage {
   private readonly getSnapshot: AnalysisHubOptions['getSnapshot'];
   private readonly onFocusMap?: AnalysisHubOptions['onFocusMap'];
@@ -142,6 +152,7 @@ export class AnalysisHubPage {
 
   public show(): void {
     this.overlay.classList.add('active');
+    syncAnalysisHubVisibility(true);
     this.render();
     if (!this.refreshTimer) {
       this.refreshTimer = setInterval(() => {
@@ -152,6 +163,7 @@ export class AnalysisHubPage {
 
   public hide(): void {
     this.overlay.classList.remove('active');
+    syncAnalysisHubVisibility(false);
   }
 
   public toggle(): void {

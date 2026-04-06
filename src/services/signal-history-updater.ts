@@ -17,6 +17,11 @@ import pg from 'pg';
 
 let pool: pg.Pool | null = null;
 let poolCacheKey = '';
+let consecutiveFailures = 0;
+let disabledUntil = 0;
+let lastPoolError = '';
+const CIRCUIT_BREAKER_FAILS = Math.max(1, Number(process.env.SIGNAL_HISTORY_POOL_CIRCUIT_FAILS || 3));
+const CIRCUIT_BREAKER_OPEN_MS = Math.max(60_000, Number(process.env.SIGNAL_HISTORY_POOL_CIRCUIT_OPEN_MS || (5 * 60 * 1000)));
 
 function resolveNasPgConfig(): pg.PoolConfig {
   const env = (keys: string[], fallback: string): string => {
@@ -46,7 +51,28 @@ function resolveNasPgConfig(): pg.PoolConfig {
   };
 }
 
-function getPool(): pg.Pool {
+function recordPoolFailure(error: unknown): void {
+  consecutiveFailures += 1;
+  lastPoolError = String((error as Error)?.message || error || 'pool failure');
+  if (consecutiveFailures >= CIRCUIT_BREAKER_FAILS) {
+    disabledUntil = Date.now() + CIRCUIT_BREAKER_OPEN_MS;
+    console.warn(`[signal-history-updater] pool circuit open for ${Math.round(CIRCUIT_BREAKER_OPEN_MS / 1000)}s: ${lastPoolError}`);
+    if (pool) {
+      void pool.end().catch(() => { /* ignore */ });
+      pool = null;
+      poolCacheKey = '';
+    }
+  }
+}
+
+function recordPoolSuccess(): void {
+  consecutiveFailures = 0;
+  disabledUntil = 0;
+  lastPoolError = '';
+}
+
+function getPool(): pg.Pool | null {
+  if (Date.now() < disabledUntil) return null;
   const config = resolveNasPgConfig();
   const key = JSON.stringify({
     host: config.host,
@@ -62,7 +88,7 @@ function getPool(): pg.Pool {
   }
 
   pool = new pg.Pool(config);
-  pool.on('error', (err) => console.error('[pool] idle client error:', err.message));
+  pool.on('error', (err) => recordPoolFailure(err));
   poolCacheKey = key;
   return pool;
 }
@@ -75,17 +101,36 @@ export async function closeSignalHistoryUpdaterPool(): Promise<void> {
   await ref.end().catch(() => { /* ignore */ });
 }
 
+export function getSignalHistoryUpdaterCircuitState(): { consecutiveFailures: number; disabledUntil: number; lastError: string } {
+  return {
+    consecutiveFailures,
+    disabledUntil,
+    lastError: lastPoolError,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Symbol-to-signal mapping
 // ---------------------------------------------------------------------------
 
 const SYMBOL_TO_SIGNAL: Record<string, string> = {
+  // Market volatility
   '^VIX': 'vix',
   'VIXCLS': 'vix',
+  // Rates & spreads
   'T10Y2Y': 'yieldSpread',
+  'DGS10': 'treasury10y',
+  'FEDFUNDS': 'fedFundsRate',
+  'TEDRATE': 'tedSpread',
+  // Credit stress
   'BAMLH0A0HYM2': 'hy_credit_spread',
+  'BAMLC0A0CM': 'ig_credit_spread',
+  // Macro
   'DTWEXBGS': 'dollarIndex',
   'DCOILWTICO': 'oilPrice',
+  'NAPM': 'pmiManufacturing',
+  'UNRATE': 'unemployment',
+  'CPIAUCSL': 'cpiIndex',
 };
 
 // ---------------------------------------------------------------------------
@@ -130,13 +175,16 @@ export async function pushSignalFromMarketData(
 
   try {
     const db = getPool();
+    if (!db) return;
     await db.query({
       text: `INSERT INTO signal_history (signal_name, ts, value)
              VALUES ($1, $2, $3)
              ON CONFLICT (signal_name, ts) DO NOTHING`,
       values: [signalName, ts, price],
     });
+    recordPoolSuccess();
   } catch (err: unknown) {
+    recordPoolFailure(err);
     console.error('[signal-history-updater] pushSignalFromMarketData failed:', err);
   }
 }
@@ -176,6 +224,7 @@ export async function pushGdeltStress(
 
   try {
     const db = getPool();
+    if (!db) return;
     // Use a single client for the batch to avoid pool churn
     const client = await db.connect();
     try {
@@ -187,10 +236,12 @@ export async function pushGdeltStress(
           values: [s.name, ts, s.value],
         });
       }
+      recordPoolSuccess();
     } finally {
       client.release();
     }
   } catch (err: unknown) {
+    recordPoolFailure(err);
     console.error('[signal-history-updater] pushGdeltStress failed:', err);
   }
 }
@@ -214,13 +265,16 @@ export async function pushSignal(
 
   try {
     const db = getPool();
+    if (!db) return;
     await db.query({
       text: `INSERT INTO signal_history (signal_name, ts, value)
              VALUES ($1, $2, $3)
              ON CONFLICT (signal_name, ts) DO NOTHING`,
       values: [name, ts, value],
     });
+    recordPoolSuccess();
   } catch (err: unknown) {
+    recordPoolFailure(err);
     console.error('[signal-history-updater] pushSignal failed:', err);
   }
 }
@@ -238,11 +292,13 @@ export async function getLatestSignals(): Promise<Record<string, { value: number
 
   try {
     const db = getPool();
+    if (!db) return result;
     const { rows } = await db.query<{ signal_name: string; ts: string; value: number }>({
       text: `SELECT DISTINCT ON (signal_name) signal_name, ts, value
              FROM signal_history
              ORDER BY signal_name, ts DESC`,
     });
+    recordPoolSuccess();
 
     for (const row of rows) {
       const name = String(row.signal_name);
@@ -252,6 +308,7 @@ export async function getLatestSignals(): Promise<Record<string, { value: number
       };
     }
   } catch (err: unknown) {
+    recordPoolFailure(err);
     console.error('[signal-history-updater] getLatestSignals failed:', err);
   }
 

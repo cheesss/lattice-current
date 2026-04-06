@@ -159,12 +159,12 @@ export async function summarizeArticle(
           .replace(/<\|begin_of_thought\|>[\s\S]*/gi, '')
           .trim();
 
-        if (['brief', 'analysis', 'deep'].includes(normalizedMode) && rawContent.length < 20) {
+        if (['brief', 'analysis'].includes(mode) && rawContent.length < 20) {
           console.warn(`[SummarizeArticle:${provider}] Output too short after stripping (${rawContent.length} chars), rejecting`);
           return null;
         }
 
-        if (['brief', 'analysis', 'deep'].includes(normalizedMode) && hasReasoningPreamble(rawContent)) {
+        if (['brief', 'analysis'].includes(mode) && hasReasoningPreamble(rawContent)) {
           console.warn(`[SummarizeArticle:${provider}] Reasoning preamble detected, rejecting`);
           return null;
         }

@@ -19,7 +19,10 @@ import {
   type InvestmentIntelligenceSnapshot,
   type WorkflowDropoffSummary,
 } from '@/services/investment-intelligence';
-import { type RemoteAutomationStatusPayload } from '@/services/intelligence-automation-remote';
+import {
+  loadLocalBacktestRunsRemote,
+  type RemoteAutomationStatusPayload,
+} from '@/services/intelligence-automation-remote';
 import { type ReplayAdaptationSnapshot } from '@/services/replay-adaptation';
 import type { IntelligencePostgresConfig } from '@/services/server/intelligence-postgres';
 import {
@@ -38,6 +41,7 @@ import { openBacktestHubWindow } from '@/services/backtest-hub-launcher';
 import { getDataFlowOpsSnapshot } from '@/services/data-flow-ops';
 import { APP_BRAND } from '@/config/brand';
 import { escapeHtml } from '@/utils/sanitize';
+import { canUseLocalAgentEndpoints } from '@/services/runtime';
 
 interface EventDecisionSummary {
   ideaRunId: string;
@@ -220,7 +224,7 @@ function runCostAdjustedAvgReturn(run: HistoricalReplayRun, horizon: number): nu
 
 function renderWindowSummary(windows: WalkForwardWindow[] | undefined): string {
   if (!windows || windows.length === 0) return 'single replay window';
-  return windows.map((window) => `${window.phase}:${window.frameCount}`).join(' | ');
+  return windows.map((window) => `F${window.fold} ${window.phase}:${window.frameCount}`).join(' | ');
 }
 
 function getIdeaRecords(run: HistoricalReplayRun, ideaRunId: string): ForwardReturnRecord[] {
@@ -396,6 +400,19 @@ function buildRunThemeOptions(runs: HistoricalReplayRun[]): Array<{ id: string; 
   return Array.from(seen.entries())
     .map(([id, label]) => ({ id, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function mergeReplayRunsById(localRuns: HistoricalReplayRun[], remoteRuns: HistoricalReplayRun[]): HistoricalReplayRun[] {
+  const merged = new Map<string, HistoricalReplayRun>();
+  for (const run of remoteRuns) merged.set(run.id, run);
+  for (const run of localRuns) {
+    if (!merged.has(run.id)) merged.set(run.id, run);
+  }
+  return Array.from(merged.values()).sort((left, right) => {
+    const leftTs = Date.parse(left.completedAt || left.startedAt || '');
+    const rightTs = Date.parse(right.completedAt || right.startedAt || '');
+    return (Number.isFinite(rightTs) ? rightTs : 0) - (Number.isFinite(leftTs) ? leftTs : 0);
+  });
 }
 
 function buildRunRegionOptions(runs: HistoricalReplayRun[]): string[] {
@@ -890,11 +907,13 @@ export class BacktestLabPanel extends Panel {
     try {
       this.setFetching(true);
       this.showLoading('Loading replay history...');
-      const [runs, dataFlowOps] = await Promise.all([
-        listHistoricalReplayRuns(12),
+      const preferRemoteRuns = canUseLocalAgentEndpoints();
+      const [dataFlowOps, localRuns, remoteRuns] = await Promise.all([
         getDataFlowOpsSnapshot({ forceRefresh: options.forceOpsRefresh }),
+        listHistoricalReplayRuns(12),
+        preferRemoteRuns ? loadLocalBacktestRunsRemote(12) : Promise.resolve([] as HistoricalReplayRun[]),
       ]);
-      this.runs = runs;
+      this.runs = mergeReplayRunsById(localRuns, remoteRuns);
       this.datasets = dataFlowOps.historicalDatasets;
       this.opsSnapshot = dataFlowOps.backtestOps;
       this.automationStatus = dataFlowOps.automation;
@@ -1565,6 +1584,7 @@ export class BacktestLabPanel extends Panel {
     ` : '<div class="backtest-mission-empty">No current investment snapshot loaded yet.</div>';
     const latestTrainingWindows = latestReplayRun?.windows?.map((window) => `
       <tr>
+        <td>${window.fold}</td>
         <td>${escapeHtml(window.phase.toUpperCase())}</td>
         <td>${escapeHtml(formatTimeRange(window.from, window.to))}</td>
         <td>${window.frameCount}</td>
@@ -1624,8 +1644,8 @@ export class BacktestLabPanel extends Panel {
             <div class="backtest-lab-note">Latest replay mode: ${latestReplayRun ? escapeHtml(latestReplayRun.mode.toUpperCase()) : 'n/a'} | retain learning: ${latestReplayRun?.retainLearningState ? 'yes' : 'no'}</div>
             <div class="backtest-lab-note">Primary run period: ${latestReplayRun ? escapeHtml(runPeriodLabel(latestReplayRun)) : 'n/a'}</div>
             <table class="investment-table backtest-lab-table">
-              <thead><tr><th>Window</th><th>Period</th><th>Frames</th></tr></thead>
-              <tbody>${latestTrainingWindows || '<tr><td colspan="3">No explicit walk-forward window is attached to the latest run.</td></tr>'}</tbody>
+              <thead><tr><th>Fold</th><th>Window</th><th>Period</th><th>Frames</th></tr></thead>
+              <tbody>${latestTrainingWindows || '<tr><td colspan="4">No explicit walk-forward window is attached to the latest run.</td></tr>'}</tbody>
             </table>
           </section>
         </div>
@@ -1722,6 +1742,7 @@ export class BacktestLabPanel extends Panel {
 
     const windowRows = (selectedRun.windows || []).map((window) => `
       <tr>
+        <td>${window.fold}</td>
         <td>${escapeHtml(window.phase.toUpperCase())}</td>
         <td>${escapeHtml(formatDateTime(window.from))}</td>
         <td>${escapeHtml(formatDateTime(window.to))}</td>
@@ -1809,8 +1830,8 @@ export class BacktestLabPanel extends Panel {
           <section class="investment-subcard">
             <h4>Walk-forward Windows</h4>
             <table class="investment-table backtest-lab-table">
-              <thead><tr><th>Phase</th><th>From</th><th>To</th><th>Frames</th></tr></thead>
-              <tbody>${windowRows || '<tr><td colspan="4">Single replay run</td></tr>'}</tbody>
+              <thead><tr><th>Fold</th><th>Phase</th><th>From</th><th>To</th><th>Frames</th></tr></thead>
+              <tbody>${windowRows || '<tr><td colspan="5">Single replay run</td></tr>'}</tbody>
             </table>
           </section>
           <section class="investment-subcard">

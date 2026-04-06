@@ -1,23 +1,23 @@
 ---
-title: Investment & Replay
-summary: Event-to-asset mapping, idea support, replay, and walk-forward evaluation.
+title: Signal Evaluation & Replay
+summary: Decision-support candidates, replay validation, and historical calibration.
 status: beta
 variants:
   - finance
   - tech
-updated: 2026-03-16
+updated: 2026-04-02
 owner: core
 ---
 
-# Investment & Replay
+# Signal Evaluation & Replay
 
 ## What it does
 
-Connects live events to assets, produces decision-support objects, and validates them with replay and backtesting.
+Connects live events to decision-support candidates and validates them with replay and historical calibration.
 
 ## Why it exists
 
-To turn narrative monitoring into testable, reviewable decision workflows.
+To keep live signal interpretation and historical validation in the same operator loop without making replay the product itself.
 
 ## Inputs
 
@@ -28,9 +28,11 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 
 ## Outputs
 
-- investment idea cards
-- sizing and false-positive guardrails
+- decision workflow objects
+- signal candidate cards
+- false-positive and confidence guardrails
 - replay and walk-forward run summaries
+- expanding-window walk-forward folds with 6-month validation and 6-month test segments
 - backtest lab visuals and decision comparisons
 - coverage-aware universe summary, review queue, and gap tracking
 - approved dynamic candidates that join the next refresh and subsequent backtests
@@ -53,12 +55,13 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - explainable attribution that splits corroboration, graph, beta, macro, and reality penalties
 - self-tuning experiment history and active weight profile summaries
 - cost-adjusted replay summaries in Backtest Lab, not only raw signed returns
+- default-on adaptive modules for ATR stops, Kalman noise tuning, execution-cost modeling, and theme sensitivity
 
 ## Key UI surfaces
 
 - Investment Workflow
 - Auto Investment Ideas
-- Backtest Lab
+- Replay Validation
 - Transmission Sankey / Network
 - Coverage-aware universe review queue
 
@@ -91,12 +94,13 @@ To turn narrative monitoring into testable, reviewable decision workflows.
 - graph-driven hidden candidate propagation beyond direct trigger keywords
 - macro risk overlay with kill-switch, hedge bias, and exposure caps
 - explainable attribution over corroboration, graph support, beta, macro pressure, and penalties
+- default-enabled adaptive ATR stop logic, Kalman auto-tuning, execution-cost curves, and theme sensitivity
 
 ## Limits
 
 The public site documents the system behavior but not private operational data or sensitive market configurations.
 
-The engine is now closer to constrained autonomy, but it is still not a blind live auto-trader. It remains:
+The engine remains:
 
 - a decision-support and paper-trade research surface first
 - a cost-aware replay engine second

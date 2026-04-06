@@ -30,11 +30,20 @@ loadOptionalEnvFile();
 const { Client } = pg;
 const PG_CONFIG = resolveNasPgConfig();
 
-const ONLY_STEP = process.argv.includes('--step') ? Number(process.argv[process.argv.indexOf('--step') + 1]) : null;
+const REQUESTED_STEPS = process.argv.reduce((steps, arg, index, argv) => {
+  if (arg === '--step' && argv[index + 1]) {
+    const step = Number(argv[index + 1]);
+    if (Number.isFinite(step)) steps.add(step);
+  }
+  return steps;
+}, new Set());
 const NO_CODEX = process.argv.includes('--no-codex');
 const AUTO_MODE = process.argv.includes('--auto');
 const AUTO_INTERVAL_MS = 5 * 60 * 1000; // 5분
 
+function shouldRunStep(step) {
+  return REQUESTED_STEPS.size === 0 || REQUESTED_STEPS.has(step);
+}
 function run(cmd, timeout = 120000) {
   console.log(`  $ ${cmd.slice(0, 80)}...`);
   try {
@@ -57,7 +66,7 @@ async function runPipeline() {
   console.log('═══════════════════════════════════════════════════\n');
 
   // ═══ STEP 0: 데이터 갭 메우기 ═══
-  if (ONLY_STEP === null || ONLY_STEP === 0) {
+  if (shouldRunStep(0)) {
     console.log('▶ STEP 0: 데이터 갭 메우기...');
 
     // 0-1. signal_history에 marketStress 적재 (GDELT goldstein → stress)
@@ -147,7 +156,7 @@ async function runPipeline() {
   }
 
   // ═══ STEP 1: 분석 테이블에 시계열 데이터 통합 ═══
-  if (ONLY_STEP === null || ONLY_STEP === 1) {
+  if (shouldRunStep(1)) {
     console.log('▶ STEP 1: 분석 테이블에 시계열 통합...');
 
     // conditional_sensitivity에 시계열 기반 조건 추가
@@ -217,7 +226,7 @@ async function runPipeline() {
   }
 
   // ═══ STEP 2: auto-pipeline (기사분류 → 종목매핑 → outcome → 분석갱신) ═══
-  if (ONLY_STEP === null || ONLY_STEP === 2) {
+  if (shouldRunStep(2)) {
     console.log('▶ STEP 2: auto-pipeline 실행...');
     run('node --import tsx scripts/auto-pipeline.mjs --limit 1000', 300000);
     results.steps.push({ step: 2, status: 'ok' });
@@ -225,7 +234,7 @@ async function runPipeline() {
   }
 
   // ═══ STEP 3: 분석 테이블 전체 갱신 (regime, hawkes, whatif) ═══
-  if (ONLY_STEP === null || ONLY_STEP === 3) {
+  if (shouldRunStep(3)) {
     console.log('▶ STEP 3: 분석 테이블 갱신...');
     run('node --import tsx scripts/event-engine-full-build.mjs', 300000);
     run('node --import tsx scripts/event-analysis-ml-upgrade.mjs build', 300000);
@@ -234,7 +243,7 @@ async function runPipeline() {
   }
 
   // ═══ STEP 4: Codex 에이전트 → 패턴 발견 + 제안 ═══
-  if ((ONLY_STEP === null || ONLY_STEP === 4) && !NO_CODEX) {
+  if (shouldRunStep(4) && !NO_CODEX) {
     console.log('▶ STEP 4: Codex 에이전트 실행...');
     // Codex에 시계열 + 분석 결과 함께 전달
     run('node --import tsx scripts/codex-from-analysis.mjs', 300000);
@@ -243,7 +252,7 @@ async function runPipeline() {
   }
 
   // ═══ STEP 5: Executor → 제안 실행 + 검증 ═══
-  if (ONLY_STEP === null || ONLY_STEP === 5) {
+  if (shouldRunStep(5)) {
     console.log('▶ STEP 5: Executor 실행...');
     run('node --import tsx scripts/proposal-executor.mjs', 300000);
     results.steps.push({ step: 5, status: 'ok' });
@@ -251,7 +260,7 @@ async function runPipeline() {
   }
 
   // ═══ STEP 6: 리포트 ═══
-  if (ONLY_STEP === null || ONLY_STEP === 6) {
+  if (shouldRunStep(6)) {
     console.log('▶ STEP 6: 최종 리포트...');
 
     const stats = {};

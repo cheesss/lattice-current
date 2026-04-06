@@ -228,6 +228,16 @@ function buildBundledLayout(nodes: KeywordGraphNode[], edges: KeywordGraphEdge[]
   };
 }
 
+function syncOntologyHubVisibility(visible: boolean): void {
+  const activeSelector = '.analysis-hub-overlay.active, .codex-hub-overlay.active, .ontology-graph-overlay.active';
+  window.dispatchEvent(new CustomEvent('wm:hub-visibility', {
+    detail: { hub: 'ontology', visible },
+  }));
+  queueMicrotask(() => {
+    document.body.classList.toggle('hub-active', Boolean(document.querySelector(activeSelector)));
+  });
+}
+
 export class OntologyGraphPage {
   private readonly getSnapshot: OntologyGraphOptions['getSnapshot'];
   private readonly overlay: HTMLElement;
@@ -285,6 +295,7 @@ export class OntologyGraphPage {
 
   public show(): void {
     this.overlay.classList.add('active');
+    syncOntologyHubVisibility(true);
     void this.render();
     if (!this.refreshTimer) {
       this.refreshTimer = setInterval(() => {
@@ -295,6 +306,7 @@ export class OntologyGraphPage {
 
   public hide(): void {
     this.overlay.classList.remove('active');
+    syncOntologyHubVisibility(false);
   }
 
   public toggle(): void {

@@ -1,6 +1,6 @@
 import type { ClusteredEvent, MarketData, NewsItem } from '@/types';
 import { getActiveWeightProfileSync } from '../experiment-registry';
-import { inferHMMRegimePosterior } from './hmm-regime';
+import { inferHMMRegimePosterior, type HMMOnlineState } from './hmm-regime';
 
 export type MarketRegimeId = 'risk-on' | 'risk-off' | 'inflation-shock' | 'deflation-bust';
 
@@ -11,6 +11,7 @@ export interface MarketRegimeState {
   scores: Record<MarketRegimeId, number>;
   posterior: Record<MarketRegimeId, number>;
   transitionMatrix: Record<MarketRegimeId, Record<MarketRegimeId, number>>;
+  hmmOnlineState?: HMMOnlineState;
   persistence: number;
   switchPenalty: number;
   posteriorEntropy: number;
@@ -174,6 +175,7 @@ export function inferMarketRegime(args: {
           id: args.previous.id,
           confidence: args.previous.confidence,
           posterior: args.previous.posterior,
+          onlineState: args.previous.hmmOnlineState,
         }
       : null,
   });
@@ -221,6 +223,7 @@ export function inferMarketRegime(args: {
         ),
       ]),
     ) as Record<MarketRegimeId, Record<MarketRegimeId, number>>,
+    hmmOnlineState: hmm.onlineState,
     persistence: Number(hmm.persistence.toFixed(4)),
     switchPenalty: Number(hmm.switchPenalty.toFixed(4)),
     posteriorEntropy: Number(hmm.entropy.toFixed(4)),

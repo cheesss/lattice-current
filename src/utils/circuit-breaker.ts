@@ -26,6 +26,9 @@ export interface CircuitBreakerOptions {
    *  Opt-in only — cached payloads must be JSON-safe (no Date objects).
    *  Auto-disabled when cacheTtlMs === 0. */
   persistCache?: boolean;
+  /** Cache tier for this breaker's data source (Phase 4.3).
+   *  Used for TTL extension during cooldown. */
+  cacheTier?: import('../config/cache-tiers').CacheTier;
 }
 
 const DEFAULT_MAX_FAILURES = 2;
@@ -36,9 +39,12 @@ const PERSISTENT_STALE_CEILING_MS = 24 * 60 * 60 * 1000; // 24h — discard pers
 
 function isDesktopOfflineMode(): boolean {
   if (typeof window === 'undefined') return false;
-  const hasTauri = Boolean((window as unknown as { __TAURI__?: unknown }).__TAURI__);
+  const hasTauri = Boolean((window as { __TAURI__?: unknown }).__TAURI__);
   return hasTauri && typeof navigator !== 'undefined' && navigator.onLine === false;
 }
+
+/** Multiplier applied to cache TTL when breaker enters cooldown (Phase 4.3) */
+const COOLDOWN_TTL_EXTENSION_MULTIPLIER = 3;
 
 export class CircuitBreaker<T> {
   private state: CircuitState = { failures: 0, cooldownUntil: 0 };
@@ -47,17 +53,21 @@ export class CircuitBreaker<T> {
   private maxFailures: number;
   private cooldownMs: number;
   private cacheTtlMs: number;
+  private originalCacheTtlMs: number;
   private persistEnabled: boolean;
   private persistentLoaded = false;
   private persistentLoadPromise: Promise<void> | null = null;
   private lastDataState: BreakerDataState = { mode: 'unavailable', timestamp: null, offline: false };
   private backgroundRefreshPromise: Promise<void> | null = null;
+  /** Optional recovery callback — called when breaker exits cooldown (Phase 4.3) */
+  private recoveryCallbacks: Array<() => void> = [];
 
   constructor(options: CircuitBreakerOptions) {
     this.name = options.name;
     this.maxFailures = options.maxFailures ?? DEFAULT_MAX_FAILURES;
     this.cooldownMs = options.cooldownMs ?? DEFAULT_COOLDOWN_MS;
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
+    this.originalCacheTtlMs = this.cacheTtlMs;
     this.persistEnabled = this.cacheTtlMs === 0
       ? false
       : (options.persistCache ?? false);
@@ -158,13 +168,40 @@ export class CircuitBreaker<T> {
   }
 
   recordSuccess(data: T): void {
+    const wasOnCooldown = this.isOnCooldown();
     this.state = { failures: 0, cooldownUntil: 0 };
     this.cache = { data, timestamp: Date.now() };
     this.lastDataState = { mode: 'live', timestamp: Date.now(), offline: false };
 
+    // Phase 4.3: Restore original cache TTL after recovery
+    if (wasOnCooldown) {
+      this.cacheTtlMs = this.originalCacheTtlMs;
+    }
+
     if (this.persistEnabled) {
       this.writePersistentCache(data);
     }
+    // Trigger health check if recovering from cooldown
+    if (wasOnCooldown) {
+      checkHealthTransition();
+      // Phase 4.3: Fire recovery callbacks (fresh data replaces stale cache)
+      for (const cb of this.recoveryCallbacks) {
+        try { cb(); } catch { /* don't let callback errors cascade */ }
+      }
+    }
+  }
+
+  /**
+   * Register a callback to be called when the breaker recovers from cooldown (Phase 4.3).
+   * Useful for triggering immediate fresh data fetch after recovery.
+   * Returns an unsubscribe function.
+   */
+  onRecovery(callback: () => void): () => void {
+    this.recoveryCallbacks.push(callback);
+    return () => {
+      const idx = this.recoveryCallbacks.indexOf(callback);
+      if (idx >= 0) this.recoveryCallbacks.splice(idx, 1);
+    };
   }
 
   clearCache(): void {
@@ -181,7 +218,11 @@ export class CircuitBreaker<T> {
     this.state.lastError = error;
     if (this.state.failures >= this.maxFailures) {
       this.state.cooldownUntil = Date.now() + this.cooldownMs;
-      console.warn(`[${this.name}] On cooldown for ${this.cooldownMs / 1000}s after ${this.state.failures} failures`);
+      // Phase 4.3: Extend cache TTL during cooldown so stale data stays available
+      this.cacheTtlMs = this.originalCacheTtlMs * COOLDOWN_TTL_EXTENSION_MULTIPLIER;
+      console.warn(`[${this.name}] On cooldown for ${this.cooldownMs / 1000}s after ${this.state.failures} failures (cache TTL extended to ${this.cacheTtlMs / 1000}s)`);
+      // Trigger global health check on cooldown entry
+      checkHealthTransition();
     }
   }
 
@@ -288,4 +329,130 @@ export function removeCircuitBreaker(name: string): void {
 
 export function clearAllCircuitBreakers(): void {
   breakers.clear();
+}
+
+// ── Health Dashboard & Cascade Detection ────────────────────────────
+
+export type SystemHealthLevel = 'healthy' | 'degraded' | 'critical';
+
+export interface CircuitBreakerHealthReport {
+  /** Overall system health based on breaker states */
+  level: SystemHealthLevel;
+  /** Total registered breakers */
+  total: number;
+  /** Breakers currently on cooldown */
+  onCooldown: number;
+  /** Breakers serving stale/cached data */
+  servingStale: number;
+  /** Breakers in healthy state */
+  healthy: number;
+  /** Names of breakers currently on cooldown */
+  cooldownBreakers: string[];
+  /** Cascade detected: 3+ breakers simultaneously on cooldown */
+  cascadeDetected: boolean;
+  /** Timestamp of this report */
+  timestamp: number;
+}
+
+/**
+ * Generates a health report across all registered circuit breakers.
+ *
+ * Health levels:
+ * - healthy:  All breakers operational
+ * - degraded: 1-2 breakers on cooldown (some data sources unavailable)
+ * - critical: 3+ breakers on cooldown (cascade failure likely)
+ */
+export function getCircuitBreakerHealthReport(): CircuitBreakerHealthReport {
+  const cooldownBreakers: string[] = [];
+  let servingStale = 0;
+  let healthy = 0;
+
+  breakers.forEach((breaker, name) => {
+    if (breaker.isOnCooldown()) {
+      cooldownBreakers.push(name);
+    } else {
+      const dataState = breaker.getDataState();
+      if (dataState.mode === 'cached' || dataState.mode === 'unavailable') {
+        servingStale += 1;
+      } else {
+        healthy += 1;
+      }
+    }
+  });
+
+  const total = breakers.size;
+  const onCooldown = cooldownBreakers.length;
+  const CASCADE_THRESHOLD = 3;
+  const cascadeDetected = onCooldown >= CASCADE_THRESHOLD;
+
+  let level: SystemHealthLevel = 'healthy';
+  if (onCooldown >= CASCADE_THRESHOLD) {
+    level = 'critical';
+  } else if (onCooldown > 0 || servingStale > total * 0.3) {
+    level = 'degraded';
+  }
+
+  return {
+    level,
+    total,
+    onCooldown,
+    servingStale,
+    healthy,
+    cooldownBreakers,
+    cascadeDetected,
+    timestamp: Date.now(),
+  };
+}
+
+/** Listener type for health change events */
+type HealthChangeListener = (report: CircuitBreakerHealthReport) => void;
+const healthListeners: HealthChangeListener[] = [];
+let lastHealthLevel: SystemHealthLevel = 'healthy';
+
+/**
+ * Register a listener for health level changes.
+ * Fires when the system transitions between healthy/degraded/critical.
+ */
+export function onHealthChange(listener: HealthChangeListener): () => void {
+  healthListeners.push(listener);
+  return () => {
+    const idx = healthListeners.indexOf(listener);
+    if (idx >= 0) healthListeners.splice(idx, 1);
+  };
+}
+
+/** Whether the system is currently in degraded mode (Phase 4.3) */
+let degradedModeActive = false;
+
+/** Get whether degraded mode is currently active */
+export function isDegradedMode(): boolean {
+  return degradedModeActive;
+}
+
+/**
+ * Check health and fire listeners if level changed.
+ * Should be called after each breaker state change (failure/recovery).
+ * Lightweight — only computes report when called.
+ *
+ * Phase 4.3: Automatically activates/deactivates degraded mode
+ * when cascade detection changes.
+ */
+export function checkHealthTransition(): void {
+  const report = getCircuitBreakerHealthReport();
+
+  // Phase 4.3: Toggle degraded mode on cascade detection
+  if (report.cascadeDetected && !degradedModeActive) {
+    degradedModeActive = true;
+    console.warn(`[circuit-breaker] Degraded mode ACTIVATED — ${report.onCooldown} breakers on cooldown: ${report.cooldownBreakers.join(', ')}`);
+  } else if (!report.cascadeDetected && degradedModeActive) {
+    degradedModeActive = false;
+    console.warn('[circuit-breaker] Degraded mode DEACTIVATED — system recovering');
+  }
+
+  if (report.level !== lastHealthLevel) {
+    lastHealthLevel = report.level;
+    for (const listener of healthListeners) {
+      try { listener(report); } catch { /* don't let listener errors cascade */ }
+    }
+  }
 }

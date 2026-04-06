@@ -26,6 +26,7 @@ owner: core
 - ドメインサービスと分析モジュール
 - デスクトップ sidecar とローカル API
 - ヒストリカル・リプレイとアーカイブサービス
+- storage envelope, schema registry, and hot / warm / cold retention pipeline
 - unattended dataset registry と scheduler worker
 - theme discovery queue と guarded Codex proposer
 - 生成されたサービス契約と OpenAPI surface
@@ -35,6 +36,7 @@ owner: core
 - [アーキテクチャ詳細](https://github.com/cheesss/lattice-current/blob/main/docs/ARCHITECTURE.md)
 - [デスクトップ runtime](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)
 - [過去データソース](https://github.com/cheesss/lattice-current/blob/main/docs/historical-data-sources.md)
+- [Phase 7 implementation notes](https://github.com/cheesss/lattice-current/blob/main/docs/PHASE7_IMPLEMENTATION_NOTES.md)
 - [インテリジェンスサーバースキーマ](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
 - [サービス公開準備計画](https://github.com/cheesss/lattice-current/blob/main/docs/service-server-plan.md)
 

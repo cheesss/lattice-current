@@ -17,6 +17,16 @@ interface CodexHubOptions {
   };
 }
 
+function syncCodexHubVisibility(visible: boolean): void {
+  const activeSelector = '.analysis-hub-overlay.active, .codex-hub-overlay.active, .ontology-graph-overlay.active';
+  window.dispatchEvent(new CustomEvent('wm:hub-visibility', {
+    detail: { hub: 'codex', visible },
+  }));
+  queueMicrotask(() => {
+    document.body.classList.toggle('hub-active', Boolean(document.querySelector(activeSelector)));
+  });
+}
+
 export class CodexHubPage {
   private readonly getDataQAPanel: CodexHubOptions['getDataQAPanel'];
   private readonly getSourceOpsPanel: CodexHubOptions['getSourceOpsPanel'];
@@ -113,6 +123,7 @@ export class CodexHubPage {
   public show(): void {
     if (!this.overlay.classList.contains('active')) {
       this.overlay.classList.add('active');
+      syncCodexHubVisibility(true);
     }
     void this.refresh();
     if (!this.refreshTimer) {
@@ -126,6 +137,7 @@ export class CodexHubPage {
 
   public hide(): void {
     this.overlay.classList.remove('active');
+    syncCodexHubVisibility(false);
   }
 
   public toggle(): void {

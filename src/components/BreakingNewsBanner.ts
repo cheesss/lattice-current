@@ -4,9 +4,10 @@ import { getSourcePanelId } from '@/config/feeds';
 import { t } from '@/services/i18n';
 
 const MAX_ALERTS = 3;
-const CRITICAL_DISMISS_MS = 60_000;
-const HIGH_DISMISS_MS = 30_000;
+const CRITICAL_DISMISS_MS = 0; // Critical: manual dismiss only (Phase 3.2)
+const HIGH_DISMISS_MS = 120_000; // High: shrink to badge after 120s
 const SOUND_COOLDOWN_MS = 5 * 60 * 1000;
+const MAX_HISTORY = 50;
 
 interface ActiveAlert {
   alert: BreakingAlert;
@@ -14,6 +15,15 @@ interface ActiveAlert {
   timer: ReturnType<typeof setTimeout> | null;
   remainingMs: number;
   timerStartedAt: number;
+  shrunk?: boolean; // Phase 3.2: high alerts shrink instead of disappearing
+}
+
+/** Stored alert for history timeline */
+export interface AlertHistoryEntry {
+  alert: BreakingAlert;
+  receivedAt: number;
+  dismissedAt?: number;
+  wasRead: boolean;
 }
 
 export class BreakingNewsBanner {
@@ -29,12 +39,21 @@ export class BreakingNewsBanner {
   private boundOnResize: () => void;
   private dismissed = new Map<string, number>();
 
+  // Phase 3.2: Alert history and missed count
+  private alertHistory: AlertHistoryEntry[] = [];
+  private missedCount = 0;
+  private missedBadgeEl: HTMLElement | null = null;
+  private historyPanelEl: HTMLElement | null = null;
+  private historyVisible = false;
+
   constructor() {
     this.container = document.createElement('div');
     this.container.className = 'breaking-news-container';
     document.body.appendChild(this.container);
 
     this.initAudio();
+    this.createMissedBadge();
+    this.createHistoryPanel();
     this.updatePosition();
     this.setupObservers();
 
@@ -133,6 +152,9 @@ export class BreakingNewsBanner {
     const existing = this.activeAlerts.find(a => a.alert.id === alert.id);
     if (existing) return;
 
+    // Phase 3.2: Track in history
+    this.addToHistory(alert);
+
     if (alert.threatLevel === 'critical') {
       const highAlerts = this.activeAlerts.filter(a => a.alert.threatLevel === 'high');
       for (const h of highAlerts) {
@@ -160,13 +182,21 @@ export class BreakingNewsBanner {
       timerStartedAt: now,
     };
 
-    if (!document.hidden) {
-      active.timer = setTimeout(() => this.dismissAlert(alert.id), dismissMs);
+    // Phase 3.2: Critical alerts have no auto-dismiss (dismissMs = 0 → manual only)
+    // High alerts shrink to badge after HIGH_DISMISS_MS
+    if (dismissMs > 0 && !document.hidden) {
+      active.timer = setTimeout(() => this.shrinkAlert(alert.id), dismissMs);
     }
 
     this.activeAlerts.push(active);
     this.playSound();
     this.updateOffset();
+
+    // If tab is hidden, increment missed counter
+    if (document.hidden) {
+      this.missedCount++;
+      this.updateMissedBadge();
+    }
   }
 
   private resolveTargetPanel(alert: BreakingAlert): string {
@@ -238,8 +268,44 @@ export class BreakingNewsBanner {
     return t('components.intelligenceFindings.time.hoursAgo', { count: String(Math.floor(ms / 3_600_000)) });
   }
 
+  /**
+   * Phase 3.2: Shrink a high alert to a small badge instead of removing it.
+   * This reduces the "disappeared and I missed it" feeling.
+   */
+  private shrinkAlert(id: string): void {
+    const idx = this.activeAlerts.findIndex(a => a.alert.id === id);
+    if (idx === -1) return;
+    const active = this.activeAlerts[idx]!;
+    if (active.shrunk) return;
+    active.shrunk = true;
+    if (active.timer) {
+      clearTimeout(active.timer);
+      active.timer = null;
+    }
+    active.element.classList.add('breaking-alert-shrunk');
+    // Replace full content with compact badge
+    const badge = document.createElement('div');
+    badge.className = 'breaking-alert-shrunk-content';
+    const icon = active.alert.threatLevel === 'critical' ? '🚨' : '⚠️';
+    badge.innerHTML = `<span class="shrunk-icon">${icon}</span><span class="shrunk-headline">${this.escapeText(active.alert.headline.slice(0, 60))}${active.alert.headline.length > 60 ? '...' : ''}</span>`;
+    // Keep dismiss button
+    const dismissBtn = active.element.querySelector('.breaking-alert-dismiss');
+    active.element.innerHTML = '';
+    active.element.appendChild(badge);
+    if (dismissBtn) active.element.appendChild(dismissBtn);
+    this.updateOffset();
+  }
+
+  private escapeText(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   private dismissAlert(id: string): void {
     this.dismissed.set(id, Date.now());
+    // Mark in history as dismissed
+    const histEntry = this.alertHistory.find(h => h.alert.id === id);
+    if (histEntry) histEntry.dismissedAt = Date.now();
+
     const idx = this.activeAlerts.findIndex(a => a.alert.id === id);
     if (idx === -1) return;
     const active = this.activeAlerts[idx]!;
@@ -251,6 +317,114 @@ export class BreakingNewsBanner {
   private removeAlert(active: ActiveAlert): void {
     if (active.timer) clearTimeout(active.timer);
     active.element.remove();
+  }
+
+  // ── Phase 3.2: Alert history ───────────────────────────────────────────────
+
+  private addToHistory(alert: BreakingAlert): void {
+    this.alertHistory.unshift({
+      alert,
+      receivedAt: Date.now(),
+      wasRead: !document.hidden,
+    });
+    // Cap history size
+    if (this.alertHistory.length > MAX_HISTORY) {
+      this.alertHistory.length = MAX_HISTORY;
+    }
+    this.renderHistoryPanel();
+  }
+
+  /** Get the alert history (newest first) */
+  public getAlertHistory(): readonly AlertHistoryEntry[] {
+    return this.alertHistory;
+  }
+
+  /** Get count of unread (missed) alerts */
+  public getMissedCount(): number {
+    return this.missedCount;
+  }
+
+  // ── Phase 3.2: Missed alert badge ─────────────────────────────────────────
+
+  private createMissedBadge(): void {
+    this.missedBadgeEl = document.createElement('button');
+    this.missedBadgeEl.className = 'alert-missed-badge';
+    this.missedBadgeEl.style.display = 'none';
+    this.missedBadgeEl.title = 'Missed alerts — click to view history';
+    this.missedBadgeEl.addEventListener('click', () => this.toggleHistory());
+    document.body.appendChild(this.missedBadgeEl);
+  }
+
+  private updateMissedBadge(): void {
+    if (!this.missedBadgeEl) return;
+    if (this.missedCount <= 0) {
+      this.missedBadgeEl.style.display = 'none';
+      return;
+    }
+    this.missedBadgeEl.style.display = 'flex';
+    this.missedBadgeEl.textContent = this.missedCount > 9 ? '9+' : `${this.missedCount}`;
+  }
+
+  // ── Phase 3.2: Alert history panel ────────────────────────────────────────
+
+  private createHistoryPanel(): void {
+    this.historyPanelEl = document.createElement('div');
+    this.historyPanelEl.className = 'alert-history-panel';
+    this.historyPanelEl.style.display = 'none';
+    this.historyPanelEl.innerHTML = `
+      <div class="alert-history-header">
+        <span class="alert-history-title">Alert History</span>
+        <button class="alert-history-close">\u00d7</button>
+      </div>
+      <div class="alert-history-list"></div>
+    `;
+    this.historyPanelEl.querySelector('.alert-history-close')?.addEventListener('click', () => {
+      this.toggleHistory(false);
+    });
+    document.body.appendChild(this.historyPanelEl);
+  }
+
+  private toggleHistory(force?: boolean): void {
+    this.historyVisible = force ?? !this.historyVisible;
+    if (this.historyPanelEl) {
+      this.historyPanelEl.style.display = this.historyVisible ? 'flex' : 'none';
+    }
+    if (this.historyVisible) {
+      // Clear missed count when user opens history
+      this.missedCount = 0;
+      this.updateMissedBadge();
+      // Mark all as read
+      for (const entry of this.alertHistory) {
+        entry.wasRead = true;
+      }
+      this.renderHistoryPanel();
+    }
+  }
+
+  private renderHistoryPanel(): void {
+    if (!this.historyPanelEl) return;
+    const list = this.historyPanelEl.querySelector('.alert-history-list');
+    if (!list) return;
+
+    if (this.alertHistory.length === 0) {
+      list.innerHTML = '<div class="alert-history-empty">No alerts yet</div>';
+      return;
+    }
+
+    list.innerHTML = this.alertHistory.slice(0, 20).map((entry) => {
+      const icon = entry.alert.threatLevel === 'critical' ? '🚨' : '⚠️';
+      const timeStr = this.formatTimeAgo(new Date(entry.receivedAt));
+      const unread = !entry.wasRead ? ' alert-history-unread' : '';
+      return `
+        <div class="alert-history-item${unread}">
+          <span class="alert-history-icon">${icon}</span>
+          <div class="alert-history-content">
+            <span class="alert-history-headline">${this.escapeText(entry.alert.headline)}</span>
+            <span class="alert-history-meta">${this.escapeText(entry.alert.source)} · ${timeStr}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   private handleVisibility(): void {
@@ -265,16 +439,23 @@ export class BreakingNewsBanner {
         }
       }
     } else {
-      const expired: string[] = [];
+      // Clear missed count when tab becomes visible
+      if (this.missedCount > 0) {
+        // Keep the badge visible so user notices, but don't auto-clear
+      }
+
+      const toShrink: string[] = [];
       for (const active of this.activeAlerts) {
-        if (!active.timer && active.remainingMs > 0) {
+        // Phase 3.2: Critical alerts never auto-dismiss/shrink
+        if (active.alert.threatLevel === 'critical') continue;
+        if (!active.timer && active.remainingMs > 0 && !active.shrunk) {
           active.timerStartedAt = now;
-          active.timer = setTimeout(() => this.dismissAlert(active.alert.id), active.remainingMs);
-        } else if (active.remainingMs <= 0) {
-          expired.push(active.alert.id);
+          active.timer = setTimeout(() => this.shrinkAlert(active.alert.id), active.remainingMs);
+        } else if (active.remainingMs <= 0 && !active.shrunk) {
+          toShrink.push(active.alert.id);
         }
       }
-      for (const id of expired) this.dismissAlert(id);
+      for (const id of toShrink) this.shrinkAlert(id);
     }
   }
 
@@ -289,7 +470,10 @@ export class BreakingNewsBanner {
       if (active.timer) clearTimeout(active.timer);
     }
     this.activeAlerts = [];
+    this.alertHistory = [];
     this.container.remove();
+    this.missedBadgeEl?.remove();
+    this.historyPanelEl?.remove();
     document.body.classList.remove('has-breaking-alert');
     document.documentElement.style.removeProperty('--breaking-alert-offset');
   }

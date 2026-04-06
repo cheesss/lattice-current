@@ -1,7 +1,8 @@
 name: CI
 on: [push, pull_request]
+
 jobs:
-  check:
+  typecheck-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,6 +12,51 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: TypeScript check
-        run: npx tsc --noEmit
-      - name: Unit tests
-        run: node --import tsx --test tests/fast-keyword-extractor.test.mjs tests/auto-pipeline.test.mjs tests/master-daemon-guardrails.test.mjs
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+
+  core-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Core contracts
+        run: npm run test:ci:core
+
+  data-integrity-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Data integrity contracts
+        run: npm run test:ci:data-integrity
+
+  coverage-report:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Focused contract coverage
+        run: npm run test:ci:coverage
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-test-coverage
+          path: |
+            coverage
+            .coverage

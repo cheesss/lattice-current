@@ -1,5 +1,12 @@
 import { SITE_VARIANT } from '@/config/variant';
 
+declare global {
+  interface Window {
+    __wmFetchPatched?: boolean;
+    __wmWebRedirectPatched?: boolean;
+  }
+}
+
 function getRuntimeEnv(name: string): string {
   try {
     const value = import.meta.env?.[name as keyof ImportMetaEnv];
@@ -301,6 +308,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ── Memory Pressure Integration (Phase 4.2) ─────────────────────────────────
+// Injectable multiplier to avoid circular imports between runtime ↔ memory-pressure.
+// memory-pressure.ts calls setMemoryPressureMultiplierFn() at init time.
+let _memoryPressureMultiplierFn: () => number = () => 1;
+
+/**
+ * Register a function that returns the current memory-pressure poll multiplier.
+ * Called by memory-pressure.ts during initialization.
+ */
+export function setMemoryPressureMultiplierFn(fn: () => number): void {
+  _memoryPressureMultiplierFn = fn;
+}
+
 export type SmartPollReason = 'interval' | 'resume' | 'manual' | 'startup';
 
 export interface SmartPollContext {
@@ -322,6 +342,8 @@ export interface SmartPollOptions {
   minIntervalMs?: number;
   onError?: (error: unknown) => void;
   visibilityDebounceMs?: number;
+  /** When true, poll interval is multiplied by memory pressure factor (Phase 4.2). Default: true. */
+  memoryPressureAware?: boolean;
 }
 
 export interface SmartPollLoopHandle {
@@ -364,6 +386,8 @@ export function startSmartPollLoop(
     ? Math.max(minIntervalMs, Math.round(opts.hiddenIntervalMs))
     : undefined;
 
+  const memoryPressureAware = opts.memoryPressureAware ?? true;
+
   const visibilityDebounceMs = Math.max(0, opts.visibilityDebounceMs ?? 300);
 
   let active = true;
@@ -384,7 +408,12 @@ export function startSmartPollLoop(
       if (pauseWhenHidden) return null;
       return hiddenIntervalMs ?? (intervalMs * hiddenMultiplier);
     }
-    return intervalMs * backoffMultiplier;
+    let base = intervalMs * backoffMultiplier;
+    // Phase 4.2: scale poll interval under memory pressure
+    if (memoryPressureAware) {
+      base *= _memoryPressureMultiplierFn();
+    }
+    return base;
   };
 
   const computeDelay = (baseMs: number): number => {
@@ -604,7 +633,7 @@ async function fetchLocalWithStartupRetry(
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
 export function installRuntimeFetchPatch(): void {
-  if (!isDesktopRuntime() || typeof window === 'undefined' || (window as unknown as Record<string, unknown>).__wmFetchPatched) {
+  if (!isDesktopRuntime() || typeof window === 'undefined' || window.__wmFetchPatched) {
     return;
   }
 
@@ -731,7 +760,7 @@ export function installRuntimeFetchPatch(): void {
     }
   };
 
-  (window as unknown as Record<string, unknown>).__wmFetchPatched = true;
+  window.__wmFetchPatched = true;
 }
 
 const ALLOWED_REDIRECT_HOSTS = /^https:\/\/([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*worldmonitor\.app(:\d+)?$/;
@@ -753,7 +782,7 @@ export function installWebApiRedirect(): void {
     console.warn('[runtime] VITE_WS_API_URL blocked — not in hostname allowlist:', WS_API_URL);
     return;
   }
-  if ((window as unknown as Record<string, unknown>).__wmWebRedirectPatched) return;
+  if (window.__wmWebRedirectPatched) return;
 
   const nativeFetch = window.fetch.bind(window);
   const API_BASE = WS_API_URL;
@@ -793,5 +822,5 @@ export function installWebApiRedirect(): void {
     return nativeFetch(input, init);
   };
 
-  (window as unknown as Record<string, unknown>).__wmWebRedirectPatched = true;
+  window.__wmWebRedirectPatched = true;
 }

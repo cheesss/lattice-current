@@ -128,6 +128,7 @@ function createContext() {
     refreshRunners: new Map(),
     flushTimeoutIds: new Set(),
     hiddenSince: 0,
+    suspendedRunners: new Set(),
   };
 }
 
@@ -254,7 +255,7 @@ describe('flushStaleRefreshes behavior', () => {
     assert.equal(ctx.hiddenSince, 0, 'hiddenSince must still be reset even if no services flushed');
   });
 
-  it('staggers re-triggered services deterministically by 150ms', () => {
+  it('staggers re-triggered services deterministically by 250ms', () => {
     const timestamps = [];
     const start = timers.now;
 
@@ -270,7 +271,7 @@ describe('flushStaleRefreshes behavior', () => {
     timers.runAll();
 
     assert.equal(timestamps.length, 3, 'All 3 services should fire');
-    assert.deepEqual(timestamps, [0, 150, 300], 'Services should fire in 150ms steps');
+    assert.deepEqual(timestamps, [0, 250, 500], 'Services should fire in 250ms steps');
   });
 
   it('cleans up stale flush timeout IDs after triggering', () => {

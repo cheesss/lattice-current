@@ -18,12 +18,20 @@ owner: core
 
 <OperationsConsoleDemo locale="ko" />
 
+## 리플레이 · 시나리오 워크벤치
+
+위 콘솔이 운영 표면에 집중한다면, 아래 워크벤치는 과거 리플레이, 저장 계층, 시나리오 비교를 보여줍니다. 데이터는 가상이지만 실제 리플레이 스택과 비슷한 구조를 따릅니다.
+
+<ReplayScenarioWorkbench locale="ko" />
+
 ## 이 페이지에서 볼 수 있는 것
 
 - 2D 지도에서 레이어를 켜고 지역 핫스팟을 선택
 - 국가 관계도와 지역별 안내, 최근 이벤트 카드 확인
 - Analysis, Codex, Ontology, Backtest, Resource 허브 전환
 - 리플레이 단계와 시나리오 슬라이더를 통해 같은 지역의 해석 변화 확인
+- ACLED, GDELT, FRED, 시장 바스켓을 활용한 가상 과거 백테스트
+- 현재 저장 아키텍처를 반영한 hot / warm / cold 데이터 흐름
 
 ## 제한
 

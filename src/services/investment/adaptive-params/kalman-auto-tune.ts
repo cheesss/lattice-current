@@ -1,6 +1,5 @@
 import type { PricePoint, KalmanNoiseResult } from './types';
-
-function clamp(v: number, min: number, max: number): number { return Math.max(min, Math.min(max, v)); }
+import { clamp } from './math-utils';
 
 export function computeKalmanNoise(
   priceSeries: Map<string, PricePoint[]>,

@@ -26,6 +26,7 @@ The architecture stack below is interactive. Click a layer to inspect its runtim
 - domain services and analysis modules
 - desktop sidecar and local APIs
 - historical replay and archive services
+- storage envelope, schema registry, and hot/warm/cold retention pipeline
 - unattended dataset registry and scheduler worker for fetch/import/replay cadence
 - guarded dataset discovery and auto-registration for missing historical coverage
 - theme discovery queue and guarded Codex theme proposer
@@ -39,6 +40,7 @@ The architecture stack below is interactive. Click a layer to inspect its runtim
 - [Architecture deep dive](https://github.com/cheesss/lattice-current/blob/main/docs/ARCHITECTURE.md)
 - [Desktop runtime](https://github.com/cheesss/lattice-current/blob/main/docs/DESKTOP_APP.md)
 - [Historical data sources](https://github.com/cheesss/lattice-current/blob/main/docs/historical-data-sources.md)
+- [Phase 7 implementation notes](https://github.com/cheesss/lattice-current/blob/main/docs/PHASE7_IMPLEMENTATION_NOTES.md)
 - [Intelligence server schema](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
 - [Service server plan](https://github.com/cheesss/lattice-current/blob/main/docs/service-server-plan.md)
 

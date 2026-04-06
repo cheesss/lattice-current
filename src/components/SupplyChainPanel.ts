@@ -60,14 +60,15 @@ export class SupplyChainPanel extends Panel {
       </div>
     `;
 
+    const { chokepointData, shippingData, mineralsData } = this;
     const activeHasData = this.activeTab === 'chokepoints'
-      ? (this.chokepointData?.chokepoints?.length ?? 0) > 0
+      ? (chokepointData?.chokepoints.length ?? 0) > 0
       : this.activeTab === 'shipping'
-        ? (this.shippingData?.indices?.length ?? 0) > 0
-        : (this.mineralsData?.minerals?.length ?? 0) > 0;
-    const activeData = this.activeTab === 'chokepoints' ? this.chokepointData
-      : this.activeTab === 'shipping' ? this.shippingData
-      : this.mineralsData;
+        ? (shippingData?.indices.length ?? 0) > 0
+        : (mineralsData?.minerals.length ?? 0) > 0;
+    const activeData = this.activeTab === 'chokepoints' ? chokepointData
+      : this.activeTab === 'shipping' ? shippingData
+      : mineralsData;
     const unavailableBanner = !activeHasData && activeData?.upstreamUnavailable
       ? `<div class="economic-warning">${t('components.supplyChain.upstreamUnavailable')}</div>`
       : '';

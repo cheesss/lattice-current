@@ -1165,11 +1165,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gdelt/, ''),
       },
-      // Event Intelligence analysis API (proxied to dashboard API server)
+      // Event Intelligence analysis API (served by the local sidecar runtime)
       '/api/event-intel': {
-        target: 'http://127.0.0.1:46200',
+        target: localApiProxyTarget,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/event-intel/, '/api'),
+        configure: attachLocalProxyAuth,
       },
       // Local sidecar endpoints for browser/dev runtime, including backtesting.
       '/api/local-': {

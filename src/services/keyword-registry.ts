@@ -916,6 +916,19 @@ export async function setKeywordStatus(id: string, status: KeywordStatus): Promi
   return existing;
 }
 
+export async function adjustKeywordConfidence(term: string, deltaPct: number): Promise<KeywordRecord | null> {
+  await ensureLoaded();
+  const normalized = normalizeTerm(term);
+  const record = Array.from(keywordMap.values()).find((item) => item.term === normalized || normalizeTerm(item.canonicalName) === normalized);
+  if (!record) return null;
+  record.confidence = clamp01To100(record.confidence + deltaPct, record.confidence);
+  record.qualityScore = computeQuality(record);
+  record.updatedAt = nowMs();
+  keywordMap.set(record.id, record);
+  await persist();
+  return record;
+}
+
 export async function listKeywordRegistry(): Promise<KeywordRecord[]> {
   await ensureLoaded();
   return Array.from(keywordMap.values()).sort((a, b) => {

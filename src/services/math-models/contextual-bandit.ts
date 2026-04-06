@@ -3,6 +3,8 @@ export interface BanditArmState {
   dimension: number;
   matrixA: number[][];
   vectorB: number[];
+  discountFactor: number;
+  effectivePulls: number;
   pulls: number;
   totalReward: number;
   lastUpdatedAt: string;
@@ -70,6 +72,19 @@ function invertMatrix(matrix: number[][]): number[][] {
   return augmented.map((row) => row.slice(n));
 }
 
+// IS-5: Configurable default discount factor
+let _configuredBanditDiscountFactor = 0.995;
+
+/** IS-5: Update the default bandit discount factor from ConfigManager. */
+export function setBanditDiscountFactor(factor: number): void {
+  _configuredBanditDiscountFactor = clamp(factor, 0.9, 0.9999);
+}
+
+/** IS-5: Get the current configured default. */
+export function getBanditDiscountFactor(): number {
+  return _configuredBanditDiscountFactor;
+}
+
 export function createBanditArmState(id: string, dimension: number): BanditArmState {
   const safeDimension = Math.max(2, Math.min(16, Math.round(dimension)));
   return {
@@ -77,6 +92,8 @@ export function createBanditArmState(id: string, dimension: number): BanditArmSt
     dimension: safeDimension,
     matrixA: identityMatrix(safeDimension),
     vectorB: Array.from({ length: safeDimension }, () => 0),
+    discountFactor: _configuredBanditDiscountFactor,
+    effectivePulls: 0,
     pulls: 0,
     totalReward: 0,
     lastUpdatedAt: new Date().toISOString(),
@@ -111,6 +128,9 @@ export function updateBanditArm(
   state: BanditArmState | null | undefined,
   context: number[],
   reward: number,
+  options: {
+    discountFactor?: number;
+  } = {},
 ): BanditArmState {
   const arm = state && state.dimension === context.length
     ? {
@@ -120,16 +140,35 @@ export function updateBanditArm(
     }
     : createBanditArmState((state?.id || 'arm'), context.length);
 
+  const discountFactor = clamp(options.discountFactor ?? state?.discountFactor ?? 0.995, 0.9, 0.9999);
+  const clippedReward = clamp(reward, -1, 1);
+  const now = new Date();
+  const lastUpdatedTs = state?.lastUpdatedAt ? Date.parse(state.lastUpdatedAt) : now.getTime();
+  const elapsedHours = Number.isFinite(lastUpdatedTs)
+    ? Math.max(0, (now.getTime() - lastUpdatedTs) / 3_600_000)
+    : 0;
+  const effectiveDiscount = elapsedHours < 1e-3 ? 1 : discountFactor ** elapsedHours;
+  arm.discountFactor = discountFactor;
+
+  for (let row = 0; row < arm.dimension; row += 1) {
+    const matrixRow = arm.matrixA[row] ?? (arm.matrixA[row] = Array.from({ length: arm.dimension }, () => 0));
+    for (let col = 0; col < arm.dimension; col += 1) {
+      matrixRow[col] = (matrixRow[col] ?? 0) * effectiveDiscount;
+    }
+    arm.vectorB[row] = (arm.vectorB[row] ?? 0) * effectiveDiscount;
+  }
+
   for (let row = 0; row < arm.dimension; row += 1) {
     const matrixRow = arm.matrixA[row] ?? (arm.matrixA[row] = Array.from({ length: arm.dimension }, () => 0));
     for (let col = 0; col < arm.dimension; col += 1) {
       matrixRow[col] = (matrixRow[col] ?? 0) + (context[row] ?? 0) * (context[col] ?? 0);
     }
-    arm.vectorB[row]! += (context[row] ?? 0) * reward;
+    arm.vectorB[row]! += (context[row] ?? 0) * clippedReward;
   }
 
   arm.pulls += 1;
-  arm.totalReward = Number((arm.totalReward + reward).toFixed(6));
-  arm.lastUpdatedAt = new Date().toISOString();
+  arm.effectivePulls = Number(((arm.effectivePulls || 0) * effectiveDiscount + 1).toFixed(6));
+  arm.totalReward = Number((arm.totalReward + clippedReward).toFixed(6));
+  arm.lastUpdatedAt = now.toISOString();
   return arm;
 }

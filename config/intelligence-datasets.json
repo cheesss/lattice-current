@@ -26,12 +26,12 @@
   },
   "themeAutomation": {
     "mode": "guarded-auto",
-    "minDiscoveryScore": 58,
+    "minDiscoveryScore": 40,
     "minSampleCount": 4,
     "minSourceCount": 2,
-    "minCodexConfidence": 78,
+    "minCodexConfidence": 58,
     "minAssetCount": 2,
-    "minPromotionScore": 72,
+    "minPromotionScore": 55,
     "maxOverlapWithKnownThemes": 0.62,
     "maxPromotionsPerDay": 1
   },
@@ -66,7 +66,7 @@
   "datasetAutomation": {
     "enabled": true,
     "everyMinutes": 360,
-    "codexTopThemesPerCycle": 2,
+    "codexTopThemesPerCycle": 5,
     "mode": "guarded-auto",
     "minProposalScore": 60,
     "autoRegisterScore": 74,

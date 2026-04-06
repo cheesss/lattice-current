@@ -207,6 +207,128 @@ async function buildAll(client) {
     console.log(`    ${r.theme.padEnd(10)} ${r.symbol.padEnd(5)} [${r.condition_type}=${r.condition_value}] avg=${(Number(r.avg_return)>=0?'+':'')+Number(r.avg_return).toFixed(2)}% hit=${(Number(r.hit_rate)*100).toFixed(0)}% n=${r.sample_size}`);
   }
 
+  // ── 3b. Additional condition types: credit_regime, signal_freshness, positioning ──
+  console.log('\n▶ 3b. 추가 조건부 민감도 (크레딧/신선도/포지셔닝)...');
+
+  // Credit regime condition
+  try {
+    await client.query(`
+      INSERT INTO conditional_sensitivity (theme, symbol, horizon, condition_type, condition_value, avg_return, hit_rate, avg_abs_return, sample_size)
+      SELECT
+        lo.theme, lo.symbol, lo.horizon,
+        'credit_regime' AS condition_type,
+        CASE
+          WHEN sh.value > (SELECT AVG(value) + STDDEV(value) FROM signal_history WHERE signal_name='hy_credit_spread' AND ts >= lo_date - INTERVAL '90 days' AND ts < lo_date) THEN 'tight'
+          WHEN sh.value < (SELECT AVG(value) - STDDEV(value) FROM signal_history WHERE signal_name='hy_credit_spread' AND ts >= lo_date - INTERVAL '90 days' AND ts < lo_date) THEN 'loose'
+          ELSE 'normal'
+        END AS condition_value,
+        AVG(lo.forward_return_pct::numeric),
+        AVG(lo.hit::int::numeric),
+        AVG(ABS(lo.forward_return_pct)::numeric),
+        COUNT(*)::int
+      FROM labeled_outcomes lo
+      JOIN articles a ON lo.article_id = a.id
+      CROSS JOIN LATERAL (SELECT DATE(a.published_at) AS lo_date) d
+      LEFT JOIN signal_history sh
+        ON sh.signal_name = 'hy_credit_spread' AND DATE(sh.ts) = d.lo_date
+      WHERE lo.horizon = '2w' AND sh.value IS NOT NULL
+      GROUP BY lo.theme, lo.symbol, lo.horizon, condition_type,
+        CASE
+          WHEN sh.value > (SELECT AVG(value) + STDDEV(value) FROM signal_history WHERE signal_name='hy_credit_spread' AND ts >= lo_date - INTERVAL '90 days' AND ts < lo_date) THEN 'tight'
+          WHEN sh.value < (SELECT AVG(value) - STDDEV(value) FROM signal_history WHERE signal_name='hy_credit_spread' AND ts >= lo_date - INTERVAL '90 days' AND ts < lo_date) THEN 'loose'
+          ELSE 'normal'
+        END
+      HAVING COUNT(*) >= 30
+      ON CONFLICT (theme, symbol, horizon, condition_type, condition_value) DO UPDATE SET
+        avg_return=EXCLUDED.avg_return, hit_rate=EXCLUDED.hit_rate,
+        avg_abs_return=EXCLUDED.avg_abs_return, sample_size=EXCLUDED.sample_size, updated_at=NOW()
+    `);
+    const creditCount = await client.query(`SELECT COUNT(*) FROM conditional_sensitivity WHERE condition_type='credit_regime'`);
+    console.log(`  credit_regime: ${creditCount.rows[0].count} records`);
+  } catch (err) {
+    console.warn(`  credit_regime: skipped (${err.message.slice(0, 80)})`);
+  }
+
+  // Signal freshness condition
+  try {
+    await client.query(`
+      INSERT INTO conditional_sensitivity (theme, symbol, horizon, condition_type, condition_value, avg_return, hit_rate, avg_abs_return, sample_size)
+      SELECT
+        lo.theme, lo.symbol, lo.horizon,
+        'signal_freshness' AS condition_type,
+        CASE
+          WHEN a.published_at >= lo_ts - INTERVAL '6 hours' THEN 'fresh_<6h'
+          WHEN a.published_at >= lo_ts - INTERVAL '24 hours' THEN 'recent_6-24h'
+          WHEN a.published_at >= lo_ts - INTERVAL '7 days' THEN 'warm_1-7d'
+          ELSE 'stale_>7d'
+        END AS condition_value,
+        AVG(lo.forward_return_pct::numeric),
+        AVG(lo.hit::int::numeric),
+        AVG(ABS(lo.forward_return_pct)::numeric),
+        COUNT(*)::int
+      FROM labeled_outcomes lo
+      JOIN articles a ON lo.article_id = a.id
+      CROSS JOIN LATERAL (SELECT a.published_at AS lo_ts) d
+      WHERE lo.horizon = '2w'
+      GROUP BY lo.theme, lo.symbol, lo.horizon, condition_type,
+        CASE
+          WHEN a.published_at >= lo_ts - INTERVAL '6 hours' THEN 'fresh_<6h'
+          WHEN a.published_at >= lo_ts - INTERVAL '24 hours' THEN 'recent_6-24h'
+          WHEN a.published_at >= lo_ts - INTERVAL '7 days' THEN 'warm_1-7d'
+          ELSE 'stale_>7d'
+        END
+      HAVING COUNT(*) >= 30
+      ON CONFLICT (theme, symbol, horizon, condition_type, condition_value) DO UPDATE SET
+        avg_return=EXCLUDED.avg_return, hit_rate=EXCLUDED.hit_rate,
+        avg_abs_return=EXCLUDED.avg_abs_return, sample_size=EXCLUDED.sample_size, updated_at=NOW()
+    `);
+    const freshCount = await client.query(`SELECT COUNT(*) FROM conditional_sensitivity WHERE condition_type='signal_freshness'`);
+    console.log(`  signal_freshness: ${freshCount.rows[0].count} records`);
+  } catch (err) {
+    console.warn(`  signal_freshness: skipped (${err.message.slice(0, 80)})`);
+  }
+
+  // Positioning extreme condition
+  try {
+    await client.query(`
+      INSERT INTO conditional_sensitivity (theme, symbol, horizon, condition_type, condition_value, avg_return, hit_rate, avg_abs_return, sample_size)
+      SELECT
+        lo.theme, lo.symbol, lo.horizon,
+        'positioning_extreme' AS condition_type,
+        CASE
+          WHEN cot.net_pct > 15 THEN 'crowded_long'
+          WHEN cot.net_pct < -15 THEN 'crowded_short'
+          ELSE 'neutral'
+        END AS condition_value,
+        AVG(lo.forward_return_pct::numeric),
+        AVG(lo.hit::int::numeric),
+        AVG(ABS(lo.forward_return_pct)::numeric),
+        COUNT(*)::int
+      FROM labeled_outcomes lo
+      JOIN articles a ON lo.article_id = a.id
+      LEFT JOIN positioning_cot cot
+        ON cot.asset = 'sp500' AND cot.report_date = (
+          SELECT MAX(report_date) FROM positioning_cot
+          WHERE asset='sp500' AND report_date <= DATE(a.published_at)
+        )
+      WHERE lo.horizon = '2w' AND cot.net_pct IS NOT NULL
+      GROUP BY lo.theme, lo.symbol, lo.horizon, condition_type,
+        CASE
+          WHEN cot.net_pct > 15 THEN 'crowded_long'
+          WHEN cot.net_pct < -15 THEN 'crowded_short'
+          ELSE 'neutral'
+        END
+      HAVING COUNT(*) >= 30
+      ON CONFLICT (theme, symbol, horizon, condition_type, condition_value) DO UPDATE SET
+        avg_return=EXCLUDED.avg_return, hit_rate=EXCLUDED.hit_rate,
+        avg_abs_return=EXCLUDED.avg_abs_return, sample_size=EXCLUDED.sample_size, updated_at=NOW()
+    `);
+    const posCount = await client.query(`SELECT COUNT(*) FROM conditional_sensitivity WHERE condition_type='positioning_extreme'`);
+    console.log(`  positioning_extreme: ${posCount.rows[0].count} records`);
+  } catch (err) {
+    console.warn(`  positioning_extreme: skipped (${err.message.slice(0, 80)})`);
+  }
+
   // ── 4. Anomaly Detection (이상 탐지) ──
   console.log('\n▶ 4. 이상 탐지 테이블 생성...');
 

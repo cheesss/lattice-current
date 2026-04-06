@@ -10,6 +10,8 @@ export type RuntimeSecretKey =
   | 'EIA_API_KEY'
   | 'CLOUDFLARE_API_TOKEN'
   | 'ACLED_ACCESS_TOKEN'
+  | 'ACLED_EMAIL'
+  | 'ACLED_PASSWORD'
   | 'URLHAUS_AUTH_KEY'
   | 'OTX_API_KEY'
   | 'ABUSEIPDB_API_KEY'
@@ -80,6 +82,11 @@ function getSidecarSecretValidateUrl(): string {
 }
 function getSidecarRuntimeSecretsUrl(): string {
   return `${getApiBaseUrl()}/api/local-runtime-secrets`;
+}
+
+function shouldHydrateBrowserSecretsFromLocalSidecar(): boolean {
+  if (isDesktopRuntime()) return false;
+  return Boolean(getApiBaseUrl());
 }
 
 const defaultToggles: Record<RuntimeFeatureId, boolean> = {
@@ -165,7 +172,7 @@ export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
   {
     id: 'acledConflicts',
     name: 'ACLED conflicts & protests',
-    description: 'Conflict and protest event feeds from ACLED.',
+    description: 'Conflict and protest event feeds from ACLED. Optional ACLED account credentials can recover expired tokens automatically.',
     requiredSecrets: ['ACLED_ACCESS_TOKEN'],
     fallback: 'Conflict/protest overlays are hidden.',
   },
@@ -258,6 +265,8 @@ function readEnvSecret(key: RuntimeSecretKey): string {
 
 const EXTRA_RUNTIME_SECRET_KEYS: RuntimeSecretKey[] = [
   'GLINT_AUTH_TOKEN',
+  'ACLED_EMAIL',
+  'ACLED_PASSWORD',
 ];
 
 function readStoredToggles(): Record<RuntimeFeatureId, boolean> {
@@ -315,6 +324,20 @@ export function validateSecret(key: RuntimeSecretKey, value: string): { valid: b
     return { valid: true };
   }
 
+  if (key === 'ACLED_EMAIL') {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return { valid: false, hint: 'Must be a valid email address' };
+    }
+    return { valid: true };
+  }
+
+  if (key === 'ACLED_PASSWORD') {
+    if (trimmed.length < 8) {
+      return { valid: false, hint: 'Password must be at least 8 characters' };
+    }
+    return { valid: true };
+  }
+
   return { valid: true };
 }
 
@@ -365,7 +388,10 @@ function seedSecretsFromEnvironment(): void {
 seedSecretsFromEnvironment();
 
 async function hydrateBrowserSecretsFromLocalSidecar(): Promise<void> {
-  if (isDesktopRuntime()) return;
+  if (!shouldHydrateBrowserSecretsFromLocalSidecar()) {
+    resolveSecretsReadyOnce();
+    return;
+  }
 
   try {
     const response = await fetch(getSidecarRuntimeSecretsUrl(), {
@@ -394,7 +420,7 @@ async function hydrateBrowserSecretsFromLocalSidecar(): Promise<void> {
   }
 }
 
-if (!isDesktopRuntime()) {
+if (shouldHydrateBrowserSecretsFromLocalSidecar()) {
   void hydrateBrowserSecretsFromLocalSidecar();
   if (typeof window !== 'undefined') {
     window.setInterval(() => {
@@ -410,7 +436,7 @@ if (typeof window !== 'undefined') {
     if (e.key === 'wm-secrets-updated') {
       if (isDesktopRuntime()) {
         void loadDesktopSecrets();
-      } else {
+      } else if (shouldHydrateBrowserSecretsFromLocalSidecar()) {
         void hydrateBrowserSecretsFromLocalSidecar();
       }
     } else if (e.key === TOGGLES_STORAGE_KEY && e.newValue) {

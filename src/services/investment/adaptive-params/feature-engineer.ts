@@ -1,13 +1,10 @@
 import type { InvestmentIdeaCard } from '../types';
 import type { SignalHistoryReader } from './signal-history-buffer';
+import { clamp } from './math-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function clamp(x: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, x));
-}
 
 function safe(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;

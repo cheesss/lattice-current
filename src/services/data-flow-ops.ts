@@ -9,7 +9,9 @@ import { getBacktestOpsSnapshot, type BacktestOpsSnapshot } from './historical-i
 import {
   getIntelligenceAutomationStatusRemote,
   getLocalAutomationOpsSnapshotRemote,
+  getLocalRuntimeObservabilityRemote,
   type LocalAutomationOpsSnapshotPayload,
+  type LocalRuntimeObservabilityPayload,
   type RemoteAutomationDatasetRegistryEntry,
   type RemoteAutomationDatasetState,
   type RemoteAutomationDefaults,
@@ -150,6 +152,7 @@ export interface DataFlowOpsSnapshot {
   backtestOps: BacktestOpsSnapshot | null;
   automation: RemoteAutomationStatusPayload | null;
   localOps: LocalAutomationOpsSnapshotPayload | null;
+  observability: LocalRuntimeObservabilityPayload | null;
   intelligence: InvestmentIntelligenceSnapshot | null;
   replayAdaptation: ReplayAdaptationSnapshot | null;
   historicalDatasets: HistoricalDatasetSummary[];
@@ -328,6 +331,9 @@ function suggestDatasetFix(args: {
     return 'Replay cadence is behind; re-run the historical job and inspect recent automation errors.';
   }
   if ((args.coverage?.completenessScore || 0) < 35 || (args.coverage?.gapRatio || 0) >= 0.65) {
+    if (String(args.provider || '').toLowerCase().includes('acled')) {
+      return 'Coverage is thin; this is a corpus-depth issue rather than an ACLED login failure. Expand the date window, add supporting sources, or wait for more events to accumulate.';
+    }
     return 'Coverage is thin; expand source family coverage or review transaction-time/bucket settings for this dataset.';
   }
   if (args.artifactCount > args.defaults.artifactRetentionCount) {
@@ -392,6 +398,7 @@ function buildChecks(args: {
   intelligence: InvestmentIntelligenceSnapshot | null;
   automation: RemoteAutomationStatusPayload | null;
   localOps: LocalAutomationOpsSnapshotPayload | null;
+  observability: LocalRuntimeObservabilityPayload | null;
   overview: DataFlowOpsOverview;
   retention: DataFlowOpsRetention;
   pipeline: DataFlowOpsPipeline;
@@ -441,6 +448,14 @@ function buildChecks(args: {
       detail: args.localOps
         ? `${Number(serviceSummary?.operational || 0)} operational, ${degradedServices} degraded or outage services reported.`
         : 'Local automation ops snapshot is not reachable.',
+    },
+    {
+      id: 'observability',
+      label: 'Runtime observability',
+      status: args.observability?.summary?.status || 'blocked',
+      detail: args.observability
+        ? `Score ${Math.round(Number(args.observability.summary?.observabilityScore || 0))}, ${Number(args.observability.summary?.failingTaskCount || 0)} failing tasks, ${Number(args.observability.summary?.staleTaskCount || 0)} stale tasks, ${Number(args.observability.summary?.unhealthyServices || 0)} unhealthy services.`
+        : 'Runtime observability endpoint is not reachable.',
     },
     {
       id: 'retention',
@@ -512,9 +527,10 @@ export async function getDataFlowOpsSnapshot(
 }
 
 async function buildDataFlowOpsSnapshot(): Promise<DataFlowOpsSnapshot> {
-  const [automation, localOps, backtestOps, intelligence, replayAdaptation, datasetSummaries] = await Promise.all([
+  const [automation, localOps, observability, backtestOps, intelligence, replayAdaptation, datasetSummaries] = await Promise.all([
     getIntelligenceAutomationStatusRemote(),
     getLocalAutomationOpsSnapshotRemote(),
+    getLocalRuntimeObservabilityRemote(),
     getBacktestOpsSnapshot(8).catch(() => null),
     getInvestmentIntelligenceSnapshot().catch(() => null),
     getReplayAdaptationSnapshot().catch(() => null),
@@ -759,6 +775,33 @@ async function buildDataFlowOpsSnapshot(): Promise<DataFlowOpsSnapshot> {
   } satisfies DataFlowOpsPipeline;
 
   const issues: DataFlowOpsIssue[] = [];
+  if (observability?.summary?.status === 'blocked' || observability?.summary?.status === 'degraded') {
+    issues.push({
+      id: 'observability:runtime',
+      status: observability.summary.status,
+      title: 'Runtime observability is degraded',
+      detail: observability.daemon?.readError
+        || `Observability score is ${Math.round(Number(observability.summary.observabilityScore || 0))}; failing tasks ${Number(observability.summary.failingTaskCount || 0)}, stale tasks ${Number(observability.summary.staleTaskCount || 0)}.`,
+      suggestion: 'Inspect daemon-state, dashboard health, and local service status before trusting the live signal surface.',
+    });
+  }
+  for (const task of observability?.daemon?.tasks || []) {
+    if (task.status === 'ready') continue;
+    issues.push({
+      id: `observability:task:${task.name}`,
+      status: task.status,
+      title: `${task.name} is ${task.status}`,
+      detail: task.error
+        || (task.stale
+          ? `Last run was ${task.lagMinutes ?? 'unknown'}m ago.`
+          : task.lastRunAt
+            ? `Last run recorded at ${task.lastRunAt}.`
+            : 'Task has not recorded a successful run yet.'),
+      suggestion: task.disabledUntil
+        ? `Circuit breaker is open until ${task.disabledUntil}; clear the root cause before rerunning the task.`
+        : 'Review the daemon task output and rerun the task after clearing the upstream blocker.',
+    });
+  }
   if (pipeline.activeCycleStatus === 'error') {
     issues.push({
       id: 'automation:cycle-error',
@@ -820,7 +863,7 @@ async function buildDataFlowOpsSnapshot(): Promise<DataFlowOpsSnapshot> {
       ? 'blocked'
       : dedupedIssues.some((issue) => issue.status === 'degraded')
         ? 'degraded'
-        : overviewStatus,
+        : pickWorseStatus(overviewStatus, (observability?.summary?.status as DataFlowOpsStatusTone) || 'ready'),
     snapshotLagMinutes: currentSnapshotLagMinutes,
     readyDatasets: datasets.filter((dataset) => dataset.status === 'ready').length,
     watchDatasets: datasets.filter((dataset) => dataset.status === 'watch').length,
@@ -840,6 +883,7 @@ async function buildDataFlowOpsSnapshot(): Promise<DataFlowOpsSnapshot> {
     intelligence,
     automation,
     localOps,
+    observability,
     overview,
     retention,
     pipeline,
@@ -871,6 +915,7 @@ async function buildDataFlowOpsSnapshot(): Promise<DataFlowOpsSnapshot> {
     backtestOps,
     automation,
     localOps,
+    observability,
     intelligence,
     replayAdaptation,
     historicalDatasets: datasetSummaries,

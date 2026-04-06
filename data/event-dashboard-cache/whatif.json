@@ -1,0 +1,92 @@
+{
+  "strategies": [
+    {
+      "name": "energy / BDRY",
+      "sharpe": 13.2180640911681,
+      "expectedReturn": 13.2180640911681,
+      "maxDrawdown": 0,
+      "theme": "energy"
+    },
+    {
+      "name": "economy / XRT",
+      "sharpe": 0.3562289443082067,
+      "expectedReturn": 1.2762047132407075,
+      "maxDrawdown": 3.582540761024024,
+      "theme": "economy"
+    },
+    {
+      "name": "politics / GLD",
+      "sharpe": 0.3105938950543958,
+      "expectedReturn": 1.0394003914171968,
+      "maxDrawdown": 3.1374076239546618,
+      "theme": "politics"
+    },
+    {
+      "name": "conflict / GLD",
+      "sharpe": 0.2844410913530741,
+      "expectedReturn": 0.8543167925704511,
+      "maxDrawdown": 3.1374076239546618,
+      "theme": "conflict"
+    },
+    {
+      "name": "tech / NVDA",
+      "sharpe": 0.2606442910265589,
+      "expectedReturn": 2.6306930467122482,
+      "maxDrawdown": 10.093039200479508,
+      "theme": "tech"
+    },
+    {
+      "name": "tech / SMH",
+      "sharpe": 0.19151361891890917,
+      "expectedReturn": 1.185238117829766,
+      "maxDrawdown": 6.188792862462801,
+      "theme": "tech"
+    },
+    {
+      "name": "tech / AMD",
+      "sharpe": 0.17313481256264243,
+      "expectedReturn": 1.7831049541139605,
+      "maxDrawdown": 10.2989394664277,
+      "theme": "tech"
+    },
+    {
+      "name": "tech / QQQ",
+      "sharpe": 0.17149142166287437,
+      "expectedReturn": 0.70064966868906,
+      "maxDrawdown": 4.0856251694410055,
+      "theme": "tech"
+    },
+    {
+      "name": "economy / SPY",
+      "sharpe": 0.1688460723777761,
+      "expectedReturn": 0.5063540279367751,
+      "maxDrawdown": 3.064917003434733,
+      "theme": "economy"
+    },
+    {
+      "name": "energy / USO",
+      "sharpe": 0.1556095367242035,
+      "expectedReturn": 0.7580089684906752,
+      "maxDrawdown": 5.124152430209557,
+      "theme": "energy"
+    },
+    {
+      "name": "tech / CIBR",
+      "sharpe": 0.14109102520311767,
+      "expectedReturn": 0.6362408479935479,
+      "maxDrawdown": 4.509435288868317,
+      "theme": "tech"
+    },
+    {
+      "name": "economy / DBC",
+      "sharpe": 0.13569229182243353,
+      "expectedReturn": 0.4221481412843448,
+      "maxDrawdown": 3.1110694322767163,
+      "theme": "economy"
+    }
+  ],
+  "meta": {
+    "updatedAt": "2026-04-05T17:22:30.579Z",
+    "stale": false
+  }
+}

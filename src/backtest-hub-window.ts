@@ -30,9 +30,10 @@ import { tryInvokeTauri } from '@/services/tauri-bridge';
 import { escapeHtml } from '@/utils/sanitize';
 import { buildBacktestOpsRunSummary, buildBacktestOpsSnapshot } from '@/services/replay-adaptation';
 import { APP_BRAND } from '@/config/brand';
+import { renderIntelViewTabs, fetchViewData, renderIntelView, mountIntelViewCharts, type IntelView } from '@/views/intel-view-registry';
 
 const AUTO_REFRESH_MS = 45_000;
-type BacktestHubView = 'overview' | 'decision' | 'data' | 'history';
+type BacktestHubView = 'overview' | 'decision' | 'data' | 'history' | 'intel';
 type BacktestHubLocale = 'en' | 'ko';
 const HUB_LOCALE_STORAGE_KEY = 'wm:backtest-hub:locale';
 let activeHubLocale: BacktestHubLocale = 'en';
@@ -76,6 +77,8 @@ const HUB_KO_COPY: Record<string, string> = {
   'Weak result': '약한 결과',
   'Usable signal': '활용 가능한 신호',
   'Thin sample': '얇은 샘플',
+  'Intelligence': '인텔리전스',
+  'Interactive analysis dashboard': '인터랙티브 분석 대시보드',
 };
 type HubGuidanceAction = {
   label: string;
@@ -639,7 +642,7 @@ function renderThemePulse(snapshot: ThemeDiagnosticsSnapshot, opsSnapshot: DataF
       <div class="backtest-hub-theme-row ${toneClass(row.status)}">
         <div class="backtest-hub-theme-head">
           <strong>${escapeHtml(row.themeLabel)}</strong>
-          <span class="investment-action-chip ${toneClass(row.status)}">${escapeHtml(row.confirmationState.toUpperCase())}</span>
+          <span class="investment-action-chip ${toneClass(row.status)}">${escapeHtml((row.confirmationState ?? 'unknown').toUpperCase())}</span>
         </div>
         <div class="backtest-hub-meter-row">
           <span>Diagnostic</span>
@@ -681,7 +684,7 @@ function renderWorkflowFunnel(summary: WorkflowDropoffSummary): string {
 }
 
 function renderDatasetHealth(snapshot: DataFlowOpsSnapshot): string {
-  const rows = snapshot.datasets
+  const rows = (snapshot.datasets ?? [])
     .slice()
     .sort((left, right) => {
       const toneRank = { blocked: 3, degraded: 2, watch: 1, ready: 0 };
@@ -695,8 +698,8 @@ function renderDatasetHealth(snapshot: DataFlowOpsSnapshot): string {
   return rows.map((row) => `
     <tr class="${toneClass(row.status)}">
       <td>${escapeHtml(row.label)}</td>
-      <td>${escapeHtml(row.provider.toUpperCase())}</td>
-      <td><span class="investment-action-chip ${toneClass(row.status)}">${escapeHtml(row.stageLabel.toUpperCase())}</span></td>
+      <td>${escapeHtml((row.provider ?? 'unknown').toUpperCase())}</td>
+      <td><span class="investment-action-chip ${toneClass(row.status)}">${escapeHtml((row.stageLabel ?? 'unknown').toUpperCase())}</span></td>
       <td>${row.progressPct}%</td>
       <td>${row.pipelineLagMinutes ?? 'n/a'}m</td>
       <td>${formatMaybe(row.completenessScore, 0)} / ${formatMaybe(row.coverageDensity, 0)}</td>
@@ -832,7 +835,7 @@ function renderSelectedRunOverview(run: HistoricalReplayRun | null): string {
     return `<div class="backtest-hub-empty">${hubLabel('No replay run is available yet.', '아직 표시할 리플레이 실행이 없습니다.')}</div>`;
   }
   const summary = run.portfolioAccounting?.summary || null;
-  const curve = Array.isArray(run.portfolioAccounting?.equityCurve) ? run.portfolioAccounting!.equityCurve : [];
+  const curve = Array.isArray(run.portfolioAccounting?.equityCurve) ? run.portfolioAccounting?.equityCurve ?? [] : [];
   const navValues = curve.map((point) => Number(point.nav) || 0).filter((value) => Number.isFinite(value) && value > 0);
   const trend = portfolioTrend(run);
   return `
@@ -891,7 +894,7 @@ function renderRunHistory(runs: HistoricalReplayRun[]): string {
         </div>
         <div class="backtest-hub-run-history-meta">
           <span>${escapeHtml(formatRelativeTime(run.completedAt))}</span>
-          <span>Horizon ${run.horizonsHours[0] ?? 'n/a'}h</span>
+          <span>Horizon ${run.horizonsHours?.[0] ?? 'n/a'}h</span>
           <span>Ideas ${run.ideaRuns.length}</span>
         </div>
       </div>
@@ -986,7 +989,7 @@ function renderSourceFamilyOverview(snapshot: DataFlowOpsSnapshot): string {
 }
 
 function renderDatasetPipelineLanes(snapshot: DataFlowOpsSnapshot): string {
-  const rows = snapshot.datasets
+  const rows = (snapshot.datasets ?? [])
     .slice()
     .sort((left, right) => (right.progressPct - left.progressPct) || ((left.pipelineLagMinutes ?? 9999) - (right.pipelineLagMinutes ?? 9999)))
     .slice(0, 8);
@@ -1057,6 +1060,7 @@ function renderViewTabs(activeView: BacktestHubView): string {
     { id: 'decision', label: hubLabel('Decision', '의사결정'), note: hubLabel('Themes and live guidance', '테마와 현재 행동 가이드') },
     { id: 'data', label: hubLabel('Data', '데이터'), note: hubLabel('Coverage and dataset flow', '커버리지와 처리 흐름') },
     { id: 'history', label: hubLabel('History', '히스토리'), note: hubLabel('Run history and drift', '실행 이력과 드리프트') },
+    { id: 'intel' as BacktestHubView, label: hubLabel('Intelligence', '인텔리전스'), note: hubLabel('Interactive analysis dashboard', '인터랙티브 분석 대시보드') },
   ];
   return tabs.map((tab) => `
     <button
@@ -1065,6 +1069,8 @@ function renderViewTabs(activeView: BacktestHubView): string {
       data-action="set-view"
       data-view="${tab.id}"
       aria-label="${escapeHtml(tab.label)}"
+      aria-pressed="${tab.id === activeView ? 'true' : 'false'}"
+      ${tab.id === activeView ? 'aria-current="page"' : ''}
     >
       <strong>${escapeHtml(tab.label)}</strong>
       <span>${escapeHtml(tab.note)}</span>
@@ -1082,8 +1088,9 @@ function renderActivityBanner(
   refreshError: string | null,
 ): string {
   const running = snapshot.pipeline.activeCycleStatus === 'running';
-  const blockedDatasets = snapshot.datasets.filter((row) => row.status === 'blocked').length;
-  const degradedDatasets = snapshot.datasets.filter((row) => row.status === 'degraded').length;
+  const datasets = snapshot.datasets ?? [];
+  const blockedDatasets = datasets.filter((row) => row.status === 'blocked').length;
+  const degradedDatasets = datasets.filter((row) => row.status === 'degraded').length;
   const totalAttentionDatasets = blockedDatasets + degradedDatasets;
   const hasLiveSnapshot = Boolean(snapshot.currentSnapshot.generatedAt);
   const topIssue = issues[0] || null;
@@ -1191,7 +1198,7 @@ function renderGuidedFlow(
   decisionSupport: CurrentDecisionSupportSnapshot,
   selectedRun: HistoricalReplayRun | null,
 ): string {
-  const blockedDatasets = snapshot.datasets.filter((row) => row.status === 'blocked' || row.status === 'degraded').length;
+  const blockedDatasets = (snapshot.datasets ?? []).filter((row) => row.status === 'blocked' || row.status === 'degraded').length;
   const liveSnapshotReady = Boolean(snapshot.currentSnapshot.generatedAt);
   const replayIdeas = latestReplaySummary?.ideaRunCount ?? 0;
   const totalDecisionItems = decisionSupport.actNow.length
@@ -1320,6 +1327,18 @@ function renderGuidedFlow(
 }
 
 function renderViewSectionLead(view: BacktestHubView): string {
+  if (view === 'intel') {
+    return `
+      <div class="intel-dashboard" id="intel-dashboard-container">
+        <div id="intel-view-tabs-container">${renderIntelViewTabs('theme-radar', activeHubLocale)}</div>
+        <div id="intel-view-content" style="min-height: 400px;">
+          <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+            ${hubLabel('Loading intelligence data...', '인텔리전스 데이터 로딩 중...')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
   const content = {
     overview: {
       title: hubLabel('Overview mode', '개요 모드'),
@@ -1349,7 +1368,7 @@ function renderViewSectionLead(view: BacktestHubView): string {
         '실행 이력을 비교하고 드리프트를 보면서 최신 결과가 더 넓은 패턴의 일부인지 확인할 때 이 화면을 보세요.',
       ),
     },
-  } satisfies Record<BacktestHubView, { title: string; body: string }>;
+  } satisfies Record<Exclude<BacktestHubView, 'intel'>, { title: string; body: string }>;
   return `
     <section class="investment-subcard backtest-hub-panel backtest-hub-view-lead">
       <div class="investment-subcard-head">
@@ -1475,6 +1494,28 @@ class BacktestHubWindow {
         this.locale = nextLocale;
         setActiveHubLocale(nextLocale);
         this.render();
+      }
+    });
+
+    // Intel view tab switching
+    this.root.addEventListener('click', async (e) => {
+      const target = e.target as HTMLElement;
+      const viewTab = target.closest('[data-intel-view]') as HTMLElement | null;
+      if (viewTab) {
+        const viewId = viewTab.dataset.intelView as IntelView;
+        const tabsContainer = document.getElementById('intel-view-tabs-container');
+        const contentContainer = document.getElementById('intel-view-content');
+        if (tabsContainer) tabsContainer.innerHTML = renderIntelViewTabs(viewId, activeHubLocale);
+        if (contentContainer) {
+          contentContainer.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">Loading...</div>';
+          try {
+            const data = await fetchViewData(viewId);
+            contentContainer.innerHTML = renderIntelView(viewId, data, activeHubLocale);
+            requestAnimationFrame(() => mountIntelViewCharts(viewId, data));
+          } catch {
+            contentContainer.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Failed to load view data</div>';
+          }
+        }
       }
     });
   }
@@ -1899,7 +1940,7 @@ class BacktestHubWindow {
     const issues = snapshot.issues.slice(0, 4);
     const readinessScore = backtestOps?.derived.readinessScore ?? 0;
     const decisionPressure = decisionSupport.actNow.length + decisionSupport.defensive.length;
-    const avgLag = average(snapshot.datasets.map((row) => row.pipelineLagMinutes ?? 0).filter((value) => value > 0));
+    const avgLag = average((snapshot.datasets ?? []).map((row) => row.pipelineLagMinutes ?? 0).filter((value) => value > 0));
     const highlightCompletion = this.attentionUntil > Date.now();
     const decisionBriefNotice = renderDecisionBriefNotice(snapshot, decisionSupport);
     const guidedFlow = renderGuidedFlow(snapshot, latestReplaySummary, decisionSupport, selectedRun);
@@ -1961,7 +2002,7 @@ class BacktestHubWindow {
 
         ${viewLead}
 
-        <div class="backtest-hub-grid backtest-hub-grid-three" data-view-anchor="overview">
+        ${this.view === 'intel' ? '' : `<div class="backtest-hub-grid backtest-hub-grid-three" data-view-anchor="overview">
           ${renderRunComparisonCard(latestReplaySummary, hubLabel('Latest Replay', '최신 리플레이'))}
           ${renderRunComparisonCard(latestWalkForwardSummary, hubLabel('Latest Walk-forward', '최신 워크포워드'))}
           ${renderRunComparisonCard(currentLike, hubLabel('Current-like', '현재 유사 구간'), { emptyText: currentLikeEmptyText, note: currentLikeNote })}
@@ -2061,7 +2102,7 @@ class BacktestHubWindow {
           <section class="investment-subcard backtest-hub-panel">
             <div class="investment-subcard-head">
               <h4>${hubLabel('Dataset Pipeline Lanes', '데이터셋 파이프라인 레인')}</h4>
-              <span class="investment-mini-label">${snapshot.datasets.length} ${hubLabel('tracked datasets', '추적 중인 데이터셋')}</span>
+              <span class="investment-mini-label">${(snapshot.datasets ?? []).length} ${hubLabel('tracked datasets', '추적 중인 데이터셋')}</span>
             </div>
             <div class="backtest-hub-theme-list">
               ${renderDatasetPipelineLanes(snapshot)}
@@ -2104,6 +2145,7 @@ class BacktestHubWindow {
             </div>
           </section>
         </div>
+        `}
       </div>
     `;
     this.normalizeRenderedUi();
@@ -2163,6 +2205,21 @@ class BacktestHubWindow {
       for (const [from, to] of koReplacements) {
         this.root.innerHTML = this.root.innerHTML.split(from).join(to);
       }
+    }
+
+    // Auto-load intel view data when intel tab is active
+    const intelContent = this.root.querySelector('#intel-view-content') as HTMLElement | null;
+    if (intelContent) {
+      fetchViewData('theme-radar').then((data) => {
+        const el = document.getElementById('intel-view-content');
+        if (el) {
+          el.innerHTML = renderIntelView('theme-radar', data, activeHubLocale);
+          requestAnimationFrame(() => mountIntelViewCharts('theme-radar', data));
+        }
+      }).catch(() => {
+        const el = document.getElementById('intel-view-content');
+        if (el) el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Failed to load</div>';
+      });
     }
   }
 }

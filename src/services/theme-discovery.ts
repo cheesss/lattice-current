@@ -1,4 +1,5 @@
 import type { HistoricalReplayFrame } from './historical-intelligence';
+import { THEME_DISCOVERY_TUNING } from '@/config/intelligence-tuning';
 import { isLowSignalKeywordTerm } from './keyword-registry';
 
 export interface KnownThemeCatalogEntry {
@@ -55,6 +56,13 @@ export interface CodexThemeProposal {
   thesis: string;
   invalidation: string[];
   assets: CodexThemeAssetProposal[];
+  suggestedSources?: Array<{
+    url: string;
+    domain: string;
+    confidence: number;
+  }>;
+  suggestedGdeltKeywords?: string[];
+  validationWarnings?: string[];
 }
 
 export interface ThemeDiscoveryOptions {
@@ -103,7 +111,7 @@ function tokenize(text: string): string[] {
   return normalize(text)
     .split(/\s+/)
     .map((token) => token.trim())
-    .filter((token) => token.length >= 3 && !STOPWORDS.has(token));
+    .filter((token) => token.length >= THEME_DISCOVERY_TUNING.tokenMinLength && !STOPWORDS.has(token));
 }
 
 function extractPhrases(text: string): string[] {
@@ -111,7 +119,7 @@ function extractPhrases(text: string): string[] {
   const phrases = new Set<string>();
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (token && token.length >= 6) {
+    if (token && token.length >= THEME_DISCOVERY_TUNING.longTokenMinLength) {
       if (!isLowSignalKeywordTerm(token)) phrases.add(token);
     }
     const bigram = tokens.slice(index, index + 2).join(' ').trim();
@@ -192,9 +200,9 @@ export function discoverThemeQueue(
   previousQueue: ThemeDiscoveryQueueItem[] = [],
   options: ThemeDiscoveryOptions = {},
 ): ThemeDiscoveryQueueItem[] {
-  const minSamples = Math.max(2, Math.round(options.minSamples ?? 3));
-  const minSources = Math.max(1, Math.round(options.minSources ?? 2));
-  const maxQueueItems = Math.max(4, Math.round(options.maxQueueItems ?? 16));
+  const minSamples = Math.max(2, Math.round(options.minSamples ?? THEME_DISCOVERY_TUNING.defaultMinSamples));
+  const minSources = Math.max(1, Math.round(options.minSources ?? THEME_DISCOVERY_TUNING.defaultMinSources));
+  const maxQueueItems = Math.max(4, Math.round(options.maxQueueItems ?? THEME_DISCOVERY_TUNING.defaultMaxQueueItems));
   const knownThemePhrases = buildKnownThemePhraseSet(knownThemes);
   const aggregates = new Map<string, PhraseAggregate>();
 
@@ -202,7 +210,7 @@ export function discoverThemeQueue(
     const phrases = Array.from(new Set(extractPhrases(entry.text)));
     for (const phrase of phrases) {
       const overlap = themeOverlapScore(phrase, knownThemePhrases);
-      if (overlap >= 0.72) continue;
+      if (overlap >= THEME_DISCOVERY_TUNING.knownThemeOverlapReject) continue;
       const bucket = aggregates.get(phrase) || {
         label: titleCase(phrase),
         sampleCount: 0,
@@ -227,10 +235,10 @@ export function discoverThemeQueue(
     .flatMap(([phrase, aggregate]) => {
       if (isLowSignalKeywordTerm(phrase)) return [];
       const overlap = themeOverlapScore(phrase, knownThemePhrases);
-      const sampleScore = aggregate.sampleCount * 11;
-      const sourceScore = aggregate.sources.size * 9;
-      const regionScore = aggregate.regions.size * 6;
-      const noveltyPenalty = overlap * 28;
+      const sampleScore = aggregate.sampleCount * THEME_DISCOVERY_TUNING.sampleWeight;
+      const sourceScore = aggregate.sources.size * THEME_DISCOVERY_TUNING.sourceWeight;
+      const regionScore = aggregate.regions.size * THEME_DISCOVERY_TUNING.regionWeight;
+      const noveltyPenalty = overlap * THEME_DISCOVERY_TUNING.overlapPenaltyWeight;
       const signalScore = clamp(Math.round(sampleScore + sourceScore + regionScore - noveltyPenalty), 0, 100);
       const topicKey = slugify(phrase);
       const existing = previousByKey.get(topicKey);
@@ -259,7 +267,10 @@ export function discoverThemeQueue(
       } satisfies ThemeDiscoveryQueueItem;
       return [item];
     })
-    .filter((item) => item.sampleCount >= minSamples && item.sourceCount >= minSources && item.signalScore >= 48)
+    .filter((item) =>
+      item.sampleCount >= minSamples
+      && item.sourceCount >= minSources
+      && item.signalScore >= THEME_DISCOVERY_TUNING.queueSignalFloor)
     .sort((a, b) => b.signalScore - a.signalScore || b.sampleCount - a.sampleCount || a.label.localeCompare(b.label))
     .slice(0, maxQueueItems);
 

@@ -232,11 +232,11 @@ function buildTrailingReturns(series: PricePoint[], targetTs: number, lookbackPo
   return returns;
 }
 
-function estimateSymbolDailyVolatilityPct(series: PricePoint[], targetTs: number): number {
+function estimateSymbolDailyVolatilityPct(series: PricePoint[], targetTs: number): number | null {
   const lookbackMs = 90 * 24 * 60 * 60 * 1000;
   const cutoff = targetTs - lookbackMs;
   const trailingReturns = buildTrailingReturns(series.filter((point) => point.ts >= cutoff), targetTs);
-  if (trailingReturns.length < 5) return DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.targetPositionVolatilityPct;
+  if (trailingReturns.length < 5) return null;
   const mean = average(trailingReturns);
   const variance = average(trailingReturns.map((value) => (value - mean) ** 2));
   return Math.max(0.25, Math.sqrt(Math.max(variance, 0)) * 100);
@@ -304,7 +304,8 @@ function estimatePortfolioRiskMetricsPct(
   }
   const variance = positions.reduce((sum, position) => {
     const series = prices.get(position.symbol) || [];
-    const dailyVolPct = estimateSymbolDailyVolatilityPct(series, targetTs);
+    const dailyVolPct = estimateSymbolDailyVolatilityPct(series, targetTs)
+      ?? DEFAULT_PORTFOLIO_ACCOUNTING_RISK_CONTROLS.targetPositionVolatilityPct;
     const weight = Math.abs(position.notional) / equity;
     return sum + Math.pow(weight * (dailyVolPct / 100), 2);
   }, 0);
@@ -603,10 +604,12 @@ export function computePortfolioAccountingSnapshot(args: {
       if (!tradeEntryPrice || !Number.isFinite(tradeEntryPrice) || tradeEntryPrice <= 0) continue;
       const symbolSeries = prices.get(trade.symbol) || [];
       const symbolDailyVolatilityPct = estimateSymbolDailyVolatilityPct(symbolSeries, dayTs);
-      const volatilityScaler = Math.max(
-        0.35,
-        Math.min(1.15, riskControls.targetPositionVolatilityPct / Math.max(symbolDailyVolatilityPct, 0.25)),
-      );
+      const volatilityScaler = symbolDailyVolatilityPct == null
+        ? 1
+        : Math.max(
+          0.35,
+          Math.min(1.15, riskControls.targetPositionVolatilityPct / Math.max(symbolDailyVolatilityPct, 0.25)),
+        );
       const impliedExecutionPenaltyPct = Math.max(0, Number(trade.executionPenaltyPct ?? 0));
       const executionScaler = Math.max(0.45, Math.min(1, 1 - (impliedExecutionPenaltyPct / 2.5)));
       const requestedNotional = Math.max(0, startingEquity * (trade.weightPct / 100) * volatilityScaler * executionScaler);

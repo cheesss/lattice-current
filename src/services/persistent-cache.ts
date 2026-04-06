@@ -524,5 +524,6 @@ export function stopAutoVacuum(): void {
   }
 }
 
-// Start auto-vacuum on module load
-startAutoVacuum();
+export function isAutoVacuumRunning(): boolean {
+  return vacuumTimer !== null;
+}

@@ -2,6 +2,7 @@ import { isDesktopRuntime } from '../services/runtime';
 import { invokeTauri } from '../services/tauri-bridge';
 import { t } from '../services/i18n';
 import { h, replaceChildren, safeHtml } from '../utils/dom-utils';
+import { patchContent } from '../utils/dom-diff';
 import { trackPanelResized } from '@/services/analytics';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { getSecretState } from '@/services/runtime-config';
@@ -207,9 +208,14 @@ export class Panel {
     this.element = document.createElement('div');
     this.element.className = `panel ${options.className || ''}`;
     this.element.dataset.panel = options.id;
+    this.element.setAttribute('role', 'region');
+    this.element.setAttribute('aria-label', options.title);
+    this.element.setAttribute('tabindex', '0');
 
     this.header = document.createElement('div');
     this.header.className = 'panel-header';
+    this.header.setAttribute('role', 'heading');
+    this.header.setAttribute('aria-level', '2');
 
     const headerLeft = document.createElement('div');
     headerLeft.className = 'panel-header-left';
@@ -270,6 +276,8 @@ export class Panel {
     this.content = document.createElement('div');
     this.content.className = 'panel-content';
     this.content.id = `${options.id}Content`;
+    this.content.setAttribute('role', 'group');
+    this.content.setAttribute('aria-live', 'polite');
 
     this.element.appendChild(this.header);
     this.element.appendChild(this.content);
@@ -640,6 +648,7 @@ export class Panel {
     if (this._locked) return;
     this.setErrorState(false);
     this.clearRetryCountdown();
+    this.content.setAttribute('aria-busy', 'true');
     replaceChildren(this.content,
       h('div', { className: 'panel-loading' },
         h('div', { className: 'panel-loading-radar' },
@@ -655,6 +664,7 @@ export class Panel {
     if (this._locked) return;
     this.clearRetryCountdown();
     this.setErrorState(true);
+    this.content.removeAttribute('aria-busy');
     if (onRetry !== undefined) this.retryCallback = onRetry;
 
     const radarEl = h('div', { className: 'panel-loading-radar panel-error-radar' },
@@ -689,6 +699,38 @@ export class Panel {
 
   public resetRetryBackoff(): void {
     this.retryAttempt = 0;
+  }
+
+  /**
+   * Show a standardised empty-state placeholder.
+   * @param message  Primary text (falls back to i18n 'common.noDataAvailable')
+   * @param options  Optional icon SVG string and actionLabel/onAction for a CTA button
+   */
+  public showEmpty(
+    message?: string,
+    options?: { icon?: string; actionLabel?: string; onAction?: () => void },
+  ): void {
+    if (this._locked) return;
+    this.setErrorState(false);
+    this.clearRetryCountdown();
+
+    const emptyIconSvg = options?.icon ??
+      '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+    const iconEl = h('div', { className: 'panel-empty-icon' });
+    iconEl.innerHTML = emptyIconSvg;
+
+    const msgEl = h('div', { className: 'panel-empty-msg' }, message || t('common.noDataAvailable'));
+
+    const children: (HTMLElement | string)[] = [iconEl, msgEl];
+
+    if (options?.actionLabel && options.onAction) {
+      const btn = h('button', { type: 'button', className: 'panel-empty-action' }, options.actionLabel);
+      btn.addEventListener('click', options.onAction);
+      children.push(btn);
+    }
+
+    replaceChildren(this.content, h('div', { className: 'panel-empty-state' }, ...children));
   }
 
   public showLocked(features: string[] = []): void {
@@ -824,6 +866,7 @@ export class Panel {
     this.setErrorState(false);
     this.clearRetryCountdown();
     this.retryAttempt = 0;
+    this.content.removeAttribute('aria-busy');
     if (this.pendingContentHtml === html || this.content.innerHTML === html) {
       return;
     }
@@ -850,6 +893,19 @@ export class Panel {
     if (this.content.innerHTML !== html) {
       this.content.innerHTML = html;
     }
+  }
+
+  /**
+   * DOM-diffing alternative to setContent().
+   * Patches the existing DOM tree in-place so that focus, scroll positions,
+   * and event listeners on unchanged nodes are preserved.
+   */
+  public setContentDiff(html: string): void {
+    if (this._locked) return;
+    this.setErrorState(false);
+    this.clearRetryCountdown();
+    this.retryAttempt = 0;
+    patchContent(this.content, html);
   }
 
   public show(): void {
@@ -926,6 +982,21 @@ export class Panel {
 
   protected isAbortError(error: unknown): boolean {
     return error instanceof DOMException && error.name === 'AbortError';
+  }
+
+  /**
+   * Returns true if this panel's async work should be abandoned.
+   * Combines AbortSignal check with DOM connectivity check.
+   * Use after every `await` in panel refresh/render methods:
+   *
+   * ```ts
+   * const data = await fetchData(this.signal);
+   * if (this.isDetached()) return;
+   * this.renderData(data);
+   * ```
+   */
+  protected isDetached(): boolean {
+    return this.abortController.signal.aborted || !this.element?.isConnected;
   }
 
   public destroy(): void {

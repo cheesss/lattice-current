@@ -1,4 +1,4 @@
-function clamp(v: number, min: number, max: number): number { return Math.max(min, Math.min(max, v)); }
+import { clamp } from './math-utils';
 
 export function computeKellySizing(
   mappingStats: Map<string, { posteriorWinRate: number; emaReturnPct: number; emaWorstReturnPct?: number; observations: number }>,

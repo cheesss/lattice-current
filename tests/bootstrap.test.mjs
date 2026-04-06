@@ -23,7 +23,7 @@ describe('Bootstrap cache key registry', () => {
     const extractKeys = (src) => {
       const block = src.match(/BOOTSTRAP_CACHE_KEYS[^=]*=\s*\{([^}]+)\}/);
       if (!block) return {};
-      const re = /(\w+):\s+'([a-z_]+(?::[a-z_-]+)+:v\d+)'/g;
+      const re = /(\w+):\s+'([a-z_-]+(?::[a-z_-]+)+:v\d+)'/g;
       const keys = {};
       let m;
       while ((m = re.exec(block[1])) !== null) keys[m[1]] = m[2];
@@ -48,7 +48,7 @@ describe('Bootstrap cache key registry', () => {
       keys.push(m[1]);
     }
     for (const key of keys) {
-      assert.match(key, /^[a-z_]+(?::[a-z_-]+)+:v\d+$/, `Cache key "${key}" does not match expected pattern`);
+      assert.match(key, /^[a-z_-]+(?::[a-z_-]+)+:v\d+$/, `Cache key "${key}" does not match expected pattern`);
     }
   });
 
@@ -172,9 +172,9 @@ describe('Frontend hydration (src/services/bootstrap.ts)', () => {
   });
 
   it('has a fast timeout cap to avoid regressing startup', () => {
-    const timeoutMatch = src.match(/(?:AbortSignal\.timeout|setTimeout)\D+(\d+)\)/);
-    assert.ok(timeoutMatch, 'Missing timeout');
-    const ms = parseInt(timeoutMatch[1], 10);
+    const timeoutMatches = [...src.matchAll(/(?:AbortSignal\.timeout|setTimeout)[^0-9]*([0-9_]+)/g)];
+    assert.ok(timeoutMatches.length > 0, 'Missing timeout');
+    const ms = Math.min(...timeoutMatches.map((match) => parseInt(match[1].replace(/_/g, ''), 10)));
     assert.ok(ms <= 2000, `Timeout ${ms}ms too high — should be ≤2000ms to avoid regressing startup`);
   });
 

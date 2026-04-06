@@ -1,3 +1,5 @@
+import { clamp } from './math-utils';
+
 export interface MetaWeights {
   featureNames: string[];
   weights: number[];
@@ -66,10 +68,6 @@ const META_LEARNING_RATE = 0.01;
 const META_ITERATIONS = 1000;
 const META_L2_LAMBDA = 0.01;
 const CREDIBILITY_L2_LAMBDA = 0.1;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);

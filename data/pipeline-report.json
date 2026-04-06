@@ -1,0 +1,139 @@
+{
+  "steps": [
+    {
+      "step": 0,
+      "status": "ok",
+      "detail": "data gaps filled"
+    },
+    {
+      "step": 1,
+      "status": "ok"
+    },
+    {
+      "step": 2,
+      "status": "ok"
+    },
+    {
+      "step": 3,
+      "status": "ok"
+    },
+    {
+      "step": 5,
+      "status": "ok"
+    },
+    {
+      "step": 6,
+      "status": "ok",
+      "stats": {
+        "articles": "60721",
+        "outcomes": "619495",
+        "signals": [
+          {
+            "signal_name": "cot_sp500",
+            "n": "274"
+          },
+          {
+            "signal_name": "gpr",
+            "n": "1743"
+          },
+          {
+            "signal_name": "vix",
+            "n": "1346"
+          },
+          {
+            "signal_name": "hy_credit_spread",
+            "n": "1374"
+          },
+          {
+            "signal_name": "eventIntensity",
+            "n": "2473"
+          },
+          {
+            "signal_name": "cot_dollar",
+            "n": "57"
+          },
+          {
+            "signal_name": "cot_oil",
+            "n": "274"
+          },
+          {
+            "signal_name": "cot_gold",
+            "n": "274"
+          },
+          {
+            "signal_name": "marketStress",
+            "n": "2473"
+          },
+          {
+            "signal_name": "transmissionStrength",
+            "n": "2473"
+          },
+          {
+            "signal_name": "cot_euro_fx",
+            "n": "274"
+          },
+          {
+            "signal_name": "yieldSpread",
+            "n": "1313"
+          },
+          {
+            "signal_name": "ted_spread",
+            "n": "258"
+          },
+          {
+            "signal_name": "e2e_probe",
+            "n": "1"
+          },
+          {
+            "signal_name": "cot_treasury_10y",
+            "n": "274"
+          },
+          {
+            "signal_name": "ig_credit_spread",
+            "n": "1373"
+          }
+        ],
+        "sensitivity": "139",
+        "conditions": [
+          {
+            "condition_type": "tone_sentiment",
+            "n": "312"
+          },
+          {
+            "condition_type": "goldstein_intensity",
+            "n": "165"
+          },
+          {
+            "condition_type": "positioning_extreme",
+            "n": "76"
+          },
+          {
+            "condition_type": "credit_regime",
+            "n": "75"
+          },
+          {
+            "condition_type": "vix_momentum",
+            "n": "75"
+          },
+          {
+            "condition_type": "signal_freshness",
+            "n": "30"
+          },
+          {
+            "condition_type": "stress_level",
+            "n": "30"
+          }
+        ],
+        "proposals": [
+          {
+            "status": "executed",
+            "n": "5"
+          }
+        ],
+        "autoSymbols": "19"
+      }
+    }
+  ],
+  "timestamp": "2026-04-05T23:49:42.536Z",
+  "elapsedSeconds": "228"
+}

@@ -1,6 +1,7 @@
 import type { HistoricalBackfillOptions, HistoricalFrameLoadOptions } from './importer/historical-stream-worker';
 import type { HistoricalReplayOptions, WalkForwardBacktestOptions } from './historical-intelligence';
 import type { ThemeDiscoveryQueueItem } from './theme-discovery';
+import { AUTOMATION_THRESHOLDS } from '@/config/automation-thresholds';
 
 export type DatasetHistoricalProvider = 'fred' | 'alfred' | 'gdelt-doc' | 'coingecko' | 'acled' | 'yahoo-chart' | 'rss-feed';
 export type DatasetAutomationMode = 'manual' | 'guarded-auto' | 'full-auto';
@@ -73,12 +74,12 @@ export interface DatasetDiscoveryPolicy {
 }
 
 const DEFAULT_POLICY: DatasetDiscoveryPolicy = {
-  mode: 'guarded-auto',
-  minProposalScore: 58,
-  autoRegisterScore: 72,
-  autoEnableScore: 86,
-  maxRegistrationsPerCycle: 2,
-  maxEnabledDatasets: 10,
+  mode: AUTOMATION_THRESHOLDS.theme.mode,
+  minProposalScore: AUTOMATION_THRESHOLDS.dataset.minProposalScore,
+  autoRegisterScore: AUTOMATION_THRESHOLDS.dataset.autoRegisterScore,
+  autoEnableScore: AUTOMATION_THRESHOLDS.dataset.autoEnableScore,
+  maxRegistrationsPerCycle: AUTOMATION_THRESHOLDS.dataset.maxRegistrationsPerCycle,
+  maxEnabledDatasets: AUTOMATION_THRESHOLDS.dataset.maxEnabledDatasets,
   allowProviders: ['fred', 'alfred', 'gdelt-doc', 'coingecko', 'acled', 'yahoo-chart', 'rss-feed'],
 };
 
@@ -138,8 +139,10 @@ function topTerms(theme: DatasetDiscoveryThemeInput): string[] {
   ].map((value) => normalize(value)).filter((value) => value.length >= 3)).slice(0, 6);
 }
 
-function buildGoogleNewsRssUrl(query: string): string {
-  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+function buildGoogleNewsRssUrl(query: string, locale?: string): string {
+  const lang = locale || `${AUTOMATION_THRESHOLDS.locale.newsLanguage}-${AUTOMATION_THRESHOLDS.locale.newsRegion}`;
+  const [langCode, regionCode] = lang.split('-');
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${lang}&gl=${regionCode || 'US'}&ceid=${regionCode || 'US'}:${langCode || 'en'}`;
 }
 
 function hasPolicySignal(blob: string): boolean {

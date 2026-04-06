@@ -11,6 +11,11 @@ import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+  DEFAULT_DAEMON_STATE_PATH,
+  readDaemonStateSnapshot,
+  summarizeRuntimeObservability,
+} from '../../scripts/_shared/runtime-observability.mjs';
 
 const brotliCompressAsync = promisify(brotliCompress);
 
@@ -113,7 +118,21 @@ const ALLOWED_ENV_KEYS = new Set([
 ]);
 const DESKTOP_APP_IDENTIFIER = process.env.LOCAL_API_APP_IDENTIFIER || 'app.worldmonitor.desktop';
 const RUNTIME_SECRETS_MIRROR_FILE = 'runtime-secrets-mirror.json';
+const RUNTIME_SECRETS_MIRROR_REFRESH_MS = Math.max(
+  1_000,
+  Number(process.env.LOCAL_API_SECRETS_MIRROR_REFRESH_MS || 5_000),
+);
 const mirroredRuntimeSecrets = new Set();
+const runtimeSecretsMirrorState = {
+  mirrorPath: '',
+  mtimeMs: -1,
+  size: -1,
+  lastCheckedAt: 0,
+  present: 0,
+  loaded: 0,
+  appliedValues: new Map(),
+  lastLogSignature: '',
+};
 
 const CHROME_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const CODEX_WORKDIR = path.join(os.tmpdir(), 'worldmonitor-codex-cli');
@@ -121,6 +140,7 @@ const CODEX_TIMEOUT_MS = 45_000;
 const LOCAL_SOURCE_DISCOVERY_TIMEOUT_MS = 20_000;
 const ENABLE_PLAYWRIGHT_DISCOVERY = String(process.env.LOCAL_SOURCE_DISCOVERY_PLAYWRIGHT ?? 'true').toLowerCase() !== 'false';
 const ENABLE_CODEX_SOURCE_DISCOVERY = String(process.env.LOCAL_SOURCE_DISCOVERY_CODEX ?? 'true').toLowerCase() !== 'false';
+const WINDOWS_HIDE_BACKGROUND_CHILDREN = process.platform === 'win32';
 const INTELLIGENCE_ARCHIVE_DB = 'intelligence-archive.duckdb';
 const DUCKDB_LOCK_TTL_MINUTES = 180;
 const INTELLIGENCE_FABRIC_CACHE_KEY = 'intelligence-fabric:v1';
@@ -130,6 +150,7 @@ let intelligenceArchivePromise = null;
 let intelligenceArchiveVacuumTimer = null;
 let manualBacktestJobPromise = null;
 let manualBacktestBusyUntil = 0;
+let eventDashboardModulePromise = null;
 
 function isPidLikelyAlive(pid) {
   const numericPid = Number(pid);
@@ -371,6 +392,23 @@ function readRuntimeSecretsMirror() {
   }
 }
 
+function statRuntimeSecretsMirror(mirrorPath) {
+  try {
+    const stat = statSync(mirrorPath);
+    return {
+      exists: true,
+      mtimeMs: Number(stat.mtimeMs || 0),
+      size: Number(stat.size || 0),
+    };
+  } catch {
+    return {
+      exists: false,
+      mtimeMs: -1,
+      size: -1,
+    };
+  }
+}
+
 function getPersistentCacheDir(context) {
   const baseDir = context?.resourceDir || process.cwd();
   return path.join(baseDir, 'data', 'persistent-cache');
@@ -392,22 +430,77 @@ function readPersistentCacheEntry(context, key) {
 }
 
 function loadMirroredRuntimeSecrets(context) {
-  const { mirrorPath, secrets } = readRuntimeSecretsMirror();
+  const mirrorPath = resolveRuntimeSecretsMirrorPath();
+  const now = Date.now();
+  const refreshIntervalMs = Math.max(
+    1_000,
+    Number(context?.runtimeSecretsMirrorRefreshMs || RUNTIME_SECRETS_MIRROR_REFRESH_MS),
+  );
+  if (
+    runtimeSecretsMirrorState.mirrorPath === mirrorPath
+    && now - runtimeSecretsMirrorState.lastCheckedAt < refreshIntervalMs
+  ) {
+    return {
+      mirrorPath,
+      present: runtimeSecretsMirrorState.present,
+      loaded: runtimeSecretsMirrorState.loaded,
+      cached: true,
+    };
+  }
+
+  runtimeSecretsMirrorState.lastCheckedAt = now;
+  const stats = statRuntimeSecretsMirror(mirrorPath);
+  if (
+    runtimeSecretsMirrorState.mirrorPath === mirrorPath
+    && runtimeSecretsMirrorState.mtimeMs === stats.mtimeMs
+    && runtimeSecretsMirrorState.size === stats.size
+  ) {
+    return {
+      mirrorPath,
+      present: runtimeSecretsMirrorState.present,
+      loaded: runtimeSecretsMirrorState.loaded,
+      cached: true,
+    };
+  }
+
+  const { secrets } = readRuntimeSecretsMirror();
   let loaded = 0;
   let present = 0;
+  const nextKeys = new Set(Object.keys(secrets));
+
+  for (const [key, previousValue] of runtimeSecretsMirrorState.appliedValues.entries()) {
+    const nextValue = secrets[key];
+    if (!nextKeys.has(key) || nextValue !== previousValue) {
+      if (process.env[key] === previousValue) {
+        delete process.env[key];
+      }
+    }
+  }
+
   mirroredRuntimeSecrets.clear();
+  runtimeSecretsMirrorState.appliedValues.clear();
   for (const [key, value] of Object.entries(secrets)) {
     present += 1;
     if (!process.env[key]) {
       process.env[key] = value;
       loaded += 1;
+      runtimeSecretsMirrorState.appliedValues.set(key, value);
+      mirroredRuntimeSecrets.add(key);
     }
-    mirroredRuntimeSecrets.add(key);
   }
-  if (present > 0) {
-    context.logger.log(`[local-api] runtime secrets mirror loaded ${loaded}/${present} keys from ${mirrorPath}`);
+
+  runtimeSecretsMirrorState.mirrorPath = mirrorPath;
+  runtimeSecretsMirrorState.mtimeMs = stats.mtimeMs;
+  runtimeSecretsMirrorState.size = stats.size;
+  runtimeSecretsMirrorState.present = present;
+  runtimeSecretsMirrorState.loaded = loaded;
+
+  const logSignature = `${mirrorPath}|${stats.mtimeMs}|${stats.size}|${present}|${loaded}`;
+  if (logSignature !== runtimeSecretsMirrorState.lastLogSignature) {
+    context.logger.log(`[local-api] runtime secrets mirror synced ${loaded}/${present} keys from ${mirrorPath}`);
+    runtimeSecretsMirrorState.lastLogSignature = logSignature;
   }
-  return { mirrorPath, present, loaded };
+  return { mirrorPath, present, loaded, cached: false };
 }
 
 function snapshotRuntimeSecrets() {
@@ -578,7 +671,7 @@ async function runCodexCli(args, options = {}) {
     const child = spawn(codexCommand, args, {
       cwd: CODEX_WORKDIR,
       env: codexEnv,
-      windowsHide: true,
+      windowsHide: WINDOWS_HIDE_BACKGROUND_CHILDREN,
       shell: useShell,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -1451,6 +1544,7 @@ async function runIntelligenceJob(action, payload, context, timeoutMs = 120_000)
           LOCAL_API_DATA_DIR: context.dataDir,
         },
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: WINDOWS_HIDE_BACKGROUND_CHILDREN,
       },
     );
 
@@ -1502,6 +1596,61 @@ async function runIntelligenceJob(action, payload, context, timeoutMs = 120_000)
 
     child.stdin.write(JSON.stringify(payload || {}));
     child.stdin.end();
+  });
+}
+
+async function runLocalAnalysisRuntimeJob(action, payload, context, timeoutMs = 60_000) {
+  const cwd = context.resourceDir || process.cwd();
+  return await new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      ['--import', 'tsx', path.join('scripts', 'local-analysis-runtime-job.mjs')],
+      {
+        cwd,
+        env: {
+          ...process.env,
+          LOCAL_API_RESOURCE_DIR: context.resourceDir,
+          LOCAL_API_DATA_DIR: context.dataDir,
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: WINDOWS_HIDE_BACKGROUND_CHILDREN,
+      },
+    );
+
+    const stdout = [];
+    const stderr = [];
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, Math.max(5_000, Math.min(timeoutMs, 5 * 60 * 1000)));
+
+    child.stdout.on('data', (chunk) => stdout.push(chunk));
+    child.stderr.on('data', (chunk) => stderr.push(chunk));
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const out = Buffer.concat(stdout).toString('utf8').trim();
+      const err = Buffer.concat(stderr).toString('utf8').trim();
+      if (timedOut) {
+        reject(new Error(`local analysis runtime job timed out: ${action}`));
+        return;
+      }
+      if (code !== 0) {
+        reject(new Error(err || out || `local analysis runtime job failed: ${action}`));
+        return;
+      }
+      try {
+        resolve(out ? JSON.parse(out) : { ok: true });
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    child.stdin.end(JSON.stringify({ action, payload }));
   });
 }
 
@@ -1704,6 +1853,29 @@ async function buildRouteTable(root) {
 
 const REQUEST_BODY_CACHE = Symbol('requestBodyCache');
 
+function isBenignLoggerWriteError(error) {
+  const code = String(error?.code || '');
+  return code === 'EPIPE' || code === 'ERR_STREAM_DESTROYED' || code === 'UNKNOWN';
+}
+
+function safeLoggerCall(method, args) {
+  try {
+    method(...args);
+  } catch (error) {
+    if (!isBenignLoggerWriteError(error)) {
+      throw error;
+    }
+  }
+}
+
+function createSafeLogger(baseLogger = console) {
+  return {
+    log: (...args) => safeLoggerCall((baseLogger.log || console.log).bind(baseLogger), args),
+    warn: (...args) => safeLoggerCall((baseLogger.warn || console.warn).bind(baseLogger), args),
+    error: (...args) => safeLoggerCall((baseLogger.error || console.error).bind(baseLogger), args),
+  };
+}
+
 async function readBody(req) {
   if (Object.prototype.hasOwnProperty.call(req, REQUEST_BODY_CACHE)) {
     return req[REQUEST_BODY_CACHE];
@@ -1790,7 +1962,7 @@ function recordTraffic(entry) {
   if (trafficLog.length > TRAFFIC_LOG_MAX) trafficLog.shift();
   if (verboseMode) {
     const ts = entry.timestamp.split('T')[1].replace('Z', '');
-    console.log(`[traffic] ${ts} ${entry.method} ${entry.path} → ${entry.status} ${entry.durationMs}ms`);
+    safeLoggerCall(console.log.bind(console), [`[traffic] ${ts} ${entry.method} ${entry.path} → ${entry.status} ${entry.durationMs}ms`]);
   }
 }
 
@@ -1905,7 +2077,20 @@ function resolveConfig(options = {}) {
   const dataDir = String(options.dataDir ?? process.env.LOCAL_API_DATA_DIR ?? resourceDir);
   const mode = String(options.mode ?? process.env.LOCAL_API_MODE ?? 'desktop-sidecar');
   const cloudFallback = String(options.cloudFallback ?? process.env.LOCAL_API_CLOUD_FALLBACK ?? '') === 'true';
-  const logger = options.logger ?? console;
+  const backgroundAutomationEnabled = String(
+    options.backgroundAutomationEnabled
+      ?? process.env.LOCAL_API_BACKGROUND_AUTOMATION
+      ?? 'true',
+  ) !== 'false';
+  const runtimeSecretsMirrorRefreshMs = Math.max(
+    1_000,
+    Number(
+      options.runtimeSecretsMirrorRefreshMs
+      ?? process.env.LOCAL_API_SECRETS_MIRROR_REFRESH_MS
+      ?? RUNTIME_SECRETS_MIRROR_REFRESH_MS,
+    ),
+  );
+  const logger = createSafeLogger(options.logger ?? console);
 
   return {
     port,
@@ -1915,6 +2100,8 @@ function resolveConfig(options = {}) {
     apiDir,
     mode,
     cloudFallback,
+    backgroundAutomationEnabled,
+    runtimeSecretsMirrorRefreshMs,
     logger,
   };
 }
@@ -2360,7 +2547,47 @@ async function probeCodexStatus(context) {
 async function buildAutomationOpsSnapshot(context, requestUrl) {
   const registryPath = String(requestUrl.searchParams.get('registryPath') || '').trim() || undefined;
   const statePath = String(requestUrl.searchParams.get('statePath') || '').trim() || undefined;
+  const collected = await collectAutomationOpsInputs(context, { registryPath, statePath });
 
+  return json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    runtime: {
+      mode: context.mode,
+      port: context.port,
+      remoteBase: context.remoteBase,
+      localApiEnabled: true,
+    },
+    serviceStatus: collected.serviceStatus,
+    health: collected.health,
+    codex: collected.codex,
+    routeCoverage: collected.routeCoverage,
+    credentials: {
+      ...collected.env,
+      requiredKeys: collected.credential.requiredKeys,
+      missingRequiredKeys: collected.credential.missingRequiredKeys,
+    },
+    automation: {
+      registry: collected.automation.registry,
+      lastCycle: collected.automation.lastCycle,
+      runsCount: collected.automation.runs.length,
+      state: {
+        lastCandidateExpansionAt: collected.automation.state?.lastCandidateExpansionAt || null,
+        lastDatasetDiscoveryAt: collected.automation.state?.lastDatasetDiscoveryAt || null,
+        lastSelfTuningAt: collected.automation.state?.lastSelfTuningAt || null,
+        activeCycle: collected.automation.state?.activeCycle || null,
+        queue: collected.automation.queue,
+        consecutiveFailures: Object.values(collected.automation.state?.datasets || {}).reduce((max, dataset) => Math.max(max, Number(dataset?.consecutiveFailures) || 0), 0),
+        lastError: collected.lastFailedRun?.detail || Object.values(collected.automation.state?.datasets || {}).map((dataset) => dataset?.lastError || '').filter(Boolean).slice(-1)[0] || null,
+      },
+    },
+    blockerReasons: collected.blockerReasons,
+  });
+}
+
+async function collectAutomationOpsInputs(context, options = {}) {
+  const registryPath = String(options.registryPath || '').trim() || undefined;
+  const statePath = String(options.statePath || '').trim() || undefined;
   const [serviceStatus, automationStatus, codex] = await Promise.all([
     Promise.resolve(buildLocalServiceStatusPayload(context)),
     getAutomationStatusCached(context, { registryPath, statePath, timeoutMs: 60_000 }).catch((error) => ({
@@ -2388,38 +2615,64 @@ async function buildAutomationOpsSnapshot(context, requestUrl) {
     blockerReasons,
   });
 
+  return {
+    serviceStatus,
+    automationStatus,
+    automation,
+    env,
+    credential,
+    lastFailedRun,
+    routeCoverage,
+    blockerReasons,
+    health,
+    codex,
+  };
+}
+
+async function buildRuntimeObservabilityPayload(context, requestUrl) {
+  const daemonStatePath = String(requestUrl.searchParams.get('daemonStatePath') || '').trim() || DEFAULT_DAEMON_STATE_PATH;
+  const serviceStatus = await buildLocalServiceStatusPayload(context);
+  const daemonSnapshot = readDaemonStateSnapshot(daemonStatePath);
+  const daemon = summarizeRuntimeObservability({
+    daemonState: daemonSnapshot.state,
+    statePath: daemonSnapshot.statePath,
+  });
+  const unhealthyServices = Number(serviceStatus?.summary?.degraded || 0) + Number(serviceStatus?.summary?.outage || 0);
+  const blockerReasons = [
+    ...(daemonSnapshot.error ? [daemonSnapshot.error] : []),
+    ...((serviceStatus?.local?.routeCoverage?.missingHandlerCount || 0) > 0
+      ? [`${serviceStatus.local.routeCoverage.missingHandlerCount} local route misses observed in the last 15m; top missing routes: ${(serviceStatus.local.routeCoverage.topMissingRoutes || []).join(', ') || 'unknown'}`]
+      : []),
+  ];
+  const blockerCount = blockerReasons.length;
+  let status = daemon.status;
+  if (unhealthyServices > 0 && status === 'ready') status = 'watch';
+  if (daemonSnapshot.error && status !== 'blocked') status = 'blocked';
+  const readinessScore = Math.max(0, Math.min(100,
+    daemon.summary.observabilityScore
+      - unhealthyServices * 8
+      - blockerCount * 6
+  ));
+
   return json({
     success: true,
     timestamp: new Date().toISOString(),
-    runtime: {
-      mode: context.mode,
-      port: context.port,
-      remoteBase: context.remoteBase,
-      localApiEnabled: true,
+    summary: {
+      status,
+      observabilityScore: readinessScore,
+      failingTaskCount: daemon.summary.failingTaskCount,
+      staleTaskCount: daemon.summary.staleTaskCount,
+      unhealthyServices,
+      blockerCount,
+      dashboardHealthy: daemon.summary.dashboardHealthy,
+    },
+    daemon: {
+      ...daemon,
+      readError: daemonSnapshot.error || null,
     },
     serviceStatus,
-    health,
-    codex,
-    routeCoverage,
-    credentials: {
-      ...env,
-      requiredKeys: credential.requiredKeys,
-      missingRequiredKeys: credential.missingRequiredKeys,
-    },
-    automation: {
-      registry: automation.registry,
-      lastCycle: automation.lastCycle,
-      runsCount: automation.runs.length,
-      state: {
-        lastCandidateExpansionAt: automation.state?.lastCandidateExpansionAt || null,
-        lastDatasetDiscoveryAt: automation.state?.lastDatasetDiscoveryAt || null,
-        lastSelfTuningAt: automation.state?.lastSelfTuningAt || null,
-        activeCycle: automation.state?.activeCycle || null,
-        queue: automation.queue,
-        consecutiveFailures: Object.values(automation.state?.datasets || {}).reduce((max, dataset) => Math.max(max, Number(dataset?.consecutiveFailures) || 0), 0),
-        lastError: lastFailedRun?.detail || Object.values(automation.state?.datasets || {}).map((dataset) => dataset?.lastError || '').filter(Boolean).slice(-1)[0] || null,
-      },
-    },
+    automationHealth: null,
+    routeCoverage: serviceStatus?.local?.routeCoverage || summarizeFallbackHealth(),
     blockerReasons,
   });
 }
@@ -4831,6 +5084,39 @@ async function dispatch(requestUrl, req, routes, context) {
     }
   }
 
+  if (requestUrl.pathname === '/api/local-analysis-engine') {
+    if (req.method === 'GET') {
+      return json({ ok: true }, 200);
+    }
+    if (req.method !== 'POST') {
+      return json({ error: 'GET or POST required' }, 405);
+    }
+    const body = await readBody(req);
+    if (!body) return json({ error: 'expected request body' }, 400);
+
+    let payload = null;
+    try {
+      payload = JSON.parse(body.toString());
+    } catch {
+      return json({ error: 'expected JSON body' }, 400);
+    }
+
+    const action = String(payload?.action || '').trim();
+    if (!action) return json({ error: 'action required' }, 422);
+
+    try {
+      const result = await runLocalAnalysisRuntimeJob(
+        action,
+        payload?.payload || {},
+        context,
+        Number(payload?.timeoutMs) > 0 ? Number(payload.timeoutMs) : 60_000,
+      );
+      return json(result, 200);
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || 'local analysis engine failed') }, 502);
+    }
+  }
+
   if (requestUrl.pathname === '/api/local-intelligence-replay') {
     if (req.method !== 'POST') {
       return json({ error: 'POST required' }, 405);
@@ -4999,6 +5285,17 @@ async function dispatch(requestUrl, req, routes, context) {
       return await buildAutomationOpsSnapshot(context, requestUrl);
     } catch (error) {
       return json({ ok: false, error: String(error?.message || 'automation ops snapshot failed') }, 502);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-runtime-observability') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    try {
+      return await buildRuntimeObservabilityPayload(context, requestUrl);
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || 'runtime observability failed') }, 502);
     }
   }
 
@@ -5422,21 +5719,20 @@ export async function createLocalApiServer(options = {}) {
       return;
     }
 
-    // Event Intelligence API proxy — forward to dashboard API on port 46200
+    // Event Intelligence API — served directly from the canonical dashboard handler.
     if (requestUrl.pathname.startsWith('/api/event-intel/') || requestUrl.pathname === '/api/event-intel') {
-      const targetPath = requestUrl.pathname.replace(/^\/api\/event-intel/, '/api') + requestUrl.search;
-      const targetUrl = 'http://127.0.0.1:46200' + targetPath;
       try {
-        const proxyResp = await fetch(targetUrl, { signal: AbortSignal.timeout(10000) });
-        const body = await proxyResp.text();
-        res.writeHead(proxyResp.status, {
-          'Content-Type': proxyResp.headers.get('Content-Type') || 'application/json',
+        const targetPath = requestUrl.pathname.replace(/^\/api\/event-intel/, '/api') + requestUrl.search;
+        const mod = await loadEventDashboardModule();
+        const dashboardResponse = await mod.resolveEventDashboardResponse(targetPath);
+        res.writeHead(dashboardResponse.status, {
+          'Content-Type': dashboardResponse.contentType || 'application/json',
           'Access-Control-Allow-Origin': getSidecarCorsOrigin(req),
         });
-        res.end(body);
+        res.end(dashboardResponse.body);
       } catch (err) {
         res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': getSidecarCorsOrigin(req) });
-        res.end(JSON.stringify({ error: 'Event Intelligence API unavailable' }));
+        res.end(JSON.stringify({ error: 'Event Intelligence API unavailable', reason: String(err?.message || err || 'unknown') }));
       }
       return;
     }
@@ -5449,6 +5745,7 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-env-update'
       || requestUrl.pathname === '/api/local-runtime-secrets'
       || requestUrl.pathname === '/api/local-validate-secret'
+      || requestUrl.pathname === '/api/local-analysis-engine'
       || requestUrl.pathname === '/api/local-openbb'
       || requestUrl.pathname === '/api/local-codex-status'
       || requestUrl.pathname === '/api/local-codex-summarize'
@@ -5468,6 +5765,7 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-intelligence-backtest-runs'
       || requestUrl.pathname === '/api/local-intelligence-automation-status'
       || requestUrl.pathname === '/api/local-automation-ops-snapshot'
+      || requestUrl.pathname === '/api/local-runtime-observability'
       || requestUrl.pathname === '/api/local-intelligence-postgres'
       || requestUrl.pathname === '/api/local-intelligence-recommendations'
       || requestUrl.pathname === '/api/local-intelligence-theme-intensity'
@@ -5573,6 +5871,7 @@ export async function createLocalApiServer(options = {}) {
               cwd: context.resourceDir || process.cwd(),
               stdio: 'ignore',
               detached: true,
+              windowsHide: WINDOWS_HIDE_BACKGROUND_CHILDREN,
             });
             child.unref();
           } catch (e) {
@@ -5588,6 +5887,7 @@ export async function createLocalApiServer(options = {}) {
               cwd: context.resourceDir || process.cwd(),
               stdio: 'ignore',
               detached: true,
+              windowsHide: WINDOWS_HIDE_BACKGROUND_CHILDREN,
             });
             child.unref();
           } catch (e) {
@@ -5596,6 +5896,7 @@ export async function createLocalApiServer(options = {}) {
         }, schedulerIntervalMs);
       }
 
+      if (context.backgroundAutomationEnabled) {
       // Check if intelligence-scheduler.mjs exists before starting
       import('node:fs').then(fs => {
         const schedulerPath = path.join(context.resourceDir || process.cwd(), 'scripts', 'intelligence-scheduler.mjs');
@@ -5614,6 +5915,7 @@ export async function createLocalApiServer(options = {}) {
                 cwd: context.resourceDir || process.cwd(),
                 stdio: 'ignore',
                 detached: true,
+                windowsHide: WINDOWS_HIDE_BACKGROUND_CHILDREN,
               });
               accChild.unref();
               context.logger.log('[auto-accumulator] started data accumulation daemon (pid ' + accChild.pid + ')');
@@ -5623,6 +5925,9 @@ export async function createLocalApiServer(options = {}) {
           }, 90_000); // 90s delay — let scheduler run first
         }
       });
+      } else {
+        context.logger.log('[auto-scheduler] disabled by config');
+      }
 
       return { port: boundPort };
     },
@@ -5696,7 +6001,7 @@ if (isMainModule()) {
     const envLocalLoaded = loadEnvFile(path.join(projectRoot, '.env.local'));
     const envLoaded = loadEnvFile(path.join(projectRoot, '.env'));
     if (envLocalLoaded + envLoaded > 0) {
-      console.log(`[sidecar:dev] loaded ${envLocalLoaded} keys from .env.local, ${envLoaded} from .env`);
+      safeLoggerCall(console.log.bind(console), [`[sidecar:dev] loaded ${envLocalLoaded} keys from .env.local, ${envLoaded} from .env`]);
     }
 
     // Step 3: Auto-resolve resourceDir to project root (so api/ directory is found)
@@ -5713,19 +6018,26 @@ if (isMainModule()) {
     }
     if (!process.env.LOCAL_API_TOKEN) {
       // No token = requireLocalApiToken() returns null = auth bypassed in dev
-      console.log('[sidecar:dev] running without auth token (dev mode)');
+      safeLoggerCall(console.log.bind(console), ['[sidecar:dev] running without auth token (dev mode)']);
     }
 
-    console.log(`[sidecar:dev] project root: ${projectRoot}`);
-    console.log(`[sidecar:dev] api dir: ${process.env.LOCAL_API_RESOURCE_DIR}`);
+    safeLoggerCall(console.log.bind(console), [`[sidecar:dev] project root: ${projectRoot}`]);
+    safeLoggerCall(console.log.bind(console), [`[sidecar:dev] api dir: ${process.env.LOCAL_API_RESOURCE_DIR}`]);
 
     const app = await createLocalApiServer();
     await app.start();
 
-    console.log('[sidecar:dev] ready — Vite proxy will forward /api/local-* requests here');
-    console.log('[sidecar:dev] run "npm run dev" in another terminal, then open http://localhost:3000');
+    safeLoggerCall(console.log.bind(console), ['[sidecar:dev] ready — Vite proxy will forward /api/local-* requests here']);
+    safeLoggerCall(console.log.bind(console), ['[sidecar:dev] run "npm run dev" in another terminal, then open http://localhost:3000']);
   } catch (error) {
-    console.error('[local-api] startup failed', error);
+    safeLoggerCall(console.error.bind(console), ['[local-api] startup failed', error]);
     process.exit(1);
   }
+}
+async function loadEventDashboardModule() {
+  if (!eventDashboardModulePromise) {
+    const resourceRoot = process.env.LOCAL_API_RESOURCE_DIR || process.cwd();
+    eventDashboardModulePromise = import(pathToFileURL(path.join(resourceRoot, 'scripts', 'event-dashboard-api.mjs')).href);
+  }
+  return eventDashboardModulePromise;
 }

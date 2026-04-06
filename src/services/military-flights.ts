@@ -14,6 +14,7 @@ import {
   analyzeAircraftDetails,
   checkWingbitsStatus,
 } from './wingbits';
+import { clearProviderCooldown, getProviderCooldownState, setProviderCooldown } from './provider-guard';
 import { isFeatureAvailable } from './runtime-config';
 
 // OpenSky API path — route through Vercel so Railway secret never reaches the browser.
@@ -23,6 +24,9 @@ const DIRECT_OPENSKY_BASE_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/opensky'
   : '';
 const isLocalhostRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const OPENSKY_PROVIDER_KEY = 'opensky';
+const OPENSKY_RATE_LIMIT_COOLDOWN_MS = 20 * 60 * 1000;
+const OPENSKY_GONE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 // Cache configuration
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes - reduce upstream API pressure
@@ -265,7 +269,14 @@ interface RegionResult {
   ok: boolean;
 }
 
+function isOpenSkyCooldownActive(): boolean {
+  return Boolean(getProviderCooldownState(OPENSKY_PROVIDER_KEY));
+}
+
 async function fetchQueryRegion(region: QueryRegion): Promise<RegionResult> {
+  if (isOpenSkyCooldownActive()) {
+    return { name: region.name, flights: [], ok: false };
+  }
   const query = `lamin=${region.lamin}&lamax=${region.lamax}&lomin=${region.lomin}&lomax=${region.lomax}`;
   const urls = [`${OPENSKY_PROXY_URL}?${query}`];
   if (isLocalhostRuntime && DIRECT_OPENSKY_BASE_URL) {
@@ -278,9 +289,16 @@ async function fetchQueryRegion(region: QueryRegion): Promise<RegionResult> {
       if (!response.ok) {
         if (response.status === 429) {
           console.warn(`[Military Flights] Rate limited for ${region.name}`);
+          setProviderCooldown(OPENSKY_PROVIDER_KEY, OPENSKY_RATE_LIMIT_COOLDOWN_MS, `HTTP ${response.status}`);
+        }
+        if (response.status === 410) {
+          console.warn('[Military Flights] OpenSky endpoint returned 410 Gone; backing off for 6 hours');
+          setProviderCooldown(OPENSKY_PROVIDER_KEY, OPENSKY_GONE_COOLDOWN_MS, 'HTTP 410');
+          break;
         }
         continue;
       }
+      clearProviderCooldown(OPENSKY_PROVIDER_KEY);
       const data: OpenSkyResponse = await response.json();
       return { name: region.name, flights: parseOpenSkyResponse(data), ok: true };
     }
@@ -297,6 +315,16 @@ async function fetchFromOpenSky(): Promise<MilitaryFlight[]> {
   const allFlights: MilitaryFlight[] = [];
   const seenHexCodes = new Set<string>();
   let allFailed = true;
+
+  if (isOpenSkyCooldownActive()) {
+    const staleFlights = Array.from(regionCache.values())
+      .filter((entry) => Date.now() - entry.timestamp < STALE_MAX_AGE_MS)
+      .flatMap((entry) => entry.flights);
+    if (staleFlights.length > 0) {
+      return staleFlights;
+    }
+    return [];
+  }
 
   const results = await Promise.all(
     MILITARY_QUERY_REGIONS.map(region => fetchQueryRegion(region))

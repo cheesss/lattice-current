@@ -21,30 +21,29 @@ import type { ServerOptions } from '../src/generated/server/worldmonitor/seismol
 export const serverOptions: ServerOptions = { onError: mapErrorToResponse };
 
 // --- Edge cache tier definitions ---
-// NOTE: This map is shared across all domain bundles (~3KB). Kept centralised for
-// single-source-of-truth maintainability; the size is negligible vs handler code.
+// Unified cache tiers from src/config/cache-tiers.ts (Phase 4.1).
+// The gateway re-exports the same tier type and derives headers from the
+// single-source-of-truth config so CDN/Redis/IDB TTLs never drift.
 
-type CacheTier = 'fast' | 'medium' | 'slow' | 'static' | 'daily' | 'no-store';
+import {
+  type CacheTier,
+  buildCacheControlHeader,
+  buildCdnCacheControlHeader,
+} from '../src/config/cache-tiers';
 
-const TIER_HEADERS: Record<CacheTier, string> = {
-  fast: 'public, s-maxage=300, stale-while-revalidate=60, stale-if-error=600',
-  medium: 'public, s-maxage=600, stale-while-revalidate=120, stale-if-error=900',
-  slow: 'public, s-maxage=1800, stale-while-revalidate=300, stale-if-error=3600',
-  static: 'public, s-maxage=7200, stale-while-revalidate=600, stale-if-error=14400',
-  daily: 'public, s-maxage=86400, stale-while-revalidate=7200, stale-if-error=172800',
-  'no-store': 'no-store',
-};
+export type { CacheTier };
 
-// Cloudflare-specific cache TTLs — more aggressive than s-maxage since CF can
-// revalidate via ETag/If-None-Match without full payload transfer.
-const TIER_CDN_CACHE: Record<CacheTier, string | null> = {
-  fast: 'public, s-maxage=600, stale-while-revalidate=300, stale-if-error=1200',
-  medium: 'public, s-maxage=1200, stale-while-revalidate=600, stale-if-error=1800',
-  slow: 'public, s-maxage=3600, stale-while-revalidate=900, stale-if-error=7200',
-  static: 'public, s-maxage=14400, stale-while-revalidate=3600, stale-if-error=28800',
-  daily: 'public, s-maxage=86400, stale-while-revalidate=14400, stale-if-error=172800',
-  'no-store': null,
-};
+// Pre-compute header strings at module load for zero per-request overhead.
+// daily => s-maxage=86400, stale-while-revalidate=3600, stale-if-error=86400
+const ALL_TIERS: CacheTier[] = ['fast', 'medium', 'slow', 'static', 'daily', 'no-store'];
+
+const TIER_HEADERS: Record<CacheTier, string> = Object.fromEntries(
+  ALL_TIERS.map(t => [t, buildCacheControlHeader(t)])
+) as Record<CacheTier, string>;
+
+const TIER_CDN_CACHE: Record<CacheTier, string | null> = Object.fromEntries(
+  ALL_TIERS.map(t => [t, buildCdnCacheControlHeader(t)])
+) as Record<CacheTier, string | null>;
 
 const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/maritime/v1/get-vessel-snapshot': 'no-store',
@@ -56,6 +55,7 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/market/v1/get-sector-summary': 'medium',
   '/api/market/v1/list-gulf-quotes': 'medium',
   '/api/infrastructure/v1/list-service-statuses': 'slow',
+  '/api/infrastructure/v1/list-temporal-anomalies': 'slow',
   '/api/seismology/v1/list-earthquakes': 'slow',
   '/api/infrastructure/v1/list-internet-outages': 'slow',
 
@@ -64,14 +64,6 @@ const RPC_CACHE_TIER: Record<string, CacheTier> = {
   '/api/conflict/v1/list-acled-events': 'slow',
   '/api/military/v1/get-theater-posture': 'slow',
   '/api/infrastructure/v1/get-temporal-baseline': 'slow',
-  '/api/aviation/v1/list-airport-delays': 'static',
-  '/api/aviation/v1/get-airport-ops-summary': 'static',
-  '/api/aviation/v1/list-airport-flights': 'static',
-  '/api/aviation/v1/get-carrier-ops': 'slow',
-  '/api/aviation/v1/get-flight-status': 'fast',
-  '/api/aviation/v1/track-aircraft': 'no-store',
-  '/api/aviation/v1/search-flight-prices': 'medium',
-  '/api/aviation/v1/list-aviation-news': 'slow',
   '/api/market/v1/get-country-stock-index': 'slow',
 
   '/api/natural/v1/list-natural-events': 'slow',

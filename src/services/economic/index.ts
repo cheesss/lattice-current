@@ -33,7 +33,19 @@ import { getHydratedData } from '@/services/bootstrap';
 // ---- Client + Circuit Breakers ----
 
 const client = new EconomicServiceClient('', { fetch: (...args) => globalThis.fetch(...args) });
+const fredBreakers = new Map<string, ReturnType<typeof createCircuitBreaker<GetFredSeriesResponse>>>();
 const wbBreakers = new Map<string, ReturnType<typeof createCircuitBreaker<ListWorldBankIndicatorsResponse>>>();
+
+function getFredBreaker(seriesId: string) {
+  if (!fredBreakers.has(seriesId)) {
+    fredBreakers.set(seriesId, createCircuitBreaker<GetFredSeriesResponse>({
+      name: `FRED:${seriesId}`,
+      cacheTtlMs: 15 * 60 * 1000,
+      persistCache: true,
+    }));
+  }
+  return fredBreakers.get(seriesId)!;
+}
 
 function getWbBreaker(indicatorCode: string) {
   if (!wbBreakers.has(indicatorCode)) {
@@ -91,6 +103,10 @@ const FRED_SERIES: FredConfig[] = [
   { id: 'CPIAUCSL', name: 'CPI Index', unit: '', precision: 1 },
   { id: 'DGS10', name: '10Y Treasury', unit: '%', precision: 2 },
   { id: 'VIXCLS', name: 'VIX', unit: '', precision: 2 },
+  { id: 'BAMLH0A0HYM2', name: 'HY Credit Spread', unit: 'bps', precision: 0 },
+  { id: 'BAMLC0A0CM', name: 'IG Credit Spread', unit: 'bps', precision: 0 },
+  { id: 'TEDRATE', name: 'TED Spread', unit: '%', precision: 2 },
+  { id: 'NAPM', name: 'ISM Manufacturing PMI', unit: '', precision: 1 },
 ];
 
 export async function fetchFredData(): Promise<FredSeries[]> {
@@ -106,8 +122,10 @@ export async function fetchFredData(): Promise<FredSeries[]> {
       // 404 deploy-skew fallback: batch endpoint not yet deployed, use per-item calls
       if (err instanceof ApiError && err.statusCode === 404) {
         const items = await Promise.all(FRED_SERIES.map((c) =>
-          client.getFredSeries({ seriesId: c.id, limit: 120 }, { signal: AbortSignal.timeout(20_000) })
-            .catch(() => ({ series: undefined }) as GetFredSeriesResponse),
+          getFredBreaker(c.id).execute(
+            async () => client.getFredSeries({ seriesId: c.id, limit: 120 }, { signal: AbortSignal.timeout(20_000) }),
+            { series: undefined } as GetFredSeriesResponse,
+          ),
         ));
         const fallbackResults: Record<string, NonNullable<GetFredSeriesResponse['series']>> = {};
         for (const item of items) {

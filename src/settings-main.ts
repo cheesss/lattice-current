@@ -38,6 +38,19 @@ let activeSection = 'overview';
 let settingsManager: SettingsManager;
 let _diagCleanup: (() => void) | null = null;
 const featureTestMessages = new Map<string, { tone: 'ok' | 'warn' | 'error'; message: string }>();
+const FEATURE_AUXILIARY_SECRETS: Partial<Record<RuntimeFeatureId, RuntimeSecretKey[]>> = {
+  acledConflicts: ['ACLED_EMAIL', 'ACLED_PASSWORD'],
+};
+
+function getFeatureSecretKeys(feature: RuntimeFeatureDefinition, includeAuxiliary = false): RuntimeSecretKey[] {
+  const keys = [...getEffectiveSecrets(feature)];
+  if (includeAuxiliary) {
+    for (const key of FEATURE_AUXILIARY_SECRETS[feature.id] || []) {
+      if (!keys.includes(key)) keys.push(key);
+    }
+  }
+  return keys;
+}
 
 function getAccessCopy(): {
   accessTitle: string;
@@ -92,7 +105,7 @@ function getSecretCandidateValue(key: RuntimeSecretKey): string {
 function getVerificationContext(): Partial<Record<RuntimeSecretKey, string>> {
   const context: Partial<Record<RuntimeSecretKey, string>> = {};
   for (const feature of RUNTIME_FEATURES) {
-    for (const key of getEffectiveSecrets(feature)) {
+    for (const key of getFeatureSecretKeys(feature, true)) {
       const value = getSecretCandidateValue(key);
       if (value) {
         context[key] = value;
@@ -105,7 +118,7 @@ function getVerificationContext(): Partial<Record<RuntimeSecretKey, string>> {
 async function runFeatureSecretTest(featureId: RuntimeFeatureId): Promise<void> {
   const feature = RUNTIME_FEATURES.find(item => item.id === featureId);
   if (!feature) return;
-  const keys = getEffectiveSecrets(feature);
+  const keys = getFeatureSecretKeys(feature, true);
   if (keys.length === 0) {
     setFeatureTestResult(featureId, 'warn', 'No secrets configured for this feature');
     return;
@@ -143,7 +156,7 @@ async function runFeatureSecretTest(featureId: RuntimeFeatureId): Promise<void> 
 
 async function runBulkConfiguredApiTests(features: RuntimeFeatureDefinition[]): Promise<void> {
   const candidates = features.filter((feature) =>
-    getEffectiveSecrets(feature).some((key) => Boolean(getSecretCandidateValue(key))),
+    getFeatureSecretKeys(feature, true).some((key) => Boolean(getSecretCandidateValue(key))),
   );
 
   if (candidates.length === 0) {
@@ -649,14 +662,18 @@ function renderFeatureSection(area: HTMLElement, cat: SettingsCategory): void {
     const enabled = isFeatureEnabled(feature.id);
     const available = isFeatureAvailable(feature.id);
     const effectiveSecrets = getEffectiveSecrets(feature);
+    const renderSecrets = getFeatureSecretKeys(feature, true);
     const allStaged = !available && effectiveSecrets.every(
       k => getSecretState(k).valid || (settingsManager.hasPending(k) && settingsManager.getValidationState(k).validated !== false)
     );
     const borderClass = available ? 'ready' : allStaged ? 'staged' : 'needs';
     const pillClass = available ? 'ok' : allStaged ? 'staged' : 'warn';
     const pillLabel = available ? 'Ready' : allStaged ? 'Staged' : 'Needs keys';
-    const secretRows = effectiveSecrets.map(key => renderSecretInput(key, feature.id)).join('');
+    const secretRows = renderSecrets.map(key => renderSecretInput(key, feature.id)).join('');
     const fallbackHtml = (available || allStaged) ? '' : `<p class="settings-feat-fallback">${escapeHtml(feature.fallback)}</p>`;
+    const auxiliaryHtml = feature.id === 'acledConflicts'
+      ? '<p class="settings-feat-fallback">Optional: save ACLED account email and password so the collector can fall back to cookie login when the access token expires.</p>'
+      : '';
     const testMessage = featureTestMessages.get(feature.id);
     const testResultHtml = testMessage
       ? `<div class="settings-feature-test-result ${testMessage.tone}" data-feature-test-result="${feature.id}">${escapeHtml(testMessage.message)}</div>`
@@ -683,6 +700,7 @@ function renderFeatureSection(area: HTMLElement, cat: SettingsCategory): void {
         </div>
         <div class="settings-feat-body">
           ${secretRows}
+          ${auxiliaryHtml}
           ${fallbackHtml}
           ${featureActions}
           ${testResultHtml}
@@ -1173,7 +1191,7 @@ function handleSearch(query: string): void {
       const searchable = [
         feature.name,
         feature.description,
-        ...getEffectiveSecrets(feature).map(k => HUMAN_LABELS[k] || k),
+        ...getFeatureSecretKeys(feature, true).map(k => HUMAN_LABELS[k] || k),
       ].join(' ').toLowerCase();
       if (searchable.includes(q)) {
         matches.push({ feature, catLabel: cat.label });
@@ -1190,13 +1208,14 @@ function handleSearch(query: string): void {
     const enabled = isFeatureEnabled(feature.id);
     const available = isFeatureAvailable(feature.id);
     const effectiveSecrets = getEffectiveSecrets(feature);
+    const renderSecrets = getFeatureSecretKeys(feature, true);
     const allStaged = !available && effectiveSecrets.every(
       k => getSecretState(k).valid || (settingsManager.hasPending(k) && settingsManager.getValidationState(k).validated !== false)
     );
     const borderClass = available ? 'ready' : allStaged ? 'staged' : 'needs';
     const pillClass = available ? 'ok' : allStaged ? 'staged' : 'warn';
     const pillLabel = available ? 'Ready' : allStaged ? 'Staged' : 'Needs keys';
-    const secretRows = effectiveSecrets.map(key => renderSecretInput(key, feature.id)).join('');
+    const secretRows = renderSecrets.map(key => renderSecretInput(key, feature.id)).join('');
 
     return `
       <div class="settings-feat ${borderClass} expanded" data-feature-id="${feature.id}">

@@ -1,0 +1,33 @@
+name: security-audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (high)
+        run: npm audit --audit-level=high
+
+      - name: Snyk test
+        if: ${{ env.HAS_SNYK == 'true' }}
+        env:
+          HAS_SNYK: ${{ secrets.SNYK_TOKEN != '' && 'true' || 'false' }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: npx snyk test

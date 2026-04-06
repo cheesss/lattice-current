@@ -142,8 +142,8 @@ function deserializeCluster(cluster: SerializedClusteredEvent): ClusteredEvent {
   };
 }
 
-function serializeDatedObject<T extends Record<string, unknown>>(value: T, dateKeys: string[]): Record<string, unknown> {
-  const next: Record<string, unknown> = { ...value };
+function serializeDatedObject(value: object, dateKeys: string[]): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(value as Record<string, unknown>) };
   for (const key of dateKeys) {
     if (next[key] != null) {
       next[key] = asTime(next[key]);
@@ -152,7 +152,7 @@ function serializeDatedObject<T extends Record<string, unknown>>(value: T, dateK
   return next;
 }
 
-function deserializeDatedObject<T extends Record<string, unknown>>(value: T, dateKeys: string[]): T {
+function deserializeDatedObject<T>(value: Record<string, unknown>, dateKeys: string[]): T {
   const next: Record<string, unknown> = { ...value };
   for (const key of dateKeys) {
     if (next[key] != null) {
@@ -163,43 +163,43 @@ function deserializeDatedObject<T extends Record<string, unknown>>(value: T, dat
 }
 
 function serializeAirportDelay(alert: AirportDelayAlert): Record<string, unknown> {
-  return serializeDatedObject(alert as unknown as Record<string, unknown>, ['updatedAt']);
+  return serializeDatedObject(alert, ['updatedAt']);
 }
 
 function deserializeAirportDelay(alert: Record<string, unknown>): AirportDelayAlert {
-  return deserializeDatedObject(alert, ['updatedAt']) as unknown as AirportDelayAlert;
+  return deserializeDatedObject<AirportDelayAlert>(alert, ['updatedAt']);
 }
 
 function serializeOutage(outage: InternetOutage): Record<string, unknown> {
-  return serializeDatedObject(outage as unknown as Record<string, unknown>, ['pubDate', 'endDate']);
+  return serializeDatedObject(outage, ['pubDate', 'endDate']);
 }
 
 function deserializeOutage(outage: Record<string, unknown>): InternetOutage {
-  return deserializeDatedObject(outage, ['pubDate', 'endDate']) as unknown as InternetOutage;
+  return deserializeDatedObject<InternetOutage>(outage, ['pubDate', 'endDate']);
 }
 
 function serializeProtest(event: SocialUnrestEvent): Record<string, unknown> {
-  return serializeDatedObject(event as unknown as Record<string, unknown>, ['time']);
+  return serializeDatedObject(event, ['time']);
 }
 
 function deserializeProtest(event: Record<string, unknown>): SocialUnrestEvent {
-  return deserializeDatedObject(event, ['time']) as unknown as SocialUnrestEvent;
+  return deserializeDatedObject<SocialUnrestEvent>(event, ['time']);
 }
 
 function serializeEarthquakeRecord(event: Earthquake): Record<string, unknown> {
-  return serializeDatedObject(event as unknown as Record<string, unknown>, ['time', 'occurredAt']);
+  return serializeDatedObject(event, ['time', 'occurredAt']);
 }
 
 function deserializeEarthquakeRecord(event: Record<string, unknown>): Earthquake {
-  return deserializeDatedObject(event, ['time', 'occurredAt']) as unknown as Earthquake;
+  return deserializeDatedObject<Earthquake>(event, ['time', 'occurredAt']);
 }
 
 function serializeFlight(flight: MilitaryFlight): Record<string, unknown> {
-  return serializeDatedObject(flight as unknown as Record<string, unknown>, ['lastSeen', 'firstSeen']);
+  return serializeDatedObject(flight, ['lastSeen', 'firstSeen']);
 }
 
 function deserializeFlight(flight: Record<string, unknown>): MilitaryFlight {
-  return deserializeDatedObject(flight, ['lastSeen', 'firstSeen']) as unknown as MilitaryFlight;
+  return deserializeDatedObject<MilitaryFlight>(flight, ['lastSeen', 'firstSeen']);
 }
 
 function serializeFlightCluster(cluster: MilitaryFlightCluster): Record<string, unknown> {
@@ -211,18 +211,19 @@ function serializeFlightCluster(cluster: MilitaryFlightCluster): Record<string, 
 
 function deserializeFlightCluster(cluster: Record<string, unknown>): MilitaryFlightCluster {
   const rawFlights = Array.isArray(cluster.flights) ? cluster.flights as Record<string, unknown>[] : [];
+  const { flights: _raw, ...rest } = cluster;
   return {
-    ...(cluster as unknown as MilitaryFlightCluster),
+    ...rest as Omit<MilitaryFlightCluster, 'flights'>,
     flights: rawFlights.map(deserializeFlight),
   };
 }
 
 function serializeVessel(vessel: MilitaryVessel): Record<string, unknown> {
-  return serializeDatedObject(vessel as unknown as Record<string, unknown>, ['lastAisUpdate']);
+  return serializeDatedObject(vessel, ['lastAisUpdate']);
 }
 
 function deserializeVessel(vessel: Record<string, unknown>): MilitaryVessel {
-  return deserializeDatedObject(vessel, ['lastAisUpdate']) as unknown as MilitaryVessel;
+  return deserializeDatedObject<MilitaryVessel>(vessel, ['lastAisUpdate']);
 }
 
 function serializeVesselCluster(cluster: MilitaryVesselCluster): Record<string, unknown> {
@@ -234,18 +235,19 @@ function serializeVesselCluster(cluster: MilitaryVesselCluster): Record<string, 
 
 function deserializeVesselCluster(cluster: Record<string, unknown>): MilitaryVesselCluster {
   const rawVessels = Array.isArray(cluster.vessels) ? cluster.vessels as Record<string, unknown>[] : [];
+  const { vessels: _raw, ...rest } = cluster;
   return {
-    ...(cluster as unknown as MilitaryVesselCluster),
+    ...rest as Omit<MilitaryVesselCluster, 'vessels'>,
     vessels: rawVessels.map(deserializeVessel),
   };
 }
 
 function serializeAdvisory(advisory: SecurityAdvisory): Record<string, unknown> {
-  return serializeDatedObject(advisory as unknown as Record<string, unknown>, ['pubDate']);
+  return serializeDatedObject(advisory, ['pubDate']);
 }
 
 function deserializeAdvisory(advisory: Record<string, unknown>): SecurityAdvisory {
-  return deserializeDatedObject(advisory, ['pubDate']) as unknown as SecurityAdvisory;
+  return deserializeDatedObject<SecurityAdvisory>(advisory, ['pubDate']);
 }
 
 function capArray<T>(value: T[] | undefined, limit = MAX_GENERIC_ARRAY): T[] {
@@ -293,8 +295,9 @@ function reviveIntelligenceCache(raw: Record<string, unknown> | null | undefined
   if (Array.isArray(raw.outages)) next.outages = raw.outages.map((item) => deserializeOutage(item as Record<string, unknown>));
   if (raw.protests && typeof raw.protests === 'object') {
     const protests = raw.protests as Record<string, unknown>;
+    const { events: _rawEvents, ...protestRest } = protests;
     next.protests = {
-      ...(protests as unknown as NonNullable<IntelligenceCache['protests']>),
+      ...(protestRest as Omit<NonNullable<IntelligenceCache['protests']>, 'events'>),
       events: Array.isArray(protests.events)
         ? protests.events.map((item) => deserializeProtest(item as Record<string, unknown>))
         : [],
@@ -303,8 +306,9 @@ function reviveIntelligenceCache(raw: Record<string, unknown> | null | undefined
   if (Array.isArray(raw.earthquakes)) next.earthquakes = raw.earthquakes.map((item) => deserializeEarthquakeRecord(item as Record<string, unknown>));
   if (raw.military && typeof raw.military === 'object') {
     const military = raw.military as Record<string, unknown>;
+    const { flights: _rf, flightClusters: _rfc, vessels: _rv, vesselClusters: _rvc, ...militaryRest } = military;
     next.military = {
-      ...(military as unknown as NonNullable<IntelligenceCache['military']>),
+      ...(militaryRest as Omit<NonNullable<IntelligenceCache['military']>, 'flights' | 'flightClusters' | 'vessels' | 'vesselClusters'>),
       flights: Array.isArray(military.flights)
         ? military.flights.map((item) => deserializeFlight(item as Record<string, unknown>))
         : [],

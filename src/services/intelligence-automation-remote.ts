@@ -249,6 +249,65 @@ export interface LocalRuntimeSecretsPayload {
   sources?: Record<string, 'env' | 'mirror'>;
 }
 
+export interface LocalRuntimeObservabilityTask {
+  name: string;
+  intervalMinutes: number | null;
+  lastRunAt: string | null;
+  lagMinutes: number | null;
+  stale: boolean;
+  status: 'ready' | 'watch' | 'degraded' | 'blocked';
+  consecutiveFailures: number;
+  disabledUntil: string | null;
+  error: string | null;
+}
+
+export interface LocalRuntimeObservabilityPayload {
+  success?: boolean;
+  timestamp?: string;
+  summary?: {
+    status?: 'ready' | 'watch' | 'degraded' | 'blocked';
+    observabilityScore?: number;
+    failingTaskCount?: number;
+    staleTaskCount?: number;
+    unhealthyServices?: number;
+    blockerCount?: number;
+    dashboardHealthy?: boolean;
+  };
+  daemon?: {
+    statePath?: string;
+    sampledAt?: string;
+    status?: 'ready' | 'watch' | 'degraded' | 'blocked';
+    readError?: string | null;
+    summary?: {
+      observabilityScore?: number;
+      healthyTaskCount?: number;
+      waitingTaskCount?: number;
+      failingTaskCount?: number;
+      staleTaskCount?: number;
+      taskCount?: number;
+      dashboardHealthy?: boolean;
+      latestTaskAt?: string | null;
+    };
+    dashboard?: {
+      ok?: boolean;
+      checkedAt?: string | null;
+      error?: string | null;
+      payload?: unknown;
+    };
+    tasks?: LocalRuntimeObservabilityTask[];
+  };
+  serviceStatus?: LocalAutomationOpsSnapshotPayload['serviceStatus'];
+  automationHealth?: LocalAutomationOpsSnapshotPayload['health'];
+  routeCoverage?: LocalAutomationOpsSnapshotPayload['serviceStatus'] extends infer _ ? {
+    missingHandlerCount?: number;
+    missingRouteCount?: number;
+    cloudFallbackCount?: number;
+    cloudFallbackRouteCount?: number;
+    topMissingRoutes?: string[];
+  } : never;
+  blockerReasons?: string[];
+}
+
 export interface LocalReplayTriggerPayload {
   ok?: boolean;
   error?: string;
@@ -302,6 +361,10 @@ function localAutomationOpsSnapshotEndpoint(): string {
 
 function localRuntimeSecretsEndpoint(): string {
   return '/api/local-runtime-secrets';
+}
+
+function localRuntimeObservabilityEndpoint(): string {
+  return '/api/local-runtime-observability';
 }
 
 function automationStatusEndpoint(): string {
@@ -387,6 +450,18 @@ export async function getLocalRuntimeSecretsRemote(): Promise<LocalRuntimeSecret
     });
     if (!response.ok) return null;
     return await safeJson<LocalRuntimeSecretsPayload>(response);
+  } catch {
+    return null;
+  }
+}
+
+export async function getLocalRuntimeObservabilityRemote(): Promise<LocalRuntimeObservabilityPayload | null> {
+  try {
+    const response = await fetch(localRuntimeObservabilityEndpoint(), {
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    return await safeJson<LocalRuntimeObservabilityPayload>(response);
   } catch {
     return null;
   }

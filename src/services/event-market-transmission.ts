@@ -7,6 +7,7 @@ import { inferMarketRegime, regimeMultiplierForRelation } from './math-models/re
 import { createKalmanState, updateKalmanState } from './math-models/kalman-filter';
 import { getPersistentCache, setPersistentCache } from './persistent-cache';
 import { logSourceOpsEvent } from './source-ops-log';
+import { getAdaptiveParamStore } from './investment/adaptive-params';
 
 export interface EventMarketTransmissionEdge {
   id: string;
@@ -201,6 +202,7 @@ export async function recomputeEventMarketTransmission(args: {
   clusters: ClusteredEvent[];
   markets: MarketData[];
   keywordGraph?: KeywordGraphSnapshot | null;
+  skipPersist?: boolean;
 }): Promise<EventMarketTransmissionSnapshot> {
   await ensureLoaded();
 
@@ -268,10 +270,24 @@ export async function recomputeEventMarketTransmission(args: {
       const rawStrength = Math.max(1, Math.min(100, matched.strength + moveBonus + event.boost + graphBonus + flowBonus));
       const regimeMultiplier = regimeMultiplierForRelation(regime, matched.type);
       const measurement = Math.max(1, Math.min(100, rawStrength * regimeMultiplier));
+      const confidenceScale = 1 + Math.max(0, (regime.confidence - 50) / 100);
+      const _adaptiveStore = getAdaptiveParamStore();
+      const baseProcessNoise = _adaptiveStore.ready ? _adaptiveStore.kalmanProcessNoise(market.symbol) : 0.8;
+      const baseMeasurementNoise = _adaptiveStore.ready ? _adaptiveStore.kalmanMeasurementNoise(market.symbol) : 3.6;
+      const adaptiveMeasurementNoise = baseMeasurementNoise + Math.max(0, (regime.features.vixChange || 0)) * 0.18 + (1 - Math.min(1, flow.supportScore / 100)) * 1.6;
+      const adaptiveProcessNoise = baseProcessNoise + Math.abs(regimeMultiplier - 1) * 1.4 + confidenceScale * 0.12;
       const kalmanState = updateKalmanState(
-        currentKalmanStates[`${event.title}::${market.symbol}`.toLowerCase()] ?? createKalmanState(measurement, { processNoise: 1.2, measurementNoise: 5.6 }),
+        currentKalmanStates[`${event.title}::${market.symbol}`.toLowerCase()] ?? createKalmanState(measurement, {
+          processNoise: adaptiveProcessNoise,
+          measurementNoise: adaptiveMeasurementNoise,
+        }),
         measurement,
-        { processNoise: 1.2, measurementNoise: 5.6 },
+        {
+          processNoise: adaptiveProcessNoise,
+          measurementNoise: adaptiveMeasurementNoise,
+          adaptive: true,
+          adaptationRate: 0.08,
+        },
       );
       currentKalmanStates[`${event.title}::${market.symbol}`.toLowerCase()] = kalmanState;
       const strength = Math.max(1, Math.min(100, Math.round(kalmanState.x)));
@@ -322,7 +338,7 @@ export async function recomputeEventMarketTransmission(args: {
       `${edge.eventTitle} -> ${edge.marketSymbol} (${edge.relationType}, ${edge.strength}, regime=${regime.id}, flow=${edge.flowDirection || 'neutral'})`,
     ),
   };
-  await persist();
+  if (!args.skipPersist) await persist();
   await logSourceOpsEvent({
     kind: 'transmission',
     action: 'recomputed',
@@ -333,6 +349,24 @@ export async function recomputeEventMarketTransmission(args: {
     category: 'transmission',
   });
   return currentSnapshot;
+}
+
+/**
+ * Batch mode: compute transmission from ALL frames' news/clusters/markets at once.
+ * All event-market pairs are matched and Kalman-filtered in one pass.
+ */
+export async function batchComputeTransmission(
+  allNews: NewsItem[],
+  allClusters: ClusteredEvent[],
+  allMarkets: MarketData[],
+): Promise<EventMarketTransmissionSnapshot> {
+  return recomputeEventMarketTransmission({
+    news: allNews,
+    clusters: allClusters,
+    markets: allMarkets,
+    keywordGraph: null,
+    skipPersist: true,
+  });
 }
 
 export async function getEventMarketTransmissionSnapshot(): Promise<EventMarketTransmissionSnapshot | null> {

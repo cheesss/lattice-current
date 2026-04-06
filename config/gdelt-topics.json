@@ -1,0 +1,70 @@
+{
+  "topics": [
+    {
+      "id": "military",
+      "name": "Military Activity",
+      "query": "(military exercise OR troop deployment OR airstrike OR \"naval exercise\") sourcelang:eng",
+      "icon": "shield",
+      "description": "Military exercises, deployments, and operations",
+      "enabled": true,
+      "priority": 100,
+      "lastUpdatedAt": "2026-03-24T00:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "id": "cyber",
+      "name": "Cyber Threats",
+      "query": "(cyberattack OR ransomware OR hacking OR \"data breach\" OR APT) sourcelang:eng",
+      "icon": "terminal",
+      "description": "Cyber attacks, ransomware, and digital threats",
+      "enabled": true,
+      "priority": 95,
+      "lastUpdatedAt": "2026-03-24T00:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "id": "nuclear",
+      "name": "Nuclear",
+      "query": "(nuclear OR uranium enrichment OR IAEA OR \"nuclear weapon\" OR plutonium) sourcelang:eng",
+      "icon": "atom",
+      "description": "Nuclear programs, inspections, proliferation",
+      "enabled": true,
+      "priority": 92,
+      "lastUpdatedAt": "2026-03-24T00:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "id": "sanctions",
+      "name": "Sanctions",
+      "query": "(sanctions OR embargo OR \"trade war\" OR tariff OR \"economic pressure\") sourcelang:eng",
+      "icon": "ban",
+      "description": "Economic sanctions and trade restrictions",
+      "enabled": true,
+      "priority": 90,
+      "lastUpdatedAt": "2026-03-24T00:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "id": "intelligence",
+      "name": "Intelligence",
+      "query": "(espionage OR spy OR intelligence agency OR covert OR surveillance) sourcelang:eng",
+      "icon": "search",
+      "description": "Espionage, intelligence operations, surveillance",
+      "enabled": true,
+      "priority": 88,
+      "lastUpdatedAt": "2026-03-24T00:00:00.000Z",
+      "source": "manual"
+    },
+    {
+      "id": "maritime",
+      "name": "Maritime Security",
+      "query": "(naval blockade OR piracy OR \"strait of hormuz\" OR \"south china sea\" OR warship) sourcelang:eng",
+      "icon": "anchor",
+      "description": "Naval operations, chokepoints, sea lanes",
+      "enabled": true,
+      "priority": 86,
+      "lastUpdatedAt": "2026-03-24T00:00:00.000Z",
+      "source": "manual"
+    }
+  ]
+}

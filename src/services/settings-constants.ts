@@ -32,6 +32,7 @@ export const PLAINTEXT_KEYS = new Set<RuntimeSecretKey>([
   'WS_RELAY_URL',
   'VITE_OPENSKY_RELAY_URL',
   'OPENBB_API_URL',
+  'ACLED_EMAIL',
 ]);
 
 export const MASKED_SENTINEL = '__WM_MASKED__';
@@ -45,6 +46,8 @@ export const HUMAN_LABELS: Record<RuntimeSecretKey, string> = {
   EIA_API_KEY: 'EIA API Key',
   CLOUDFLARE_API_TOKEN: 'Cloudflare API Token',
   ACLED_ACCESS_TOKEN: 'ACLED Access Token',
+  ACLED_EMAIL: 'ACLED Account Email',
+  ACLED_PASSWORD: 'ACLED Account Password',
   URLHAUS_AUTH_KEY: 'URLhaus Auth Key',
   OTX_API_KEY: 'AlienVault OTX Key',
   ABUSEIPDB_API_KEY: 'AbuseIPDB API Key',

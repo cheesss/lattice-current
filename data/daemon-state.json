@@ -1,0 +1,139 @@
+{
+  "lastRun": {
+    "pending-check": 1775432981878,
+    "dashboard-health": 1775432945222,
+    "signal-refresh": 1775432945140,
+    "article-check": 1775432945194,
+    "auto-pipeline": 1775432969915,
+    "sensitivity-refresh": 1775432970114,
+    "master-pipeline": 1775432980714,
+    "executor": 1775432981457,
+    "full-rebuild": 1775433210511,
+    "daily-report": 1775433210692
+  },
+  "taskResults": {
+    "pending-check": {
+      "ok": true,
+      "at": "2026-04-05T23:49:41.878Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "dashboard-health": {
+      "ok": true,
+      "at": "2026-04-05T23:49:05.222Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "signal-refresh": {
+      "ok": true,
+      "at": "2026-04-05T23:49:05.140Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "article-check": {
+      "ok": true,
+      "at": "2026-04-05T23:49:05.194Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "auto-pipeline": {
+      "ok": true,
+      "at": "2026-04-05T23:49:29.915Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "sensitivity-refresh": {
+      "ok": true,
+      "at": "2026-04-05T23:49:30.114Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "master-pipeline": {
+      "ok": true,
+      "at": "2026-04-05T23:49:40.714Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "executor": {
+      "ok": true,
+      "at": "2026-04-05T23:49:41.457Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "full-rebuild": {
+      "ok": true,
+      "at": "2026-04-05T23:53:30.511Z",
+      "error": "",
+      "consecutiveFailures": 0
+    },
+    "daily-report": {
+      "ok": true,
+      "at": "2026-04-05T23:53:30.692Z",
+      "error": "",
+      "consecutiveFailures": 0
+    }
+  },
+  "failures": {
+    "pending-check": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "dashboard-health": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "signal-refresh": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "article-check": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "auto-pipeline": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "sensitivity-refresh": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "master-pipeline": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "executor": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "full-rebuild": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    },
+    "daily-report": {
+      "consecutive": 0,
+      "disabledUntil": 0,
+      "lastError": ""
+    }
+  },
+  "health": {
+    "dashboard": {
+      "ok": true,
+      "checkedAt": "2026-04-05T23:49:05.221Z",
+      "payload": {
+        "status": "ok",
+        "timestamp": "2026-04-05T23:49:05.216Z",
+        "db": "connected"
+      }
+    }
+  }
+}

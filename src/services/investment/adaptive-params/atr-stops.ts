@@ -1,6 +1,5 @@
 import type { PricePoint, AtrStopResult } from './types';
-
-function clamp(v: number, min: number, max: number): number { return Math.max(min, Math.min(max, v)); }
+import { clamp } from './math-utils';
 
 function computeAtr(prices: PricePoint[], period = 14): number {
   if (prices.length < 2) return 0;

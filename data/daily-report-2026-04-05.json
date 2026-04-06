@@ -1,0 +1,231 @@
+{
+  "date": "2026-04-05",
+  "generatedAt": "2026-04-05T23:53:30.687Z",
+  "articles": {
+    "total": 60721,
+    "new_24h": 224
+  },
+  "labeledOutcomes": {
+    "total": 619495,
+    "new_24h": 224
+  },
+  "signals": [
+    {
+      "signal_name": "cot_dollar",
+      "latest": "2022-02-01T00:00:00.000Z",
+      "points": 57
+    },
+    {
+      "signal_name": "cot_euro_fx",
+      "latest": "2026-03-31T00:00:00.000Z",
+      "points": 274
+    },
+    {
+      "signal_name": "cot_gold",
+      "latest": "2026-03-31T00:00:00.000Z",
+      "points": 274
+    },
+    {
+      "signal_name": "cot_oil",
+      "latest": "2026-03-31T00:00:00.000Z",
+      "points": 274
+    },
+    {
+      "signal_name": "cot_sp500",
+      "latest": "2026-03-31T00:00:00.000Z",
+      "points": 274
+    },
+    {
+      "signal_name": "cot_treasury_10y",
+      "latest": "2026-03-31T00:00:00.000Z",
+      "points": 274
+    },
+    {
+      "signal_name": "e2e_probe",
+      "latest": "2021-04-01T13:30:00.000Z",
+      "points": 1
+    },
+    {
+      "signal_name": "eventIntensity",
+      "latest": "2025-12-31T00:00:00.000Z",
+      "points": 2473
+    },
+    {
+      "signal_name": "gpr",
+      "latest": "2026-04-05T00:00:00.000Z",
+      "points": 1743
+    },
+    {
+      "signal_name": "hy_credit_spread",
+      "latest": "2026-04-02T00:00:00.000Z",
+      "points": 1374
+    },
+    {
+      "signal_name": "ig_credit_spread",
+      "latest": "2026-04-02T00:00:00.000Z",
+      "points": 1373
+    },
+    {
+      "signal_name": "marketStress",
+      "latest": "2025-12-31T00:00:00.000Z",
+      "points": 2473
+    },
+    {
+      "signal_name": "ted_spread",
+      "latest": "2022-01-21T00:00:00.000Z",
+      "points": 258
+    },
+    {
+      "signal_name": "transmissionStrength",
+      "latest": "2025-12-31T00:00:00.000Z",
+      "points": 2473
+    },
+    {
+      "signal_name": "vix",
+      "latest": "2026-04-01T00:00:00.000Z",
+      "points": 1346
+    },
+    {
+      "signal_name": "yieldSpread",
+      "latest": "2026-04-03T00:00:00.000Z",
+      "points": 1313
+    }
+  ],
+  "proposals": [
+    {
+      "status": "executed",
+      "cnt": 5
+    }
+  ],
+  "pendingOutcomes": {
+    "total": 2871,
+    "overdue": 27
+  },
+  "daemonState": {
+    "lastRun": {
+      "pending-check": 1775432981878,
+      "dashboard-health": 1775432945222,
+      "signal-refresh": 1775432945140,
+      "article-check": 1775432945194,
+      "auto-pipeline": 1775432969915,
+      "sensitivity-refresh": 1775432970114,
+      "master-pipeline": 1775432980714,
+      "executor": 1775432981457,
+      "full-rebuild": 1775433210511
+    },
+    "taskResults": {
+      "pending-check": {
+        "ok": true,
+        "at": "2026-04-05T23:49:41.878Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "dashboard-health": {
+        "ok": true,
+        "at": "2026-04-05T23:49:05.222Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "signal-refresh": {
+        "ok": true,
+        "at": "2026-04-05T23:49:05.140Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "article-check": {
+        "ok": true,
+        "at": "2026-04-05T23:49:05.194Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "auto-pipeline": {
+        "ok": true,
+        "at": "2026-04-05T23:49:29.915Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "sensitivity-refresh": {
+        "ok": true,
+        "at": "2026-04-05T23:49:30.114Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "master-pipeline": {
+        "ok": true,
+        "at": "2026-04-05T23:49:40.714Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "executor": {
+        "ok": true,
+        "at": "2026-04-05T23:49:41.457Z",
+        "error": "",
+        "consecutiveFailures": 0
+      },
+      "full-rebuild": {
+        "ok": true,
+        "at": "2026-04-05T23:53:30.511Z",
+        "error": "",
+        "consecutiveFailures": 0
+      }
+    },
+    "failures": {
+      "pending-check": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "dashboard-health": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "signal-refresh": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "article-check": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "auto-pipeline": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "sensitivity-refresh": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "master-pipeline": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "executor": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      },
+      "full-rebuild": {
+        "consecutive": 0,
+        "disabledUntil": 0,
+        "lastError": ""
+      }
+    },
+    "health": {
+      "dashboard": {
+        "ok": true,
+        "checkedAt": "2026-04-05T23:49:05.221Z",
+        "payload": {
+          "status": "ok",
+          "timestamp": "2026-04-05T23:49:05.216Z",
+          "db": "connected"
+        }
+      }
+    }
+  }
+}

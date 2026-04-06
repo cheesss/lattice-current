@@ -1,152 +1,195 @@
 #!/usr/bin/env node
-/**
- * ollama-article-analyzer.mjs — 기사 제목 분석 (Ollama LLM, 비용 $0)
- *
- * 로컬 Ollama gemma3:4b를 사용하여 기사 제목에서 추출:
- * - 키워드 (핵심 용어 5-8개)
- * - 엔티티 (회사명, 국가명, 인물명, 티커 심볼)
- * - 테마 분류
- * - 감성 분석 (positive / negative / neutral)
- *
- * Usage:
- *   node --import tsx scripts/ollama-article-analyzer.mjs              # 미처리 기사 분석
- *   node --import tsx scripts/ollama-article-analyzer.mjs --limit 100  # 배치 크기 제한
- *   node --import tsx scripts/ollama-article-analyzer.mjs --since 2025-01-01
- */
 
 import pg from 'pg';
-import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+import { pathToFileURL } from 'node:url';
+import { loadOptionalEnvFile, resolveNasPgConfig, resolveOllamaChatConfig } from './_shared/nas-runtime.mjs';
+import { ensureArticleAnalysisTables } from './_shared/article-analysis-schema.mjs';
+import { normalizeText, tokenizeText } from './_shared/text-keywords.mjs';
 
 loadOptionalEnvFile();
+
 const { Client } = pg;
 const PG_CONFIG = resolveNasPgConfig();
-
-const OLLAMA_URL = (process.env.OLLAMA_API_URL || process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/+$/, '');
-const CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || 'gemma3:4b';
 const BATCH_SIZE = 10;
-const PROGRESS_INTERVAL = 50;
+const PROGRESS_INTERVAL = 25;
 
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const result = { limit: 0, since: null };
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--limit' && args[i + 1]) result.limit = parseInt(args[++i]);
-    if (args[i] === '--since' && args[i + 1]) result.since = args[++i];
+export function parseArgs(argv = process.argv.slice(2)) {
+  const result = {
+    limit: 0,
+    since: null,
+    mode: 'ambiguous',
+    confidenceThreshold: 0.45,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--limit' && argv[index + 1]) result.limit = parseInt(argv[++index], 10);
+    else if (arg === '--since' && argv[index + 1]) result.since = argv[++index];
+    else if (arg === '--mode' && argv[index + 1]) result.mode = argv[++index];
+    else if (arg === '--confidence-threshold' && argv[index + 1]) result.confidenceThreshold = parseFloat(argv[++index]);
   }
+
   return result;
 }
 
-/**
- * Send a chat prompt to the local Ollama instance and return the text response.
- */
 async function chatOllama(prompt) {
-  const resp = await fetch(`${OLLAMA_URL}/api/chat`, {
+  const { endpoint, model } = resolveOllamaChatConfig();
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: CHAT_MODEL,
+      model,
       messages: [{ role: 'user', content: prompt }],
       stream: false,
     }),
     signal: AbortSignal.timeout(60_000),
   });
-  if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${await resp.text()}`);
-  const result = await resp.json();
+
+  if (!response.ok) {
+    throw new Error(`Ollama ${response.status}: ${await response.text()}`);
+  }
+
+  const result = await response.json();
   return result.message?.content || '';
 }
 
-/**
- * Build the analysis prompt for a single headline.
- */
-function buildPrompt(title) {
-  return `Extract the following from this news headline. Respond ONLY with valid JSON, no explanation.
+function buildPrompt(article) {
+  const keywordHint = Array.isArray(article.existing_keywords) && article.existing_keywords.length > 0
+    ? `Existing fast-path keywords: ${article.existing_keywords.join(', ')}\n`
+    : '';
 
-Headline: "${title}"
-
-Return JSON with exactly these fields:
-{
-  "keywords": ["keyword1", "keyword2", ...],
-  "entities": {
-    "companies": ["Company Name"],
-    "countries": ["Country Name"],
-    "persons": ["Person Name"],
-    "tickers": ["TICKER"]
-  },
-  "theme": "one of: conflict, tech, energy, economy, politics, health, environment, finance, other",
-  "sentiment": "positive or negative or neutral",
-  "confidence": 0.0 to 1.0
+  return `Extract the following from this news headline. Respond only with valid JSON.\n\nHeadline: "${article.title}"\n${keywordHint}Return JSON with exactly these fields:\n{\n  "keywords": ["keyword1", "keyword2"],\n  "entities": {\n    "companies": ["Company Name"],\n    "countries": ["Country Name"],\n    "persons": ["Person Name"],\n    "tickers": ["TICKER"]\n  },\n  "theme": "conflict|tech|energy|economy|politics|health|environment|finance|other",\n  "sentiment": "positive|negative|neutral",\n  "confidence": 0.0\n}\n\nRules:\n- keywords: 5-8 important terms\n- theme: single best category\n- confidence: 0.0-1.0\n- no markdown, no prose`;
 }
 
-Rules:
-- keywords: 5-8 important terms from the headline
-- entities: extract company names, country names, person names, ticker symbols. Use empty arrays if none found.
-- theme: pick the single best category
-- sentiment: the overall tone of the headline
-- confidence: how confident you are in the analysis (0.0-1.0)`;
+const META_KEYWORD_STOPWORDS = new Set(['keyword', 'keywords', 'headline', 'latest', 'here', 'fast', 'path', 'fast-path']);
+
+export function filterKeywordsToHeadline(keywords, article) {
+  const headlineTokens = new Set(tokenizeText(article.title || ''));
+  const existingTokens = new Set((article.existing_keywords || []).map((value) => normalizeText(value)));
+  return keywords.filter((keyword) => {
+    const normalized = normalizeText(keyword);
+    if (!normalized || META_KEYWORD_STOPWORDS.has(normalized)) return false;
+    return headlineTokens.has(normalized) || existingTokens.has(normalized);
+  });
 }
 
-/**
- * Attempt to parse the LLM response as JSON. Handles common quirks like
- * markdown code blocks or trailing text outside the JSON object.
- */
-function parseAnalysis(raw) {
-  let text = raw.trim();
-
-  // Strip markdown code fences if present
+function parseAnalysis(raw, article) {
+  let text = String(raw || '').trim();
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced) text = fenced[1].trim();
 
-  // Try to isolate the JSON object
-  const objStart = text.indexOf('{');
-  const objEnd = text.lastIndexOf('}');
-  if (objStart >= 0 && objEnd > objStart) {
-    text = text.slice(objStart, objEnd + 1);
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    text = text.slice(start, end + 1);
   }
 
   const parsed = JSON.parse(text);
-
-  // Normalise / validate fields
   const keywords = Array.isArray(parsed.keywords)
-    ? parsed.keywords.map(String).filter(k => k.length > 0).slice(0, 12)
+    ? parsed.keywords.map((value) => String(value).trim()).filter(Boolean).slice(0, 12)
     : [];
-
   const entities = {
     companies: Array.isArray(parsed.entities?.companies) ? parsed.entities.companies.map(String) : [],
     countries: Array.isArray(parsed.entities?.countries) ? parsed.entities.countries.map(String) : [],
     persons: Array.isArray(parsed.entities?.persons) ? parsed.entities.persons.map(String) : [],
     tickers: Array.isArray(parsed.entities?.tickers) ? parsed.entities.tickers.map(String) : [],
   };
-
-  const validSentiments = new Set(['positive', 'negative', 'neutral']);
-  const sentiment = validSentiments.has(parsed.sentiment) ? parsed.sentiment : 'neutral';
-
-  let confidence = parseFloat(parsed.confidence);
-  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) confidence = 0.5;
-
+  const sentiment = ['positive', 'negative', 'neutral'].includes(parsed.sentiment)
+    ? parsed.sentiment
+    : 'neutral';
   const theme = typeof parsed.theme === 'string' ? parsed.theme.toLowerCase().trim() : 'other';
+  const confidence = Number.isFinite(Number(parsed.confidence))
+    ? Math.min(1, Math.max(0, Number(parsed.confidence)))
+    : 0.5;
 
-  return { keywords, entities, sentiment, confidence, theme };
+  return {
+    keywords: filterKeywordsToHeadline(keywords, article),
+    entities,
+    sentiment,
+    theme,
+    confidence,
+  };
 }
 
-/**
- * Process a single batch of articles through Ollama (sequentially within batch).
- */
+function buildSelectionQuery(options) {
+  const conditions = ['a.title IS NOT NULL', 'LENGTH(a.title) >= 10'];
+  const params = [];
+
+  if (options.since) {
+    params.push(options.since);
+    conditions.push(`a.published_at >= $${params.length}::timestamptz`);
+  }
+
+  if (options.mode === 'unanalyzed') {
+    conditions.push('aa.article_id IS NULL');
+  } else if (options.mode === 'all') {
+    // no extra filter
+  } else {
+    params.push(options.confidenceThreshold);
+    conditions.push(`(
+      aa.article_id IS NULL
+      OR aa.method = 'fast-keyword-extractor'
+      OR COALESCE(aa.confidence, 0) <= $${params.length}
+    )`);
+  }
+
+  let limitClause = '';
+  if (options.limit > 0) {
+    params.push(options.limit);
+    limitClause = `LIMIT $${params.length}`;
+  }
+
+  return {
+    sql: `
+      SELECT
+        a.id,
+        a.title,
+        a.theme,
+        aa.keywords AS existing_keywords,
+        aa.confidence AS existing_confidence
+      FROM articles a
+      LEFT JOIN article_analysis aa ON aa.article_id = a.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY COALESCE(aa.confidence, 0) ASC, a.published_at DESC
+      ${limitClause}
+    `,
+    params,
+  };
+}
+
+async function upsertTrendKeyword(client, keyword) {
+  const normalized = keyword.toLowerCase().trim();
+  if (!normalized) return;
+  await client.query(`
+    INSERT INTO auto_trend_keywords (keyword, source, article_count, score, first_seen, last_seen, metadata)
+    VALUES ($1, 'ollama-article-analyzer', 1, 1, CURRENT_DATE, CURRENT_DATE, '{}'::jsonb)
+    ON CONFLICT (keyword) DO UPDATE SET
+      article_count = auto_trend_keywords.article_count + 1,
+      score = auto_trend_keywords.score + 1,
+      last_seen = CURRENT_DATE,
+      source = EXCLUDED.source,
+      updated_at = NOW()
+  `, [normalized]);
+}
+
 async function processBatch(client, articles, stats) {
   for (const article of articles) {
     try {
-      const prompt = buildPrompt(article.title);
-      const raw = await chatOllama(prompt);
-      const analysis = parseAnalysis(raw);
-
-      // Insert into article_analysis
+      const raw = await chatOllama(buildPrompt(article));
+      const analysis = parseAnalysis(raw, article);
       await client.query(`
-        INSERT INTO article_analysis (article_id, keywords, entities, sentiment, confidence, analyzed_at)
-        VALUES ($1, $2, $3::jsonb, $4, $5, NOW())
+        INSERT INTO article_analysis (
+          article_id, keywords, entities, sentiment, confidence, theme, method, metadata, analyzed_at
+        )
+        VALUES ($1, $2, $3::jsonb, $4, $5, $6, 'ollama-article-analyzer', $7::jsonb, NOW())
         ON CONFLICT (article_id) DO UPDATE SET
           keywords = EXCLUDED.keywords,
           entities = EXCLUDED.entities,
           sentiment = EXCLUDED.sentiment,
           confidence = EXCLUDED.confidence,
+          theme = EXCLUDED.theme,
+          method = EXCLUDED.method,
+          metadata = EXCLUDED.metadata,
           analyzed_at = NOW()
       `, [
         article.id,
@@ -154,172 +197,90 @@ async function processBatch(client, articles, stats) {
         JSON.stringify(analysis.entities),
         analysis.sentiment,
         analysis.confidence,
+        analysis.theme || article.theme || null,
+        JSON.stringify({
+          upgradedFrom: article.existing_confidence ?? null,
+          existingKeywords: article.existing_keywords || [],
+        }),
       ]);
 
-      // Update auto_trend_keywords with new keywords
-      for (const kw of analysis.keywords) {
-        const normalised = kw.toLowerCase().trim();
-        if (normalised.length < 2) continue;
-        await client.query(`
-          INSERT INTO auto_trend_keywords (keyword, source, article_count, first_seen, last_seen)
-          VALUES ($1, 'ollama-article-analyzer', 1, CURRENT_DATE, CURRENT_DATE)
-          ON CONFLICT (keyword) DO UPDATE SET
-            article_count = auto_trend_keywords.article_count + 1,
-            last_seen = CURRENT_DATE,
-            updated_at = NOW()
-        `, [normalised]);
+      for (const keyword of analysis.keywords) {
+        await upsertTrendKeyword(client, keyword);
       }
 
-      // Track stats
-      stats.total++;
+      stats.total += 1;
       stats.sentiments[analysis.sentiment] = (stats.sentiments[analysis.sentiment] || 0) + 1;
-      for (const kw of analysis.keywords) {
-        const normalised = kw.toLowerCase().trim();
-        stats.keywords[normalised] = (stats.keywords[normalised] || 0) + 1;
-      }
-      for (const category of ['companies', 'countries', 'persons', 'tickers']) {
-        for (const entity of analysis.entities[category]) {
-          const key = `${category}:${entity}`;
-          stats.entities[key] = (stats.entities[key] || 0) + 1;
-        }
+      for (const keyword of analysis.keywords) {
+        const normalized = keyword.toLowerCase().trim();
+        stats.keywords[normalized] = (stats.keywords[normalized] || 0) + 1;
       }
 
       if (stats.total % PROGRESS_INTERVAL === 0) {
-        console.log(`  ... ${stats.total} articles analyzed`);
+        process.stdout.write(`  analyzed ${stats.total} articles\n`);
       }
-    } catch (err) {
-      stats.errors++;
+    } catch (error) {
+      stats.errors += 1;
       if (stats.errors <= 5) {
-        console.warn(`  [skip] article ${article.id}: ${err.message.slice(0, 80)}`);
-      } else if (stats.errors === 6) {
-        console.warn('  (suppressing further error messages)');
+        process.stderr.write(`  [skip] article ${article.id}: ${String(error?.message || error).slice(0, 120)}\n`);
       }
     }
+  }
+}
+
+export async function runOllamaArticleAnalyzer(options = {}) {
+  const client = new Client(PG_CONFIG);
+  await client.connect();
+
+  try {
+    await ensureArticleAnalysisTables(client);
+    const selection = buildSelectionQuery(options);
+    const { rows } = await client.query(selection.sql, selection.params);
+
+    const stats = {
+      total: 0,
+      errors: 0,
+      sentiments: {},
+      keywords: {},
+    };
+
+    const startedAt = Date.now();
+    for (let index = 0; index < rows.length; index += BATCH_SIZE) {
+      await processBatch(client, rows.slice(index, index + BATCH_SIZE), stats);
+    }
+
+    const topKeywords = Object.entries(stats.keywords)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([keyword, count]) => ({ keyword, count }));
+
+    return {
+      selectedCount: rows.length,
+      analyzedCount: stats.total,
+      errorCount: stats.errors,
+      elapsedSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(1)),
+      topKeywords,
+      sentiments: stats.sentiments,
+    };
+  } finally {
+    await client.end();
   }
 }
 
 async function main() {
-  const opts = parseArgs();
-  const client = new Client(PG_CONFIG);
-  await client.connect();
-
-  console.log(`═══ Ollama Article Analyzer (${CHAT_MODEL}) ═══`);
-  console.log(`Ollama endpoint: ${OLLAMA_URL}`);
-  if (opts.limit) console.log(`Batch limit: ${opts.limit}`);
-  if (opts.since) console.log(`Since: ${opts.since}`);
-  console.log();
-
-  // ── Ensure tables exist ──
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS article_analysis (
-      article_id INTEGER PRIMARY KEY,
-      keywords TEXT[],
-      entities JSONB,
-      sentiment TEXT,
-      confidence DOUBLE PRECISION,
-      analyzed_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS auto_trend_keywords (
-      id SERIAL PRIMARY KEY,
-      keyword TEXT UNIQUE,
-      source TEXT DEFAULT 'auto-extracted',
-      article_count INTEGER DEFAULT 0,
-      first_seen DATE,
-      last_seen DATE,
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-
-  // ── Fetch unanalyzed articles ──
-  const conditions = ['NOT EXISTS (SELECT 1 FROM article_analysis aa WHERE aa.article_id = a.id)'];
-  const params = [];
-  if (opts.since) {
-    params.push(opts.since);
-    conditions.push(`a.published_at >= $${params.length}::timestamptz`);
-  }
-
-  let limitClause = '';
-  if (opts.limit > 0) {
-    params.push(opts.limit);
-    limitClause = `LIMIT $${params.length}`;
-  }
-
-  const articlesResult = await client.query(`
-    SELECT a.id, a.title
-    FROM articles a
-    WHERE ${conditions.join(' AND ')}
-      AND a.title IS NOT NULL
-      AND LENGTH(a.title) > 10
-    ORDER BY a.published_at DESC
-    ${limitClause}
-  `, params);
-
-  const articles = articlesResult.rows;
-  console.log(`Found ${articles.length} unanalyzed articles\n`);
-
-  if (articles.length === 0) {
-    console.log('Nothing to do.');
-    await client.end();
-    return;
-  }
-
-  // ── Process in batches ──
-  const stats = {
-    total: 0,
-    errors: 0,
-    sentiments: {},
-    keywords: {},
-    entities: {},
-  };
-
-  const startTime = Date.now();
-
-  for (let i = 0; i < articles.length; i += BATCH_SIZE) {
-    const batch = articles.slice(i, i + BATCH_SIZE);
-    await processBatch(client, batch, stats);
-  }
-
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-
-  // ── Summary ──
-  console.log('\n═══ Analysis Summary ═══\n');
-  console.log(`Total analyzed: ${stats.total} (${stats.errors} errors) in ${elapsed}s`);
-  console.log(`Avg per article: ${stats.total > 0 ? (parseFloat(elapsed) / stats.total).toFixed(2) : 0}s`);
-
-  // Top 10 keywords
-  const topKeywords = Object.entries(stats.keywords)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-  if (topKeywords.length > 0) {
-    console.log('\nTop 10 keywords:');
-    for (const [kw, count] of topKeywords) {
-      console.log(`  ${kw.padEnd(25)} ${count}`);
-    }
-  }
-
-  // Sentiment distribution
-  console.log('\nSentiment distribution:');
-  for (const [sent, count] of Object.entries(stats.sentiments).sort((a, b) => b[1] - a[1])) {
-    const pct = stats.total > 0 ? ((count / stats.total) * 100).toFixed(1) : '0.0';
-    console.log(`  ${sent.padEnd(12)} ${String(count).padStart(6)}  (${pct}%)`);
-  }
-
-  // New entities discovered
-  const topEntities = Object.entries(stats.entities)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15);
-  if (topEntities.length > 0) {
-    console.log('\nTop entities discovered:');
-    for (const [entity, count] of topEntities) {
-      console.log(`  ${entity.padEnd(35)} ${count}`);
-    }
-  }
-
-  await client.end();
-  console.log('\nDone.');
+  const options = parseArgs();
+  const { endpoint, model } = resolveOllamaChatConfig();
+  process.stdout.write(`Using ${model} at ${endpoint}\n`);
+  const result = await runOllamaArticleAnalyzer(options);
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+const entryHref = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href
+  : null;
+
+if (entryHref && import.meta.url === entryHref) {
+  main().catch((error) => {
+    process.stderr.write(`${error?.stack || error?.message || error}\n`);
+    process.exit(1);
+  });
+}

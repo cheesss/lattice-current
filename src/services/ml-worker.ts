@@ -6,8 +6,26 @@
 import { detectMLCapabilities, type MLCapabilities } from './ml-capabilities';
 import { ML_THRESHOLDS, MODEL_CONFIGS } from '@/config/ml-config';
 
-// Import worker using Vite's worker syntax
-import MLWorkerClass from '@/workers/ml.worker?worker';
+type MLWorkerConstructor = new () => Worker;
+
+let cachedWorkerConstructorPromise: Promise<MLWorkerConstructor | null> | null = null;
+
+async function loadWorkerConstructor(): Promise<MLWorkerConstructor | null> {
+  if (cachedWorkerConstructorPromise) return cachedWorkerConstructorPromise;
+  cachedWorkerConstructorPromise = (async () => {
+    if (typeof window === 'undefined' || typeof Worker === 'undefined') {
+      return null;
+    }
+    try {
+      const mod = await import('@/workers/ml.worker?worker');
+      return (mod.default || null) as MLWorkerConstructor | null;
+    } catch (error) {
+      console.warn('[MLWorker] Worker module unavailable in this runtime:', error);
+      return null;
+    }
+  })();
+  return cachedWorkerConstructorPromise;
+}
 
 interface PendingRequest<T> {
   resolve: (value: T) => void;
@@ -82,8 +100,10 @@ class MLWorkerManager {
     return this.initWorker();
   }
 
-  private initWorker(): Promise<boolean> {
+  private async initWorker(): Promise<boolean> {
     if (this.worker) return Promise.resolve(this.isReady);
+    const WorkerCtor = await loadWorkerConstructor();
+    if (!WorkerCtor) return false;
 
     return new Promise((resolve) => {
       const readyTimeout = setTimeout(() => {
@@ -95,7 +115,7 @@ class MLWorkerManager {
       }, MLWorkerManager.READY_TIMEOUT_MS);
 
       try {
-        this.worker = new MLWorkerClass();
+        this.worker = new WorkerCtor();
       } catch (error) {
         console.error('[MLWorker] Failed to create worker:', error);
         this.cleanup();

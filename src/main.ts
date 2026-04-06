@@ -1,9 +1,11 @@
 import './styles/base-layer.css';
 import './styles/happy-theme.css';
+import './styles/hubs.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as Sentry from '@sentry/browser';
 import { inject } from '@vercel/analytics';
 import { App } from './App';
+import { classifyError, recordError } from '@/utils/error-boundary';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim();
 
@@ -112,9 +114,21 @@ Sentry.init({
     /reading 'style'.*HTMLImageElement/,
     /can't access property "write", \w+ is undefined/,
   ],
-  beforeSend(event) {
+  beforeSend(event, hint) {
     const msg = event.exception?.values?.[0]?.value ?? '';
     if (msg.length <= 3 && /^[a-zA-Z_$]+$/.test(msg)) return null;
+
+    // ── Structured error classification (Phase 2) ──
+    // classifyError determines whether this error should reach Sentry at all.
+    // This replaces the need to continuously grow the ignoreErrors list.
+    const classified = classifyError(hint?.originalException ?? msg);
+    recordError(classified);
+    if (!classified.reportable) return null;
+
+    // Tag the event with error category for Sentry dashboards
+    event.tags = { ...event.tags, errorCategory: classified.category };
+
+    // ── Legacy frame-based filters (kept for edge cases classifyError can't catch) ──
     const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
     // Suppress maplibre internal null-access crashes (light, placement) only when stack is in map chunk
     if (/this\.style\._layers|reading '_layers'|this\.light is null|can't access property "(id|type|setFilter)", \w+ is (null|undefined)|Cannot read properties of null \(reading '(id|type|setFilter|_layers)'\)|null is not an object \(evaluating '\w{1,3}\.(id|style)|^\w{1,2} is null$/.test(msg)) {
@@ -148,6 +162,7 @@ import { initAnalytics, trackApiKeysSnapshot } from '@/services/analytics';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { SITE_VARIANT } from '@/config/variant';
 import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chunk-reload';
+import { startAutoVacuum } from '@/services/persistent-cache';
 
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures).
 const chunkReloadStorageKey = installChunkReloadGuard(__APP_VERSION__);
@@ -166,6 +181,7 @@ installRuntimeFetchPatch();
 // In browser mode, prefer the remote app API for generic `/api/*` calls and
 // fall back to local dev proxies for `/api/local-*` and Vite-proxied feeds.
 installWebApiRedirect();
+startAutoVacuum();
 loadDesktopSecrets().then(async () => {
   await initAnalytics();
   trackApiKeysSnapshot();

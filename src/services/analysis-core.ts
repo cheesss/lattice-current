@@ -29,6 +29,7 @@ import {
   generateDedupeKey,
 } from '@/utils/analysis-constants';
 
+import type { NewsItem } from '@/types';
 import {
   extractEntitiesFromClusters,
   findNewsForMarketSymbol,
@@ -58,22 +59,10 @@ export {
 // TYPES
 // ============================================================================
 
-export interface NewsItemCore {
-  source: string;
-  title: string;
-  link: string;
-  pubDate: Date;
-  isAlert: boolean;
-  monitorColor?: string;
-  tier?: number;
-  threat?: import('./threat-classifier').ThreatClassification;
-  lat?: number;
-  lon?: number;
-  locationName?: string;
-  lang?: string;
-}
+/** @deprecated Use NewsItem from '@/types' directly. Kept as alias for backward compatibility. */
+export type NewsItemCore = NewsItem;
 
-export type NewsItemWithTier = NewsItemCore & { tier: number };
+export type NewsItemWithTier = NewsItem & { tier: number };
 
 export interface ClusteredEventCore {
   id: string;

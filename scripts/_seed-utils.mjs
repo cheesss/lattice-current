@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
 import { readFileSync, existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024; // 5MB per key
+const PROVIDER_COOLDOWN_PATH = join(os.tmpdir(), 'lattice-current-provider-cooldowns.json');
 
 export { CHROME_UA };
 
@@ -199,6 +202,59 @@ export async function writeExtraKey(key, data, ttl) {
   else console.log(`  Extra key ${key}: written`);
 }
 
+async function readProviderCooldowns() {
+  try {
+    const raw = await readFile(PROVIDER_COOLDOWN_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeProviderCooldowns(state) {
+  await mkdir(dirname(PROVIDER_COOLDOWN_PATH), { recursive: true });
+  await writeFile(PROVIDER_COOLDOWN_PATH, JSON.stringify(state, null, 2), 'utf8');
+}
+
+export async function getProviderCooldown(provider) {
+  const state = await readProviderCooldowns();
+  const entry = state[String(provider || '').trim().toLowerCase()];
+  const until = Number(entry?.until);
+  if (!Number.isFinite(until) || until <= Date.now()) {
+    if (entry) {
+      delete state[String(provider || '').trim().toLowerCase()];
+      await writeProviderCooldowns(state).catch(() => {});
+    }
+    return null;
+  }
+  return {
+    until,
+    reason: String(entry?.reason || ''),
+  };
+}
+
+export async function setProviderCooldown(provider, durationMs, reason = '') {
+  const key = String(provider || '').trim().toLowerCase();
+  if (!key) return;
+  const state = await readProviderCooldowns();
+  state[key] = {
+    until: Date.now() + Math.max(1_000, Math.round(durationMs || 0)),
+    reason: String(reason || ''),
+    updatedAt: Date.now(),
+  };
+  await writeProviderCooldowns(state).catch(() => {});
+}
+
+export async function clearProviderCooldown(provider) {
+  const key = String(provider || '').trim().toLowerCase();
+  if (!key) return;
+  const state = await readProviderCooldowns();
+  if (!(key in state)) return;
+  delete state[key];
+  await writeProviderCooldowns(state).catch(() => {});
+}
+
 export function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -215,6 +271,40 @@ export function parseYahooChart(data, symbol) {
   const sparkline = Array.isArray(closes) ? closes.filter((v) => v != null) : [];
 
   return { symbol, name: symbol, display: symbol, price, change: +change.toFixed(2), sparkline };
+}
+
+export async function fetchYahooChartViaRelay(symbol, options = {}) {
+  const relayUrl = String(process.env.WS_RELAY_URL || process.env.VITE_WS_RELAY_URL || '').trim();
+  if (!relayUrl) {
+    console.warn(`  [Yahoo] ${symbol} relay skipped: WS_RELAY_URL not set`);
+    return null;
+  }
+  const authHeader = String(process.env.RELAY_AUTH_HEADER || 'x-relay-key').trim() || 'x-relay-key';
+  const sharedSecret = String(process.env.RELAY_SHARED_SECRET || '').trim();
+  const range = String(options.range || '1d');
+  const interval = String(options.interval || '1d');
+  const url = new URL('/yahoo-chart', relayUrl);
+  url.searchParams.set('symbol', symbol);
+  url.searchParams.set('range', range);
+  url.searchParams.set('interval', interval);
+
+  const headers = { 'User-Agent': CHROME_UA };
+  if (sharedSecret) headers[authHeader] = sharedSecret;
+
+  try {
+    const resp = await fetch(url.toString(), {
+      headers,
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!resp.ok) {
+      console.warn(`  [Yahoo] ${symbol} relay HTTP ${resp.status}`);
+      return null;
+    }
+    return await resp.json();
+  } catch (err) {
+    console.warn(`  [Yahoo] ${symbol} relay error: ${err.message || err}`);
+    return null;
+  }
 }
 
 export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}) {
@@ -234,7 +324,20 @@ export async function runSeed(domain, resource, canonicalKey, fetchFn, opts = {}
   }
 
   try {
-    const data = await withRetry(fetchFn);
+    let data;
+    try {
+      data = await withRetry(fetchFn);
+    } catch (err) {
+      const existing = await verifySeedKey(canonicalKey).catch(() => null);
+      if (existing) {
+        const durationMs = Date.now() - startMs;
+        console.warn(`  FALLBACK: ${err.message || err} — preserving existing cache for ${canonicalKey}`);
+        console.log(`\n=== Done (${Math.round(durationMs)}ms, reused existing cache) ===`);
+        await releaseLock(`${domain}:${resource}`, runId);
+        return { skipped: true, reusedExistingCache: true };
+      }
+      throw err;
+    }
     const publishResult = await atomicPublish(canonicalKey, data, validateFn, ttlSeconds);
     if (publishResult.skipped) {
       const durationMs = Date.now() - startMs;

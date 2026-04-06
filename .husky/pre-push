@@ -27,3 +27,9 @@ npm run lint:md || exit 1
 
 echo "Running version sync check..."
 npm run version:check || exit 1
+
+echo "Running changelog/version consistency check..."
+npm run version:check:all || exit 1
+
+echo "Running CORS lint..."
+npm run lint:cors || exit 1

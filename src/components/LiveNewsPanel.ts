@@ -1,6 +1,6 @@
 ﻿import { Panel } from './Panel';
 import { fetchLiveVideoInfo } from '@/services/live-news';
-import { isDesktopRuntime, getRemoteApiBaseUrl, getApiBaseUrl, getLocalApiPort } from '@/services/runtime';
+import { isDesktopRuntime, getRemoteApiBaseUrl, getApiBaseUrl } from '@/services/runtime';
 import { t } from '../services/i18n';
 import { loadFromStorage, saveToStorage } from '@/utils';
 import { IDLE_PAUSE_MS, STORAGE_KEYS, SITE_VARIANT } from '@/config';
@@ -91,7 +91,7 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'cnn', name: 'CNN', handle: '@CNN', fallbackVideoId: 'w_Ma8oQLmSM' },
   { id: 'fox-news', name: 'Fox News', handle: '@FoxNews', fallbackVideoId: 'QaftgYkG-ek' },
   { id: 'newsmax', name: 'Newsmax', handle: '@NEWSMAX', fallbackVideoId: 'S-lFBzloL2Y', useFallbackOnly: true },
-  { id: 'abc-news', name: 'ABC News', handle: '@ABCNews' },
+  { id: 'abc-news', name: 'ABC News', handle: '@ABCNews', fallbackVideoId: 'yMr0neQhu6c' },
   { id: 'cbs-news', name: 'CBS News', handle: '@CBSNews', fallbackVideoId: 'R9L8sDK8iEc' },
   { id: 'nbc-news', name: 'NBC News', handle: '@NBCNews', fallbackVideoId: 'yMr0neQhu6c' },
   { id: 'cbc-news', name: 'CBC News', handle: '@CBCNews', fallbackVideoId: 'jxP_h3V-Dv8' },
@@ -108,13 +108,13 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'ntv-turkey', name: 'NTV', handle: '@NTV', fallbackVideoId: 'pqq5c6k70kk' },
   { id: 'cnn-turk', name: 'CNN TURK', handle: '@cnnturk', fallbackVideoId: 'lsY4GFoj_xY' },
   { id: 'tv-rain', name: 'TV Rain', handle: '@tvrain' },
-  { id: 'rt', name: 'RT', handle: '' },
+  { id: 'rt', name: 'RT', handle: '', fallbackVideoId: 'u9foWyMSETk' },
   { id: 'tvp-info', name: 'TVP Info', handle: '@tvpinfo', fallbackVideoId: '3jKb-uThfrg' },
   { id: 'telewizja-republika', name: 'Telewizja Republika', handle: '@Telewizja_Republika', fallbackVideoId: 'dzntyCTgJMQ' },
   // Latin America & Portuguese
   { id: 'cnn-brasil', name: 'CNN Brasil', handle: '@CNNbrasil', fallbackVideoId: 'qcTn899skkc' },
   { id: 'jovem-pan', name: 'Jovem Pan News', handle: '@jovempannews' },
-  { id: 'record-news', name: 'Record News', handle: '@RecordNews' },
+  { id: 'record-news', name: 'Record News', handle: '@RecordNews', fallbackVideoId: 'qcTn899skkc' },
   { id: 'band-jornalismo', name: 'Band Jornalismo', handle: '@BandJornalismo' },
   { id: 'tn-argentina', name: 'TN (Todo Noticias)', handle: '@todonoticias', fallbackVideoId: 'cb12KmMMDJA' },
   { id: 'c5n', name: 'C5N', handle: '@c5n', fallbackVideoId: 'SF06Qy1Ct6Y' },
@@ -127,13 +127,13 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'ann-news', name: 'ANN News', handle: '@ANNnewsCH' },
   { id: 'ntv-news', name: 'NTV News (Japan)', handle: '@ntv_news' },
   { id: 'cti-news', name: 'CTI News (Taiwan)', handle: '@ctinews' },
-  { id: 'wion', name: 'WION', handle: '@WION' },
+  { id: 'wion', name: 'WION', handle: '@WION', fallbackVideoId: 'sYZtOFzM78M' },
   { id: 'ndtv', name: 'NDTV 24x7', handle: '@NDTV' },
   { id: 'cna-asia', name: 'CNA (NewsAsia)', handle: '@channelnewsasia', fallbackVideoId: 'XWq5kBlakcQ' },
   { id: 'nhk-world', name: 'NHK World Japan', handle: '@NHKWORLDJAPAN', fallbackVideoId: 'f0lYfG_vY_U' },
-  { id: 'arirang-news', name: 'Arirang News', handle: '@ArirangCoKrArirangNEWS' },
+  { id: 'arirang-news', name: 'Arirang News', handle: '@ArirangCoKrArirangNEWS', fallbackVideoId: 'f0lYfG_vY_U' },
   { id: 'india-today', name: 'India Today', handle: '@indiatoday', fallbackVideoId: 'sYZtOFzM78M' },
-  { id: 'abp-news', name: 'ABP News', handle: '@ABPNews' },
+  { id: 'abp-news', name: 'ABP News', handle: '@ABPNews', fallbackVideoId: 'sYZtOFzM78M' },
   // Middle East (defaults first)
   { id: 'alarabiya', name: 'AlArabiya', handle: '@AlArabiya', fallbackVideoId: 'n7eQejkXbnM', useFallbackOnly: true },
   { id: 'aljazeera', name: 'AlJazeera', handle: '@AlJazeeraEnglish', fallbackVideoId: 'gCNeDWCI0vo', useFallbackOnly: true },
@@ -146,13 +146,13 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'i24-news', name: 'i24NEWS (Israel)', handle: '@i24NEWS_HE', fallbackVideoId: 'myKybZUK0IA' },
   { id: 'asharq-news', name: 'Asharq News', handle: '@asharqnews', fallbackVideoId: 'f6VpkfV7m4Y', useFallbackOnly: true },
   { id: 'aljazeera-arabic', name: 'AlJazeera Arabic', handle: '@AljazeeraChannel', fallbackVideoId: 'bNyUyrR0PHo', useFallbackOnly: true },
-  { id: 'rudaw', name: 'Rudaw', hlsUrl: 'https://svs.itworkscdn.net/rudawlive/rudawlive.smil/playlist.m3u8', useFallbackOnly: true },
+  { id: 'rudaw', name: 'Rudaw', hlsUrl: 'https://svs.itworkscdn.net/rudawlive/rudawlive.smil/playlist.m3u8', fallbackVideoId: 'xWXpl7azI8k', useFallbackOnly: true },
   // Africa
   { id: 'africanews', name: 'Africanews', handle: '@africanews' },
   { id: 'channels-tv', name: 'Channels TV', handle: '@ChannelsTelevision' },
   { id: 'ktn-news', name: 'KTN News', handle: '@ktnnews_kenya', fallbackVideoId: 'RmHtsdVb3mo' },
   { id: 'enca', name: 'eNCA', handle: '@encanews' },
-  { id: 'sabc-news', name: 'SABC News', handle: '@SABCDigitalNews' },
+  { id: 'sabc-news', name: 'SABC News', handle: '@SABCDigitalNews', fallbackVideoId: '4uHZdlX-DT4' },
   { id: 'arise-news', name: 'Arise News', handle: '@AriseNewsChannel', fallbackVideoId: '4uHZdlX-DT4' },
   // Europe (additional)
   { id: 'welt', name: 'WELT', handle: '@WELTVideoTV', fallbackVideoId: 'L-TNmYmaAKQ', geoAvailability: ['DE', 'AT', 'CH'] },
@@ -161,9 +161,10 @@ export const OPTIONAL_LIVE_CHANNELS: LiveChannel[] = [
   { id: 'france24-fr', name: 'France 24 FR', handle: '@France24_fr', fallbackVideoId: 'l8PMl7tUDIE' },
   { id: 'france-info', name: 'France Info', handle: '@franceinfo', fallbackVideoId: 'Z-Nwo-ypKtM' },
   { id: 'bfmtv', name: 'BFMTV', handle: '@BFMTV', fallbackVideoId: 'smB_F6DW7cI' },
-  { id: 'tv5monde-info', name: 'TV5 Monde Info', handle: '@TV5MONDEInfo' },
-  { id: 'nrk1', name: 'NRK1', handle: '@nrk' },
-  { id: 'aljazeera-balkans', name: 'Al Jazeera Balkans', handle: '@AlJazeeraBalkans' },
+  { id: 'tv5monde-info', name: 'TV5 Monde Info', handle: '@TV5MONDEInfo', fallbackVideoId: 'l8PMl7tUDIE' },
+  { id: 'nrk1', name: 'NRK1', handle: '@nrk', fallbackVideoId: 'pykpO5kQJ98' },
+  { id: 'aljazeera-balkans', name: 'Al Jazeera Balkans', handle: '@AlJazeeraBalkans', fallbackVideoId: 'gCNeDWCI0vo' },
+  { id: 'livenow-fox', name: 'LiveNOW from FOX', handle: '@LiveNOWFOX', fallbackVideoId: 'QaftgYkG-ek' },
   // Oceania
   { id: 'abc-news-au', name: 'ABC News Australia', handle: '@abcnewsaustralia', fallbackVideoId: 'vOTiJkg1voo' },
 ];
@@ -239,7 +240,7 @@ const DIRECT_HLS_MAP: Readonly<Record<string, string>> = {
   'arise-news': 'https://liveedge-arisenews.visioncdn.com/live-hls/arisenews/arisenews/arisenews_web/master.m3u8',
   'nhk-world': 'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index_4M.m3u8',
   'cbc-news': 'https://cbcnewshd-f.akamaihd.net/i/cbcnews_1@8981/index_2500_av-p.m3u8',
-  'record-news': 'https://stream.ads.ottera.tv/playlist.m3u8?network_id=2116',
+  'record-news': 'https://stream.ads.ottera.tv/playlist.m3u8',
   'abp-news': 'https://abplivetv.pc.cdn.bitgravity.com/httppush/abp_livetv/abp_abpnews/master.m3u8',
   'nrk1': 'https://nrk-nrk1.akamaized.net/21/0/hls/nrk_1/playlist.m3u8',
   'aljazeera-balkans': 'https://live-hls-web-ajb.getaj.net/AJB/index.m3u8',
@@ -462,11 +463,11 @@ export class LiveNewsPanel extends Panel {
     if (!entry) return undefined;
     const failedAt = this.hlsFailureCooldown.get(channelId);
     if (failedAt && Date.now() - failedAt < this.HLS_COOLDOWN_MS) return undefined;
-    return `http://127.0.0.1:${getLocalApiPort()}/api/hls-proxy?url=${encodeURIComponent(entry.url)}`;
+    return `${getApiBaseUrl()}/api/hls-proxy?url=${encodeURIComponent(entry.url)}`;
   }
 
   private get embedOrigin(): string {
-    if (isDesktopRuntime()) return `http://localhost:${getLocalApiPort()}`;
+    if (isDesktopRuntime()) return getApiBaseUrl();
     try { return new URL(getRemoteApiBaseUrl()).origin; } catch { return 'https://worldmonitor.app'; }
   }
 
@@ -1099,7 +1100,7 @@ export class LiveNewsPanel extends Panel {
       mute: this.isMuted ? '1' : '0',
     });
     if (quality !== 'auto') params.set('vq', quality);
-    const embedUrl = `http://localhost:${getLocalApiPort()}/api/youtube-embed?${params.toString()}`;
+    const embedUrl = `${getApiBaseUrl()}/api/youtube-embed?${params.toString()}`;
 
     if (renderToken !== this.desktopEmbedRenderToken) {
       return;

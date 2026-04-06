@@ -51,7 +51,7 @@ const CURATED_API_SOURCES: CuratedApiSeed[] = [
     name: 'GDELT DOC 2.1',
     baseUrl: 'https://api.gdeltproject.org',
     sampleUrl:
-      'https://api.gdeltproject.org/api/v2/doc/doc?query=(iran%20OR%20hormuz)&mode=artlist&format=json&maxrecords=20&sort=DateDesc',
+      'https://api.gdeltproject.org/api/v2/doc/doc?query=(iran%20OR%20hormuz)%20sourcelang:english&mode=artlist&format=json&maxrecords=20&sort=DateDesc',
     category: 'politics',
     confidence: 95,
     reason: 'Public global event/news API, JSON output',

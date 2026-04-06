@@ -1,14 +1,18 @@
 type TauriInvoke = <T>(command: string, payload?: Record<string, unknown>) => Promise<T>;
 
+declare global {
+  interface Window {
+    __TAURI__?: { core?: { invoke?: TauriInvoke } };
+    __TAURI_INTERNALS__?: { invoke?: TauriInvoke };
+  }
+}
+
 function resolveInvokeBridge(): TauriInvoke | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  const tauriWindow = window as unknown as {
-    __TAURI__?: { core?: { invoke?: TauriInvoke } };
-    __TAURI_INTERNALS__?: { invoke?: TauriInvoke };
-  };
+  const tauriWindow = window;
 
   const invoke =
     tauriWindow.__TAURI__?.core?.invoke ??

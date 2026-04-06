@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 
-import { loadEnvFile, CHROME_UA, sleep, runSeed, parseYahooChart, writeExtraKey } from './_seed-utils.mjs';
+import { loadEnvFile, CHROME_UA, sleep, runSeed, parseYahooChart, writeExtraKey, clearProviderCooldown, getProviderCooldown, setProviderCooldown, fetchYahooChartViaRelay } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'market:commodities-bootstrap:v1';
 const CACHE_TTL = 1800;
-const YAHOO_DELAY_MS = 200;
+const YAHOO_DELAY_MS = 1200;
+const YAHOO_PROVIDER = 'yahoo';
+const YAHOO_RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 
 async function fetchYahooWithRetry(url, label, maxAttempts = 4) {
+  const cooldown = await getProviderCooldown(YAHOO_PROVIDER);
+  if (cooldown) {
+    console.warn(`  [Yahoo] ${label} skipped while cooldown is active`);
+    return null;
+  }
   for (let i = 0; i < maxAttempts; i++) {
     const resp = await fetch(url, {
       headers: { 'User-Agent': CHROME_UA },
@@ -16,6 +23,9 @@ async function fetchYahooWithRetry(url, label, maxAttempts = 4) {
     });
     if (resp.status === 429) {
       const wait = 5000 * (i + 1);
+      if (i + 1 >= maxAttempts) {
+        await setProviderCooldown(YAHOO_PROVIDER, YAHOO_RATE_LIMIT_COOLDOWN_MS, 'HTTP 429');
+      }
       console.warn(`  [Yahoo] ${label} 429 — waiting ${wait / 1000}s (attempt ${i + 1}/${maxAttempts})`);
       await sleep(wait);
       continue;
@@ -24,6 +34,7 @@ async function fetchYahooWithRetry(url, label, maxAttempts = 4) {
       console.warn(`  [Yahoo] ${label} HTTP ${resp.status}`);
       return null;
     }
+    await clearProviderCooldown(YAHOO_PROVIDER);
     return resp;
   }
   console.warn(`  [Yahoo] ${label} rate limited after ${maxAttempts} attempts`);
@@ -41,13 +52,10 @@ async function fetchCommodityQuotes() {
     if (i > 0) await sleep(YAHOO_DELAY_MS);
 
     try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1h`;
       const resp = await fetchYahooWithRetry(url, symbol);
-      if (!resp) {
-        misses++;
-        continue;
-      }
-      const parsed = parseYahooChart(await resp.json(), symbol);
+      const payload = resp ? await resp.json() : await fetchYahooChartViaRelay(symbol, { range: '5d', interval: '1h' });
+      const parsed = payload ? parseYahooChart(payload, symbol) : null;
       if (parsed) {
         quotes.push(parsed);
         console.log(`  ${symbol}: $${parsed.price} (${parsed.change > 0 ? '+' : ''}${parsed.change}%)`);

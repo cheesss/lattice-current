@@ -26,7 +26,7 @@ interface NWSAlert {
   };
   geometry?: {
     type: string;
-    coordinates: number[][][] | number[][];
+    coordinates: unknown;
   };
 }
 
@@ -77,11 +77,11 @@ function extractCoordinates(geometry?: NWSAlert['geometry']): [number, number][]
 
   try {
     if (geometry.type === 'Polygon') {
-      const coords = geometry.coordinates as unknown as number[][][];
+      const coords = geometry.coordinates as number[][][];
       return coords[0]?.map(c => [c[0], c[1]] as [number, number]) || [];
     }
     if (geometry.type === 'MultiPolygon') {
-      const coords = geometry.coordinates as unknown as number[][][][];
+      const coords = geometry.coordinates as number[][][][];
       return coords[0]?.[0]?.map(c => [c[0], c[1]] as [number, number]) || [];
     }
   } catch {

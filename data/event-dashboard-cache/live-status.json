@@ -1,0 +1,133 @@
+{
+  "temperatures": [
+    {
+      "theme": "conflict",
+      "temperature": "COLD",
+      "intensity": 0
+    },
+    {
+      "theme": "economy",
+      "temperature": "COLD",
+      "intensity": 0
+    },
+    {
+      "theme": "energy",
+      "temperature": "COLD",
+      "intensity": 0
+    },
+    {
+      "theme": "politics",
+      "temperature": "COLD",
+      "intensity": 0
+    },
+    {
+      "theme": "tech",
+      "temperature": "COLD",
+      "intensity": 0
+    }
+  ],
+  "signals": [
+    {
+      "channel": "cot_dollar",
+      "value": 7.858066115409813,
+      "label": "cot_dollar",
+      "updatedAt": "2022-02-01T00:00:00.000Z"
+    },
+    {
+      "channel": "cot_euro_fx",
+      "value": 8.100443436114261,
+      "label": "cot_euro_fx",
+      "updatedAt": "2026-03-31T00:00:00.000Z"
+    },
+    {
+      "channel": "cot_gold",
+      "value": 25.681153485386364,
+      "label": "cot_gold",
+      "updatedAt": "2026-03-31T00:00:00.000Z"
+    },
+    {
+      "channel": "cot_oil",
+      "value": -3.952020364346965,
+      "label": "cot_oil",
+      "updatedAt": "2026-03-31T00:00:00.000Z"
+    },
+    {
+      "channel": "cot_sp500",
+      "value": 15.915631028049205,
+      "label": "cot_sp500",
+      "updatedAt": "2026-03-31T00:00:00.000Z"
+    },
+    {
+      "channel": "cot_treasury_10y",
+      "value": -37.954753108797625,
+      "label": "cot_treasury_10y",
+      "updatedAt": "2026-03-31T00:00:00.000Z"
+    },
+    {
+      "channel": "e2e_probe",
+      "value": 1.2345,
+      "label": "e2e_probe",
+      "updatedAt": "2021-04-01T13:30:00.000Z"
+    },
+    {
+      "channel": "eventIntensity",
+      "value": 0.5476463551931511,
+      "label": "Event Intensity",
+      "updatedAt": "2025-12-31T00:00:00.000Z"
+    },
+    {
+      "channel": "gpr",
+      "value": 0.6047752390104882,
+      "label": "gpr",
+      "updatedAt": "2025-12-29T00:00:00.000Z"
+    },
+    {
+      "channel": "hy_credit_spread",
+      "value": 3.17,
+      "label": "HY Credit",
+      "updatedAt": "2026-04-02T00:00:00.000Z"
+    },
+    {
+      "channel": "ig_credit_spread",
+      "value": 0.86,
+      "label": "ig_credit_spread",
+      "updatedAt": "2026-04-02T00:00:00.000Z"
+    },
+    {
+      "channel": "marketStress",
+      "value": 1,
+      "label": "Market Stress",
+      "updatedAt": "2025-12-31T00:00:00.000Z"
+    },
+    {
+      "channel": "ted_spread",
+      "value": 0.09,
+      "label": "ted_spread",
+      "updatedAt": "2022-01-21T00:00:00.000Z"
+    },
+    {
+      "channel": "transmissionStrength",
+      "value": 0.43743747512648323,
+      "label": "Transmission",
+      "updatedAt": "2025-12-31T00:00:00.000Z"
+    },
+    {
+      "channel": "vix",
+      "value": 24.54,
+      "label": "VIX",
+      "updatedAt": "2026-04-01T00:00:00.000Z"
+    },
+    {
+      "channel": "yieldSpread",
+      "value": 0.51,
+      "label": "Yield Spread",
+      "updatedAt": "2026-04-03T00:00:00.000Z"
+    }
+  ],
+  "pending": 2871,
+  "todayArticles": 237,
+  "meta": {
+    "updatedAt": "2026-04-05T17:22:30.602Z",
+    "stale": false
+  }
+}

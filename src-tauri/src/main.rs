@@ -28,7 +28,7 @@ const MENU_FILE_BACKTEST_HUB_ID: &str = "file.backtest-hub";
 const MENU_HELP_GITHUB_ID: &str = "help.github";
 #[cfg(feature = "devtools")]
 const MENU_HELP_DEVTOOLS_ID: &str = "help.devtools";
-const SUPPORTED_SECRET_KEYS: [&str; 26] = [
+const SUPPORTED_SECRET_KEYS: [&str; 28] = [
     "GROQ_API_KEY",
     "OPENAI_API_KEY",
     "OPENROUTER_API_KEY",
@@ -37,6 +37,8 @@ const SUPPORTED_SECRET_KEYS: [&str; 26] = [
     "EIA_API_KEY",
     "CLOUDFLARE_API_TOKEN",
     "ACLED_ACCESS_TOKEN",
+    "ACLED_EMAIL",
+    "ACLED_PASSWORD",
     "URLHAUS_AUTH_KEY",
     "OTX_API_KEY",
     "ABUSEIPDB_API_KEY",
@@ -1805,7 +1807,7 @@ fn main() {
             let cache_path = cache_file_path(&app.handle()).unwrap_or_default();
             app.manage(PersistentCache::load(&cache_path));
 
-            if let Ok(secrets_cache) = app.try_state::<SecretsCache>() {
+            if let Some(secrets_cache) = app.try_state::<SecretsCache>() {
                 if let Ok(secrets) = secrets_cache.secrets.lock() {
                     if let Err(err) = write_secrets_mirror(&app.handle(), &secrets) {
                         append_desktop_log(

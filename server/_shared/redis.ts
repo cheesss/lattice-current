@@ -1,3 +1,6 @@
+import { createStorageEnvelope, decodeStorageValue, isStorageEnvelope } from '../../src/services/storage/storage-envelope';
+import { resolveStorageSource } from '../../src/services/storage/schema-registry';
+
 const REDIS_OP_TIMEOUT_MS = 1_500;
 const REDIS_PIPELINE_TIMEOUT_MS = 5_000;
 
@@ -23,6 +26,14 @@ function prefixKey(key: string): string {
   return `${cachedPrefix}${key}`;
 }
 
+async function decodeCachedPayload(key: string, parsed: unknown): Promise<unknown | null> {
+  if (parsed === NEG_SENTINEL) return parsed;
+  const decoded = await decodeStorageValue(parsed, { source: resolveStorageSource(key) });
+  if (decoded.data !== null) return decoded.data;
+  if (!isStorageEnvelope(parsed)) return parsed;
+  return null;
+}
+
 export async function getCachedJson(key: string, raw = false): Promise<unknown | null> {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -35,7 +46,9 @@ export async function getCachedJson(key: string, raw = false): Promise<unknown |
     });
     if (!resp.ok) return null;
     const data = (await resp.json()) as { result?: string };
-    return data.result ? JSON.parse(data.result) : null;
+    if (!data.result) return null;
+    const parsed = JSON.parse(data.result);
+    return decodeCachedPayload(key, parsed);
   } catch (err) {
     console.warn('[redis] getCachedJson failed:', errMsg(err));
     return null;
@@ -48,7 +61,13 @@ export async function setCachedJson(key: string, value: unknown, ttlSeconds: num
   if (!url || !token) return;
   try {
     // Atomic SET with EX — single call avoids race between SET and EXPIRE (C-3 fix)
-    await fetch(`${url}/set/${encodeURIComponent(prefixKey(key))}/${encodeURIComponent(JSON.stringify(value))}/EX/${ttlSeconds}`, {
+    const storedValue = value === NEG_SENTINEL
+      ? value
+      : await createStorageEnvelope(value, {
+        source: resolveStorageSource(key),
+        ttlMs: ttlSeconds * 1000,
+      });
+    await fetch(`${url}/set/${encodeURIComponent(prefixKey(key))}/${encodeURIComponent(JSON.stringify(storedValue))}/EX/${ttlSeconds}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(REDIS_OP_TIMEOUT_MS),
@@ -60,6 +79,28 @@ export async function setCachedJson(key: string, value: unknown, ttlSeconds: num
 
 const NEG_SENTINEL = '__WM_NEG__';
 const SEED_META_TTL = 604800; // 7 days
+const SEED_META_ELIGIBLE_PREFIXES = [
+  'seismology:',
+  'wildfire:',
+  'infra:',
+  'climate:',
+  'unrest:',
+  'cyber:',
+  'market:',
+  'natural:',
+  'aviation:',
+  'prediction:',
+  'news:insights',
+  'economic:',
+  'supply_chain:',
+  'giving:',
+  'intelligence:gpsjam',
+  'cable-health',
+  'positive-events:',
+  'risk:scores',
+  'conflict:iran-events',
+  'conflict:ucdp-events',
+];
 
 /** Estimate record count from an RPC response object for seed-meta tracking. */
 function estimateRecordCount(obj: unknown): number {
@@ -77,6 +118,9 @@ const seedMetaLastWrite = new Map<string, number>();
 const SEED_META_THROTTLE_MS = 300_000; // 5 minutes
 
 function writeSeedMeta(cacheKey: string, recordCount: number): void {
+  if (!SEED_META_ELIGIBLE_PREFIXES.some((prefix) => cacheKey.startsWith(prefix))) {
+    return;
+  }
   const now = Date.now();
   const last = seedMetaLastWrite.get(cacheKey) ?? 0;
   if (now - last < SEED_META_THROTTLE_MS) return;
@@ -115,7 +159,12 @@ export async function getCachedJsonBatch(keys: string[]): Promise<Map<string, un
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          if (parsed !== NEG_SENTINEL) result.set(keys[i]!, parsed);
+          if (parsed !== NEG_SENTINEL) {
+            const decoded = await decodeCachedPayload(keys[i]!, parsed);
+            if (decoded !== null) {
+              result.set(keys[i]!, decoded);
+            }
+          }
         } catch { /* skip malformed */ }
       }
     }

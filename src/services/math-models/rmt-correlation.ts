@@ -38,6 +38,7 @@ export interface RmtDenoiseOptions {
   preserveDiagonal?: boolean;
   minEigenvalue?: number;
   noiseReplacement?: 'mean' | 'median' | 'threshold';
+  shrinkage?: 'none' | 'oas' | 'ledoit-wolf';
   maxIterations?: number;
   tolerance?: number;
 }
@@ -109,6 +110,45 @@ function symmetrize(matrix: SymmetricMatrix): SymmetricMatrix {
     }
   }
   return output;
+}
+
+function shrinkTowardIdentity(
+  matrix: SymmetricMatrix,
+  shrinkage: 'none' | 'oas' | 'ledoit-wolf',
+  sampleSize: number,
+): SymmetricMatrix {
+  if (shrinkage === 'none') return symmetrize(matrix);
+  const size = matrix.length;
+  if (size === 0) return [];
+  const trace = matrixTrace(matrix);
+  const mu = trace / Math.max(1, size);
+  const target = identityMatrix(size).map((row, rowIndex) =>
+    row.map((_, colIndex) => (rowIndex === colIndex ? mu : 0)),
+  );
+  const sample = symmetrize(matrix);
+  const p = Math.max(1, sampleSize);
+  const traceS2 = matrixTrace(sample.map((row, rowIndex) =>
+    row.map((_, colIndex) => {
+      let acc = 0;
+      for (let k = 0; k < size; k += 1) {
+        acc += (sample[rowIndex]?.[k] ?? 0) * (sample[k]?.[colIndex] ?? 0);
+      }
+      return acc;
+    }),
+  ));
+  const shrinkageIntensity = shrinkage === 'oas'
+    ? clamp(
+      ((1 - 2 / size) * traceS2 + trace * trace) / ((p + 1 - 2 / size) * (traceS2 - (trace * trace) / size)),
+      0,
+      1,
+    )
+    : clamp((size + 1) / Math.max(p, size + 1), 0.02, 0.45);
+  return symmetrize(sample.map((row, rowIndex) =>
+    row.map((value, colIndex) => (
+      (1 - shrinkageIntensity) * value
+      + shrinkageIntensity * (target[rowIndex]?.[colIndex] ?? 0)
+    )),
+  ));
 }
 
 function matrixTrace(matrix: SymmetricMatrix): number {
@@ -405,7 +445,10 @@ export function denoiseCorrelationMatrix(
   options: Partial<Omit<RmtDenoiseOptions, 'preserveDiagonal'>> & { preserveDiagonal?: boolean } = {},
 ): RmtDenoiseResult {
   const sampleSize = Math.max(1, Math.round(options.sampleSize ?? matrix.length));
-  const result = denoiseSymmetricMatrix(matrix, {
+  const normalizedInput = normalizeToCorrelation(matrix);
+  const shrinkage = options.shrinkage ?? 'oas';
+  const shrunkInput = shrinkTowardIdentity(normalizedInput, shrinkage, sampleSize);
+  const result = denoiseSymmetricMatrix(shrunkInput, {
     ...options,
     sampleSize,
     preserveDiagonal: options.preserveDiagonal ?? true,
@@ -426,6 +469,7 @@ export function denoiseCorrelationMatrix(
     summary: [
       `dimension=${normalizedMatrix.length}`,
       `sampleSize=${normalizedMp.sampleSize}`,
+      `shrinkage=${shrinkage}`,
       `lambdaMax=${normalizedMp.lambdaMax}`,
       `signalEigenCount=${normalizedMp.signalEigenCount}`,
       `noiseEigenCount=${normalizedMp.noiseEigenCount}`,

@@ -50,7 +50,18 @@ export function ingestGeoEvent(
 }
 
 function pruneOldEvents(): void {
-  const cutoff = Date.now() - WINDOW_MS;
+  const latestObservedTs = Array.from(cells.values()).reduce((latest, cell) => {
+    const cellLatest = Array.from(cell.events.values()).reduce((maxTs, data) => {
+      const seenTs = data.lastSeen.getTime();
+      return Number.isFinite(seenTs) ? Math.max(maxTs, seenTs) : maxTs;
+    }, 0);
+    return Math.max(latest, cellLatest);
+  }, 0);
+  const wallClockTs = Date.now();
+  const referenceTs = latestObservedTs > 0 && latestObservedTs < (wallClockTs - WINDOW_MS)
+    ? latestObservedTs
+    : wallClockTs;
+  const cutoff = referenceTs - WINDOW_MS;
 
   for (const [cellId, cell] of cells) {
     for (const [type, data] of cell.events) {

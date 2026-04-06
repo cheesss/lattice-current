@@ -54,6 +54,10 @@ export const MARKET_SYMBOLS: MarketSymbol[] = [
   { symbol: 'HD', name: 'Home Depot', display: 'HD' },
   { symbol: 'NFLX', name: 'Netflix', display: 'NFLX' },
   { symbol: 'BAC', name: 'BofA', display: 'BAC' },
+  { symbol: 'HYG', name: 'HY Bond ETF', display: 'HYG' },
+  { symbol: 'LQD', name: 'IG Bond ETF', display: 'LQD' },
+  { symbol: 'TLT', name: 'Long Treasury ETF', display: 'TLT' },
+  { symbol: 'EMB', name: 'EM Bond ETF', display: 'EMB' },
 ];
 
 export const CRYPTO_IDS = cryptoConfig.ids as readonly string[];

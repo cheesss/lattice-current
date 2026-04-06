@@ -11,14 +11,178 @@
 
 import pg from 'pg';
 import { writeFileSync } from 'fs';
+import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 
 loadOptionalEnvFile();
 const { Client } = pg;
-const PG_CONFIG = resolveNasPgConfig();
+let pgConfig = null;
+let pgConfigError = null;
 
-async function main() {
-  const client = new Client(PG_CONFIG);
+function getPgConfig() {
+  if (!pgConfig && !pgConfigError) {
+    try {
+      pgConfig = resolveNasPgConfig();
+    } catch (error) {
+      pgConfigError = error;
+    }
+  }
+  if (!pgConfig) {
+    throw pgConfigError;
+  }
+  return pgConfig;
+}
+
+export const REGIME_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS regime_conditional_impact (
+    id SERIAL PRIMARY KEY,
+    theme TEXT,
+    symbol TEXT,
+    horizon TEXT,
+    regime TEXT,
+    avg_return DOUBLE PRECISION,
+    hit_rate DOUBLE PRECISION,
+    avg_abs_return DOUBLE PRECISION,
+    sample_size INTEGER,
+    regime_multiplier DOUBLE PRECISION DEFAULT 1.0,
+    anomaly_rate DOUBLE PRECISION DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(theme, symbol, horizon, regime)
+  )
+`;
+
+export const HAWKES_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS event_hawkes_intensity (
+    id SERIAL PRIMARY KEY,
+    theme TEXT,
+    event_date DATE,
+    article_count INTEGER,
+    hawkes_intensity DOUBLE PRECISION,
+    normalized_temperature DOUBLE PRECISION,
+    is_surge BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(theme, event_date)
+  )
+`;
+
+export const WHATIF_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS whatif_simulations (
+    id SERIAL PRIMARY KEY,
+    theme TEXT,
+    symbol TEXT,
+    direction TEXT DEFAULT 'long',
+    position_pct DOUBLE PRECISION DEFAULT 10.0,
+    horizon TEXT DEFAULT '2w',
+    regime TEXT DEFAULT 'all',
+    simulated_trades INTEGER,
+    avg_pnl_pct DOUBLE PRECISION,
+    hit_rate DOUBLE PRECISION,
+    max_drawdown_pct DOUBLE PRECISION,
+    sharpe_ratio DOUBLE PRECISION,
+    var_95_pct DOUBLE PRECISION,
+    total_return_pct DOUBLE PRECISION,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(theme, symbol, direction, horizon, regime)
+  )
+`;
+
+export const REGIME_CASE_SQL = `
+  CASE
+    WHEN vix.price > 25 AND COALESCE(hy.value, 0) > (
+      SELECT AVG(value) + 1.5 * STDDEV(value)
+      FROM signal_history
+      WHERE signal_name = 'hy_credit_spread'
+        AND ts >= anchor_ts - INTERVAL '90 days'
+        AND ts < anchor_ts
+    ) THEN 'crisis'
+    WHEN vix.price > 25 THEN 'risk-off'
+    WHEN vix.price < 18 AND COALESCE(hy.value, 999) < (
+      SELECT AVG(value) - 0.5 * STDDEV(value)
+      FROM signal_history
+      WHERE signal_name = 'hy_credit_spread'
+        AND ts >= anchor_ts - INTERVAL '90 days'
+        AND ts < anchor_ts
+    ) THEN 'risk-on-strong'
+    WHEN vix.price < 18 THEN 'risk-on'
+    ELSE 'balanced'
+  END
+`;
+
+export function classifyRegimeFromSignals({
+  vix,
+  hyCreditSpread,
+  hyWindowMean,
+  hyWindowStd,
+}) {
+  if (Number.isFinite(vix) && vix > 25 && Number.isFinite(hyCreditSpread) && Number.isFinite(hyWindowMean) && Number.isFinite(hyWindowStd) && hyCreditSpread > hyWindowMean + 1.5 * hyWindowStd) {
+    return 'crisis';
+  }
+  if (Number.isFinite(vix) && vix > 25) return 'risk-off';
+  if (Number.isFinite(vix) && vix < 18 && Number.isFinite(hyCreditSpread) && Number.isFinite(hyWindowMean) && Number.isFinite(hyWindowStd) && hyCreditSpread < hyWindowMean - 0.5 * hyWindowStd) {
+    return 'risk-on-strong';
+  }
+  if (Number.isFinite(vix) && vix < 18) return 'risk-on';
+  return 'balanced';
+}
+
+export function computeHawkesDecayPerDay(halfLifeDays = 7) {
+  return 0.693 / halfLifeDays;
+}
+
+export function computeWhatIfSharpeRatio(pnls, annualizationPeriods = 52) {
+  if (!Array.isArray(pnls) || pnls.length === 0) return 0;
+  const mean = pnls.reduce((sum, value) => sum + value, 0) / pnls.length;
+  const variance = pnls.reduce((sum, value) => sum + (value - mean) ** 2, 0) / pnls.length;
+  const std = Math.sqrt(variance);
+  if (!(std > 0.001)) return 0;
+  return (mean / std) * Math.sqrt(annualizationPeriods);
+}
+
+export async function applyAnomalyRegimeFeedback(client) {
+  await client.query(`ALTER TABLE regime_conditional_impact ADD COLUMN IF NOT EXISTS anomaly_rate DOUBLE PRECISION DEFAULT 0`);
+  const { rows: [existsRow] } = await client.query(`SELECT to_regclass('public.event_anomalies') AS table_name`);
+  if (!existsRow?.table_name) {
+    return { applied: false, affectedRows: 0 };
+  }
+
+  const result = await client.query(`
+    WITH anomaly_regimes AS (
+      SELECT
+        ea.theme,
+        ea.symbol,
+        ${REGIME_CASE_SQL.replaceAll('anchor_ts', 'ea.event_date::timestamptz')} AS regime,
+        COUNT(*)::float AS anomaly_count
+      FROM event_anomalies ea
+      LEFT JOIN worldmonitor_intel.historical_raw_items vix
+        ON vix.provider = 'fred'
+       AND vix.symbol = 'VIXCLS'
+       AND DATE(vix.valid_time_start) = DATE(ea.event_date)
+      LEFT JOIN signal_history hy
+        ON hy.signal_name = 'hy_credit_spread'
+       AND DATE(hy.ts) = DATE(ea.event_date)
+      GROUP BY ea.theme, ea.symbol, regime
+    )
+    UPDATE regime_conditional_impact rci
+    SET
+      anomaly_rate = LEAST(1, anomaly_regimes.anomaly_count / NULLIF(rci.sample_size, 0)),
+      regime_multiplier = rci.regime_multiplier * (
+        1 - LEAST(1, anomaly_regimes.anomaly_count / NULLIF(rci.sample_size, 0)) * 0.5
+      ),
+      updated_at = NOW()
+    FROM anomaly_regimes
+    WHERE rci.theme = anomaly_regimes.theme
+      AND rci.symbol = anomaly_regimes.symbol
+      AND rci.regime = anomaly_regimes.regime
+  `);
+
+  return {
+    applied: true,
+    affectedRows: Number(result.rowCount || 0),
+  };
+}
+
+export async function main() {
+  const client = new Client(getPgConfig());
   await client.connect();
 
   console.log('═══ Event Analysis Engine — Full Build ═══\n');
@@ -26,22 +190,7 @@ async function main() {
   // ═══ 1. HMM Regime 분리 ═══
   console.log('▶ 1. HMM Regime 분리 — 시장 상태별 종목 반응...');
 
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS regime_conditional_impact (
-      id SERIAL PRIMARY KEY,
-      theme TEXT,
-      symbol TEXT,
-      horizon TEXT,
-      regime TEXT,
-      avg_return DOUBLE PRECISION,
-      hit_rate DOUBLE PRECISION,
-      avg_abs_return DOUBLE PRECISION,
-      sample_size INTEGER,
-      regime_multiplier DOUBLE PRECISION DEFAULT 1.0,
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(theme, symbol, horizon, regime)
-    )
-  `);
+  await client.query(REGIME_TABLE_SQL);
 
   // Use Yahoo VIX + yield spread to classify regime
   // VIX > 25 = risk-off, VIX < 18 = risk-on, else balanced
@@ -50,11 +199,7 @@ async function main() {
     INSERT INTO regime_conditional_impact (theme, symbol, horizon, regime, avg_return, hit_rate, avg_abs_return, sample_size, regime_multiplier)
     SELECT
       lo.theme, lo.symbol, lo.horizon,
-      CASE
-        WHEN vix.price > 25 THEN 'risk-off'
-        WHEN vix.price < 18 THEN 'risk-on'
-        ELSE 'balanced'
-      END AS regime,
+      ${REGIME_CASE_SQL.replaceAll('anchor_ts', 'a.published_at')} AS regime,
       AVG(lo.forward_return_pct::numeric) AS avg_return,
       AVG(lo.hit::int::numeric) AS hit_rate,
       AVG(ABS(lo.forward_return_pct)::numeric) AS avg_abs_return,
@@ -69,6 +214,9 @@ async function main() {
     LEFT JOIN worldmonitor_intel.historical_raw_items vix
       ON vix.provider = 'fred' AND vix.symbol = 'VIXCLS'
       AND DATE(vix.valid_time_start) = DATE(a.published_at)
+    LEFT JOIN signal_history hy
+      ON hy.signal_name = 'hy_credit_spread'
+      AND DATE(hy.ts) = DATE(a.published_at)
     CROSS JOIN LATERAL (
       SELECT AVG(ABS(lo2.forward_return_pct)::numeric) AS avg_abs
       FROM labeled_outcomes lo2
@@ -76,17 +224,23 @@ async function main() {
     ) overall
     WHERE vix.price IS NOT NULL AND lo.horizon = '2w'
     GROUP BY lo.theme, lo.symbol, lo.horizon,
-      CASE WHEN vix.price > 25 THEN 'risk-off' WHEN vix.price < 18 THEN 'risk-on' ELSE 'balanced' END,
+      ${REGIME_CASE_SQL.replaceAll('anchor_ts', 'a.published_at')},
       overall.avg_abs
     HAVING COUNT(*) >= 30
     ON CONFLICT (theme, symbol, horizon, regime) DO UPDATE SET
       avg_return=EXCLUDED.avg_return, hit_rate=EXCLUDED.hit_rate,
       avg_abs_return=EXCLUDED.avg_abs_return, sample_size=EXCLUDED.sample_size,
-      regime_multiplier=EXCLUDED.regime_multiplier, updated_at=NOW()
+      regime_multiplier=EXCLUDED.regime_multiplier, anomaly_rate=0, updated_at=NOW()
   `);
 
+  const anomalyFeedback = await applyAnomalyRegimeFeedback(client);
   const regimeCount = await client.query('SELECT COUNT(*) FROM regime_conditional_impact');
   console.log(`  ${regimeCount.rows[0].count} regime-conditional records 생성`);
+  if (anomalyFeedback.applied) {
+    console.log(`  anomaly-regime feedback applied to ${anomalyFeedback.affectedRows} rows`);
+  } else {
+    console.log('  anomaly-regime feedback skipped (event_anomalies table missing)');
+  }
 
   // Show regime differences
   const regimeDiff = await client.query(`
@@ -113,19 +267,7 @@ async function main() {
   // ═══ 2. Hawkes 이슈 온도 ═══
   console.log('\n\n▶ 2. Hawkes 이슈 온도 — 이벤트 연쇄 강도...');
 
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS event_hawkes_intensity (
-      id SERIAL PRIMARY KEY,
-      theme TEXT,
-      event_date DATE,
-      article_count INTEGER,
-      hawkes_intensity DOUBLE PRECISION,
-      normalized_temperature DOUBLE PRECISION,
-      is_surge BOOLEAN DEFAULT FALSE,
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(theme, event_date)
-    )
-  `);
+  await client.query(HAWKES_TABLE_SQL);
 
   // Compute daily article counts per theme, then calculate Hawkes-like intensity
   // Intensity = exponential moving sum of past events (half-life 7 days)
@@ -144,7 +286,7 @@ async function main() {
 
     // Compute Hawkes-like intensity (exponential decay sum)
     const halfLifeDays = 7;
-    const decay = 0.693 / halfLifeDays;
+    const decay = computeHawkesDecayPerDay(halfLifeDays);
     const records = [];
     let intensity = 0;
     const counts = daily.rows.map(r => ({ date: r.event_date, n: Number(r.n) }));
@@ -225,26 +367,7 @@ async function main() {
   // ═══ 3. What-if 시뮬레이션 ═══
   console.log('\n\n▶ 3. What-if 시뮬레이션 테이블 생성...');
 
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS whatif_simulations (
-      id SERIAL PRIMARY KEY,
-      theme TEXT,
-      symbol TEXT,
-      direction TEXT DEFAULT 'long',
-      position_pct DOUBLE PRECISION DEFAULT 10.0,
-      horizon TEXT DEFAULT '2w',
-      regime TEXT DEFAULT 'all',
-      simulated_trades INTEGER,
-      avg_pnl_pct DOUBLE PRECISION,
-      hit_rate DOUBLE PRECISION,
-      max_drawdown_pct DOUBLE PRECISION,
-      sharpe_ratio DOUBLE PRECISION,
-      var_95_pct DOUBLE PRECISION,
-      total_return_pct DOUBLE PRECISION,
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(theme, symbol, direction, horizon, regime)
-    )
-  `);
+  await client.query(WHATIF_TABLE_SQL);
 
   // Simulate for each theme-symbol pair
   const pairs = await client.query(`
@@ -279,10 +402,7 @@ async function main() {
         if (dd > maxDD) maxDD = dd;
       }
 
-      // Sharpe
-      const mean = avgPnl;
-      const std = Math.sqrt(pnls.reduce((s, p) => s + (p - mean) ** 2, 0) / pnls.length);
-      const sharpe = std > 0.001 ? (mean / std) * Math.sqrt(52) : 0; // annualized (2w periods)
+      const sharpe = computeWhatIfSharpeRatio(pnls, 52);
 
       // VaR 95%
       const sorted = [...pnls].sort((a, b) => a - b);
@@ -329,4 +449,14 @@ async function main() {
   await client.end();
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+const entryHref = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href
+  : null;
+const isNodeTestRun = process.argv.includes('--test');
+
+if (!isNodeTestRun && entryHref && import.meta.url === entryHref) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

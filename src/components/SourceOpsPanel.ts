@@ -495,13 +495,15 @@ export class SourceOpsPanel extends Panel {
           <td>${escapeHtml(row.source)}</td>
           <td>${row.credibilityScore}</td>
           <td>${row.corroborationScore}</td>
+          <td>${row.independentCorroborationScore ?? '-'}</td>
           <td>${row.historicalAccuracyScore}</td>
           <td>${row.feedHealthScore}</td>
+          <td>${row.copyAmplificationRiskScore ?? '-'}</td>
           <td>${row.propagandaRiskScore}</td>
           <td>${escapeHtml(row.notes.slice(0, 2).join(' | ') || '-')}</td>
         </tr>
       `).join('')
-      : '<tr><td colspan="7" class="source-ops-empty">No credibility profiles yet</td></tr>';
+      : '<tr><td colspan="9" class="source-ops-empty">No credibility profiles yet</td></tr>';
 
     const healingHtml = healingSuggestions.length > 0
       ? healingSuggestions.slice(0, 14).map((row) => {
@@ -566,7 +568,7 @@ export class SourceOpsPanel extends Panel {
           <div class="source-ops-table-wrap">
             <table class="source-ops-table">
               <thead>
-                <tr><th>Source</th><th>Cred</th><th>Corroboration</th><th>History</th><th>Health</th><th>Propaganda</th><th>Notes</th></tr>
+                <tr><th>Source</th><th>Cred</th><th>Corroboration</th><th>Ind Corr</th><th>History</th><th>Health</th><th>Copy Risk</th><th>Propaganda</th><th>Notes</th></tr>
               </thead>
               <tbody>${credibilityHtml}</tbody>
             </table>

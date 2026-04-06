@@ -1,0 +1,226 @@
+{
+  "startedAt": "2026-04-05T16:57:04.722Z",
+  "ok": true,
+  "steps": {
+    "ingestArticle": {
+      "ok": true,
+      "articleId": 76906,
+      "theme": "energy",
+      "pendingCount": 10
+    },
+    "articleStored": {
+      "ok": true,
+      "row": {
+        "id": 76906,
+        "source": "e2e-smoke",
+        "title": "[e2e-smoke] energy BDRY 1775408241521",
+        "auto_theme": "energy"
+      }
+    },
+    "pendingCreated": {
+      "ok": true,
+      "count": 10,
+      "rows": [
+        {
+          "id": 1037,
+          "status": "pending",
+          "symbol": "DAL",
+          "target_date": "2021-04-07T15:00:00.000Z"
+        },
+        {
+          "id": 1039,
+          "status": "pending",
+          "symbol": "SLB",
+          "target_date": "2021-04-07T15:00:00.000Z"
+        },
+        {
+          "id": 1033,
+          "status": "pending",
+          "symbol": "OXY",
+          "target_date": "2021-04-07T15:00:00.000Z"
+        },
+        {
+          "id": 1035,
+          "status": "pending",
+          "symbol": "^VIX",
+          "target_date": "2021-04-07T15:00:00.000Z"
+        },
+        {
+          "id": 1031,
+          "status": "pending",
+          "symbol": "BDRY",
+          "target_date": "2021-04-07T15:00:00.000Z"
+        },
+        {
+          "id": 1036,
+          "status": "pending",
+          "symbol": "^VIX",
+          "target_date": "2021-04-14T15:00:00.000Z"
+        },
+        {
+          "id": 1032,
+          "status": "pending",
+          "symbol": "BDRY",
+          "target_date": "2021-04-14T15:00:00.000Z"
+        },
+        {
+          "id": 1038,
+          "status": "pending",
+          "symbol": "DAL",
+          "target_date": "2021-04-14T15:00:00.000Z"
+        },
+        {
+          "id": 1034,
+          "status": "pending",
+          "symbol": "OXY",
+          "target_date": "2021-04-14T15:00:00.000Z"
+        },
+        {
+          "id": 1040,
+          "status": "pending",
+          "symbol": "SLB",
+          "target_date": "2021-04-14T15:00:00.000Z"
+        }
+      ]
+    },
+    "signalHistory": {
+      "ok": true,
+      "latest": {
+        "value": 1.2345,
+        "ts": "2021-04-01T13:30:00.000Z"
+      }
+    },
+    "pendingResolution": {
+      "ok": true,
+      "checkPendingSummary": {
+        "completed": 10,
+        "remaining": 1020
+      },
+      "pendingStatuses": [
+        {
+          "status": "completed",
+          "count": 8
+        },
+        {
+          "status": "skipped",
+          "count": 2
+        }
+      ],
+      "labeledOutcomes": [
+        {
+          "symbol": "BDRY",
+          "horizon": "1w",
+          "forward_return_pct": -7.808140517020187,
+          "hit": false
+        },
+        {
+          "symbol": "BDRY",
+          "horizon": "2w",
+          "forward_return_pct": 13.218064091168072,
+          "hit": true
+        },
+        {
+          "symbol": "DAL",
+          "horizon": "1w",
+          "forward_return_pct": 2.0069619199012037,
+          "hit": true
+        },
+        {
+          "symbol": "DAL",
+          "horizon": "2w",
+          "forward_return_pct": -4.116326153713467,
+          "hit": false
+        },
+        {
+          "symbol": "OXY",
+          "horizon": "1w",
+          "forward_return_pct": -9.678596419854957,
+          "hit": false
+        },
+        {
+          "symbol": "OXY",
+          "horizon": "2w",
+          "forward_return_pct": -9.203793380775556,
+          "hit": false
+        },
+        {
+          "symbol": "SLB",
+          "horizon": "1w",
+          "forward_return_pct": -3.7010708235191423,
+          "hit": false
+        },
+        {
+          "symbol": "SLB",
+          "horizon": "2w",
+          "forward_return_pct": -5.124556991135173,
+          "hit": false
+        }
+      ]
+    },
+    "sensitivity": {
+      "ok": true,
+      "rows": [
+        {
+          "theme": "energy",
+          "symbol": "BDRY",
+          "horizon": "1w",
+          "sample_size": 1,
+          "hit_rate": 0
+        },
+        {
+          "theme": "energy",
+          "symbol": "BDRY",
+          "horizon": "2w",
+          "sample_size": 1,
+          "hit_rate": 1
+        },
+        {
+          "theme": "energy",
+          "symbol": "DAL",
+          "horizon": "1w",
+          "sample_size": 1,
+          "hit_rate": 1
+        },
+        {
+          "theme": "energy",
+          "symbol": "DAL",
+          "horizon": "2w",
+          "sample_size": 1,
+          "hit_rate": 0
+        },
+        {
+          "theme": "energy",
+          "symbol": "OXY",
+          "horizon": "1w",
+          "sample_size": 1,
+          "hit_rate": 0
+        },
+        {
+          "theme": "energy",
+          "symbol": "OXY",
+          "horizon": "2w",
+          "sample_size": 1,
+          "hit_rate": 0
+        },
+        {
+          "theme": "energy",
+          "symbol": "SLB",
+          "horizon": "1w",
+          "sample_size": 1,
+          "hit_rate": 0
+        },
+        {
+          "theme": "energy",
+          "symbol": "SLB",
+          "horizon": "2w",
+          "sample_size": 1,
+          "hit_rate": 0
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "syntheticArticleDeleted": true
+  },
+  "completedAt": "2026-04-05T16:57:30.993Z"
+}

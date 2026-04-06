@@ -11,18 +11,51 @@
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+import { createLogger } from './_shared/structured-logger.mjs';
+import { computeCalibrationDiagnostic } from './_shared/calibration-diagnostic.mjs';
+import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
 
 loadOptionalEnvFile();
 
 const { Pool } = pg;
 const PORT = Number(process.env.DASHBOARD_PORT || 46200);
 const CACHE_DIR = path.resolve('data', 'event-dashboard-cache');
-const PG_CONFIG = { ...resolveNasPgConfig(), max: 6 };
-const pool = new Pool(PG_CONFIG);
+const logger = createLogger('event-dashboard-api');
+let pool = null;
+let poolConfig = null;
+let poolConfigError = null;
+
+function getPgConfig() {
+  if (!poolConfig && !poolConfigError) {
+    try {
+      poolConfig = { ...resolveNasPgConfig(), max: 6 };
+    } catch (error) {
+      poolConfigError = error;
+    }
+  }
+  if (!poolConfig) {
+    throw poolConfigError;
+  }
+  return poolConfig;
+}
+
+function getPool() {
+  if (!pool) {
+    pool = new Pool(getPgConfig());
+  }
+  return pool;
+}
+
+export async function closeEventDashboardResources() {
+  if (!pool) return;
+  const current = pool;
+  pool = null;
+  await current.end();
+}
 
 const SIGNAL_LABELS = {
   vix: 'VIX',
@@ -64,8 +97,13 @@ function parseUrl(url) {
 
 async function safeQuery(text, values = []) {
   try {
-    return await pool.query(text, values);
-  } catch {
+    return await getPool().query(text, values);
+  } catch (error) {
+    logger.warn('database query failed', {
+      queryPreview: String(text || '').trim().slice(0, 80),
+      error: String(error?.message || error || 'query failed'),
+    });
+    logger.metric('db.query_error_count', 1);
     return { rows: [] };
   }
 }
@@ -115,15 +153,18 @@ async function resolveWithCache(cacheKey, buildPayload) {
     }
     const enriched = withMeta(payload);
     await writeJsonCache(cacheKey, enriched);
+    logger.metric('api.cache_miss', 1, { cacheKey });
     return buildJsonResponse(enriched);
   } catch (error) {
     const cached = await readJsonCache(cacheKey);
     if (cached) {
+      logger.metric('api.cache_hit', 1, { cacheKey });
       return buildJsonResponse(withMeta(cached, {
         stale: true,
         cacheReason: String(error?.message || error || 'cache fallback'),
       }));
     }
+    logger.metric('api.cache_miss', 1, { cacheKey });
     throw error;
   }
 }
@@ -131,6 +172,11 @@ async function resolveWithCache(cacheKey, buildPayload) {
 function normalizeTemperatureValue(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function clamp(value, minimum, maximum) {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function classifyTemperature(intensity) {
@@ -385,17 +431,183 @@ async function buildStrategies(params) {
   };
 }
 
-async function buildHealth() {
-  const [articlesR, signalsR, pendingR] = await Promise.all([
-    safeQuery(`SELECT COUNT(*)::int AS count FROM articles`),
-    safeQuery(`SELECT COUNT(*)::int AS count FROM signal_history`),
-    safeQuery(`SELECT COUNT(*)::int AS count FROM pending_outcomes WHERE status IN ('pending','waiting')`),
-  ]);
+function ageScore(ageMs, strongThresholdMs, weakThresholdMs) {
+  if (!Number.isFinite(ageMs) || ageMs < 0) return 0;
+  if (ageMs <= strongThresholdMs) return 1;
+  if (ageMs <= weakThresholdMs) return 0.5;
+  return 0;
+}
+
+function computeApiHealthScore(metricsSnapshot) {
+  const metrics = Array.isArray(metricsSnapshot?.metrics) ? metricsSnapshot.metrics : [];
+  let requestCount = 0;
+  let errorCount = 0;
+  for (const metric of metrics) {
+    if (metric?.name === 'api.request_count') requestCount += Number(metric.value || 0);
+    if (metric?.name === 'api.error_count') errorCount += Number(metric.value || 0);
+  }
+  if (requestCount <= 0) return 1;
+  const errorRate = clamp(errorCount / requestCount, 0, 1);
+  return Number(clamp(1 - errorRate * 2, 0, 1).toFixed(4));
+}
+
+async function computeSystemHealth() {
+  let dbHealthy = 1;
+  try {
+    await getPool().query('SELECT 1');
+  } catch {
+    dbHealthy = 0;
+  }
+
+  const [articlesFreshnessR, signalsFreshnessR, pendingR] = dbHealthy
+    ? await Promise.all([
+      safeQuery(`
+        SELECT EXTRACT(EPOCH FROM (NOW() - MAX(published_at))) * 1000 AS age_ms,
+               COUNT(*)::int AS count
+        FROM articles
+      `),
+      safeQuery(`
+        SELECT EXTRACT(EPOCH FROM (NOW() - MAX(ts))) * 1000 AS age_ms,
+               COUNT(*)::int AS count
+        FROM signal_history
+      `),
+      safeQuery(`
+        SELECT COUNT(*)::int AS count
+        FROM pending_outcomes
+        WHERE status IN ('pending','waiting')
+      `),
+    ])
+    : [{ rows: [] }, { rows: [] }, { rows: [] }];
+
+  const articleAgeMs = Number(articlesFreshnessR.rows[0]?.age_ms);
+  const signalAgeMs = Number(signalsFreshnessR.rows[0]?.age_ms);
+  const articleCount = Number(articlesFreshnessR.rows[0]?.count || 0);
+  const signalCount = Number(signalsFreshnessR.rows[0]?.count || 0);
+  const pendingCount = Number(pendingR.rows[0]?.count || 0);
+
+  const dataFreshness = articleCount > 0
+    ? ageScore(articleAgeMs, 6 * 60 * 60 * 1000, 24 * 60 * 60 * 1000)
+    : 0;
+  const signalFreshness = signalCount > 0
+    ? ageScore(signalAgeMs, 30 * 60 * 1000, 2 * 60 * 60 * 1000)
+    : 0;
+  const apiHealth = computeApiHealthScore(logger.getMetrics());
+  const compositeScore = Number((
+    dbHealthy * 0.3
+    + dataFreshness * 0.25
+    + signalFreshness * 0.25
+    + apiHealth * 0.2
+  ).toFixed(4));
+  const status = compositeScore >= 0.8
+    ? 'healthy'
+    : compositeScore >= 0.6
+      ? 'degraded'
+      : 'critical';
+
   return {
-    ok: true,
-    articles: Number(articlesR.rows[0]?.count || 0),
-    signals: Number(signalsR.rows[0]?.count || 0),
-    pending: Number(pendingR.rows[0]?.count || 0),
+    status,
+    compositeScore,
+    components: {
+      dbHealthy,
+      dataFreshness,
+      signalFreshness,
+      apiHealth,
+    },
+    db: dbHealthy ? 'connected' : 'disconnected',
+    articles: articleCount,
+    signals: signalCount,
+    pending: pendingCount,
+    articleAgeMs: Number.isFinite(articleAgeMs) ? Math.round(articleAgeMs) : null,
+    signalAgeMs: Number.isFinite(signalAgeMs) ? Math.round(signalAgeMs) : null,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function buildHealth() {
+  return computeSystemHealth();
+}
+
+async function buildDataQuality() {
+  return computeDataQualityMetrics(getPool());
+}
+
+async function buildCodexQuality() {
+  let persistedMetrics = {
+    totalCalls: 0,
+    parseSuccess: 0,
+    parseFail: 0,
+    validationErrors: 0,
+    avgConfidence: 0,
+    parseSuccessRate: 0,
+    lastCallAt: null,
+    lastWarnings: [],
+  };
+
+  try {
+    const metricsPath = path.resolve('data', 'codex-quality.json');
+    if (existsSync(metricsPath)) {
+      persistedMetrics = {
+        ...persistedMetrics,
+        ...JSON.parse(await readFile(metricsPath, 'utf8')),
+      };
+    }
+  } catch {
+    // best-effort metrics hydration
+  }
+
+  const auditDirs = [
+    path.resolve('data', 'automation', 'codex-audit'),
+    path.resolve('codex-audit'),
+  ].filter((dirPath, index, list) => list.indexOf(dirPath) === index);
+
+  const auditEntries = [];
+  for (const auditDir of auditDirs) {
+    if (!existsSync(auditDir)) continue;
+    const names = await readdir(auditDir).catch(() => []);
+    for (const name of names.filter((value) => value.endsWith('.json')).slice(-50)) {
+      try {
+        const parsed = JSON.parse(await readFile(path.join(auditDir, name), 'utf8'));
+        auditEntries.push(parsed);
+      } catch {
+        // ignore malformed audit rows
+      }
+    }
+  }
+
+  const successfulAuditProposals = auditEntries
+    .map((entry) => entry?.proposal)
+    .filter((proposal) => proposal && typeof proposal === 'object');
+  const auditValidationWarnings = auditEntries.flatMap((entry) => {
+    const direct = Array.isArray(entry?.validationWarnings) ? entry.validationWarnings : [];
+    const nested = Array.isArray(entry?.proposal?.validationWarnings) ? entry.proposal.validationWarnings : [];
+    return [...direct, ...nested];
+  });
+  const auditConfidenceValues = successfulAuditProposals
+    .map((proposal) => Number(proposal.confidence))
+    .filter((value) => Number.isFinite(value));
+  const auditAvgConfidence = auditConfidenceValues.length > 0
+    ? auditConfidenceValues.reduce((sum, value) => sum + value, 0) / auditConfidenceValues.length
+    : 0;
+
+  const totalCalls = Math.max(Number(persistedMetrics.totalCalls || 0), auditEntries.length);
+  const parseSuccess = Math.max(Number(persistedMetrics.parseSuccess || 0), successfulAuditProposals.length);
+  const parseFail = Math.max(Number(persistedMetrics.parseFail || 0), Math.max(0, totalCalls - parseSuccess));
+  const validationErrors = Math.max(Number(persistedMetrics.validationErrors || 0), auditValidationWarnings.length);
+  const avgConfidence = Number(persistedMetrics.avgConfidence || 0) > 0
+    ? Number(persistedMetrics.avgConfidence)
+    : auditAvgConfidence;
+
+  return {
+    totalCalls,
+    parseSuccess,
+    parseFail,
+    validationErrors,
+    avgConfidence: Number(avgConfidence.toFixed(4)),
+    parseSuccessRate: totalCalls > 0 ? Number((parseSuccess / totalCalls).toFixed(4)) : 0,
+    lastCallAt: persistedMetrics.lastCallAt || null,
+    lastWarnings: Array.isArray(persistedMetrics.lastWarnings) ? persistedMetrics.lastWarnings : [],
+    recentAuditEntries: auditEntries.length,
+    recentValidationWarnings: auditValidationWarnings.slice(-10),
   };
 }
 
@@ -404,12 +616,24 @@ export async function resolveEventDashboardResponse(rawUrl) {
   try {
     // ── /api/health ──
     if (segments[0] === 'api' && segments[1] === 'health') {
-      try {
-        await pool.query('SELECT 1');
-        return buildJsonResponse({ status: 'ok', timestamp: new Date().toISOString(), db: 'connected' });
-      } catch (e) {
-        return buildJsonResponse({ status: 'degraded', timestamp: new Date().toISOString(), db: 'disconnected', error: e.message }, 503);
-      }
+      const payload = await buildHealth();
+      return buildJsonResponse(payload, payload.status === 'critical' ? 503 : 200);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'calibration') {
+      return buildJsonResponse(await computeCalibrationDiagnostic(getPool()));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'data-quality') {
+      return buildJsonResponse(await buildDataQuality());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'codex-quality') {
+      return buildJsonResponse(await buildCodexQuality());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'metrics') {
+      return buildJsonResponse(logger.getMetrics());
     }
 
     if (segments[0] === 'api' && segments[1] === 'sensitivity') {
@@ -588,7 +812,11 @@ export async function resolveEventDashboardResponse(rawUrl) {
 
     return buildJsonResponse({ error: 'Not found' }, 404);
   } catch (error) {
-    console.error(error);
+    logger.error('request resolution failed', {
+      path: pathname,
+      error: String(error?.message || error || 'unknown error'),
+    });
+    logger.metric('api.error_count', 1, { path: pathname });
     return buildJsonResponse({ error: String(error?.message || error) }, 500);
   }
 }
@@ -600,13 +828,40 @@ export function startEventDashboardServer(port = PORT) {
       return;
     }
 
+    const startedAt = performance.now();
     const response = await resolveEventDashboardResponse(req.url);
+    const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+    const parsed = parseUrl(req.url);
+    logger.info('request completed', {
+      method: req.method || 'GET',
+      path: parsed.pathname,
+      status: response.status,
+      durationMs,
+    });
+    logger.metric('api.request_count', 1, {
+      method: req.method || 'GET',
+      path: parsed.pathname,
+      status: response.status,
+    });
+    if (response.status >= 400) {
+      logger.metric('api.error_count', 1, {
+        method: req.method || 'GET',
+        path: parsed.pathname,
+        status: response.status,
+      });
+    }
     sendResponse(res, response);
   });
 
   server.listen(port, () => {
-    console.log(`Event Dashboard API running at http://localhost:${port}`);
-    console.log(`Dashboard UI: http://localhost:${port}/dashboard`);
+    logger.info('server started', {
+      port,
+      dashboardUrl: `http://localhost:${port}/dashboard`,
+    });
+  });
+
+  server.on('close', () => {
+    void closeEventDashboardResources().catch(() => {});
   });
 
   return server;

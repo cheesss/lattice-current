@@ -5,6 +5,7 @@
  * to predict hit probability and expected return for new events.
  * No training required — uses labeled outcomes of nearest neighbors directly.
  */
+import { clamp } from './math-utils';
 
 export interface KNNPrediction {
   hitProbability: number;
@@ -181,8 +182,4 @@ export function knnPredictionFromRagCases(
     neighborCount: validCases,
     avgSimilarity: simSum / cases.length,
   };
-}
-
-function clamp(x: number, lo: number, hi: number): number {
-  return Math.min(hi, Math.max(lo, x));
 }

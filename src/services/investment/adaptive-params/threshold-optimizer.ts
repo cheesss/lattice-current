@@ -1,3 +1,5 @@
+import { clamp } from './math-utils';
+
 export interface AdmissionThresholds {
   rejectHitProbability: number;
   watchHitProbability: number;
@@ -15,10 +17,6 @@ const DEFAULT_THRESHOLDS: AdmissionThresholds = {
   rejectScore: 38,
   watchScore: 52,
 };
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
 
 function average(values: number[]): number {
   if (values.length === 0) return 0;

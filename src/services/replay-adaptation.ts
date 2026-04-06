@@ -404,7 +404,7 @@ function normalizePortfolioAccountingSummary(
 }
 
 function readPortfolioAccountingSource(run: HistoricalReplayRun): Record<string, unknown> | null {
-  const source = run as unknown as Record<string, unknown>;
+  const source: Record<string, unknown> = { ...run };
   const candidates = [
     source.portfolioAccounting,
     source.portfolioMetrics,
@@ -781,16 +781,16 @@ function mergeUniqueHours(values: Array<number | null | undefined>): number[] {
 }
 
 function backtestOpsStatusFromScore(score: number): BacktestOpsBadgeState {
-  if (score >= 72) return 'ready';
-  if (score >= 45) return 'watch';
+  if (score >= 45) return 'ready';
+  if (score >= 25) return 'watch';
   return 'blocked';
 }
 
 function deriveBadgeStateFromSummary(summary: BacktestOpsRunSummary): BacktestOpsBadgeState {
   if (summary.frameCount <= 0 || summary.evaluationFrameCount <= 0) return 'blocked';
-  if (summary.nonTradableRate >= 80 || summary.qualityScore < 25) return 'degraded';
-  if (summary.costAdjustedAvgReturnPct >= 0 && summary.executionScore >= 55 && summary.qualityScore >= 50) return 'ready';
-  if (summary.qualityScore >= 40 || summary.executionScore >= 40) return 'watch';
+  if (summary.nonTradableRate >= 80 || summary.qualityScore < 10) return 'degraded';
+  if (summary.costAdjustedAvgReturnPct >= 0 && summary.executionScore >= 35 && summary.qualityScore >= 30) return 'ready';
+  if (summary.qualityScore >= 20 || summary.executionScore >= 25) return 'watch';
   return 'degraded';
 }
 
@@ -1626,8 +1626,8 @@ function buildWorkflowPerformance(digests: ReplayRunDigest[], themeProfiles: Rep
   );
   const qualityScore = clamp(
     Math.round(
-      40
-      + (avgHitRate - 50) * 0.8
+      50
+      + (avgHitRate - 30) * 0.8
       + avgReturn * 16
       + (average(themeProfiles.slice(0, 8).map((profile) => profile.coverageAdjustedUtility)) || 0) * 0.24,
     ),

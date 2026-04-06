@@ -1,0 +1,1121 @@
+{
+  "events": [
+    {
+      "title": "A Long Gulf War Can Starve the World. A Hormuz Transit Deal Could Save Millions.",
+      "source": "CrisisWatch",
+      "publishedAt": "2026-04-05T17:08:20.898Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "حرب ترامب الحقيقية والمتخيَّلة وتداعياتها",
+      "source": "CrisisWatch",
+      "publishedAt": "2026-04-05T17:04:49.115Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Weapon of mass distraction: Congress slams Govt.’s delimitation proposal",
+      "source": "The Hindu",
+      "publishedAt": "2026-04-05T17:04:26.000Z",
+      "theme": "economy",
+      "expectedReactions": [
+        {
+          "symbol": "XRT",
+          "direction": "up",
+          "magnitude": 1.2762047132407075
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.529134580416779
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5102272737201103
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.5063540279367751
+        },
+        {
+          "symbol": "DBC",
+          "direction": "up",
+          "magnitude": 0.4221481412843448
+        }
+      ]
+    },
+    {
+      "title": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+      "source": "CrisisWatch",
+      "publishedAt": "2026-04-05T17:04:12.668Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "How the Iran War is Reshaping the Region",
+      "source": "CrisisWatch",
+      "publishedAt": "2026-04-05T17:04:12.668Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "Update 345 – IAEA Director General Statement on Situation in Ukraine",
+      "source": "IAEA",
+      "publishedAt": "2026-04-05T17:04:08.277Z",
+      "theme": "energy",
+      "expectedReactions": [
+        {
+          "symbol": "BDRY",
+          "direction": "up",
+          "magnitude": 13.2180640911681
+        },
+        {
+          "symbol": "OXY",
+          "direction": "down",
+          "magnitude": 9.20379338077556
+        },
+        {
+          "symbol": "SLB",
+          "direction": "down",
+          "magnitude": 5.12455699113517
+        },
+        {
+          "symbol": "DAL",
+          "direction": "down",
+          "magnitude": 4.11632615371347
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.7580089684906752
+        }
+      ]
+    },
+    {
+      "title": "Nuclear Science Enhances Malawi’s Food Safety and Export Systems",
+      "source": "IAEA",
+      "publishedAt": "2026-04-05T17:04:08.276Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "On Our Radar",
+      "source": "CrisisWatch",
+      "publishedAt": "2026-04-05T17:04:08.273Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "Modi pitches 33% reservation to win over women voters in West Bengal",
+      "source": "The Hindu",
+      "publishedAt": "2026-04-05T17:03:34.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "British PM slams London music festival for booking Kanye West as sponsor Pepsi quits event",
+      "source": "South China Morning Post",
+      "publishedAt": "2026-04-05T17:00:19.000Z",
+      "theme": "tech",
+      "expectedReactions": [
+        {
+          "symbol": "NVDA",
+          "direction": "up",
+          "magnitude": 2.6306930467122482
+        },
+        {
+          "symbol": "AMD",
+          "direction": "up",
+          "magnitude": 1.7831049541139605
+        },
+        {
+          "symbol": "SMH",
+          "direction": "up",
+          "magnitude": 1.185238117829766
+        },
+        {
+          "symbol": "QQQ",
+          "direction": "up",
+          "magnitude": 0.70064966868906
+        },
+        {
+          "symbol": "CIBR",
+          "direction": "up",
+          "magnitude": 0.6362408479935479
+        }
+      ]
+    },
+    {
+      "title": "‘Is there any way to fix this?’ My wife and I bought a house with my sister 35 years ago — but we screwed up some things and now owe a ton of taxes. Help. - MarketWatch",
+      "source": "MarketWatch",
+      "publishedAt": "2026-04-05T17:00:00.000Z",
+      "theme": "economy",
+      "expectedReactions": [
+        {
+          "symbol": "XRT",
+          "direction": "up",
+          "magnitude": 1.2762047132407075
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.529134580416779
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5102272737201103
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.5063540279367751
+        },
+        {
+          "symbol": "DBC",
+          "direction": "up",
+          "magnitude": 0.4221481412843448
+        }
+      ]
+    },
+    {
+      "title": "Iranian drone strikes hit Kuwait’s oil infrastructure before Opec+ supply talks",
+      "source": "Guardian ME",
+      "publishedAt": "2026-04-05T16:59:39.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "‘Mana Isuka Vahanam’ scheme introduced for online sand booking in Siddipet",
+      "source": "The Hindu",
+      "publishedAt": "2026-04-05T16:51:57.000Z",
+      "theme": "tech",
+      "expectedReactions": [
+        {
+          "symbol": "NVDA",
+          "direction": "up",
+          "magnitude": 2.6306930467122482
+        },
+        {
+          "symbol": "AMD",
+          "direction": "up",
+          "magnitude": 1.7831049541139605
+        },
+        {
+          "symbol": "SMH",
+          "direction": "up",
+          "magnitude": 1.185238117829766
+        },
+        {
+          "symbol": "QQQ",
+          "direction": "up",
+          "magnitude": 0.70064966868906
+        },
+        {
+          "symbol": "CIBR",
+          "direction": "up",
+          "magnitude": 0.6362408479935479
+        }
+      ]
+    },
+    {
+      "title": "Trump, on Easter, threatens 'hell' on Iran's infrastructure if Strait remains blocked - Reuters",
+      "source": "Reuters US",
+      "publishedAt": "2026-04-05T16:49:01.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "US airman injured but safe after rescue from inside Iran, Trump says ",
+      "source": "BBC World",
+      "publishedAt": "2026-04-05T16:46:33.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "An Egg-Citing Saturday! - mininggazette.com",
+      "source": "Mining & Resources",
+      "publishedAt": "2026-04-05T16:41:15.000Z",
+      "theme": "tech",
+      "expectedReactions": [
+        {
+          "symbol": "NVDA",
+          "direction": "up",
+          "magnitude": 2.6306930467122482
+        },
+        {
+          "symbol": "AMD",
+          "direction": "up",
+          "magnitude": 1.7831049541139605
+        },
+        {
+          "symbol": "SMH",
+          "direction": "up",
+          "magnitude": 1.185238117829766
+        },
+        {
+          "symbol": "QQQ",
+          "direction": "up",
+          "magnitude": 0.70064966868906
+        },
+        {
+          "symbol": "CIBR",
+          "direction": "up",
+          "magnitude": 0.6362408479935479
+        }
+      ]
+    },
+    {
+      "title": "Trump vows to destroy Iran’s power plants and bridges unless it reopens strait ",
+      "source": "Financial Times",
+      "publishedAt": "2026-04-05T16:38:20.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "Hungary alleges plot to blow up gas pipeline ahead of election",
+      "source": "BBC World",
+      "publishedAt": "2026-04-05T16:38:06.000Z",
+      "theme": "energy",
+      "expectedReactions": [
+        {
+          "symbol": "BDRY",
+          "direction": "up",
+          "magnitude": 13.2180640911681
+        },
+        {
+          "symbol": "OXY",
+          "direction": "down",
+          "magnitude": 9.20379338077556
+        },
+        {
+          "symbol": "SLB",
+          "direction": "down",
+          "magnitude": 5.12455699113517
+        },
+        {
+          "symbol": "DAL",
+          "direction": "down",
+          "magnitude": 4.11632615371347
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.7580089684906752
+        }
+      ]
+    },
+    {
+      "title": "Most Investors Build Their Portfolio Backwards. Here's the Right Order.",
+      "source": "Yahoo Finance",
+      "publishedAt": "2026-04-05T16:35:00.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "3 killed including baby as high winds topple tree during Easter egg hunt in Germany",
+      "source": "South China Morning Post",
+      "publishedAt": "2026-04-05T16:33:52.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "This isn’t the first oil price shock. And for some, it can launch a whole new lifestyle - Pittsburgh Post-Gazette",
+      "source": "Oil & Gas",
+      "publishedAt": "2026-04-05T16:30:17.000Z",
+      "theme": "economy",
+      "expectedReactions": [
+        {
+          "symbol": "XRT",
+          "direction": "up",
+          "magnitude": 1.2762047132407075
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.529134580416779
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5102272737201103
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.5063540279367751
+        },
+        {
+          "symbol": "DBC",
+          "direction": "up",
+          "magnitude": 0.4221481412843448
+        }
+      ]
+    },
+    {
+      "title": "The Melanesian: Dark-skinned people with blonde hair region of Oceania",
+      "source": "Hacker News",
+      "publishedAt": "2026-04-05T16:21:51.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "US inflation seen spiking in first snapshot since Iran war",
+      "source": "Yahoo Finance",
+      "publishedAt": "2026-04-05T16:20:21.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "At least 14 people killed in Israeli strikes across Lebanon",
+      "source": "Al Jazeera",
+      "publishedAt": "2026-04-05T16:15:14.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "Global Oil Oversupply Is Resetting Price Expectations - stonex.com",
+      "source": "Oil & Gas",
+      "publishedAt": "2026-04-05T16:12:31.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Pope warns world is becoming ‘indifferent’ to violence",
+      "source": "Al Jazeera",
+      "publishedAt": "2026-04-05T16:11:13.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Petronas-chartered tanker loaded with Iraqi crude passes through Hormuz - Reuters",
+      "source": "Reuters Energy",
+      "publishedAt": "2026-04-05T16:06:19.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Iranian missile strikes industrial area in southern Israel",
+      "source": "Al Jazeera",
+      "publishedAt": "2026-04-05T16:06:15.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Dow Jones Futures: Trump Threatens 'Hell' If Iran Doesn't Open Hormuz; Sandisk Leads 7 Stocks To Watch",
+      "source": "Yahoo Finance",
+      "publishedAt": "2026-04-05T16:05:10.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Dozens missing after migrant boat capsizes in Mediterranean",
+      "source": "DW News",
+      "publishedAt": "2026-04-05T16:05:00.000Z",
+      "theme": "energy",
+      "expectedReactions": [
+        {
+          "symbol": "BDRY",
+          "direction": "up",
+          "magnitude": 13.2180640911681
+        },
+        {
+          "symbol": "OXY",
+          "direction": "down",
+          "magnitude": 9.20379338077556
+        },
+        {
+          "symbol": "SLB",
+          "direction": "down",
+          "magnitude": 5.12455699113517
+        },
+        {
+          "symbol": "DAL",
+          "direction": "down",
+          "magnitude": 4.11632615371347
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.7580089684906752
+        }
+      ]
+    },
+    {
+      "title": "Ex-player Cuellar backs Mexico to break 'fifth-game' curse, warns of immigration hurdles",
+      "source": "CNA",
+      "publishedAt": "2026-04-05T16:02:58.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "OPEC Plus Warns of Slow Recovery After War in Iran - The New York Times",
+      "source": "Oil & Gas",
+      "publishedAt": "2026-04-05T16:01:08.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "Latest news bulletin | April 5th, 2026 – Evening",
+      "source": "EuroNews",
+      "publishedAt": "2026-04-05T16:00:29.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "'Can Le Pen and Bardella accept betraying a portion of their own voters to get elected?'",
+      "source": "Le Monde",
+      "publishedAt": "2026-04-05T16:00:05.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "Suno is a music copyright nightmare",
+      "source": "The Verge AI",
+      "publishedAt": "2026-04-05T16:00:00.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "Second Black Hills mining proposal selected for federal fast-track permitting - kotatv.com",
+      "source": "Mining & Resources",
+      "publishedAt": "2026-04-05T16:00:00.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "OPEC+ agrees to boost oil output when Strait of Hormuz reopens - Reuters",
+      "source": "Reuters Energy",
+      "publishedAt": "2026-04-05T15:59:13.000Z",
+      "theme": "politics",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 1.0394003914171968
+        },
+        {
+          "symbol": "UUP",
+          "direction": "down",
+          "magnitude": 0.5341766804122986
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.4738807125233755
+        },
+        {
+          "symbol": "EFA",
+          "direction": "down",
+          "magnitude": 0.39320134258097444
+        },
+        {
+          "symbol": "SPY",
+          "direction": "up",
+          "magnitude": 0.38690950503016674
+        }
+      ]
+    },
+    {
+      "title": "House Republican: ‘Only purpose’ for US boots on the ground in Iran is ‘to get the enriched uranium’ - The Hill",
+      "source": "Nuclear Energy",
+      "publishedAt": "2026-04-05T15:59:00.000Z",
+      "theme": "conflict",
+      "expectedReactions": [
+        {
+          "symbol": "GLD",
+          "direction": "up",
+          "magnitude": 0.8543167925704511
+        },
+        {
+          "symbol": "USO",
+          "direction": "up",
+          "magnitude": 0.5813071108523694
+        },
+        {
+          "symbol": "TLT",
+          "direction": "down",
+          "magnitude": 0.5716655424466813
+        },
+        {
+          "symbol": "XLE",
+          "direction": "up",
+          "magnitude": 0.45498585855634355
+        },
+        {
+          "symbol": "ITA",
+          "direction": "up",
+          "magnitude": 0.4486272790346936
+        }
+      ]
+    },
+    {
+      "title": "The Two Materials That Predict Freight Demand Both Just Posted Gains. Here Is What February’s Data Is Telling Us.",
+      "source": "Yahoo Finance",
+      "publishedAt": "2026-04-05T15:58:39.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    },
+    {
+      "title": "Codex is switching to API pricing based usage for all users",
+      "source": "Hacker News",
+      "publishedAt": "2026-04-05T15:58:08.000Z",
+      "theme": "unknown",
+      "expectedReactions": []
+    }
+  ],
+  "meta": {
+    "updatedAt": "2026-04-05T17:22:30.605Z",
+    "stale": false,
+    "window": "24h"
+  }
+}
