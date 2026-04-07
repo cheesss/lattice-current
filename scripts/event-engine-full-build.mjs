@@ -445,6 +445,145 @@ export async function main() {
     );
   }
 
+  // ── 4. Continuous Signal Sensitivity (CORR + REGR_SLOPE) ──
+  console.log('\n▶ 4. Continuous signal sensitivity...');
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS signal_sensitivity_continuous (
+      id SERIAL PRIMARY KEY,
+      theme TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      signal_name TEXT NOT NULL,
+      horizon TEXT DEFAULT '2w',
+      pearson_corr DOUBLE PRECISION,
+      regr_slope DOUBLE PRECISION,
+      regr_intercept DOUBLE PRECISION,
+      sample_size INTEGER,
+      p_value_approx DOUBLE PRECISION,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(theme, symbol, signal_name, horizon)
+    )
+  `);
+
+  const SIGNAL_CHANNELS = [
+    'vix', 'hy_credit_spread', 'ig_credit_spread', 'tedSpread', 'treasury10y',
+    'fedFundsRate', 'dollarIndex', 'oilPrice', 'yieldSpread', 'bdi',
+    'pmiManufacturing', 'unemployment', 'cpiIndex', 'marketStress', 'transmissionStrength'
+  ];
+
+  for (const signal of SIGNAL_CHANNELS) {
+    try {
+      await client.query(`
+        INSERT INTO signal_sensitivity_continuous (theme, symbol, signal_name, horizon, pearson_corr, regr_slope, regr_intercept, sample_size, p_value_approx)
+        SELECT
+          lo.theme, lo.symbol, $1, '2w',
+          CORR(sh.value, lo.forward_return_pct::numeric),
+          REGR_SLOPE(lo.forward_return_pct::numeric, sh.value),
+          REGR_INTERCEPT(lo.forward_return_pct::numeric, sh.value),
+          COUNT(*)::int,
+          CASE WHEN COUNT(*) > 5 AND ABS(CORR(sh.value, lo.forward_return_pct::numeric)) > 0
+            THEN 2.0 * (1.0 - ABS(CORR(sh.value, lo.forward_return_pct::numeric)) * SQRT((COUNT(*) - 2.0) / (1.0 - POWER(CORR(sh.value, lo.forward_return_pct::numeric), 2) + 0.0001)))
+            ELSE 1.0
+          END
+        FROM labeled_outcomes lo
+        JOIN articles a ON lo.article_id = a.id
+        JOIN signal_history sh ON sh.signal_name = $1 AND DATE(sh.ts) = DATE(a.published_at)
+        WHERE lo.horizon = '2w' AND sh.value IS NOT NULL
+        GROUP BY lo.theme, lo.symbol
+        HAVING COUNT(*) >= 30
+        ON CONFLICT (theme, symbol, signal_name, horizon) DO UPDATE SET
+          pearson_corr=EXCLUDED.pearson_corr, regr_slope=EXCLUDED.regr_slope,
+          regr_intercept=EXCLUDED.regr_intercept, sample_size=EXCLUDED.sample_size,
+          p_value_approx=EXCLUDED.p_value_approx, updated_at=NOW()
+      `, [signal]);
+
+      const cnt = await client.query(
+        `SELECT COUNT(*) FROM signal_sensitivity_continuous WHERE signal_name = $1 AND ABS(pearson_corr) > 0.1`,
+        [signal]
+      );
+      console.log(`  ${signal}: ${cnt.rows[0].count} significant correlations (|r|>0.1)`);
+    } catch (err) {
+      console.warn(`  ${signal}: skipped (${err.message.slice(0, 80)})`);
+    }
+  }
+
+  // ── 5. Multivariate Signal Regression ──
+  console.log('\n▶ 5. Multivariate signal regression...');
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS signal_multivariate_regression (
+      id SERIAL PRIMARY KEY,
+      theme TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      horizon TEXT DEFAULT '2w',
+      coefficients JSONB NOT NULL,
+      r_squared DOUBLE PRECISION,
+      sample_size INTEGER,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(theme, symbol, horizon)
+    )
+  `);
+
+  // For multivariate, we use PostgreSQL's built-in REGR functions pairwise
+  // and store as JSONB coefficients per (theme, symbol)
+  const multiResult = await client.query(`
+    WITH paired AS (
+      SELECT lo.theme, lo.symbol,
+        lo.forward_return_pct::numeric AS ret,
+        MAX(CASE WHEN sh.signal_name='vix' THEN sh.value END) AS vix,
+        MAX(CASE WHEN sh.signal_name='hy_credit_spread' THEN sh.value END) AS hy,
+        MAX(CASE WHEN sh.signal_name='dollarIndex' THEN sh.value END) AS dollar,
+        MAX(CASE WHEN sh.signal_name='oilPrice' THEN sh.value END) AS oil,
+        MAX(CASE WHEN sh.signal_name='yieldSpread' THEN sh.value END) AS yield_spread,
+        MAX(CASE WHEN sh.signal_name='treasury10y' THEN sh.value END) AS treasury,
+        MAX(CASE WHEN sh.signal_name='bdi' THEN sh.value END) AS bdi,
+        MAX(CASE WHEN sh.signal_name='marketStress' THEN sh.value END) AS stress
+      FROM labeled_outcomes lo
+      JOIN articles a ON lo.article_id = a.id
+      JOIN signal_history sh ON DATE(sh.ts) = DATE(a.published_at)
+      WHERE lo.horizon = '2w'
+      GROUP BY lo.theme, lo.symbol, lo.article_id, lo.forward_return_pct
+    )
+    SELECT theme, symbol,
+      COUNT(*) AS n,
+      REGR_SLOPE(ret, vix) AS beta_vix,
+      REGR_SLOPE(ret, hy) AS beta_hy,
+      REGR_SLOPE(ret, dollar) AS beta_dollar,
+      REGR_SLOPE(ret, oil) AS beta_oil,
+      REGR_SLOPE(ret, yield_spread) AS beta_yield,
+      REGR_SLOPE(ret, treasury) AS beta_treasury,
+      REGR_SLOPE(ret, bdi) AS beta_bdi,
+      REGR_SLOPE(ret, stress) AS beta_stress,
+      REGR_R2(ret, vix) AS r2_vix
+    FROM paired
+    WHERE vix IS NOT NULL
+    GROUP BY theme, symbol
+    HAVING COUNT(*) >= 50
+  `);
+
+  for (const row of multiResult.rows) {
+    const coefficients = {
+      vix: Number(row.beta_vix) || 0,
+      hy_credit_spread: Number(row.beta_hy) || 0,
+      dollarIndex: Number(row.beta_dollar) || 0,
+      oilPrice: Number(row.beta_oil) || 0,
+      yieldSpread: Number(row.beta_yield) || 0,
+      treasury10y: Number(row.beta_treasury) || 0,
+      bdi: Number(row.beta_bdi) || 0,
+      marketStress: Number(row.beta_stress) || 0,
+    };
+
+    await client.query(`
+      INSERT INTO signal_multivariate_regression (theme, symbol, horizon, coefficients, r_squared, sample_size)
+      VALUES ($1, $2, '2w', $3, $4, $5)
+      ON CONFLICT (theme, symbol, horizon) DO UPDATE SET
+        coefficients=EXCLUDED.coefficients, r_squared=EXCLUDED.r_squared,
+        sample_size=EXCLUDED.sample_size, updated_at=NOW()
+    `, [row.theme, row.symbol, JSON.stringify(coefficients), Number(row.r2_vix) || 0, Number(row.n)]);
+  }
+
+  console.log(`  ${multiResult.rows.length} multivariate regression models stored`);
+
   console.log('\n✅ Full build 완료');
   await client.end();
 }

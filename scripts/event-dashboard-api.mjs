@@ -18,6 +18,9 @@ import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.m
 import { createLogger } from './_shared/structured-logger.mjs';
 import { computeCalibrationDiagnostic } from './_shared/calibration-diagnostic.mjs';
 import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
+import { getBudgetStatus } from './_shared/automation-budget.mjs';
+import { getRecentAutomationActions } from './_shared/automation-audit.mjs';
+import { getPendingApprovals } from './_shared/approval-queue.mjs';
 
 loadOptionalEnvFile();
 
@@ -611,6 +614,256 @@ async function buildCodexQuality() {
   };
 }
 
+async function buildEmergingTechList() {
+  const { rows } = await safeQuery(`
+    SELECT
+      id,
+      COALESCE(label, initcap(array_to_string(keywords[1:3], ' '))) AS label,
+      description,
+      category,
+      stage,
+      article_count,
+      momentum,
+      research_momentum,
+      source_quality_score,
+      source_quality_breakdown,
+      novelty,
+      diversity,
+      cohesion,
+      parent_theme,
+      status,
+      updated_at
+    FROM discovery_topics
+    WHERE status IN ('labeled', 'reported')
+    ORDER BY momentum DESC NULLS LAST, article_count DESC
+    LIMIT 50
+  `);
+  return {
+    topics: rows.map((row) => ({
+      id: String(row.id || ''),
+      label: String(row.label || ''),
+      description: String(row.description || ''),
+      category: String(row.category || ''),
+      stage: String(row.stage || ''),
+      articleCount: Number(row.article_count || 0),
+      momentum: Number(row.momentum || 0),
+      researchMomentum: Number(row.research_momentum || 0),
+      sourceQualityScore: Number(row.source_quality_score || 0),
+      sourceQualityBreakdown: row.source_quality_breakdown || {},
+      novelty: Number(row.novelty || 0),
+      diversity: Number(row.diversity || 0),
+      cohesion: Number(row.cohesion || 0),
+      parentTheme: String(row.parent_theme || 'emerging-tech'),
+      status: String(row.status || 'pending'),
+      updatedAt: row.updated_at,
+    })),
+  };
+}
+
+async function buildEmergingTechDetail(topicId) {
+  const topicResponse = await safeQuery(`
+    SELECT *
+    FROM discovery_topics
+    WHERE id = $1
+    LIMIT 1
+  `, [topicId]);
+  const topic = topicResponse.rows[0];
+  if (!topic) {
+    return { topic: null, report: null, symbols: [], articles: [] };
+  }
+
+  const [articlesResponse, reportResponse, symbolsResponse] = await Promise.all([
+    safeQuery(`
+        SELECT a.id, a.title, a.source, a.published_at, a.url
+        FROM discovery_topic_articles dta
+        JOIN articles a ON a.id = dta.article_id
+        WHERE dta.topic_id = $1
+        ORDER BY published_at DESC
+        LIMIT 20
+      `, [topicId]),
+    safeQuery(`
+      SELECT *
+      FROM tech_reports
+      WHERE topic_id = $1
+      ORDER BY generated_at DESC
+      LIMIT 1
+    `, [topicId]),
+    safeQuery(`
+      SELECT symbol, avg_return, hit_rate, sample_size
+      FROM stock_sensitivity_matrix
+      WHERE theme = $1 OR theme = $2
+      ORDER BY sample_size DESC, ABS(avg_return) DESC NULLS LAST
+      LIMIT 12
+    `, [topicId, String(topic.parent_theme || 'emerging-tech')]),
+  ]);
+
+  return {
+    topic: {
+      id: String(topic.id || ''),
+      label: String(topic.label || ''),
+      description: String(topic.description || ''),
+      category: String(topic.category || ''),
+      stage: String(topic.stage || ''),
+      keywords: Array.isArray(topic.keywords) ? topic.keywords : [],
+      articleCount: Number(topic.article_count || 0),
+      momentum: Number(topic.momentum || 0),
+      researchMomentum: Number(topic.research_momentum || 0),
+      sourceQualityScore: Number(topic.source_quality_score || 0),
+      sourceQualityBreakdown: topic.source_quality_breakdown || {},
+      novelty: Number(topic.novelty || 0),
+      diversity: Number(topic.diversity || 0),
+      cohesion: Number(topic.cohesion || 0),
+      parentTheme: String(topic.parent_theme || 'emerging-tech'),
+      keyCompanies: Array.isArray(topic.key_companies) ? topic.key_companies : [],
+      keyTechnologies: Array.isArray(topic.key_technologies) ? topic.key_technologies : [],
+      monthlyCounts: topic.monthly_counts || {},
+      codexMetadata: topic.codex_metadata || {},
+      updatedAt: topic.updated_at,
+    },
+    report: reportResponse.rows[0] || null,
+    symbols: symbolsResponse.rows.map((row) => ({
+      symbol: String(row.symbol || ''),
+      avgReturn: Number(row.avg_return || 0),
+      hitRate: Number(row.hit_rate || 0),
+      sampleSize: Number(row.sample_size || 0),
+    })),
+    articles: articlesResponse.rows.map((row) => ({
+      id: Number(row.id || 0),
+      title: String(row.title || ''),
+      source: String(row.source || ''),
+      publishedAt: row.published_at,
+      url: String(row.url || ''),
+    })),
+  };
+}
+
+async function buildEmergingTechTimeline() {
+  const { rows } = await safeQuery(`
+    SELECT id, COALESCE(label, id) AS label, monthly_counts
+    FROM discovery_topics
+    WHERE status IN ('labeled', 'reported')
+    ORDER BY momentum DESC NULLS LAST, article_count DESC
+    LIMIT 30
+  `);
+  return {
+    topics: rows.map((row) => ({
+      id: String(row.id || ''),
+      label: String(row.label || ''),
+      monthlyCounts: row.monthly_counts || {},
+    })),
+  };
+}
+
+async function buildLatestReports(limitParam) {
+  const limit = Math.max(1, Math.min(50, Number(limitParam) || 20));
+  const { rows } = await safeQuery(`
+    SELECT id, topic_id, topic_label, generated_at, momentum, research_momentum, source_quality_score, tracking_score
+    FROM tech_reports
+    ORDER BY generated_at DESC
+    LIMIT $1
+  `, [limit]);
+  return { reports: rows };
+}
+
+async function buildReportDetail(reportId) {
+  const { rows } = await safeQuery(`
+    SELECT
+      tr.*,
+      dt.label AS topic_name,
+      dt.description AS topic_description,
+      dt.category AS topic_category,
+      dt.stage AS topic_stage,
+      dt.source_quality_breakdown AS topic_source_quality_breakdown,
+      dt.key_companies AS topic_key_companies,
+      dt.key_technologies AS topic_key_technologies
+    FROM tech_reports tr
+    LEFT JOIN discovery_topics dt ON dt.id = tr.topic_id
+    WHERE tr.id = $1
+    LIMIT 1
+  `, [reportId]);
+  const row = rows[0] || null;
+  if (!row) {
+    return { report: null, topic: null };
+  }
+  return {
+    report: row,
+    topic: {
+      id: String(row.topic_id || ''),
+      label: String(row.topic_name || row.topic_label || row.topic_id || ''),
+      description: String(row.topic_description || ''),
+      category: String(row.topic_category || ''),
+      stage: String(row.topic_stage || ''),
+      sourceQualityBreakdown: row.topic_source_quality_breakdown || {},
+      keyCompanies: Array.isArray(row.topic_key_companies) ? row.topic_key_companies : [],
+      keyTechnologies: Array.isArray(row.topic_key_technologies) ? row.topic_key_technologies : [],
+    },
+  };
+}
+
+async function buildWeeklyDigest() {
+  const digestDir = path.resolve('data');
+  const entries = (await readdir(digestDir).catch(() => []))
+    .filter((name) => /^weekly-digest-\d{4}-\d{2}-\d{2}\.json$/.test(name))
+    .sort()
+    .reverse();
+  if (entries.length === 0) {
+    return { digest: null };
+  }
+  const digest = JSON.parse(await readFile(path.join(digestDir, entries[0]), 'utf8'));
+  return { digest };
+}
+
+async function buildAutomationBudgetPayload() {
+  try {
+    const [budget, approvals, actions] = await Promise.all([
+      getBudgetStatus(getPool()),
+      getPendingApprovals(getPool(), 20),
+      getRecentAutomationActions(getPool(), 24, 50),
+    ]);
+    return {
+      budget,
+      approvals,
+      recentActions: actions,
+    };
+  } catch {
+    return {
+      budget: {
+        hourly: {},
+        daily: {},
+        weekly: {},
+        killSwitchActive: false,
+      },
+      approvals: [],
+      recentActions: [],
+    };
+  }
+}
+
+async function buildAutomationLogPayload() {
+  const hours = 24;
+  try {
+    const actions = await getRecentAutomationActions(getPool(), hours, 200);
+    return {
+      hours,
+      actions,
+    };
+  } catch {
+    return {
+      hours,
+      actions: [],
+    };
+  }
+}
+
+async function buildApprovalQueuePayload() {
+  try {
+    const approvals = await getPendingApprovals(getPool(), 200);
+    return { approvals };
+  } catch {
+    return { approvals: [] };
+  }
+}
+
 export async function resolveEventDashboardResponse(rawUrl) {
   const { pathname, segments, params } = parseUrl(rawUrl);
   try {
@@ -630,6 +883,42 @@ export async function resolveEventDashboardResponse(rawUrl) {
 
     if (segments[0] === 'api' && segments[1] === 'codex-quality') {
       return buildJsonResponse(await buildCodexQuality());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'automation-budget') {
+      return buildJsonResponse(await buildAutomationBudgetPayload());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'automation-log') {
+      return buildJsonResponse(await buildAutomationLogPayload());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'approval-queue') {
+      return buildJsonResponse(await buildApprovalQueuePayload());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments.length === 2) {
+      return buildJsonResponse(await buildEmergingTechList());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments[2] === 'timeline') {
+      return buildJsonResponse(await buildEmergingTechTimeline());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments[2]) {
+      return buildJsonResponse(await buildEmergingTechDetail(segments[2]));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'reports' && segments[2] === 'latest') {
+      return buildJsonResponse(await buildLatestReports(params.get('limit')));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'reports' && segments[2]) {
+      return buildJsonResponse(await buildReportDetail(segments[2]));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'digest' && segments[2] === 'weekly') {
+      return buildJsonResponse(await buildWeeklyDigest());
     }
 
     if (segments[0] === 'api' && segments[1] === 'metrics') {
@@ -684,6 +973,18 @@ export async function resolveEventDashboardResponse(rawUrl) {
         LIMIT 50
       `, [`%${q}%`]);
       return buildJsonResponse(r.rows);
+    }
+
+    // ── /api/stock/:symbol/conditions ──
+    if (segments[0] === 'api' && segments[1] === 'stock' && segments[3] === 'conditions') {
+      const symbol = (segments[2] || '').toUpperCase();
+      const r = await safeQuery(`
+        SELECT condition_type, condition_value, avg_return, hit_rate, sample_size
+        FROM conditional_sensitivity
+        WHERE symbol = $1 AND horizon = '2w' AND sample_size >= 30
+        ORDER BY condition_type, condition_value
+      `, [symbol]);
+      return buildJsonResponse({ conditions: r.rows });
     }
 
     if (segments[0] === 'api' && segments[1] === 'stock') {
@@ -792,6 +1093,79 @@ export async function resolveEventDashboardResponse(rawUrl) {
         LIMIT 20
       `);
       return buildJsonResponse({ discoveries, proposals: proposals.rows });
+    }
+
+    // ── /api/signals/history?days=30&channels=vix,hy_credit_spread ──
+    if (segments[0] === 'api' && segments[1] === 'signals' && segments[2] === 'history') {
+      const days = Math.max(1, Math.min(365, Number(params.get('days')) || 30));
+      const channelsParam = String(params.get('channels') || 'vix').trim();
+      const channelNames = channelsParam.split(',').map((c) => c.trim()).filter(Boolean);
+      const r = await safeQuery(`
+        SELECT signal_name, ts, value
+        FROM signal_history
+        WHERE signal_name = ANY($1) AND ts >= NOW() - ($2 || ' days')::interval
+        ORDER BY signal_name, ts
+      `, [channelNames, String(days)]);
+      const channels = {};
+      for (const row of r.rows) {
+        const name = String(row.signal_name || '');
+        if (!channels[name]) channels[name] = [];
+        channels[name].push({ ts: row.ts, value: Number(row.value || 0) });
+      }
+      return buildJsonResponse({ channels });
+    }
+
+    // ── /api/correlation?theme=conflict ──
+    if (segments[0] === 'api' && segments[1] === 'correlation') {
+      const theme = String(params.get('theme') || '').trim();
+      if (!theme) return buildJsonResponse({ error: 'theme parameter required' }, 400);
+      const r = await safeQuery(`
+        SELECT theme, symbol, signal_name, pearson_corr, regr_slope, sample_size
+        FROM signal_sensitivity_continuous
+        WHERE theme = $1 AND ABS(pearson_corr) > 0.05
+        ORDER BY ABS(pearson_corr) DESC
+      `, [theme]);
+      return buildJsonResponse({ correlations: r.rows });
+    }
+
+    // ── /api/regime-timeline?theme=conflict&days=365 ──
+    if (segments[0] === 'api' && segments[1] === 'regime-timeline') {
+      const days = Math.max(1, Math.min(3650, Number(params.get('days')) || 365));
+      const r = await safeQuery(`
+        WITH daily_regime AS (
+          SELECT DATE(ts) as d, value as vix,
+            CASE WHEN value > 25 THEN 'risk-off'
+                 WHEN value < 18 THEN 'risk-on'
+                 ELSE 'balanced' END AS regime
+          FROM signal_history WHERE signal_name='vix' AND ts >= NOW() - ($1 || ' days')::interval
+        )
+        SELECT d, regime, vix FROM daily_regime ORDER BY d
+      `, [String(days)]);
+      return buildJsonResponse({
+        timeline: r.rows.map((row) => ({
+          date: row.d,
+          regime: String(row.regime || 'balanced'),
+          vix: Number(row.vix || 0),
+        })),
+      });
+    }
+
+    // ── /api/multivariate/:theme/:symbol ──
+    if (segments[0] === 'api' && segments[1] === 'multivariate' && segments.length >= 4) {
+      const theme = segments[2] || '';
+      const symbol = (segments[3] || '').toUpperCase();
+      const r = await safeQuery(`
+        SELECT coefficients, r_squared, sample_size
+        FROM signal_multivariate_regression
+        WHERE theme = $1 AND symbol = $2
+      `, [theme, symbol]);
+      const row = r.rows[0] || null;
+      if (!row) return buildJsonResponse({ coefficients: null, r_squared: null, sample_size: 0 });
+      return buildJsonResponse({
+        coefficients: row.coefficients || {},
+        r_squared: Number(row.r_squared || 0),
+        sample_size: Number(row.sample_size || 0),
+      });
     }
 
     if (segments.length === 0 || segments[0] === 'dashboard') {

@@ -5,6 +5,7 @@ import { readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import type { DatasetProposal, DatasetDiscoveryThemeInput } from '../dataset-discovery';
 import type { ProposalEvidenceBundle } from './proposal-evidence-builder';
+import { ALLOWED_BACKFILL_SOURCES, validateBackfillArgs } from '../../../scripts/_shared/backfill-whitelist.mjs';
 
 interface CodexExecResult {
   code: number;
@@ -132,6 +133,42 @@ function parseJsonObject(rawText: string): Record<string, unknown> | null {
   }
 }
 
+export interface BackfillCurationAction {
+  type: 'backfill-source' | 'add-rss' | 'add-theme';
+  source?: string;
+  args?: Record<string, unknown>;
+  reason: string;
+  priority?: 'high' | 'medium' | 'low';
+  expectedImpact?: string;
+  url?: string;
+  name?: string;
+  theme?: string;
+}
+
+export interface BackfillCurationContext {
+  stats: {
+    totalArticles: number;
+    sourcesBreakdown: Record<string, number>;
+    recentTopics: number;
+    unknownRate?: number;
+  };
+  budgets: {
+    daily?: Record<string, { remaining?: number }>;
+  };
+  topics: Array<{
+    id: string;
+    label: string;
+    category: string;
+    articleCount: number;
+  }>;
+  weakAreas: string[];
+}
+
+export interface BackfillCurationPlan {
+  diagnosis: string;
+  actions: BackfillCurationAction[];
+}
+
 function buildPrompt(theme: DatasetDiscoveryThemeInput, evidence?: ProposalEvidenceBundle | null): string {
   return [
     'You are a historical dataset planner for macro and geopolitical replay.',
@@ -156,6 +193,140 @@ function buildPrompt(theme: DatasetDiscoveryThemeInput, evidence?: ProposalEvide
       ? `Coverage signals:\n${evidence.coverageSignals.map((row) => `- ${row}`).join('\n')}`
       : '',
   ].join('\n');
+}
+
+function buildBackfillPrompt(context: BackfillCurationContext): string {
+  const whitelist = (Object.entries(ALLOWED_BACKFILL_SOURCES) as Array<[string, { args?: Record<string, { max?: number }>; minIntervalHours: number }]>)
+    .map(([name, config]) => `- ${name}: max ${(config.args?.limit as { max?: number } | undefined)?.max || 'n/a'} items, min interval ${config.minIntervalHours}h`)
+    .join('\n');
+  return [
+    'You are a signal-first corpus curator for emerging technology discovery.',
+    'Return strict JSON only. No markdown.',
+    'JSON schema:',
+    '{ "diagnosis": "string", "actions": [ { "type": "backfill-source" | "add-rss" | "add-theme", "source": "string", "args": {}, "reason": "string", "priority": "high|medium|low", "expectedImpact": "string" } ] }',
+    `Corpus total articles: ${context.stats.totalArticles}`,
+    `Sources: ${JSON.stringify(context.stats.sourcesBreakdown)}`,
+    `Recent topics (30d): ${context.stats.recentTopics}`,
+    `Unknown rate: ${Number(context.stats.unknownRate || 0).toFixed(3)}`,
+    `Weak areas: ${(context.weakAreas || []).join(', ') || '(none)'}`,
+    `Topic snapshot: ${(context.topics || []).slice(0, 12).map((topic) => `${topic.label}:${topic.articleCount}`).join(' | ') || '(none)'}`,
+    `Remaining daily budget: ${JSON.stringify(context.budgets?.daily || {})}`,
+    'Allowed backfill sources:',
+    whitelist,
+    'Rules:',
+    '- Maximum 3 actions.',
+    '- Prefer backfill-source when coverage is weak.',
+    '- Do not exceed budget.',
+    '- Use add-rss only for targeted follow-up coverage.',
+    '- Every action must include a concrete reason.',
+  ].join('\n');
+}
+
+function normalizeBackfillAction(raw: Record<string, unknown>): BackfillCurationAction | null {
+  const type = String(raw.type || '').trim();
+  if (type === 'backfill-source') {
+    const source = String(raw.source || '').trim().toLowerCase();
+    const args = raw.args && typeof raw.args === 'object' ? raw.args as Record<string, unknown> : {};
+    const validated = validateBackfillArgs(source, args);
+    if (!validated.ok) return null;
+    return {
+      type: 'backfill-source',
+      source,
+      args: validated.value,
+      reason: String(raw.reason || 'backfill coverage gap').trim() || 'backfill coverage gap',
+      priority: String(raw.priority || 'medium').trim() as BackfillCurationAction['priority'],
+      expectedImpact: String(raw.expectedImpact || '').trim() || undefined,
+    };
+  }
+  if (type === 'add-rss') {
+    const url = String(raw.url || '').trim();
+    if (!url) return null;
+    return {
+      type: 'add-rss',
+      url,
+      name: String(raw.name || '').trim() || undefined,
+      theme: String(raw.theme || '').trim() || undefined,
+      reason: String(raw.reason || 'add rss coverage').trim() || 'add rss coverage',
+      priority: String(raw.priority || 'medium').trim() as BackfillCurationAction['priority'],
+      expectedImpact: String(raw.expectedImpact || '').trim() || undefined,
+    };
+  }
+  if (type === 'add-theme') {
+    return {
+      type: 'add-theme',
+      name: String(raw.name || raw.id || '').trim() || undefined,
+      theme: String(raw.theme || raw.id || '').trim() || undefined,
+      reason: String(raw.reason || 'add theme coverage').trim() || 'add theme coverage',
+      priority: String(raw.priority || 'medium').trim() as BackfillCurationAction['priority'],
+      expectedImpact: String(raw.expectedImpact || '').trim() || undefined,
+    };
+  }
+  return null;
+}
+
+function buildFallbackBackfillPlan(context: BackfillCurationContext): BackfillCurationPlan {
+  const actions: BackfillCurationAction[] = [];
+  const remainingBackfills = Number(context.budgets?.daily?.backfillCalls?.remaining ?? 0);
+  if (remainingBackfills <= 0) {
+    return {
+      diagnosis: 'Daily backfill budget exhausted. No automated actions proposed.',
+      actions,
+    };
+  }
+
+  if (context.weakAreas.includes('source-diversity') || context.weakAreas.includes('corpus-volume')) {
+    actions.push({
+      type: 'backfill-source',
+      source: 'hackernews',
+      args: { limit: 10000, minScore: 50 },
+      reason: 'broaden emerging-tech source coverage with high-signal HN stories',
+      priority: 'high',
+      expectedImpact: 'increase source diversity and discovery candidate volume',
+    });
+  }
+  if (context.weakAreas.some((area) => area === 'topic-discovery' || area.startsWith('category:'))) {
+    actions.push({
+      type: 'backfill-source',
+      source: 'arxiv',
+      args: { categories: ['cs.AI', 'cs.LG', 'q-bio.QM'], from: '2024-01-01', limit: 8000 },
+      reason: 'strengthen research-side discovery when recent topics are sparse',
+      priority: 'high',
+      expectedImpact: 'raise research momentum and topic discovery breadth',
+    });
+  }
+  if (context.weakAreas.includes('emerging-tech-coverage') && actions.length < 3) {
+    actions.push({
+      type: 'backfill-source',
+      source: 'gdelt-articles',
+      args: { keywords: ['emerging technology', 'robotics', 'semiconductor'], from: '2024-01-01', limit: 12000 },
+      reason: 'fill broad global news coverage for emerging technology',
+      priority: 'medium',
+      expectedImpact: 'increase cross-source corroboration for new topics',
+    });
+  }
+  return {
+    diagnosis: `Fallback curation based on weak areas: ${(context.weakAreas || []).join(', ') || 'none'}`,
+    actions: actions.slice(0, 3),
+  };
+}
+
+export async function proposeBackfillActions(context: BackfillCurationContext): Promise<BackfillCurationPlan> {
+  const fallback = buildFallbackBackfillPlan(context);
+  const loginStatus = await runCodexCli(['login', 'status'], 8_000);
+  if (loginStatus.code !== 0 || !isCodexLoggedIn(`${loginStatus.stdout}\n${loginStatus.stderr}`)) return fallback;
+
+  const result = await runCodexCli(buildExecArgs(buildBackfillPrompt(context)), CODEX_TIMEOUT_MS);
+  if (result.code !== 0) return fallback;
+
+  const parsed = parseJsonObject(parseCodexJsonOutput(result.stdout || '') || result.stdout);
+  if (!parsed) return fallback;
+  const actions = Array.isArray(parsed.actions)
+    ? parsed.actions.map((action) => normalizeBackfillAction(action as Record<string, unknown>)).filter(Boolean) as BackfillCurationAction[]
+    : [];
+  return {
+    diagnosis: String(parsed.diagnosis || fallback.diagnosis).trim() || fallback.diagnosis,
+    actions: actions.slice(0, 3),
+  };
 }
 
 export async function proposeDatasetsWithCodex(

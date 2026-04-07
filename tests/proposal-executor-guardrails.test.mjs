@@ -10,5 +10,10 @@ test('proposal executor includes retry and dead-letter queues', () => {
   assert.match(source, /MAX_RETRIES/);
   assert.match(source, /movedToDeadQueue/);
   assert.match(source, /pathToFileURL/);
+  assert.match(source, /handleBackfillSource/);
+  assert.match(source, /ensureAutomationSchema/);
+  assert.match(source, /queueForApproval/);
+  assert.match(source, /backfill-source/);
+  assert.match(source, /isTrustedFeedUrl/);
+  assert.match(source, /evaluateAndRegisterFeed/);
 });
-

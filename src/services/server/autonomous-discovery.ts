@@ -1,6 +1,6 @@
 import allowedDomains from '../../../shared/rss-allowed-domains.json';
 
-import { addDiscoveredSource, listDiscoveredSources, listSourceRegistrySnapshot } from '../source-registry';
+import { addDiscoveredSource, listDiscoveredSources, listSourceRegistrySnapshot, setDiscoveredSourceStatus } from '../source-registry';
 import { adjustKeywordConfidence, extractKeywordCandidatesFromText, listKeywordRegistry, upsertKeywordCandidates } from '../keyword-registry';
 import { proposeGdeltTopicsFromKeywords } from '../gdelt-topic-registry';
 import { AUTOMATION_THRESHOLDS } from '@/config/automation-thresholds';
@@ -13,6 +13,16 @@ export interface AutonomousDiscoveryResult {
   keywordConfidenceAdjustments: number;
 }
 
+export interface FeedQualityScore {
+  score: number;
+  articleCount: number;
+  avgTitleLength: number;
+  languageDiversity: number;
+  topicDiversity: number;
+  spamRate: number;
+  freshness: number;
+}
+
 const PLAYWRIGHT_DOMAIN_LIMIT = 40;
 
 type PlaywrightModule = typeof import('playwright');
@@ -23,6 +33,150 @@ function normalize(value: string): string {
     .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function parseFeedTitles(xml: string): Array<{ title: string; publishedAt: string | null }> {
+  const titles = Array.from(String(xml || '').matchAll(/<title[^>]*>([\s\S]*?)<\/title>/gi))
+    .map((match) => String(match[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim());
+  const dates = Array.from(String(xml || '').matchAll(/<(?:pubDate|published|updated)>([\s\S]*?)<\/(?:pubDate|published|updated)>/gi))
+    .map((match) => String(match[1] || '').trim());
+  return titles
+    .filter((title) => title.length >= 8)
+    .slice(0, 50)
+    .map((title, index) => ({
+      title,
+      publishedAt: dates[index] || null,
+    }));
+}
+
+function detectLanguageHeuristic(text: string): string {
+  const value = String(text || '');
+  if (/[ㄱ-ㅎ가-힣]/.test(value)) return 'ko';
+  if (/[ぁ-ゔァ-ヴー々〆〤]/.test(value)) return 'ja';
+  return 'en';
+}
+
+export async function evaluateFeedQuality(feedUrl: string): Promise<FeedQualityScore> {
+  const response = await fetch(feedUrl, { signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) {
+    return {
+      score: 0,
+      articleCount: 0,
+      avgTitleLength: 0,
+      languageDiversity: 0,
+      topicDiversity: 0,
+      spamRate: 1,
+      freshness: 0,
+    };
+  }
+
+  const xml = await response.text();
+  const articles = parseFeedTitles(xml);
+  if (articles.length < 5) {
+    return {
+      score: 0,
+      articleCount: articles.length,
+      avgTitleLength: articles.reduce((sum, article) => sum + article.title.length, 0) / Math.max(1, articles.length),
+      languageDiversity: 1,
+      topicDiversity: 0,
+      spamRate: 0,
+      freshness: 0,
+    };
+  }
+
+  const avgTitleLength = articles.reduce((sum, article) => sum + article.title.length, 0) / articles.length;
+  const languages = new Set(articles.map((article) => detectLanguageHeuristic(article.title)));
+  const titleHashes = new Set(articles.map((article) => normalize(article.title).slice(0, 60)));
+  const uniqueRate = titleHashes.size / articles.length;
+  const spamPatterns = [/click here/i, /buy now/i, /limited offer/i, /\$\d+/];
+  const spamCount = articles.filter((article) => spamPatterns.some((pattern) => pattern.test(article.title))).length;
+  const spamRate = spamCount / articles.length;
+  const recentCount = articles.filter((article) => {
+    if (!article.publishedAt) return false;
+    const timestamp = new Date(article.publishedAt).getTime();
+    return Number.isFinite(timestamp) && (Date.now() - timestamp) < (7 * 86400000);
+  }).length;
+  const freshness = recentCount / articles.length;
+  const score = Math.min(articles.length / 30, 1) * 0.2
+    + Math.min(avgTitleLength / 80, 1) * 0.1
+    + uniqueRate * 0.25
+    + (1 - spamRate) * 0.25
+    + freshness * 0.2;
+
+  return {
+    score: Math.max(0, Math.min(1, Number(score.toFixed(4)))),
+    articleCount: articles.length,
+    avgTitleLength: Number(avgTitleLength.toFixed(2)),
+    languageDiversity: languages.size,
+    topicDiversity: Number(uniqueRate.toFixed(4)),
+    spamRate: Number(spamRate.toFixed(4)),
+    freshness: Number(freshness.toFixed(4)),
+  };
+}
+
+export async function evaluateAndRegisterFeed(
+  feedUrl: string,
+  source: string,
+  options: {
+    minScore?: number;
+    autoRegister?: boolean;
+    feedName?: string;
+    lang?: string;
+    topics?: string[];
+  } = {},
+): Promise<{ registered: boolean; quality: FeedQualityScore; reason?: string }> {
+  const minScore = options.minScore ?? 0.65;
+  const quality = await evaluateFeedQuality(feedUrl);
+  if (quality.score < minScore) {
+    return {
+      registered: false,
+      quality,
+      reason: `quality ${quality.score.toFixed(2)} below threshold ${minScore}`,
+    };
+  }
+
+  const [{ default: pg }, nasRuntime, schemaAutomation, budget] = await Promise.all([
+    import('pg'),
+    import('../../../scripts/_shared/nas-runtime.mjs'),
+    import('../../../scripts/_shared/schema-automation.mjs'),
+    import('../../../scripts/_shared/automation-budget.mjs'),
+  ]);
+  nasRuntime.loadOptionalEnvFile();
+  const client = new pg.Client(nasRuntime.resolveNasPgConfig());
+  await client.connect();
+  try {
+    await schemaAutomation.ensureAutomationSchema(client);
+    const budgetCheck = await budget.checkBudget(client, 'rssRegistrations', 1);
+    if (!budgetCheck.allowed) {
+      return { registered: false, quality, reason: budgetCheck.reason };
+    }
+
+    const record = await addDiscoveredSource({
+      category: source,
+      feedName: options.feedName || `${source} auto feed`,
+      url: feedUrl,
+      lang: options.lang || 'en',
+      discoveredBy: 'heuristic',
+      confidence: Math.round(quality.score * 100),
+      reason: `quality=${quality.score.toFixed(2)} auto-registered`,
+      topics: options.topics || [],
+    });
+    if (!record) {
+      return { registered: false, quality, reason: 'source registry rejected feed' };
+    }
+
+    if (options.autoRegister !== false) {
+      await setDiscoveredSourceStatus(record.id, 'active', {
+        actor: 'system',
+        note: `auto-registered after quality screen ${quality.score.toFixed(2)}`,
+      });
+    }
+
+    await budget.consumeBudget(client, 'rssRegistrations', 1, { feedUrl, score: quality.score, source });
+    return { registered: true, quality };
+  } finally {
+    await client.end().catch(() => {});
+  }
 }
 
 function domainCandidatesForKeyword(term: string, domain: string): string[] {

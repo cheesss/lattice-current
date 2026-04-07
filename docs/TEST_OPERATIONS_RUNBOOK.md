@@ -75,6 +75,34 @@ reduce token waste during debugging.
   - verify both:
     - `auto_theme_symbol_candidates` row count > 0
     - `auto_theme_symbols` accepted row count > 0
+- Changed emerging-tech ingestion or discovery scripts
+  - run `node --import tsx --test tests/fetch-hackernews-archive.test.mjs`
+  - run `node --import tsx --test tests/fetch-arxiv-archive.test.mjs`
+  - run `node --import tsx --test tests/emerging-tech-discovery.test.mjs`
+  - run `node --import tsx --test tests/label-discovery-topics.test.mjs`
+  - run `node --import tsx --test tests/generate-tech-report.test.mjs`
+  - run `node --import tsx --test tests/generate-weekly-digest.test.mjs`
+  - run `node --import tsx --test tests/schema-emerging-tech.test.mjs`
+  - run `node --import tsx --test tests/event-dashboard-emerging-tech.test.mjs`
+  - run `node --import tsx --test tests/verify-emerging-tech-runtime.test.mjs`
+  - run `node --import tsx scripts/fetch-arxiv-archive.mjs --since 2021-01-01 --max-batches 2`
+  - run `node --import tsx scripts/discover-emerging-tech.mjs --limit 20000`
+  - run `node --import tsx scripts/label-discovery-topics.mjs --limit 5`
+  - run `node --import tsx scripts/generate-tech-report.mjs --limit 3`
+  - run `node --import tsx scripts/generate-weekly-digest.mjs`
+  - run `npm run verify:emerging-tech:runtime`
+  - confirm all are true:
+    - `discovery_topics` has rows
+    - `discovery_topic_articles` has rows
+    - `research_momentum` is populated for at least one topic when arXiv rows exist
+    - `source_quality_score` is populated for at least one topic
+    - `tech_reports` has rows
+    - `/api/emerging-tech` returns topics
+    - `/api/emerging-tech/:id` returns topic detail
+    - `/api/reports/latest` returns reports
+    - `/api/reports/:id` returns report detail
+    - `/api/digest/weekly` returns a digest payload or explicit `digest: null`
+    - labeled topics can flow into `auto-pipeline` step 2
 - Changed `scripts/event-engine-full-build.mjs`
   - run `node --import tsx --test tests/event-engine-schema.test.mjs`
   - run `node --import tsx scripts/event-engine-full-build.mjs`
@@ -87,7 +115,27 @@ reduce token waste during debugging.
   - run `node --import tsx scripts/master-daemon.mjs --once --task daily-backup`
   - run `node --import tsx scripts/master-daemon.mjs --once --task duckdb-sync`
   - run `node --import tsx scripts/master-daemon.mjs --once --task data-quality`
+  - run `node --import tsx scripts/master-daemon.mjs --once --task coverage-gap-analysis`
+  - run `node --import tsx scripts/master-daemon.mjs --once --task auto-curate`
+  - run `node --import tsx scripts/master-daemon.mjs --once --task source-self-heal`
   - inspect `data/daemon-state.json`
+- Changed automation safety helpers, whitelist backfills, or proposal autonomy
+  - run `node --import tsx --test tests/automation-budget.test.mjs`
+  - run `node --import tsx --test tests/backfill-whitelist.test.mjs`
+  - run `node --import tsx --test tests/feed-trust.test.mjs`
+  - run `node --import tsx --test tests/self-heal-sources.test.mjs`
+  - run `node --import tsx --test tests/proposal-executor-guardrails.test.mjs`
+  - run `node --import tsx --test tests/event-dashboard-automation.test.mjs`
+  - run `node --import tsx scripts/auto-curate.mjs`
+  - run `node --import tsx scripts/analyze-coverage-gaps.mjs`
+  - run `node --import tsx scripts/self-heal-sources.mjs --limit 5`
+  - confirm:
+    - `/api/automation-budget` returns budget, approval, and recent action state
+    - `/api/automation-log` returns durable recent actions
+    - `/api/approval-queue` returns pending approvals
+    - `proposal-executor.mjs --dry-run` validates without launching child work
+    - `add-rss` proposals are trusted-domain and quality-gated before registration
+    - `AUTOMATION_KILL_SWITCH=1` or `data/.automation-disabled` blocks execution
 - Changed `scripts/_shared/structured-logger.mjs`, `scripts/event-dashboard-api.mjs`, pipeline metrics exposure, or Codex/data-quality endpoints
   - run `npm run test:ci:data-integrity`
   - confirm both:
@@ -191,6 +239,16 @@ Do not let reusable script helpers require secrets or start database work at imp
 - if a script is also a CLI entry point, it must not execute `main()` when imported under `node --test`
 - verify with the smallest import-only contract test before running the full script
 
+## Automation guardrail
+
+Do not accept an autonomy change as complete unless all of these are true:
+
+1. budget checks exist for the action class
+2. a kill switch can stop the action without code edits
+3. dry-run mode exercises the same validation path
+4. the action is visible in automation logs or approval queue state
+5. the executable source/script is explicitly whitelisted before launch
+
 ## Signal-first regression contract
 
 Run these before calling a signal-runtime or automation change complete:
@@ -203,6 +261,20 @@ npm run test:ci:ops-observability
 ```
 
 Do not substitute row counts or a one-off smoke command for this contract.
+
+## Emerging-tech guardrail
+
+Do not call emerging-tech discovery complete unless all of these are true:
+
+1. the source is ingested into canonical `articles`
+2. `discover-emerging-tech.mjs` produces `discovery_topics`
+3. `discovery_topic_articles` is populated
+4. `label-discovery-topics.mjs` can label at least one pending topic
+5. `/api/emerging-tech` exposes the result without custom local inspection
+6. `tech_reports` is populated through `generate-tech-report.mjs`
+7. `weekly-digest-YYYY-MM-DD.json` is generated by `generate-weekly-digest.mjs`
+8. dashboard HTML surfaces emerging topics, reports, and digest without local SQL inspection
+9. `npm run verify:emerging-tech:runtime` passes
 
 ## Resilience and quality contract
 

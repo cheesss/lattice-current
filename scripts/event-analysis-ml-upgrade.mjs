@@ -329,6 +329,63 @@ async function buildAll(client) {
     console.warn(`  positioning_extreme: skipped (${err.message.slice(0, 80)})`);
   }
 
+  // ── 3c. Generic signal-based conditional sensitivity (auto-quantile) ──
+  console.log('\n▶ 3c. Generic signal conditioning (auto-quantile)...');
+
+  const SIGNAL_CHANNELS = [
+    'vix', 'hy_credit_spread', 'ig_credit_spread', 'tedSpread', 'treasury10y',
+    'fedFundsRate', 'dollarIndex', 'oilPrice', 'yieldSpread', 'bdi',
+    'pmiManufacturing', 'unemployment', 'cpiIndex', 'marketStress', 'transmissionStrength'
+  ];
+
+  for (const signal of SIGNAL_CHANNELS) {
+    try {
+      await client.query(`
+        INSERT INTO conditional_sensitivity (theme, symbol, horizon, condition_type, condition_value, avg_return, hit_rate, avg_abs_return, sample_size)
+        WITH signal_stats AS (
+          SELECT
+            percentile_cont(0.25) WITHIN GROUP (ORDER BY value) AS p25,
+            percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75
+          FROM signal_history WHERE signal_name = $1
+        )
+        SELECT lo.theme, lo.symbol, lo.horizon,
+          $2::text AS condition_type,
+          CASE
+            WHEN sh.value > ss.p75 THEN 'high'
+            WHEN sh.value < ss.p25 THEN 'low'
+            ELSE 'mid'
+          END AS condition_value,
+          AVG(lo.forward_return_pct::numeric),
+          AVG(lo.hit::int::numeric),
+          AVG(ABS(lo.forward_return_pct)::numeric),
+          COUNT(*)::int
+        FROM labeled_outcomes lo
+        JOIN articles a ON lo.article_id = a.id
+        LEFT JOIN signal_history sh ON sh.signal_name = $1 AND DATE(sh.ts) = DATE(a.published_at)
+        CROSS JOIN signal_stats ss
+        WHERE sh.value IS NOT NULL AND lo.horizon = '2w'
+        GROUP BY lo.theme, lo.symbol, lo.horizon,
+          CASE
+            WHEN sh.value > ss.p75 THEN 'high'
+            WHEN sh.value < ss.p25 THEN 'low'
+            ELSE 'mid'
+          END
+        HAVING COUNT(*) >= 30
+        ON CONFLICT (theme, symbol, horizon, condition_type, condition_value) DO UPDATE SET
+          avg_return=EXCLUDED.avg_return, hit_rate=EXCLUDED.hit_rate,
+          avg_abs_return=EXCLUDED.avg_abs_return, sample_size=EXCLUDED.sample_size, updated_at=NOW()
+      `, [signal, `signal_${signal}`]);
+
+      const cnt = await client.query(
+        `SELECT COUNT(*) FROM conditional_sensitivity WHERE condition_type = $1`,
+        [`signal_${signal}`]
+      );
+      console.log(`  signal_${signal}: ${cnt.rows[0].count} records`);
+    } catch (err) {
+      console.warn(`  signal_${signal}: skipped (${err.message.slice(0, 80)})`);
+    }
+  }
+
   // ── 4. Anomaly Detection (이상 탐지) ──
   console.log('\n▶ 4. 이상 탐지 테이블 생성...');
 

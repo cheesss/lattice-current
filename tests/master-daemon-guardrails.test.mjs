@@ -13,6 +13,14 @@ test('master daemon includes circuit breaker and pending outcome resolution', ()
   assert.match(source, /daily-backup/);
   assert.match(source, /duckdb-sync/);
   assert.match(source, /data-quality/);
+  assert.match(source, /arxiv-backfill/);
+  assert.match(source, /discover-emerging-tech/);
+  assert.match(source, /label-discovery-topics/);
+  assert.match(source, /generate-tech-report/);
+  assert.match(source, /generate-weekly-digest/);
+  assert.match(source, /auto-curate/);
+  assert.match(source, /coverage-gap-analysis/);
+  assert.match(source, /source-self-heal/);
   assert.match(source, /sendAlert/);
   assert.match(source, /unhandledRejection/);
   assert.match(source, /createLogger/);

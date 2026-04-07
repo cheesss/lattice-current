@@ -274,6 +274,14 @@ async function fetchThemeSymbolMetrics(client) {
       WHERE t.auto_theme IS NOT NULL
         AND t.auto_theme <> 'unknown'
       GROUP BY t.auto_theme, DATE(a.published_at)
+      UNION
+      SELECT dta.topic_id AS theme, DATE(a.published_at) AS d
+      FROM discovery_topic_articles dta
+      JOIN discovery_topics dt
+        ON dt.id = dta.topic_id
+       AND dt.status = 'labeled'
+      JOIN articles a ON a.id = dta.article_id
+      GROUP BY dta.topic_id, DATE(a.published_at)
     ),
     theme_date_counts AS (
       SELECT theme, COUNT(DISTINCT d) AS date_count

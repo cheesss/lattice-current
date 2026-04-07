@@ -7,9 +7,12 @@ import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.m
 import { createLogger } from './_shared/structured-logger.mjs';
 import {
   MIN_15_MS,
+  MIN_30_MS,
   HOUR_1_MS,
+  HOUR_2_MS,
   HOUR_6_MS,
   DAY_1_MS,
+  WEEK_1_MS,
 } from './_shared/daemon-contract.mjs';
 import { runBackup } from './_shared/pg-backup.mjs';
 import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
@@ -380,9 +383,63 @@ async function taskDataQuality(state) {
   }
 }
 
-async function taskAutoPipeline() {
-  log('>> auto-pipeline: running step 3 + step 5');
-  const result = run('node --import tsx scripts/auto-pipeline.mjs --step 3 --step 5 --limit 200', 600_000);
+async function taskDiscoverEmergingTech() {
+  log('>> discover-emerging-tech: clustering potentially emerging topics');
+  const result = run('node --import tsx scripts/discover-emerging-tech.mjs --limit 20000', 1_200_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskArxivBackfill() {
+  log('>> arxiv-backfill: ingesting broad arXiv archive window');
+  const result = run('node --import tsx scripts/fetch-arxiv-archive.mjs --since 2021-01-01 --max-batches 5', 1_200_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskLabelDiscoveryTopics() {
+  log('>> label-discovery-topics: labeling pending emerging-tech topics');
+  const result = run('node --import tsx scripts/label-discovery-topics.mjs --limit 5', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenerateTechReport() {
+  log('>> generate-tech-report: generating operator tracking notes for labeled topics');
+  const result = run('node --import tsx scripts/generate-tech-report.mjs --limit 5', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenerateWeeklyDigest() {
+  log('>> generate-weekly-digest: building weekly emerging-tech digest');
+  const result = run('node --import tsx scripts/generate-weekly-digest.mjs', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskAutoCurate() {
+  log('>> auto-curate: generating Codex curation proposals');
+  const result = run('node --import tsx scripts/auto-curate.mjs', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskCoverageGapAnalysis() {
+  log('>> coverage-gap-analysis: proposing conditional sensitivity for unused signals');
+  const result = run('node --import tsx scripts/analyze-coverage-gaps.mjs', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskSourceSelfHeal() {
+  log('>> source-self-heal: validating and activating approved healing candidates');
+  const result = run('node --import tsx scripts/self-heal-sources.mjs --limit 8', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskAutoPipelineLabels() {
+  log('>> auto-pipeline-labels: running step 3 (label assignment)');
+  const result = run('node --import tsx scripts/auto-pipeline.mjs --step 3 --limit 200', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskAutoPipelineSensitivity() {
+  log('>> auto-pipeline-sensitivity: running step 5 (sensitivity refresh)');
+  const result = run('node --import tsx scripts/auto-pipeline.mjs --step 5', 600_000);
   return { ok: result.ok, error: result.error };
 }
 
@@ -496,19 +553,28 @@ async function taskDailyReport(state) {
 
 const TASKS = {
   'signal-refresh': { interval: MIN_15_MS, fn: taskSignalRefresh },
-  'article-check': { interval: MIN_15_MS, fn: taskArticleCheck },
-  'dashboard-health': { interval: MIN_15_MS, fn: taskDashboardHealth },
+  'article-check': { interval: MIN_30_MS, fn: taskArticleCheck },
+  'dashboard-health': { interval: MIN_30_MS, fn: taskDashboardHealth },
   'db-health': { interval: MIN_15_MS, fn: taskDbHealth },
-  'auto-pipeline': { interval: HOUR_1_MS, fn: taskAutoPipeline },
+  'auto-pipeline-labels': { interval: HOUR_2_MS, fn: taskAutoPipelineLabels },
+  'auto-pipeline-sensitivity': { interval: HOUR_1_MS, fn: taskAutoPipelineSensitivity },
   'sensitivity-refresh': { interval: HOUR_1_MS, fn: taskSensitivityRefresh },
   'master-pipeline': { interval: HOUR_6_MS, fn: taskMasterPipeline },
   'executor': { interval: HOUR_6_MS, fn: taskExecutor },
   'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync },
   'data-quality': { interval: HOUR_6_MS, fn: taskDataQuality },
+  'arxiv-backfill': { interval: HOUR_6_MS, fn: taskArxivBackfill },
+  'discover-emerging-tech': { interval: HOUR_6_MS, fn: taskDiscoverEmergingTech },
+  'label-discovery-topics': { interval: HOUR_6_MS, fn: taskLabelDiscoveryTopics },
+  'generate-tech-report': { interval: HOUR_6_MS, fn: taskGenerateTechReport },
+  'source-self-heal': { interval: HOUR_6_MS, fn: taskSourceSelfHeal },
   'pending-check': { interval: DAY_1_MS, fn: taskPendingCheck },
   'full-rebuild': { interval: DAY_1_MS, fn: taskFullRebuild },
   'daily-backup': { interval: DAY_1_MS, fn: taskDailyBackup },
   'daily-report': { interval: DAY_1_MS, fn: taskDailyReport },
+  'generate-weekly-digest': { interval: DAY_1_MS, fn: taskGenerateWeeklyDigest },
+  'coverage-gap-analysis': { interval: DAY_1_MS, fn: taskCoverageGapAnalysis },
+  'auto-curate': { interval: WEEK_1_MS, fn: taskAutoCurate },
 };
 
 async function runAllTasks(state) {
@@ -520,10 +586,14 @@ async function runAllTasks(state) {
 
 async function main() {
   process.stderr.write('\nMaster Daemon Started\n');
-  process.stderr.write('  15min: signal refresh, article check, dashboard health, db health\n');
-  process.stderr.write('  1h:    auto-pipeline, sensitivity refresh\n');
-  process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality\n');
-  process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report\n\n');
+  process.stderr.write('  15min: signal refresh, db health\n');
+  process.stderr.write('  30min: article check, dashboard health\n');
+  process.stderr.write('  1h:    auto-pipeline-sensitivity, sensitivity refresh\n');
+  process.stderr.write('  2h:    auto-pipeline-labels\n');
+  process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality, arxiv, discovery, reports, self-heal\n');
+  process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report, weekly digest\n');
+  process.stderr.write('         coverage-gap-analysis\n');
+  process.stderr.write('  weekly:auto-curate\n\n');
 
   const state = loadState();
 

@@ -40,6 +40,12 @@ td{padding:3px 6px;border-bottom:1px solid #111}
 .refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:3px 10px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:10px}
 .refresh-btn:hover{background:var(--border)}
 #last-update{color:var(--dim);font-size:10px}
+.interactive-row{padding:8px;border:1px solid transparent;border-radius:4px;margin-bottom:6px;cursor:pointer;background:var(--surface)}
+.interactive-row:hover{background:var(--surface2);border-color:var(--border)}
+.interactive-row.active{border-color:var(--accent);background:rgba(74,255,138,0.06)}
+.detail-meta{font-size:10px;color:var(--dim);margin-top:4px}
+.detail-block{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.pill-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
 </style>
 </head>
 <body>
@@ -71,6 +77,18 @@ td{padding:3px 6px;border-bottom:1px solid #111}
     </div>
   </div>
 
+  <div class="section-title">Automation Control Plane</div>
+  <div class="grid2" style="margin-top:4px">
+    <div class="card">
+      <div class="card-title">Automation Budget</div>
+      <div id="automation-budget" class="loading">Loading automation budget...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Automation Audit</div>
+      <div id="automation-log" class="loading">Loading automation activity...</div>
+    </div>
+  </div>
+
   <!-- Row 2: Today's Events -->
   <div class="section-title">Today's Key Events</div>
   <div class="card">
@@ -87,6 +105,62 @@ td{padding:3px 6px;border-bottom:1px solid #111}
       <div class="card-title">Technology Trends</div>
       <div id="trends" class="loading">수집 중...</div>
     </div>
+  </div>
+
+  <div class="section-title">Emerging Technology Watchlist</div>
+  <div class="grid3" style="margin-top:4px">
+    <div class="card">
+      <div class="card-title">Top Topics</div>
+      <div id="emerging-tech-topics" class="loading">Loading emerging topics...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Latest Reports</div>
+      <div id="emerging-tech-reports" class="loading">Loading reports...</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Weekly Digest</div>
+      <div id="emerging-tech-digest" class="loading">Loading digest...</div>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:10px">
+    <div class="card">
+      <div class="card-title">Selected Topic</div>
+      <div id="emerging-tech-topic-detail" class="loading">Select a topic to inspect detail.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Selected Report</div>
+      <div id="emerging-tech-report-detail" class="loading">Select a report to inspect detail.</div>
+    </div>
+  </div>
+
+  <!-- Signal Timeline -->
+  <div class="section-title">Signal Timeline (30-day)</div>
+  <div class="card">
+    <div id="signal-timeline" class="loading">시그널 타임라인 수집 중...</div>
+  </div>
+
+  <!-- Correlation Matrix -->
+  <div class="section-title">Correlation Matrix</div>
+  <div class="card">
+    <div style="margin-bottom:6px">
+      <label style="color:var(--dim);font-size:10px">Theme:
+        <select id="corr-theme-select" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:10px;padding:2px 4px;border-radius:3px;font-family:inherit">
+          <option value="conflict">conflict</option>
+          <option value="trade_war">trade_war</option>
+          <option value="monetary_policy">monetary_policy</option>
+          <option value="energy_crisis">energy_crisis</option>
+        </select>
+      </label>
+      <button class="refresh-btn" onclick="loadCorrelation()" style="margin-left:6px">Load</button>
+    </div>
+    <div id="correlation-matrix" class="loading">상관 데이터 수집 중...</div>
+  </div>
+
+  <!-- Regime Timeline -->
+  <div class="section-title">Regime Timeline (VIX-based)</div>
+  <div class="card">
+    <div id="regime-timeline" class="loading">레짐 타임라인 수집 중...</div>
   </div>
 
   <!-- Row 4: What-if + Anomalies + Codex + Pending -->
@@ -125,6 +199,15 @@ const rf=v=>{const n=Number(v);return`<span class="${rc(v)}">${n>=0?'+':''}${n.t
 
 function lsGet(key){try{return JSON.parse(localStorage.getItem('ei_'+key));}catch{return null;}}
 function lsSet(key,val){try{localStorage.setItem('ei_'+key,JSON.stringify(val));}catch{}}
+let selectedEmergingTopicId='';
+let selectedEmergingReportId='';
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function fmtDate(value){if(!value)return'';const d=new Date(value);return Number.isNaN(d.getTime())?String(value).slice(0,10):d.toLocaleDateString();}
+function renderSourceQuality(score,breakdown){
+  const distinctSources=Array.isArray(breakdown?.distinctSources)?breakdown.distinctSources:[];
+  const sourceTypeCounts=breakdown?.sourceTypeCounts||{};
+  return `<div class="detail-meta">source quality ${fmt(score||0,2)} 夷?distinct sources ${distinctSources.length} 夷?types ${Object.keys(sourceTypeCounts).length}</div>`;
+}
 
 async function f(url,cacheKey){
   try{
@@ -149,8 +232,47 @@ function cachedBadge(ts){
 
 async function refreshAll(){
   document.getElementById('last-update').textContent='Updating...';
-  await Promise.all([loadStatus(),loadToday(),loadHeatmap(),loadTrends(),loadWhatif(),loadAnomalies(),loadCodex(),loadPending(),loadRegime()]);
+  await Promise.all([loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadToday(),loadHeatmap(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),loadWhatif(),loadAnomalies(),loadCodex(),loadPending(),loadRegime(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline()]);
   document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+async function loadAutomationBudget(){
+  const {data:d,cached,cachedAt}=await f(API+'/automation-budget','automation-budget');
+  const el=document.getElementById('automation-budget');
+  if(!d||!d.budget){el.innerHTML='Automation budget unavailable';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  const daily=d.budget.daily||{};
+  const approvals=Array.isArray(d.approvals)?d.approvals:[];
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  h+=`<div style="font-size:10px;color:var(--dim);margin-bottom:6px">kill switch ${d.budget.killSwitchActive?'<span class="neg">ACTIVE</span>':'<span class="pos">off</span>'} | approvals ${approvals.length}</div>`;
+  h+='<table><tr><th>Action</th><th>Used</th><th>Limit</th><th>Remain</th></tr>';
+  for(const [name,row] of Object.entries(daily)){
+    h+=`<tr><td>${escapeHtml(name)}</td><td>${Number(row.used||0)}</td><td>${Number(row.limit||0)}</td><td>${Number(row.remaining||0)}</td></tr>`;
+  }
+  h+='</table>';
+  if(approvals.length>0){
+    h+=`<div class="detail-block"><div><strong>Pending approvals</strong></div>`;
+    for(const item of approvals.slice(0,4)){
+      h+=`<div class="detail-meta">${escapeHtml(item.action_type)} | ${fmtDate(item.created_at)}</div>`;
+    }
+    h+=`</div>`;
+  }
+  el.innerHTML=h;
+}
+
+async function loadAutomationLog(){
+  const {data:d,cached,cachedAt}=await f(API+'/automation-log','automation-log');
+  const el=document.getElementById('automation-log');
+  if(!d||!Array.isArray(d.actions)){el.innerHTML='Automation log unavailable';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  if(d.actions.length===0){el.innerHTML=h+'No automation actions recorded yet.';return}
+  for(const row of d.actions.slice(0,8)){
+    const dot=row.result==='success'?'dot-green':row.result==='queued' || row.result==='dry-run' || row.result==='skipped'?'dot-yellow':'dot-red';
+    h+=`<div style="margin-bottom:6px"><span class="status-dot ${dot}"></span><strong>${escapeHtml(row.action_type||'unknown')}</strong>`;
+    h+=`<div class="detail-meta">${escapeHtml(row.result||'')} | ${fmtDate(row.executed_at)}${row.reason?` | ${escapeHtml(row.reason)}`:''}</div></div>`;
+  }
+  el.innerHTML=h;
 }
 
 async function loadStatus(){
@@ -254,6 +376,130 @@ async function loadTrends(){
   document.getElementById('trends').innerHTML=h;
 }
 
+async function loadEmergingTechTopics(){
+  const{data:d,cached,cachedAt}=await f(API+'/emerging-tech','emerging-tech');
+  const el=document.getElementById('emerging-tech-topics');
+  if(!d||!Array.isArray(d.topics)){el.innerHTML='Emerging-topic data unavailable';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  if(d.topics.length===0){el.innerHTML=(cb||'')+'No labeled discovery topics yet.';return}
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  for(const topic of d.topics.slice(0,6)){
+    const active=selectedEmergingTopicId===topic.id?' active':'';
+    h+=`<div class="interactive-row${active}" onclick="openEmergingTopicDetail('${escapeHtml(topic.id)}')">`;
+    h+=`<div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(topic.label||topic.id)}</strong><span class="tag tag-neutral">${escapeHtml(topic.stage||'watch')}</span></div>`;
+    h+=`<div style="font-size:10px;color:var(--dim)">${escapeHtml(topic.category||'other')} |articles ${topic.articleCount||0} |momentum ${fmt(topic.momentum||0,2)}</div>`;
+    h+=`<div style="font-size:10px;color:var(--dim)">research ${fmt(topic.researchMomentum||0,2)} |novelty ${fmt(topic.novelty||0,2)}</div>`;
+    h+=renderSourceQuality(topic.sourceQualityScore,topic.sourceQualityBreakdown);
+    if(topic.description){h+=`<div style="font-size:10px;margin-top:2px">${escapeHtml(topic.description)}</div>`}
+    h+=`</div>`;
+  }
+  el.innerHTML=h;
+  if(!selectedEmergingTopicId&&d.topics[0]?.id){
+    await openEmergingTopicDetail(d.topics[0].id);
+  }
+}
+
+async function loadEmergingTechReports(){
+  const{data:d,cached,cachedAt}=await f(API+'/reports/latest?limit=6','emerging-tech-reports');
+  const el=document.getElementById('emerging-tech-reports');
+  if(!d||!Array.isArray(d.reports)){el.innerHTML='Report data unavailable';return}
+  const cb=cached?cachedBadge(cachedAt):'';
+  if(d.reports.length===0){el.innerHTML=(cb||'')+'No reports generated yet.';return}
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  for(const report of d.reports.slice(0,6)){
+    const active=selectedEmergingReportId===report.id?' active':'';
+    h+=`<div class="interactive-row${active}" onclick="openReportDetail('${escapeHtml(report.id)}')">`;
+    h+=`<div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(report.topic_label||report.topic_id)}</strong><span class="tag ${Number(report.tracking_score||0)>=60?'tag-pos':'tag-neutral'}">track ${Number(report.tracking_score||0)}</span></div>`;
+    h+=`<div style="font-size:10px;color:var(--dim)">generated ${String(report.generated_at||'').slice(0,10)} |momentum ${fmt(report.momentum||0,2)} |research ${fmt(report.research_momentum||0,2)}</div>`;
+    h+=`<div style="font-size:10px;color:var(--dim)">source quality ${fmt(report.source_quality_score||0,2)}</div>`;
+    h+=`</div>`;
+  }
+  el.innerHTML=h;
+  if(!selectedEmergingReportId&&d.reports[0]?.id){
+    await openReportDetail(d.reports[0].id);
+  }
+}
+
+async function openEmergingTopicDetail(topicId){
+  if(!topicId)return;
+  selectedEmergingTopicId=topicId;
+  const el=document.getElementById('emerging-tech-topic-detail');
+  const {data:d}=await f(API+'/emerging-tech/'+encodeURIComponent(topicId),'emerging-tech-topic-'+topicId);
+  if(!d||!d.topic){el.innerHTML='Topic detail unavailable';return}
+  const topic=d.topic;
+  let h=`<div><strong>${escapeHtml(topic.label||topic.id)}</strong></div>`;
+  h+=`<div class="detail-meta">${escapeHtml(topic.category||'other')} |stage ${escapeHtml(topic.stage||'watch')} |updated ${fmtDate(topic.updatedAt)}</div>`;
+  if(topic.description){h+=`<div style="margin-top:6px;font-size:11px">${escapeHtml(topic.description)}</div>`}
+  h+=renderSourceQuality(topic.sourceQualityScore,topic.sourceQualityBreakdown);
+  h+=`<div class="detail-meta">momentum ${fmt(topic.momentum||0,2)} |research ${fmt(topic.researchMomentum||0,2)} |novelty ${fmt(topic.novelty||0,2)} |cohesion ${fmt(topic.cohesion||0,2)}</div>`;
+  const keywords=Array.isArray(topic.keywords)?topic.keywords:[];
+  if(keywords.length>0){h+=`<div class="pill-row">${keywords.slice(0,10).map((item)=>`<span class="tag tag-cool">${escapeHtml(item)}</span>`).join('')}</div>`}
+  const techs=Array.isArray(topic.keyTechnologies)?topic.keyTechnologies:[];
+  if(techs.length>0){h+=`<div class="detail-block"><div><strong>Technologies</strong></div><div class="pill-row">${techs.slice(0,10).map((item)=>`<span class="tag tag-neutral">${escapeHtml(item)}</span>`).join('')}</div></div>`}
+  const companies=Array.isArray(topic.keyCompanies)?topic.keyCompanies:[];
+  if(companies.length>0){h+=`<div class="detail-block"><div><strong>Companies</strong></div><div class="pill-row">${companies.slice(0,10).map((item)=>`<span class="tag tag-neutral">${escapeHtml(item)}</span>`).join('')}</div></div>`}
+  if(Array.isArray(d.symbols)&&d.symbols.length>0){
+    h+=`<div class="detail-block"><div><strong>Linked Symbols</strong></div>`;
+    h+=`<table><tr><th>Symbol</th><th>Return</th><th>Hit</th><th>Sample</th></tr>`;
+    for(const row of d.symbols.slice(0,8)){
+      h+=`<tr><td>${escapeHtml(row.symbol)}</td><td>${rf(row.avgReturn)}</td><td>${pct(row.hitRate)}</td><td>${row.sampleSize}</td></tr>`;
+    }
+    h+=`</table></div>`;
+  }
+  if(Array.isArray(d.articles)&&d.articles.length>0){
+    h+=`<div class="detail-block"><div><strong>Recent Articles</strong></div>`;
+    for(const article of d.articles.slice(0,6)){
+      const href=article.url?`<a href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer" style="color:var(--text)">${escapeHtml(article.title)}</a>`:escapeHtml(article.title);
+      h+=`<div style="margin-top:5px"><div>${href}</div><div class="detail-meta">${escapeHtml(article.source||'unknown')} |${fmtDate(article.publishedAt)}</div></div>`;
+    }
+    h+=`</div>`;
+  }
+  if(d.report?.id){
+    h+=`<div class="detail-block"><button class="refresh-btn" onclick="openReportDetail('${escapeHtml(d.report.id)}')">Open latest report</button></div>`;
+  }
+  el.innerHTML=h;
+  await loadEmergingTechTopics();
+}
+
+async function openReportDetail(reportId){
+  if(!reportId)return;
+  selectedEmergingReportId=reportId;
+  const el=document.getElementById('emerging-tech-report-detail');
+  const {data:d}=await f(API+'/reports/'+encodeURIComponent(reportId),'emerging-tech-report-'+reportId);
+  if(!d||!d.report){el.innerHTML='Report detail unavailable';return}
+  const report=d.report;
+  const topic=d.topic||null;
+  let h=`<div><strong>${escapeHtml(report.topic_label||topic?.label||report.topic_id||report.id)}</strong></div>`;
+  h+=`<div class="detail-meta">generated ${fmtDate(report.generated_at)} |track ${Number(report.tracking_score||0)} |next review ${fmtDate(report.next_review_at)}</div>`;
+  h+=`<div class="detail-meta">momentum ${fmt(report.momentum||0,2)} |research ${fmt(report.research_momentum||0,2)} |source quality ${fmt(report.source_quality_score||0,2)}</div>`;
+  if(report.investment_thesis){h+=`<div class="detail-block" style="font-size:11px;white-space:pre-wrap">${escapeHtml(report.investment_thesis)}</div>`}
+  if(topic){
+    h+=`<div class="detail-block"><div><strong>Topic context</strong></div><div class="detail-meta">${escapeHtml(topic.category||'other')} |stage ${escapeHtml(topic.stage||'watch')}</div>${renderSourceQuality(report.source_quality_score||0,topic.sourceQualityBreakdown)}</div>`;
+    if(Array.isArray(topic.keyTechnologies)&&topic.keyTechnologies.length>0){h+=`<div class="pill-row">${topic.keyTechnologies.slice(0,8).map((item)=>`<span class="tag tag-cool">${escapeHtml(item)}</span>`).join('')}</div>`}
+  }
+  el.innerHTML=h;
+  await loadEmergingTechReports();
+}
+
+async function loadWeeklyDigest(){
+  const{data:d,cached,cachedAt}=await f(API+'/digest/weekly','weekly-digest');
+  const el=document.getElementById('emerging-tech-digest');
+  const digest=d&&d.digest?d.digest:null;
+  const cb=cached?cachedBadge(cachedAt):'';
+  if(!digest){el.innerHTML=(cb||'')+'No weekly digest generated yet.';return}
+  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
+  h+=`<div style="margin-bottom:6px"><strong>${digest.headline||'Weekly digest'}</strong></div>`;
+  h+=`<div style="font-size:10px;color:var(--dim);margin-bottom:6px">week ending ${digest.weekEnding||''} 쨌 ${digest.mode||'deterministic'}</div>`;
+  h+=`<div style="font-size:10px;margin-bottom:6px">${digest.summary||''}</div>`;
+  const watchlist=Array.isArray(digest.watchlist)?digest.watchlist:[];
+  if(watchlist.length>0){
+    h+=`<div style="display:flex;flex-wrap:wrap;gap:4px">`;
+    for(const item of watchlist.slice(0,8))h+=`<span class="tag tag-cool">${item}</span>`;
+    h+=`</div>`;
+  }
+  el.innerHTML=h;
+}
+
 async function loadWhatif(){
   const{data:d,cached,cachedAt}=await f(API+'/whatif//','whatif');
   if(!d){document.getElementById('whatif').innerHTML='시뮬레이션 대기 중...';return}
@@ -332,6 +578,159 @@ async function loadRegime(){
   }
   h+='</div>';
   document.getElementById('regime').innerHTML=h;
+}
+
+// ── Signal Timeline ──
+async function loadSignalTimeline(){
+  const channels='vix,hy_credit_spread,dollarIndex,oilPrice';
+  const{data:d}=await f(API+'/signals/history?days=30&channels='+channels,'signal-timeline');
+  const el=document.getElementById('signal-timeline');
+  if(!d||!d.channels||Object.keys(d.channels).length===0){el.innerHTML='시그널 타임라인 데이터 없음';return}
+  const colors={vix:'#ff5a5a',hy_credit_spread:'#ffaa33',dollarIndex:'#6a8aff',oilPrice:'#4aff8a'};
+  const allNames=Object.keys(d.channels);
+  // Normalize each channel to 0-1 range
+  const normalized={};
+  for(const name of allNames){
+    const pts=d.channels[name]||[];
+    const vals=pts.map(p=>Number(p.value||0));
+    const mn=Math.min(...vals),mx=Math.max(...vals);
+    const range=mx-mn||1;
+    normalized[name]=pts.map(p=>({ts:p.ts,norm:(Number(p.value||0)-mn)/range}));
+  }
+  // SVG dimensions
+  const W=900,H=220,PAD=40;
+  const plotW=W-PAD*2,plotH=H-PAD*2;
+  // Gather all timestamps to determine x range
+  let allTs=[];
+  for(const name of allNames)for(const p of normalized[name])allTs.push(new Date(p.ts).getTime());
+  const minT=Math.min(...allTs),maxT=Math.max(...allTs);
+  const tRange=maxT-minT||1;
+  let svg=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">`;
+  // Grid lines
+  for(let i=0;i<=4;i++){
+    const y=PAD+plotH*(1-i/4);
+    svg+=`<line x1="${PAD}" y1="${y}" x2="${PAD+plotW}" y2="${y}" stroke="#1e2e1e" stroke-width="0.5"/>`;
+    svg+=`<text x="${PAD-4}" y="${y+3}" fill="#6a7a6a" font-size="9" text-anchor="end">${(i/4).toFixed(1)}</text>`;
+  }
+  // Draw lines for each channel
+  for(const name of allNames){
+    const pts=normalized[name];
+    if(pts.length<2)continue;
+    const col=colors[name]||'#999';
+    let pathD='';
+    for(let i=0;i<pts.length;i++){
+      const x=PAD+((new Date(pts[i].ts).getTime()-minT)/tRange)*plotW;
+      const y=PAD+plotH*(1-pts[i].norm);
+      pathD+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);
+    }
+    svg+=`<path d="${pathD}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.85"/>`;
+  }
+  svg+=`</svg>`;
+  // Legend
+  let legend='<div style="display:flex;gap:12px;margin-top:4px;font-size:10px">';
+  for(const name of allNames){
+    const col=colors[name]||'#999';
+    const label=name.replace(/_/g,' ');
+    legend+=`<span><span style="display:inline-block;width:12px;height:3px;background:${col};margin-right:3px;vertical-align:middle"></span>${label}</span>`;
+  }
+  legend+='</div>';
+  el.innerHTML=svg+legend;
+}
+
+// ── Correlation Matrix ──
+async function loadCorrelation(){
+  const theme=document.getElementById('corr-theme-select')?.value||'conflict';
+  const{data:d}=await f(API+'/correlation?theme='+encodeURIComponent(theme),'corr-'+theme);
+  const el=document.getElementById('correlation-matrix');
+  if(!d||!d.correlations||d.correlations.length===0){el.innerHTML='상관 데이터 없음 (theme: '+theme+')';return}
+  // Build a table: rows = symbols, columns = signal_name
+  const rows=d.correlations;
+  const signalNames=[...new Set(rows.map(r=>r.signal_name))];
+  const symbols=[...new Set(rows.map(r=>r.symbol))];
+  const lookup={};
+  for(const r of rows)lookup[r.symbol+':'+r.signal_name]=r;
+  let h='<div style="overflow-x:auto"><table><tr><th>Symbol</th>';
+  for(const s of signalNames)h+=`<th style="text-align:center;font-size:9px;max-width:60px;overflow:hidden">${s}</th>`;
+  h+='</tr>';
+  for(const sym of symbols.slice(0,20)){
+    h+=`<tr><td style="font-weight:bold">${sym}</td>`;
+    for(const sig of signalNames){
+      const r=lookup[sym+':'+sig];
+      if(!r){h+='<td style="text-align:center">-</td>';continue}
+      const corr=Number(r.pearson_corr||0);
+      const absCorr=Math.abs(corr);
+      const alpha=Math.min(1,absCorr*3).toFixed(2);
+      const bg=corr>0?`rgba(74,255,138,${alpha})`:`rgba(255,90,90,${alpha})`;
+      h+=`<td style="text-align:center;background:${bg};font-size:10px" title="slope=${fmt(r.regr_slope,4)} n=${r.sample_size}">${corr.toFixed(2)}</td>`;
+    }
+    h+='</tr>';
+  }
+  h+='</table></div>';
+  h+='<div style="font-size:9px;color:var(--dim);margin-top:4px">Green = positive, Red = negative. Hover for slope/sample size.</div>';
+  el.innerHTML=h;
+}
+
+// ── Regime Timeline ──
+async function loadRegimeTimeline(){
+  const{data:d}=await f(API+'/regime-timeline?days=365','regime-timeline');
+  const el=document.getElementById('regime-timeline');
+  if(!d||!d.timeline||d.timeline.length===0){el.innerHTML='레짐 타임라인 데이터 없음';return}
+  const tl=d.timeline;
+  const W=900,H=140,PAD=40;
+  const plotW=W-PAD*2,plotH=H-PAD*2;
+  const barH=20;
+  // Regime bar at top, VIX line below
+  const vixValues=tl.map(r=>Number(r.vix||0));
+  const vixMin=Math.min(...vixValues),vixMax=Math.max(...vixValues);
+  const vixRange=vixMax-vixMin||1;
+  const n=tl.length;
+  const barW=plotW/Math.max(n,1);
+  const regimeColors={'risk-off':'#ff5a5a','risk-on':'#4aff8a','balanced':'#555'};
+  let svg=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">`;
+  // Regime color blocks
+  for(let i=0;i<n;i++){
+    const x=PAD+i*barW;
+    const col=regimeColors[tl[i].regime]||'#555';
+    svg+=`<rect x="${x}" y="${PAD}" width="${Math.max(barW,1)}" height="${barH}" fill="${col}" opacity="0.6"/>`;
+  }
+  // Labels
+  svg+=`<text x="${PAD-4}" y="${PAD+barH/2+3}" fill="#6a7a6a" font-size="9" text-anchor="end">Regime</text>`;
+  svg+=`<text x="${PAD-4}" y="${PAD+barH+plotH/2}" fill="#6a7a6a" font-size="9" text-anchor="end">VIX</text>`;
+  // VIX grid lines
+  const vixLineTop=PAD+barH+4;
+  const vixLineH=plotH-barH-8;
+  for(let i=0;i<=3;i++){
+    const y=vixLineTop+vixLineH*(1-i/3);
+    const val=vixMin+(vixRange*i/3);
+    svg+=`<line x1="${PAD}" y1="${y}" x2="${PAD+plotW}" y2="${y}" stroke="#1e2e1e" stroke-width="0.5"/>`;
+    svg+=`<text x="${PAD+plotW+2}" y="${y+3}" fill="#6a7a6a" font-size="8">${val.toFixed(0)}</text>`;
+  }
+  // VIX line
+  let pathD='';
+  for(let i=0;i<n;i++){
+    const x=PAD+i*barW+barW/2;
+    const normV=(vixValues[i]-vixMin)/vixRange;
+    const y=vixLineTop+vixLineH*(1-normV);
+    pathD+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);
+  }
+  svg+=`<path d="${pathD}" fill="none" stroke="#ffaa33" stroke-width="1.5"/>`;
+  // Threshold lines at VIX 18 and 25
+  for(const thresh of[18,25]){
+    if(thresh>=vixMin&&thresh<=vixMax){
+      const y=vixLineTop+vixLineH*(1-(thresh-vixMin)/vixRange);
+      svg+=`<line x1="${PAD}" y1="${y}" x2="${PAD+plotW}" y2="${y}" stroke="#6a7a6a" stroke-width="0.5" stroke-dasharray="3,3"/>`;
+      svg+=`<text x="${PAD+plotW+2}" y="${y+3}" fill="#6a7a6a" font-size="8">${thresh}</text>`;
+    }
+  }
+  svg+=`</svg>`;
+  // Legend
+  let legend='<div style="display:flex;gap:12px;margin-top:4px;font-size:10px">';
+  legend+=`<span><span style="display:inline-block;width:12px;height:8px;background:#ff5a5a;margin-right:3px;vertical-align:middle;opacity:0.6"></span>risk-off (VIX&gt;25)</span>`;
+  legend+=`<span><span style="display:inline-block;width:12px;height:8px;background:#4aff8a;margin-right:3px;vertical-align:middle;opacity:0.6"></span>risk-on (VIX&lt;18)</span>`;
+  legend+=`<span><span style="display:inline-block;width:12px;height:8px;background:#555;margin-right:3px;vertical-align:middle;opacity:0.6"></span>balanced</span>`;
+  legend+=`<span><span style="display:inline-block;width:12px;height:3px;background:#ffaa33;margin-right:3px;vertical-align:middle"></span>VIX</span>`;
+  legend+='</div>';
+  el.innerHTML=svg+legend;
 }
 
 // Auto-refresh every 60 seconds
