@@ -10,7 +10,7 @@
 
 import http from 'node:http';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import pg from 'pg';
@@ -20,7 +20,39 @@ import { computeCalibrationDiagnostic } from './_shared/calibration-diagnostic.m
 import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
 import { getBudgetStatus } from './_shared/automation-budget.mjs';
 import { getRecentAutomationActions } from './_shared/automation-audit.mjs';
-import { getPendingApprovals } from './_shared/approval-queue.mjs';
+import {
+  getPendingApprovals,
+  loadApprovalById,
+  markApprovalReviewed,
+} from './_shared/approval-queue.mjs';
+import { executeProposal, ensureExecutorSchema, reviewCodexProposalById } from './proposal-executor.mjs';
+import {
+  buildCompactInvestmentSnapshot,
+  buildCompactMacroSnapshot,
+  buildCompactRiskSnapshot,
+  buildCompactValidationSnapshot,
+  buildThemeShellSnapshotPayloads,
+} from './_shared/theme-shell-snapshot-builders.mjs';
+import {
+  buildCategoryTrendsPayload,
+  buildDailyDigestPayload,
+  buildFollowedThemeBriefingPayload,
+  buildQuarterlyInsightsPayload,
+  buildSharedThemeBriefPayload,
+  buildThemeBriefPayload,
+  buildThemeBriefExportPayload,
+  buildThemeEvolutionPayload,
+  buildTrendPyramidPayload,
+  loadThemeNotebookEntry,
+  upsertThemeNotebookEntry,
+} from './_shared/trend-dashboard-queries.mjs';
+import {
+  applyDiscoveryTriageDecision,
+  buildDiscoveryTriagePayload,
+  buildStructuralAlertsPayload,
+  dismissStructuralAlert,
+} from './_shared/trend-workbench.mjs';
+import { isLowSignalAddRssProposal } from './_shared/rss-proposal-quality.mjs';
 
 loadOptionalEnvFile();
 
@@ -83,7 +115,7 @@ function sendResponse(res, response) {
   res.writeHead(response.status, {
     'Content-Type': response.contentType,
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(response.body);
@@ -170,6 +202,47 @@ async function resolveWithCache(cacheKey, buildPayload) {
     logger.metric('api.cache_miss', 1, { cacheKey });
     throw error;
   }
+}
+
+function toCacheToken(value) {
+  const normalized = String(value ?? 'all')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || 'all';
+}
+
+function buildCacheKey(prefix, ...parts) {
+  return [prefix, ...parts.map((part) => toCacheToken(part))].join('--');
+}
+
+function hasDynamicSinceParams(params) {
+  if (!params || typeof params.keys !== 'function') return false;
+  if (params.has('since')) return true;
+  return Array.from(params.keys()).some((key) => String(key || '').startsWith('since_'));
+}
+
+function buildSinceToken(params, keyPrefix = 'since') {
+  const parts = [];
+  for (const [key, value] of params.entries()) {
+    if (key === keyPrefix || key.startsWith(`${keyPrefix}_`)) {
+      parts.push(`${key}:${value}`);
+    }
+  }
+  parts.sort();
+  return parts.length > 0 ? parts.join('|') : 'none';
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  if (!chunks.length) return {};
+  const text = Buffer.concat(chunks).toString('utf8').trim();
+  if (!text) return {};
+  return JSON.parse(text);
 }
 
 function normalizeTemperatureValue(value) {
@@ -269,6 +342,7 @@ async function buildHeatmap() {
         theme,
         symbol,
         hit_rate,
+        avg_return,
         sample_size,
         ABS(sensitivity_zscore) AS zscore,
         ROW_NUMBER() OVER (PARTITION BY theme ORDER BY ABS(sensitivity_zscore) DESC, sample_size DESC) AS theme_rank
@@ -289,7 +363,7 @@ async function buildHeatmap() {
       ORDER BY MAX(zscore) DESC NULLS LAST, SUM(sample_size) DESC
       LIMIT 10
     )
-    SELECT r.theme, r.symbol, r.hit_rate
+    SELECT r.theme, r.symbol, r.hit_rate, r.avg_return
     FROM ranked r
     JOIN top_themes tt ON tt.theme = r.theme
     JOIN top_symbols ts ON ts.symbol = r.symbol
@@ -300,7 +374,7 @@ async function buildHeatmap() {
   const rows = primary.rows.length > 0
     ? primary.rows
     : (await safeQuery(`
-      SELECT theme, symbol, AVG(hit::int)::float AS hit_rate
+      SELECT theme, symbol, AVG(hit::int)::float AS hit_rate, AVG(forward_return_pct)::float AS avg_return
       FROM labeled_outcomes
       WHERE horizon = '2w'
       GROUP BY theme, symbol
@@ -314,6 +388,7 @@ async function buildHeatmap() {
     theme: String(row.theme || 'unknown'),
     symbol: String(row.symbol || ''),
     hitRate: Number(row.hit_rate || 0),
+    avgReturn: Number(row.avg_return || 0),
   }));
 
   return { themes, symbols, cells };
@@ -492,7 +567,7 @@ async function computeSystemHealth() {
     ? ageScore(articleAgeMs, 6 * 60 * 60 * 1000, 24 * 60 * 60 * 1000)
     : 0;
   const signalFreshness = signalCount > 0
-    ? ageScore(signalAgeMs, 30 * 60 * 1000, 2 * 60 * 60 * 1000)
+    ? ageScore(signalAgeMs, 18 * 60 * 60 * 1000, 72 * 60 * 60 * 1000)
     : 0;
   const apiHealth = computeApiHealthScore(logger.getMetrics());
   const compositeScore = Number((
@@ -614,7 +689,8 @@ async function buildCodexQuality() {
   };
 }
 
-async function buildEmergingTechList() {
+async function buildEmergingTechList(includeNoise = false) {
+  const noiseFilter = includeNoise ? '' : "AND COALESCE(category, '') != 'other'";
   const { rows } = await safeQuery(`
     SELECT
       id,
@@ -634,7 +710,7 @@ async function buildEmergingTechList() {
       status,
       updated_at
     FROM discovery_topics
-    WHERE status IN ('labeled', 'reported')
+    WHERE status IN ('labeled', 'reported') ${noiseFilter}
     ORDER BY momentum DESC NULLS LAST, article_count DESC
     LIMIT 50
   `);
@@ -737,11 +813,12 @@ async function buildEmergingTechDetail(topicId) {
   };
 }
 
-async function buildEmergingTechTimeline() {
+async function buildEmergingTechTimeline(includeNoise = false) {
+  const noiseFilter = includeNoise ? '' : "AND COALESCE(category, '') != 'other'";
   const { rows } = await safeQuery(`
     SELECT id, COALESCE(label, id) AS label, monthly_counts
     FROM discovery_topics
-    WHERE status IN ('labeled', 'reported')
+    WHERE status IN ('labeled', 'reported') ${noiseFilter}
     ORDER BY momentum DESC NULLS LAST, article_count DESC
     LIMIT 30
   `);
@@ -754,15 +831,29 @@ async function buildEmergingTechTimeline() {
   };
 }
 
-async function buildLatestReports(limitParam) {
+async function buildLatestReports(limitParam, includeNoise = false) {
   const limit = Math.max(1, Math.min(50, Number(limitParam) || 20));
+  const fetchLimit = Math.min(160, limit * 4);
+  const noiseFilter = includeNoise
+    ? ''
+    : "WHERE COALESCE(dt.category, '') != 'other'";
   const { rows } = await safeQuery(`
-    SELECT id, topic_id, topic_label, generated_at, momentum, research_momentum, source_quality_score, tracking_score
-    FROM tech_reports
-    ORDER BY generated_at DESC
+    SELECT tr.id, tr.topic_id, tr.topic_label, tr.generated_at, tr.momentum, tr.research_momentum, tr.source_quality_score, tr.tracking_score
+    FROM tech_reports tr
+    LEFT JOIN discovery_topics dt ON dt.id = tr.topic_id
+    ${noiseFilter}
+    ORDER BY tr.generated_at DESC
     LIMIT $1
-  `, [limit]);
-  return { reports: rows };
+  `, [fetchLimit]);
+  const deduped = [];
+  const seenTopics = new Set();
+  for (const row of rows) {
+    const topicKey = String(row.topic_id || row.id || '').trim();
+    if (!topicKey || seenTopics.has(topicKey)) continue;
+    seenTopics.add(topicKey);
+    deduped.push(row);
+  }
+  return { reports: deduped.slice(0, limit) };
 }
 
 async function buildReportDetail(reportId) {
@@ -864,8 +955,227 @@ async function buildApprovalQueuePayload() {
   }
 }
 
-export async function resolveEventDashboardResponse(rawUrl) {
+async function readPersistentCacheSnapshot(cacheKey) {
+  const filePath = path.resolve('data', 'persistent-cache', `${encodeURIComponent(cacheKey)}.json`);
+  if (!existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(await readFile(filePath, 'utf8'));
+    return parsed?.data?.snapshot ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function coerceReviewDecision(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'accept' || normalized === 'approve' || normalized === 'approved') return 'accept';
+  if (normalized === 'reject' || normalized === 'rejected' || normalized === 'deny') return 'reject';
+  return null;
+}
+
+function normalizeProposalReviewStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (!normalized) return 'pending';
+  return normalized;
+}
+
+function classifyRiskLevel(score) {
+  if (score >= 70) return 'critical';
+  if (score >= 52) return 'high';
+  if (score >= 34) return 'elevated';
+  return 'watch';
+}
+
+function classifyMacroVerdict({ vix, marketStress, hyCredit, transmission }) {
+  if ((Number.isFinite(vix) && vix >= 26)
+    || (Number.isFinite(marketStress) && marketStress >= 0.72)
+    || (Number.isFinite(hyCredit) && hyCredit >= 4.5)) {
+    return 'defensive';
+  }
+  if ((Number.isFinite(vix) && vix <= 18)
+    && (Number.isFinite(marketStress) ? marketStress <= 0.45 : true)
+    && (Number.isFinite(transmission) ? transmission >= 0.2 : true)) {
+    return 'constructive';
+  }
+  return 'watch';
+}
+
+async function buildProposalInboxPayload() {
+  const [proposalRows, approvalPayload] = await Promise.all([
+    safeQuery(`
+      SELECT id, proposal_type, payload, status, result, reasoning, source, created_at, executed_at
+      FROM codex_proposals
+      WHERE status NOT IN ('executed', 'dead')
+      ORDER BY created_at DESC
+      LIMIT 40
+    `),
+    buildApprovalQueuePayload(),
+  ]);
+
+  const proposals = proposalRows.rows.map((row) => ({
+    id: Number(row.id),
+    proposal_type: String(row.proposal_type || 'proposal'),
+    proposalType: String(row.proposal_type || 'proposal'),
+    payload: row.payload || {},
+    status: normalizeProposalReviewStatus(row.status),
+    result: row.result || null,
+    reasoning: row.reasoning || null,
+    source: row.source || null,
+    created_at: row.created_at || null,
+    createdAt: row.created_at || null,
+    executed_at: row.executed_at || null,
+    executedAt: row.executed_at || null,
+  }));
+
+  const approvals = Array.isArray(approvalPayload.approvals) ? approvalPayload.approvals : [];
+  const actionableProposals = proposals.filter((item) => (
+    ['pending', 'pending-review', 'pending-approval', 'approved'].includes(item.status)
+    && !isLowSignalAddRssProposal(item)
+  ));
+
+  return {
+    proposals: actionableProposals,
+    approvals,
+    summary: {
+      pendingProposals: actionableProposals.length,
+      pendingApprovals: approvals.length,
+      actionableCount: actionableProposals.length + approvals.length,
+    },
+  };
+}
+
+async function reviewCodexProposal(proposalId, body = {}) {
+  const decision = coerceReviewDecision(body.decision);
+  if (!decision) {
+    return buildJsonResponse({ error: 'decision must be accept or reject' }, 400);
+  }
+  try {
+    const reviewed = await reviewCodexProposalById(getPool(), proposalId, decision, {
+      reviewer: String(body.reviewer || 'theme-dashboard').slice(0, 120),
+      reason: String(body.reason || ''),
+      dryRun: body.dryRun === true,
+    });
+    const proposal = reviewed?.proposal || {};
+    return buildJsonResponse({
+      proposal: {
+        id: Number(proposal.id || proposalId),
+        proposal_type: String(proposal.proposal_type || proposal.proposalType || 'proposal'),
+        proposalType: String(proposal.proposal_type || proposal.proposalType || 'proposal'),
+        payload: proposal.payload || {},
+        status: String(reviewed.status || proposal.status || 'pending'),
+        result: reviewed.result ?? proposal.result ?? null,
+        created_at: proposal.created_at || proposal.createdAt || null,
+        createdAt: proposal.created_at || proposal.createdAt || null,
+        executed_at: proposal.executed_at || proposal.executedAt || null,
+        executedAt: proposal.executed_at || proposal.executedAt || null,
+        alreadyFinal: Boolean(reviewed.alreadyFinal),
+      },
+    });
+  } catch (error) {
+    const message = String(error?.message || error || 'proposal review failed');
+    const status = /not found/i.test(message) ? 404 : 500;
+    return buildJsonResponse({ error: message }, status);
+  }
+}
+
+async function reviewApprovalQueueItem(queueId, body = {}) {
+  const decision = coerceReviewDecision(body.decision);
+  if (!decision) {
+    return buildJsonResponse({ error: 'decision must be accept or reject' }, 400);
+  }
+  const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
+  const approval = await loadApprovalById(getPool(), queueId);
+  if (!approval) {
+    return buildJsonResponse({ error: 'approval queue item not found' }, 404);
+  }
+
+  const currentStatus = String(approval.status || '').trim().toLowerCase();
+  if (['approved', 'rejected', 'executed'].includes(currentStatus)) {
+    return buildJsonResponse({
+      approval,
+      execution: null,
+      alreadyFinal: true,
+    });
+  }
+
+  if (decision === 'reject') {
+    const reviewed = await markApprovalReviewed(getPool(), queueId, {
+      decision: 'rejected',
+      reviewer,
+      note: body.reason ? String(body.reason) : 'Rejected in proposal inbox',
+    });
+    return buildJsonResponse({
+      approval: reviewed,
+      execution: null,
+      alreadyFinal: false,
+    });
+  }
+
+  try {
+    await ensureExecutorSchema(getPool());
+    const payload = approval.payload && typeof approval.payload === 'object' ? approval.payload : {};
+    const execution = await executeProposal(getPool(), {
+      ...payload,
+      payload,
+      type: String(approval.action_type || 'unknown'),
+      human_approved: true,
+    }, {
+      dryRun: body.dryRun === true,
+      humanApproved: true,
+    });
+
+    const note = execution?.summary
+      || execution?.reason
+      || `Executed ${String(approval.action_type || 'approval action')}`;
+    const reviewed = await markApprovalReviewed(getPool(), queueId, {
+      decision: 'executed',
+      reviewer,
+      note,
+    });
+    return buildJsonResponse({
+      approval: reviewed,
+      execution,
+      alreadyFinal: false,
+    });
+  } catch (error) {
+    const message = String(error?.message || error || 'approval execution failed');
+    return buildJsonResponse({
+      error: message,
+      approval,
+    }, /not found/i.test(message) ? 404 : 500);
+  }
+}
+
+async function buildRiskSnapshot() {
+  return buildCompactRiskSnapshot({
+    safeQuery,
+    buildStructuralAlerts: buildStructuralAlertsPayload,
+  });
+}
+
+async function buildMacroSnapshot() {
+  return buildCompactMacroSnapshot({ safeQuery });
+}
+
+async function buildInvestmentSnapshot() {
+  return buildCompactInvestmentSnapshot({ safeQuery });
+}
+
+async function buildValidationSnapshot() {
+  return buildCompactValidationSnapshot();
+}
+
+async function buildThemeShellSnapshots() {
+  return buildThemeShellSnapshotPayloads({
+    safeQuery,
+    buildStructuralAlerts: buildStructuralAlertsPayload,
+  });
+}
+
+export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
   const { pathname, segments, params } = parseUrl(rawUrl);
+  const method = String(requestMeta.method || 'GET').toUpperCase();
+  const body = requestMeta.body && typeof requestMeta.body === 'object' ? requestMeta.body : {};
   try {
     // ── /api/health ──
     if (segments[0] === 'api' && segments[1] === 'health') {
@@ -893,16 +1203,50 @@ export async function resolveEventDashboardResponse(rawUrl) {
       return buildJsonResponse(await buildAutomationLogPayload());
     }
 
+    if (segments[0] === 'api' && segments[1] === 'proposal-inbox') {
+      return buildJsonResponse(await buildProposalInboxPayload());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'codex-proposals' && segments[2] && segments[3] === 'review' && method === 'POST') {
+      return await reviewCodexProposal(segments[2], body);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'approval-queue' && segments[2] && segments[3] === 'review' && method === 'POST') {
+      return await reviewApprovalQueueItem(segments[2], body);
+    }
+
     if (segments[0] === 'api' && segments[1] === 'approval-queue') {
       return buildJsonResponse(await buildApprovalQueuePayload());
     }
 
+    if (segments[0] === 'api' && segments[1] === 'risk-snapshot') {
+      return buildJsonResponse(await buildRiskSnapshot());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'macro-snapshot') {
+      return buildJsonResponse(await buildMacroSnapshot());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'investment-snapshot') {
+      return buildJsonResponse(await buildInvestmentSnapshot());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'validation-snapshot') {
+      return buildJsonResponse(await buildValidationSnapshot());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-shell-snapshots') {
+      return buildJsonResponse(await buildThemeShellSnapshots());
+    }
+
     if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments.length === 2) {
-      return buildJsonResponse(await buildEmergingTechList());
+      const includeNoise = params.get('include_noise') === '1';
+      return buildJsonResponse(await buildEmergingTechList(includeNoise));
     }
 
     if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments[2] === 'timeline') {
-      return buildJsonResponse(await buildEmergingTechTimeline());
+      const includeNoise = params.get('include_noise') === '1';
+      return buildJsonResponse(await buildEmergingTechTimeline(includeNoise));
     }
 
     if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments[2]) {
@@ -910,11 +1254,179 @@ export async function resolveEventDashboardResponse(rawUrl) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'reports' && segments[2] === 'latest') {
-      return buildJsonResponse(await buildLatestReports(params.get('limit')));
+      const includeNoise = params.get('include_noise') === '1';
+      return buildJsonResponse(await buildLatestReports(params.get('limit'), includeNoise));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'trend-pyramid') {
+      return await resolveWithCache(
+        buildCacheKey('trend-pyramid', params.get('period') || 'quarter', params.get('category') || 'all', params.get('limit') || '6'),
+        () => buildTrendPyramidPayload(safeQuery, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-evolution' && segments[2]) {
+      const parentTheme = decodeURIComponent(segments[2] || '');
+      return await resolveWithCache(
+        buildCacheKey(
+          'theme-evolution',
+          parentTheme,
+          params.get('period') || 'quarter',
+          params.get('from') || 'auto',
+          params.get('to') || 'auto',
+          params.get('periods') || '8',
+          params.get('limit') || '8',
+        ),
+        () => buildThemeEvolutionPayload(parentTheme, safeQuery, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-brief' && segments[2]) {
+      const theme = decodeURIComponent(segments[2] || '');
+      if (hasDynamicSinceParams(params)) {
+        return buildJsonResponse(withMeta(await buildThemeBriefPayload(theme, safeQuery, params), {
+          cacheable: false,
+          cacheReason: 'dynamic-since',
+        }));
+      }
+      return await resolveWithCache(
+        buildCacheKey(
+          'theme-brief',
+          theme,
+          params.get('period') || 'quarter',
+          params.get('digest_limit') || '3',
+          params.get('article_limit') || '5',
+          buildSinceToken(params, 'since'),
+        ),
+        () => buildThemeBriefPayload(theme, safeQuery, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-brief-notebook' && segments[2]) {
+      const theme = decodeURIComponent(segments[2] || '');
+      const periodType = params.get('period') || body.periodType || 'quarter';
+      if (method === 'POST') {
+        return buildJsonResponse(withMeta(await upsertThemeNotebookEntry(safeQuery, theme, periodType, {
+          label: body.label,
+          noteMarkdown: body.noteMarkdown,
+          tags: body.tags,
+          pinned: body.pinned,
+          shareRequested: body.shareRequested,
+          unshareRequested: body.unshareRequested,
+          metadata: body.metadata,
+        }), {
+          cacheable: false,
+        }));
+      }
+      return buildJsonResponse(withMeta(await loadThemeNotebookEntry(safeQuery, theme, periodType), {
+        cacheable: false,
+      }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-brief-export' && segments[2]) {
+      const theme = decodeURIComponent(segments[2] || '');
+      return buildJsonResponse(withMeta(await buildThemeBriefExportPayload(theme, safeQuery, params), {
+        cacheable: false,
+      }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-brief-shared' && segments[2]) {
+      const shared = await buildSharedThemeBriefPayload(decodeURIComponent(segments[2] || ''), safeQuery, params);
+      if (!shared) return buildJsonResponse({ error: 'Shared Theme Brief not found' }, 404);
+      return buildJsonResponse(withMeta(shared, {
+        cacheable: false,
+      }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'structural-alerts') {
+      if (method === 'POST' && segments[2] === 'dismiss') {
+        return buildJsonResponse(withMeta(await dismissStructuralAlert({ query: safeQuery }, body.alertKey || body.alert_key || params.get('alert_key')), {
+          cacheable: false,
+        }));
+      }
+      return buildJsonResponse(await buildStructuralAlertsPayload(safeQuery, params));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'discovery-triage') {
+      if (method === 'POST' && segments[2] === 'review') {
+        return buildJsonResponse(withMeta(await applyDiscoveryTriageDecision({ query: safeQuery }, body), {
+          cacheable: false,
+        }));
+      }
+      return buildJsonResponse(await buildDiscoveryTriagePayload(safeQuery, params));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'followed-theme-briefing') {
+      if (hasDynamicSinceParams(params)) {
+        return buildJsonResponse(withMeta(await buildFollowedThemeBriefingPayload(safeQuery, params), {
+          cacheable: false,
+          cacheReason: 'dynamic-since',
+        }));
+      }
+      return await resolveWithCache(
+        buildCacheKey(
+          'followed-theme-briefing',
+          params.get('themes') || 'none',
+          params.get('period') || 'week',
+          params.get('limit') || '5',
+          params.get('snapshot_date') || 'auto',
+          params.get('refresh') || '0',
+          buildSinceToken(params, 'since'),
+        ),
+        () => buildFollowedThemeBriefingPayload(safeQuery, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'category-trends') {
+      const category = decodeURIComponent(segments[2] || params.get('category') || '');
+      return await resolveWithCache(
+        buildCacheKey('category-trends', category || 'all', params.get('period') || 'quarter', params.get('limit') || '6'),
+        () => buildCategoryTrendsPayload(safeQuery, category, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'insights' && segments[2] === 'quarterly') {
+      return await resolveWithCache(
+        buildCacheKey('quarterly-insights', params.get('period') || 'quarter', params.get('category') || 'all', params.get('limit') || '10'),
+        () => buildQuarterlyInsightsPayload(safeQuery, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'quarterly-insights') {
+      return await resolveWithCache(
+        buildCacheKey('quarterly-insights', params.get('period') || 'quarter', params.get('category') || 'all', params.get('limit') || '10'),
+        () => buildQuarterlyInsightsPayload(safeQuery, params),
+      );
     }
 
     if (segments[0] === 'api' && segments[1] === 'reports' && segments[2]) {
       return buildJsonResponse(await buildReportDetail(segments[2]));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'daily-digest') {
+      return await resolveWithCache(
+        buildCacheKey(
+          'daily-digest',
+          params.get('date') || 'today',
+          params.get('theme') || 'all',
+          params.get('category') || 'all',
+          params.get('limit') || '5',
+        ),
+        () => buildDailyDigestPayload(safeQuery, params),
+      );
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'digest' && segments[2] === 'daily') {
+      return await resolveWithCache(
+        buildCacheKey(
+          'daily-digest',
+          params.get('date') || 'today',
+          params.get('theme') || 'all',
+          params.get('category') || 'all',
+          params.get('limit') || '5',
+        ),
+        () => buildDailyDigestPayload(safeQuery, params),
+      );
     }
 
     if (segments[0] === 'api' && segments[1] === 'digest' && segments[2] === 'weekly') {
@@ -1203,7 +1715,19 @@ export function startEventDashboardServer(port = PORT) {
     }
 
     const startedAt = performance.now();
-    const response = await resolveEventDashboardResponse(req.url);
+    let requestBody = {};
+    if (String(req.method || 'GET').toUpperCase() === 'POST') {
+      try {
+        requestBody = await readJsonBody(req);
+      } catch (error) {
+        sendResponse(res, buildJsonResponse({ error: `Invalid JSON body: ${String(error?.message || error)}` }, 400));
+        return;
+      }
+    }
+    const response = await resolveEventDashboardResponse(req.url, {
+      method: req.method,
+      body: requestBody,
+    });
     const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
     const parsed = parseUrl(req.url);
     logger.info('request completed', {
@@ -1242,10 +1766,27 @@ export function startEventDashboardServer(port = PORT) {
 }
 
 const isDirectRun = (() => {
+  // PM2 fork mode: pm_exec_path holds the actual script path
+  const pmExecPath = process.env.pm_exec_path;
+  if (pmExecPath) {
+    try {
+      const metaPath = fileURLToPath(import.meta.url);
+      const norm = (p) => p.replace(/\\/g, '/').toLowerCase();
+      if (norm(metaPath) === norm(pmExecPath)) return true;
+    } catch {
+      // fall through to standard check
+    }
+  }
+
   const entryArg = process.argv[1];
   if (!entryArg) return false;
   try {
-    return import.meta.url === pathToFileURL(entryArg).href;
+    // Standard check: import.meta.url matches argv[1] as file URL
+    if (import.meta.url === pathToFileURL(entryArg).href) return true;
+    // Fallback for PM2/Windows: compare normalized basenames
+    const entryBase = entryArg.replace(/\\/g, '/').split('/').pop();
+    const metaBase = import.meta.url.split('/').pop();
+    return entryBase === metaBase;
   } catch {
     return false;
   }

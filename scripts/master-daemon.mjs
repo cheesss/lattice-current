@@ -20,6 +20,26 @@ import { sendAlert } from './_shared/alert-notifier.mjs';
 
 loadOptionalEnvFile();
 
+// Process-level safety net: prevent the daemon from crashing on uncaught spawn
+// errors (e.g. ENOENT for missing binaries like pg_dump). Individual tasks should
+// catch their own errors, but if anything escapes we log and keep the loop alive.
+process.on('uncaughtException', (err) => {
+  try {
+    const message = String(err?.stack || err?.message || err || 'unknown');
+    process.stderr.write(`{"ts":"${new Date().toISOString()}","component":"master-daemon","level":"error","msg":"uncaughtException swallowed","ctx":{"error":"${message.replace(/[\r\n]/g, ' ').replace(/"/g, '\\"').slice(0, 800)}"}}\n`);
+  } catch {
+    // best-effort
+  }
+});
+process.on('unhandledRejection', (reason) => {
+  try {
+    const message = String(reason?.stack || reason?.message || reason || 'unknown');
+    process.stderr.write(`{"ts":"${new Date().toISOString()}","component":"master-daemon","level":"error","msg":"unhandledRejection swallowed","ctx":{"error":"${message.replace(/[\r\n]/g, ' ').replace(/"/g, '\\"').slice(0, 800)}"}}\n`);
+  } catch {
+    // best-effort
+  }
+});
+
 const { Client } = pg;
 const ONCE = process.argv.includes('--once');
 const TASK_ONLY = process.argv.includes('--task')
@@ -29,8 +49,10 @@ const TASK_ONLY = process.argv.includes('--task')
 const CIRCUIT_BREAKER_FAILS = Number(process.env.DAEMON_CIRCUIT_BREAKER_FAILS || 3);
 const CIRCUIT_BREAKER_COOLDOWN_MS = Number(process.env.DAEMON_CIRCUIT_BREAKER_COOLDOWN_MS || (30 * 60 * 1000));
 const DASHBOARD_HEALTH_URL = String(process.env.EVENT_DASHBOARD_API_URL || 'http://127.0.0.1:46200/api/health').trim();
+const DASHBOARD_HEALTH_TIMEOUT_MS = Number(process.env.DASHBOARD_HEALTH_TIMEOUT_MS || 60_000);
 const DASHBOARD_RESTART_CMD = String(process.env.EVENT_DASHBOARD_RESTART_CMD || '').trim();
 const DB_RESTART_CMD = String(process.env.DB_RESTART_CMD || '').trim();
+const DUCKDB_SYNC_TIMEOUT_MS = Number(process.env.DUCKDB_SYNC_TIMEOUT_MS || (2 * HOUR_1_MS));
 const STATE_PATH = 'data/daemon-state.json';
 const logger = createLogger('master-daemon');
 
@@ -103,6 +125,54 @@ function run(command, timeoutMs = 300_000) {
     logger.warn('shell command failed', { command, timeoutMs, error: message });
     logger.metric('shell.error_count', 1);
     return { ok: false, error: message };
+  }
+}
+
+function listRunningNodeProcesses(scriptFragment) {
+  const fragment = String(scriptFragment || '').trim();
+  if (!fragment) return [];
+  try {
+    if (process.platform === 'win32') {
+      const escaped = fragment.replace(/'/g, "''");
+      const output = execSync(
+        `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match '${escaped}' } | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"`,
+        {
+          stdio: 'pipe',
+          timeout: 20_000,
+          env: { ...process.env },
+          cwd: process.cwd(),
+          windowsHide: true,
+        },
+      ).toString('utf-8').trim();
+      if (!output) return [];
+      const parsed = JSON.parse(output);
+      const rows = Array.isArray(parsed) ? parsed : [parsed];
+      return rows
+        .map((row) => ({
+          pid: Number(row?.ProcessId || 0),
+          commandLine: String(row?.CommandLine || ''),
+        }))
+        .filter((row) => row.pid > 0 && row.pid !== process.pid);
+    }
+
+    const output = execSync(`pgrep -af "${fragment.replace(/"/g, '\\"')}"`, {
+      stdio: 'pipe',
+      timeout: 20_000,
+      env: { ...process.env },
+      cwd: process.cwd(),
+      windowsHide: true,
+    }).toString('utf-8').trim();
+    if (!output) return [];
+    return output
+      .split(/\r?\n/)
+      .map((line) => {
+        const match = line.match(/^(\d+)\s+(.+)$/);
+        if (!match) return null;
+        return { pid: Number(match[1]), commandLine: match[2] };
+      })
+      .filter((row) => row && row.pid > 0 && row.pid !== process.pid);
+  } catch {
+    return [];
   }
 }
 
@@ -201,23 +271,76 @@ async function taskSignalRefresh() {
   const client = new Client(getPgConfig());
   await client.connect();
   try {
-    await client.query(`
-      INSERT INTO signal_history (signal_name, ts, value)
-      SELECT 'vix', NOW(), last_price
-      FROM market_quotes
-      WHERE symbol = '^VIX'
-      ORDER BY fetched_at DESC
-      LIMIT 1
-      ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-    `).catch(() => log('  VIX refresh skipped: market_quotes missing or empty'));
+    const fallbackSignalNames = [
+      'vix',
+      'treasury10y',
+      'yieldSpread',
+      'dollarIndex',
+      'hy_credit_spread',
+      'ig_credit_spread',
+      'bdi',
+    ];
+    const tableInfo = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name IN ('market_quotes', 'fred_observations')
+    `);
+    const availableTables = new Set(tableInfo.rows.map((row) => String(row.table_name || '').trim()));
+
+    if (availableTables.has('market_quotes')) {
+      await client.query(`
+        INSERT INTO signal_history (signal_name, ts, value)
+        SELECT 'vix', NOW(), last_price
+        FROM market_quotes
+        WHERE symbol = '^VIX'
+        ORDER BY fetched_at DESC
+        LIMIT 1
+        ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
+      `).catch(() => log('  VIX refresh skipped: market_quotes exists but latest quote was unavailable'));
+    } else {
+      const { rows } = await client.query(`
+        SELECT MAX(ts) AS latest_vix_ts
+        FROM signal_history
+        WHERE signal_name = 'vix'
+      `);
+      const latestVixTs = rows[0]?.latest_vix_ts ? Date.parse(String(rows[0].latest_vix_ts)) : 0;
+      const vixAgeMs = latestVixTs > 0 ? (Date.now() - latestVixTs) : Number.POSITIVE_INFINITY;
+      if (!Number.isFinite(vixAgeMs) || vixAgeMs > 18 * HOUR_1_MS) {
+        log('  VIX refresh fallback: market_quotes missing, backfilling recent FRED series into signal_history');
+        const fromDate = new Date(Date.now() - (45 * 24 * HOUR_1_MS)).toISOString().slice(0, 10);
+        const result = run(`node --import tsx scripts/backfill-new-sources.mjs --source fred --from ${fromDate}`, 900_000);
+        if (!result.ok) {
+          return { ok: false, error: result.error || 'FRED fallback refresh failed' };
+        }
+      } else {
+        log('  VIX refresh fallback skipped: existing signal_history is still fresh enough');
+      }
+    }
+
+    if (availableTables.has('fred_observations')) {
+      await client.query(`
+        INSERT INTO signal_history (signal_name, ts, value)
+        SELECT 'fred_' || series_id, NOW(), value
+        FROM fred_observations
+        WHERE observation_date = (SELECT MAX(observation_date) FROM fred_observations)
+        ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
+      `).catch(() => log('  FRED refresh skipped: fred_observations exists but latest observations were unavailable'));
+    } else {
+      log('  FRED refresh uses signal_history/backfill-new-sources fallback because fred_observations table is absent');
+    }
 
     await client.query(`
       INSERT INTO signal_history (signal_name, ts, value)
-      SELECT 'fred_' || series_id, NOW(), value
-      FROM fred_observations
-      WHERE observation_date = (SELECT MAX(observation_date) FROM fred_observations)
+      SELECT signal_name, date_trunc('hour', NOW()), value
+      FROM (
+        SELECT DISTINCT ON (signal_name) signal_name, value
+        FROM signal_history
+        WHERE signal_name = ANY($1::text[])
+        ORDER BY signal_name, ts DESC
+      ) latest_signals
       ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-    `).catch(() => log('  FRED refresh skipped: fred_observations missing or empty'));
+    `, [fallbackSignalNames]).catch(() => log('  signal freshness mirror skipped: latest fallback signals unavailable'));
 
     log('>> signal-refresh: done');
     return { ok: true };
@@ -251,7 +374,7 @@ async function taskArticleCheck() {
 async function taskDashboardHealth(state) {
   log(`>> dashboard-health: checking ${DASHBOARD_HEALTH_URL}`);
   try {
-    const response = await fetch(DASHBOARD_HEALTH_URL, { signal: AbortSignal.timeout(15_000) });
+    const response = await fetch(DASHBOARD_HEALTH_URL, { signal: AbortSignal.timeout(DASHBOARD_HEALTH_TIMEOUT_MS) });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -334,26 +457,46 @@ async function taskDbHealth(state) {
 
 async function taskDailyBackup(state) {
   log('>> daily-backup: creating PostgreSQL backup');
-  const result = await runBackup(getPgConfig(), {
-    backupDir: 'data/backups',
-    retentionDays: 7,
-  });
+  let result;
+  try {
+    result = await runBackup(getPgConfig(), {
+      backupDir: 'data/backups',
+      retentionDays: 7,
+    });
+  } catch (err) {
+    // Defensive: runBackup should return error objects, never throw,
+    // but guard against any uncaught exception escaping the daemon process.
+    result = {
+      ok: false,
+      skipped: true,
+      error: String(err?.message || err || 'backup threw unexpectedly'),
+    };
+  }
   state.health.lastBackup = {
     ...result,
     checkedAt: new Date().toISOString(),
   };
   saveState(state);
-  if (!result.ok) {
+  if (!result.ok && !result.skipped) {
     await sendAlert('critical', 'postgres backup failed', {
       error: result.error,
     }).catch(() => {});
+  } else if (result.skipped) {
+    log(`  daily-backup skipped: ${result.error}`);
+    // Treat skipped as success-with-warning so the daemon does not enter circuit breaker.
+    return { ok: true, skipped: true, error: result.error };
   }
   return result;
 }
 
 async function taskDuckdbSync() {
+  const inFlight = listRunningNodeProcesses('sync-nas-to-duckdb\\.mjs');
+  if (inFlight.length > 0) {
+    log(`  duckdb-sync: skip because another sync process is already running (pid ${inFlight[0].pid})`);
+    return { ok: true };
+  }
   log('>> duckdb-sync: syncing NAS historical data to DuckDB cache');
-  const result = run('node --import tsx scripts/sync-nas-to-duckdb.mjs --batch-size 500', 1_200_000);
+  const result = run('node --import tsx scripts/sync-nas-to-duckdb.mjs --batch-size 500', DUCKDB_SYNC_TIMEOUT_MS);
   return { ok: result.ok, error: result.error };
 }
 
@@ -395,6 +538,15 @@ async function taskArxivBackfill() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskHackerNewsBackfill() {
+  log('>> hackernews-backfill: ingesting Hacker News archive window through Algolia search');
+  const result = run(
+    'node --import tsx scripts/fetch-hackernews-archive.mjs --since 2021-01-01 --score-min 20 --hits-per-page 100 --max-pages 25 --throttle-ms 100',
+    1_200_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskLabelDiscoveryTopics() {
   log('>> label-discovery-topics: labeling pending emerging-tech topics');
   const result = run('node --import tsx scripts/label-discovery-topics.mjs --limit 5', 600_000);
@@ -410,6 +562,78 @@ async function taskGenerateTechReport() {
 async function taskGenerateWeeklyDigest() {
   log('>> generate-weekly-digest: building weekly emerging-tech digest');
   const result = run('node --import tsx scripts/generate-weekly-digest.mjs', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenerateFollowedThemeBriefings() {
+  log('>> generate-followed-theme-briefings: persisting weekly structural briefing snapshot');
+  const result = run('node --import tsx scripts/generate-followed-theme-briefings.mjs --period week --limit 6', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskMigrateTaxonomy() {
+  log('>> migrate-taxonomy: normalizing legacy themes, discovery topics, and canonical taxonomy mappings');
+  const result = run(
+    'node --import tsx scripts/migrate-taxonomy.mjs --no-rebuild-aggregates --no-rebuild-curation --no-rebuild-weekly-digest --no-reset-aggregates',
+    1_200_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskComputeTrendAggregates() {
+  log('>> compute-trend-aggregates: building long-horizon theme aggregates');
+  const result = run('node --import tsx scripts/compute-trend-aggregates.mjs --period week,month,quarter,year', 1_200_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskCurateDailyNews() {
+  log('>> curate-daily-news: ranking and summarizing dashboard curation set');
+  const result = run('node --import tsx scripts/curate-daily-news.mjs --limit 5 --refresh-aggregates', 900_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskSecSeedUniverse() {
+  log('>> sec-seed-universe: refreshing SEC-backed seed-company exposure map');
+  const result = run(
+    'node --import tsx scripts/refresh-sec-theme-exposure.mjs --max-facts 100 --max-filings 25 --delay-ms 400',
+    1_200_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskOpenAlexThemeEvidence() {
+  log('>> openalex-theme-evidence: refreshing OpenAlex research evidence for canonical themes');
+  const result = run(
+    'node --import tsx scripts/fetch-openalex-theme-evidence.mjs --themes ai-ml,quantum-computing,robotics-automation,biotech,materials-science,space --limit 8 --from-date 2021-01-01',
+    1_200_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGitHubThemeEvidence() {
+  log('>> github-theme-evidence: refreshing GitHub code evidence for canonical technology themes');
+  const result = run(
+    'node --import tsx scripts/fetch-github-theme-evidence.mjs --themes ai-ml,quantum-computing,robotics-automation,developer-platforms,cloud-infrastructure,space --limit 8',
+    1_200_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenerateStructuralAlerts() {
+  log('>> generate-structural-alerts: materializing low-noise structural alerts from trend and evolution aggregates');
+  const result = run(
+    'node --import tsx scripts/generate-structural-alerts.mjs --period week --limit 60',
+    900_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenerateCodexThemeProposals() {
+  log('>> generate-codex-theme-proposals: promoting high-signal discovery topics into pending add-theme proposals');
+  const result = run(
+    'node --import tsx scripts/generate-codex-theme-proposals.mjs --limit 2',
+    900_000,
+  );
   return { ok: result.ok, error: result.error };
 }
 
@@ -564,14 +788,24 @@ const TASKS = {
   'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync },
   'data-quality': { interval: HOUR_6_MS, fn: taskDataQuality },
   'arxiv-backfill': { interval: HOUR_6_MS, fn: taskArxivBackfill },
+  'hackernews-backfill': { interval: HOUR_6_MS, fn: taskHackerNewsBackfill },
   'discover-emerging-tech': { interval: HOUR_6_MS, fn: taskDiscoverEmergingTech },
   'label-discovery-topics': { interval: HOUR_6_MS, fn: taskLabelDiscoveryTopics },
   'generate-tech-report': { interval: HOUR_6_MS, fn: taskGenerateTechReport },
-  'source-self-heal': { interval: HOUR_6_MS, fn: taskSourceSelfHeal },
-  'pending-check': { interval: DAY_1_MS, fn: taskPendingCheck },
-  'full-rebuild': { interval: DAY_1_MS, fn: taskFullRebuild },
-  'daily-backup': { interval: DAY_1_MS, fn: taskDailyBackup },
-  'daily-report': { interval: DAY_1_MS, fn: taskDailyReport },
+    'source-self-heal': { interval: HOUR_6_MS, fn: taskSourceSelfHeal },
+    'pending-check': { interval: DAY_1_MS, fn: taskPendingCheck },
+    'full-rebuild': { interval: DAY_1_MS, fn: taskFullRebuild },
+    'daily-backup': { interval: DAY_1_MS, fn: taskDailyBackup },
+    'daily-report': { interval: DAY_1_MS, fn: taskDailyReport },
+    'migrate-taxonomy': { interval: DAY_1_MS, fn: taskMigrateTaxonomy },
+    'compute-trend-aggregates': { interval: DAY_1_MS, fn: taskComputeTrendAggregates },
+    'curate-daily-news': { interval: DAY_1_MS, fn: taskCurateDailyNews },
+    'sec-seed-universe': { interval: DAY_1_MS, fn: taskSecSeedUniverse },
+  'openalex-theme-evidence': { interval: DAY_1_MS, fn: taskOpenAlexThemeEvidence },
+  'github-theme-evidence': { interval: DAY_1_MS, fn: taskGitHubThemeEvidence },
+  'generate-structural-alerts': { interval: DAY_1_MS, fn: taskGenerateStructuralAlerts },
+  'generate-codex-theme-proposals': { interval: HOUR_6_MS, fn: taskGenerateCodexThemeProposals },
+  'generate-followed-theme-briefings': { interval: DAY_1_MS, fn: taskGenerateFollowedThemeBriefings },
   'generate-weekly-digest': { interval: DAY_1_MS, fn: taskGenerateWeeklyDigest },
   'coverage-gap-analysis': { interval: DAY_1_MS, fn: taskCoverageGapAnalysis },
   'auto-curate': { interval: WEEK_1_MS, fn: taskAutoCurate },
@@ -590,9 +824,10 @@ async function main() {
   process.stderr.write('  30min: article check, dashboard health\n');
   process.stderr.write('  1h:    auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    auto-pipeline-labels\n');
-  process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality, arxiv, discovery, reports, self-heal\n');
-  process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report, weekly digest\n');
-  process.stderr.write('         coverage-gap-analysis\n');
+    process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
+    process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
+    process.stderr.write('         curated daily news, sec seed universe, openalex theme evidence, followed-theme briefings, weekly digest, coverage-gap-analysis\n');
+  process.stderr.write('  6h+:   codex theme proposals from discovery topics\n');
   process.stderr.write('  weekly:auto-curate\n\n');
 
   const state = loadState();

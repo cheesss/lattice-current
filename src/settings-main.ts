@@ -34,7 +34,7 @@ import { applyStoredTheme } from '@/utils/theme-manager';
 import { trackFeatureToggle } from '@/services/analytics';
 import { getGlintAuthToken, persistGlintAuthToken, removePersistedGlintAuthToken } from '@/services/glint';
 
-let activeSection = 'overview';
+let activeSection = 'runtime';
 let settingsManager: SettingsManager;
 let _diagCleanup: (() => void) | null = null;
 const featureTestMessages = new Map<string, { tone: 'ok' | 'warn' | 'error'; message: string }>();
@@ -221,7 +221,7 @@ async function diagFetch(path: string, init?: RequestInit): Promise<Response> {
 // ── Sidebar icons ──
 
 const SIDEBAR_ICONS: Record<string, string> = {
-  overview: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 00-1.38-3.56A8.03 8.03 0 0118.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 015.08 16zm2.95-8H5.08a7.987 7.987 0 014.33-3.56A15.65 15.65 0 008.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 01-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>',
+  runtime: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 00-1.38-3.56A8.03 8.03 0 0118.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 015.08 16zm2.95-8H5.08a7.987 7.987 0 014.33-3.56A15.65 15.65 0 008.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 01-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>',
   ai: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1s-2.73 7.08 0 9.79 7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.53-9.11-.02-12.58s9.14-3.49 12.65 0L21 3v7.12zM12.5 8v4.25l3.5 2.08-.72 1.21L11 13V8h1.5z"/></svg>',
   economy: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>',
   markets: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>',
@@ -255,12 +255,12 @@ function renderSidebar(): void {
   const items: string[] = [];
 
   const progress = getTotalProgress();
-  const overviewDotClass = progress.ready === progress.total ? 'dot-ok' : progress.ready > 0 ? 'dot-partial' : 'dot-warn';
+  const runtimeDotClass = progress.ready === progress.total ? 'dot-ok' : progress.ready > 0 ? 'dot-partial' : 'dot-warn';
   items.push(`
-    <button class="settings-nav-item${activeSection === 'overview' ? ' active' : ''}" data-section="overview" role="tab" aria-selected="${activeSection === 'overview'}">
-      ${SIDEBAR_ICONS.overview}
-      <span class="settings-nav-label">Overview</span>
-      <span class="settings-nav-dot ${overviewDotClass}"></span>
+    <button class="settings-nav-item${activeSection === 'runtime' ? ' active' : ''}" data-section="runtime" role="tab" aria-selected="${activeSection === 'runtime'}">
+      ${SIDEBAR_ICONS.runtime}
+      <span class="settings-nav-label">Runtime</span>
+      <span class="settings-nav-dot ${runtimeDotClass}"></span>
     </button>
   `);
 
@@ -305,8 +305,8 @@ function renderSection(sectionId: string): void {
   area.classList.remove('fade-in');
 
   requestAnimationFrame(() => {
-    if (sectionId === 'overview') {
-      renderOverview(area);
+    if (sectionId === 'runtime') {
+      renderRuntimeOverview(area);
     } else if (sectionId === 'debug') {
       renderDebug(area);
     } else {
@@ -321,9 +321,9 @@ function renderSection(sectionId: string): void {
   });
 }
 
-// ── Overview ──
+// ── Runtime Overview ──
 
-function renderOverview(area: HTMLElement): void {
+function renderRuntimeOverview(area: HTMLElement): void {
   const { ready, total } = getTotalProgress();
   const pct = total > 0 ? (ready / total) * 100 : 0;
   const circumference = 2 * Math.PI * 40;
@@ -435,10 +435,10 @@ function renderOverview(area: HTMLElement): void {
     </div>
   `;
 
-  initOverviewListeners(area);
+  initRuntimeOverviewListeners(area);
 }
 
-function refreshGlintOverviewState(area: HTMLElement, options?: {
+function refreshGlintRuntimeState(area: HTMLElement, options?: {
   message?: string;
   tone?: 'ok' | 'error' | 'warn';
 }): void {
@@ -463,7 +463,7 @@ function refreshGlintOverviewState(area: HTMLElement, options?: {
   }
 }
 
-function initOverviewListeners(area: HTMLElement): void {
+function initRuntimeOverviewListeners(area: HTMLElement): void {
   const accessCopy = getAccessCopy();
   area.querySelector('[data-wm-toggle]')?.addEventListener('click', () => {
     const input = area.querySelector<HTMLInputElement>('[data-wm-key-input]');
@@ -515,7 +515,7 @@ function initOverviewListeners(area: HTMLElement): void {
     const input = area.querySelector<HTMLInputElement>('[data-glint-token-input]');
     const token = input?.value.trim() || '';
     if (!token || token === MASKED_SENTINEL) {
-      refreshGlintOverviewState(area, {
+      refreshGlintRuntimeState(area, {
         message: getGlintAuthToken()
           ? 'Glint token is already configured.'
           : 'Paste a Glint token first, then click Save Token.',
@@ -529,7 +529,7 @@ function initOverviewListeners(area: HTMLElement): void {
         throw new Error(verification.message || 'Glint token verification failed');
       }
       await persistGlintAuthToken(token);
-      refreshGlintOverviewState(area, {
+      refreshGlintRuntimeState(area, {
         message: verification.message || 'Glint token saved and activated.',
         tone: 'ok',
       });
@@ -545,7 +545,7 @@ function initOverviewListeners(area: HTMLElement): void {
     const statusEl = area.querySelector<HTMLElement>('[data-glint-login-status]');
     try {
       await removePersistedGlintAuthToken();
-      refreshGlintOverviewState(area, {
+      refreshGlintRuntimeState(area, {
         message: 'Glint token cleared.',
         tone: 'ok',
       });
@@ -587,7 +587,7 @@ function initOverviewListeners(area: HTMLElement): void {
           throw new Error(verification.message || 'Glint token verification failed');
         }
         await persistGlintAuthToken(clean);
-        refreshGlintOverviewState(area, {
+      refreshGlintRuntimeState(area, {
           message: verification.message || 'Glint token synced from login window.',
           tone: 'ok',
         });
@@ -1266,7 +1266,7 @@ async function initSettingsWindow(): Promise<void> {
   await loadDesktopSecrets();
   settingsManager = new SettingsManager();
 
-  renderSection('overview');
+  renderSection('runtime');
 
   document.getElementById('sidebarNav')?.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-section]');

@@ -5,7 +5,7 @@
  */
 import { isMobileDevice } from '@/utils';
 import { MapComponent } from './Map';
-import { DeckGLMap, type DeckMapView, type CountryClickPayload } from './DeckGLMap';
+import { DeckGLMap, type DeckGLMapOptions, type DeckMapView, type CountryClickPayload } from './DeckGLMap';
 import { GlobeMap } from './GlobeMap';
 import type {
   MapLayers,
@@ -53,6 +53,11 @@ export interface MapContainerState {
   timeRange: TimeRange;
 }
 
+export interface MapContainerOptions {
+  deckMap?: DeckGLMapOptions;
+  preferGlobe?: boolean;
+}
+
 interface TechEventMarker {
   id: string;
   title: string;
@@ -83,6 +88,7 @@ export class MapContainer {
   private initialState: MapContainerState;
   private useDeckGL: boolean;
   private useGlobe: boolean;
+  private deckMapOptions: DeckGLMapOptions;
   private isResizingInternal = false;
   private resizeObserver: ResizeObserver | null = null;
 
@@ -131,11 +137,15 @@ export class MapContainer {
   private cachedEscalationFlights: MilitaryFlight[] | null = null;
   private cachedEscalationVessels: MilitaryVessel[] | null = null;
 
-  constructor(container: HTMLElement, initialState: MapContainerState, preferGlobe = false) {
+  constructor(container: HTMLElement, initialState: MapContainerState, options: boolean | MapContainerOptions = false) {
     this.container = container;
     this.initialState = initialState;
     this.isMobile = isMobileDevice();
-    this.useGlobe = preferGlobe && this.hasWebGLSupport();
+    const normalizedOptions: MapContainerOptions = typeof options === 'boolean'
+      ? { preferGlobe: options }
+      : options;
+    this.deckMapOptions = normalizedOptions.deckMap ?? {};
+    this.useGlobe = Boolean(normalizedOptions.preferGlobe) && this.hasWebGLSupport();
 
     // Use deck.gl on desktop with WebGL support, SVG on mobile
     this.useDeckGL = !this.useGlobe && this.shouldUseDeckGL();
@@ -187,7 +197,7 @@ export class MapContainer {
         this.deckGLMap = new DeckGLMap(this.container, {
           ...this.initialState,
           view: this.initialState.view as DeckMapView,
-        });
+        }, this.deckMapOptions);
       } catch (error) {
         console.warn('[MapContainer] DeckGL initialization failed, falling back to SVG map', error);
         this.initSvgMap('[MapContainer] Initializing SVG map (DeckGL fallback mode)');

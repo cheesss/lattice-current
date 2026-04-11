@@ -1,6 +1,6 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import type { PanelConfig } from '@/types';
-import type { MapView } from '@/components';
+import type { MapView, TimeRange } from '@/components';
 import type { ClusteredEvent } from '@/types';
 import type { DashboardSnapshot } from '@/services/storage';
 import {
@@ -46,11 +46,18 @@ import { invokeTauri } from '@/services/tauri-bridge';
 import { dataFreshness } from '@/services/data-freshness';
 import { mlWorker } from '@/services/ml-worker';
 import { openBacktestHubWindow } from '@/services/backtest-hub-launcher';
+import {
+  getInvestmentFocusContext,
+  INVESTMENT_FOCUS_EVENT_NAME,
+  setInvestmentFocusContext,
+} from '@/services/investment-focus-context';
 import { UnifiedSettings } from '@/components/UnifiedSettings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { TvModeController } from '@/services/tv-mode';
+import { getCountryNameByCode } from '@/services/country-geometry';
 import {
   getWorkspaceDefinition,
+  resolveWorkspaceId,
   LEGACY_WORKSPACE_STORAGE_KEY,
   type WorkspaceDefinition,
   type WorkspaceId,
@@ -63,6 +70,7 @@ export interface EventHandlerCallbacks {
   loadAllData: () => Promise<void>;
   flushStaleRefreshes: () => void;
   setHiddenSince: (ts: number) => void;
+  ensureMapMounted?: (forceRender?: boolean) => boolean;
   loadDataForLayer: (layer: string) => void;
   waitForAisData: () => void;
   syncDataFreshnessWithLayers: () => void;
@@ -86,6 +94,11 @@ export class EventHandlerManager implements AppModule {
   private boundOpenCodexHubHandler: ((e: Event) => void) | null = null;
   private boundOpenHubRequestHandler: ((e: Event) => void) | null = null;
   private boundHubVisibilityHandler: ((e: Event) => void) | null = null;
+  private boundOperatorContextHandler: ((e: Event) => void) | null = null;
+  private boundThemeFocusRequestHandler: ((e: Event) => void) | null = null;
+  private boundThemeWorkspaceMessageHandler: ((e: MessageEvent) => void) | null = null;
+  private boundInvestmentFocusHandler: ((e: Event) => void) | null = null;
+  private boundDeferredMapBootstrapHandler: (() => void) | null = null;
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
   private clockIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -95,6 +108,8 @@ export class EventHandlerManager implements AppModule {
   private focusedHeadlineIndex = -1;
   private readonly IDLE_PAUSE_MS = 2 * 60 * 1000;
   private activeWorkspace: WorkspaceId = getWorkspaceDefinition().id;
+  private mapLayerHandlersBound = false;
+  private urlStateSyncBound = false;
 
   constructor(ctx: AppContext, callbacks: EventHandlerCallbacks) {
     this.ctx = ctx;
@@ -119,6 +134,9 @@ export class EventHandlerManager implements AppModule {
   init(): void {
     this.setupEventListeners();
     this.setupWorkspaceShell();
+    this.setupOperatorContextBinding();
+    this.setupThemeWorkspaceShell();
+    this.setupSourceDrawer();
     this.setupTerminalTape();
     this.setupKeyboardShortcuts();
     this.setupIdleDetection();
@@ -224,6 +242,26 @@ export class EventHandlerManager implements AppModule {
     if (this.boundHubVisibilityHandler) {
       window.removeEventListener('wm:hub-visibility', this.boundHubVisibilityHandler);
       this.boundHubVisibilityHandler = null;
+    }
+    if (this.boundOperatorContextHandler) {
+      window.removeEventListener('wm:operator-context-changed', this.boundOperatorContextHandler);
+      this.boundOperatorContextHandler = null;
+    }
+    if (this.boundThemeFocusRequestHandler) {
+      window.removeEventListener('wm:focus-theme', this.boundThemeFocusRequestHandler);
+      this.boundThemeFocusRequestHandler = null;
+    }
+    if (this.boundThemeWorkspaceMessageHandler) {
+      window.removeEventListener('message', this.boundThemeWorkspaceMessageHandler);
+      this.boundThemeWorkspaceMessageHandler = null;
+    }
+    if (this.boundInvestmentFocusHandler) {
+      window.removeEventListener(INVESTMENT_FOCUS_EVENT_NAME, this.boundInvestmentFocusHandler);
+      this.boundInvestmentFocusHandler = null;
+    }
+    if (this.boundDeferredMapBootstrapHandler) {
+      window.removeEventListener('wm:map-mounted', this.boundDeferredMapBootstrapHandler);
+      this.boundDeferredMapBootstrapHandler = null;
     }
     if (this.boundHotkeyHandler) {
       document.removeEventListener('keydown', this.boundHotkeyHandler);
@@ -410,6 +448,7 @@ export class EventHandlerManager implements AppModule {
     const regionSelect = document.getElementById('regionSelect') as HTMLSelectElement;
     regionSelect?.addEventListener('change', () => {
       this.ctx.map?.setView(regionSelect.value as MapView);
+      this.ctx.setOperatorContext({ mapView: regionSelect.value as MapView });
       trackMapViewChange(regionSelect.value);
     });
 
@@ -476,17 +515,48 @@ export class EventHandlerManager implements AppModule {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       const zoom = Number(detail?.zoom);
       const nextZoom = Number.isFinite(zoom) ? Math.max(2, Math.min(7, zoom)) : 4;
+      if (!getWorkspaceDefinition(this.activeWorkspace, SITE_VARIANT).showMap) {
+        this.setActiveWorkspace('brief');
+      }
+      this.callbacks.ensureMapMounted?.(true);
       this.ctx.map?.setCenter(lat, lon, nextZoom);
       document.getElementById('mapSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     window.addEventListener('wm:focus-news-location', this.boundNewsMapFocusHandler);
+
+    if (this.boundThemeFocusRequestHandler) {
+      window.removeEventListener('wm:focus-theme', this.boundThemeFocusRequestHandler);
+    }
+    this.boundThemeFocusRequestHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        themeId?: string;
+        workspaceId?: WorkspaceId | string;
+        scrollTarget?: 'theme-workspace' | 'validation' | 'none';
+      }>).detail;
+      const workspaceId = resolveWorkspaceId(detail?.workspaceId, SITE_VARIANT);
+      if (workspaceId === 'validate') {
+        this.openValidationWorkspace(detail?.themeId, detail?.scrollTarget === 'none' ? 'none' : 'validation');
+        return;
+      }
+      this.focusThemeInWorkspace(detail?.themeId, workspaceId, detail?.scrollTarget ?? 'theme-workspace');
+    };
+    window.addEventListener('wm:focus-theme', this.boundThemeFocusRequestHandler);
+
+    if (this.boundInvestmentFocusHandler) {
+      window.removeEventListener(INVESTMENT_FOCUS_EVENT_NAME, this.boundInvestmentFocusHandler);
+    }
+    this.boundInvestmentFocusHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{ themeId?: string | null }>).detail;
+      const themeId = this.normalizeThemeId(detail?.themeId || null);
+      if (!themeId || themeId === this.ctx.operatorContext.selectedThemeId) return;
+      this.ctx.setOperatorContext({ selectedThemeId: themeId });
+    };
+    window.addEventListener(INVESTMENT_FOCUS_EVENT_NAME, this.boundInvestmentFocusHandler);
   }
 
   private setupWorkspaceShell(): void {
-    this.activeWorkspace = getWorkspaceDefinition(
-      localStorage.getItem(WORKSPACE_STORAGE_KEY) || localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY),
-      SITE_VARIANT,
-    ).id;
+    this.activeWorkspace = getWorkspaceDefinition(this.ctx.operatorContext.workspaceId, SITE_VARIANT).id;
+    this.ctx.setOperatorContext({ workspaceId: this.activeWorkspace }, { persist: false });
 
     this.ctx.container.querySelectorAll<HTMLButtonElement>('[data-workspace-target]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -505,7 +575,76 @@ export class EventHandlerManager implements AppModule {
     this.activeWorkspace = resolved;
     localStorage.setItem(WORKSPACE_STORAGE_KEY, this.activeWorkspace);
     localStorage.setItem(LEGACY_WORKSPACE_STORAGE_KEY, this.activeWorkspace);
+    this.ctx.setOperatorContext({ workspaceId: this.activeWorkspace });
     this.applyWorkspaceMode();
+    this.syncUrlState();
+  }
+
+  private normalizeThemeId(value: string | null | undefined): string | null {
+    if (typeof value !== 'string') return null;
+    const normalized = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!normalized || normalized === 'unknown') return null;
+    return normalized;
+  }
+
+  private scrollWorkspaceTarget(target: 'theme-workspace' | 'validation' | 'none' = 'none'): void {
+    if (target === 'none') return;
+    window.requestAnimationFrame(() => {
+      if (target === 'theme-workspace') {
+        document.getElementById('themeWorkspaceShell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      document.querySelector<HTMLElement>('[data-panel="backtest-lab"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  private syncValidationFocusFromOperatorContext(): void {
+    const selectedThemeId = this.normalizeThemeId(this.ctx.operatorContext.selectedThemeId);
+    const focus = getInvestmentFocusContext();
+    if (selectedThemeId && focus.themeId !== selectedThemeId) {
+      setInvestmentFocusContext({ themeId: selectedThemeId });
+    }
+  }
+
+  private focusThemeInWorkspace(
+    themeId: string | null | undefined,
+    workspaceId: WorkspaceId = 'brief',
+    scrollTarget: 'theme-workspace' | 'validation' | 'none' = 'theme-workspace',
+  ): void {
+    const normalizedThemeId = this.normalizeThemeId(themeId);
+    if (!normalizedThemeId) return;
+    this.ctx.setOperatorContext({ selectedThemeId: normalizedThemeId });
+    if (workspaceId === 'validate') {
+      this.syncValidationFocusFromOperatorContext();
+    }
+    if (this.activeWorkspace !== workspaceId) {
+      this.setActiveWorkspace(workspaceId);
+    }
+    if (workspaceId === 'brief' || workspaceId === 'watch') {
+      this.syncThemeWorkspaceFrameFromContext(true);
+    } else {
+      this.syncValidationFocusFromOperatorContext();
+    }
+    this.syncUrlState();
+    this.scrollWorkspaceTarget(scrollTarget);
+  }
+
+  private openValidationWorkspace(themeId?: string | null, scrollTarget: 'validation' | 'none' = 'validation'): void {
+    const normalizedThemeId = this.normalizeThemeId(themeId ?? this.ctx.operatorContext.selectedThemeId);
+    if (normalizedThemeId) {
+      this.ctx.setOperatorContext({ selectedThemeId: normalizedThemeId });
+      setInvestmentFocusContext({ themeId: normalizedThemeId });
+    }
+    if (this.activeWorkspace !== 'validate') {
+      this.setActiveWorkspace('validate');
+    } else {
+      this.syncUrlState();
+    }
+    this.scrollWorkspaceTarget(scrollTarget);
   }
 
   private applyWorkspaceMode(): void {
@@ -513,7 +652,8 @@ export class EventHandlerManager implements AppModule {
     const isKoreanUi = getCurrentLanguage() === 'ko';
     document.documentElement.dataset.workspace = workspace.id;
 
-    const allowedPanels = workspace.id === 'all' ? null : new Set(workspace.panelKeys);
+    const allowedPanels = new Set(workspace.panelKeys);
+    const requiredPanels = new Set(workspace.featuredPanels);
     const enabledPanels = new Set(
       Object.entries(this.ctx.panelSettings)
         .filter(([, config]) => config.enabled !== false)
@@ -524,9 +664,8 @@ export class EventHandlerManager implements AppModule {
     document.querySelectorAll<HTMLElement>('#panelsGrid .panel[data-panel]').forEach((panelEl) => {
       const key = panelEl.dataset.panel;
       if (!key) return;
-      const enabled = enabledPanels.has(key);
-      const inWorkspace = !allowedPanels || allowedPanels.has(key);
-      const shouldShow = enabled && inWorkspace;
+      const enabled = enabledPanels.has(key) || requiredPanels.has(key);
+      const shouldShow = enabled && allowedPanels.has(key);
       panelEl.classList.toggle('workspace-hidden', !shouldShow);
       panelEl.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
       if (shouldShow) visibleCount += 1;
@@ -534,9 +673,22 @@ export class EventHandlerManager implements AppModule {
 
     const mapEnabled = this.ctx.panelSettings.map?.enabled !== false;
     const mapVisible = mapEnabled && workspace.showMap;
+    if (mapVisible) {
+      this.callbacks.ensureMapMounted?.(true);
+    }
     const mapSection = document.getElementById('mapSection');
     mapSection?.classList.toggle('workspace-hidden', !mapVisible);
     this.ctx.map?.setRenderPaused(!mapVisible);
+
+    const themeWorkspaceShell = document.getElementById('themeWorkspaceShell');
+    const themeWorkspaceVisible = workspace.id === 'brief' || workspace.id === 'watch';
+    themeWorkspaceShell?.classList.toggle('workspace-hidden', !themeWorkspaceVisible);
+    if (themeWorkspaceVisible) {
+      this.syncThemeWorkspaceFrameFromContext();
+    }
+    if (workspace.id === 'validate') {
+      this.syncValidationFocusFromOperatorContext();
+    }
 
     this.ctx.container.querySelectorAll<HTMLButtonElement>('[data-workspace-target]').forEach((button) => {
       const active = button.dataset.workspaceTarget === workspace.id;
@@ -579,7 +731,7 @@ export class EventHandlerManager implements AppModule {
     const featuredEl = document.getElementById('workspaceFeatured');
     if (featuredEl) {
       const chips = workspace.featuredPanels
-        .filter((key) => enabledPanels.has(key) && (!allowedPanels || allowedPanels.has(key)))
+        .filter((key) => (enabledPanels.has(key) || requiredPanels.has(key)) && allowedPanels.has(key))
         .map((key) => this.ctx.panelSettings[key]?.name ?? DEFAULT_PANELS[key]?.name ?? key)
         .slice(0, 4);
       featuredEl.innerHTML = chips.length > 0
@@ -589,6 +741,264 @@ export class EventHandlerManager implements AppModule {
 
     requestAnimationFrame(() => {
       this.ctx.map?.render();
+    });
+    this.renderOperatorContextChips();
+  }
+
+  private setupOperatorContextBinding(): void {
+    this.boundOperatorContextHandler = () => {
+      this.renderOperatorContextChips();
+      if (this.activeWorkspace === 'brief' || this.activeWorkspace === 'watch') {
+        this.syncThemeWorkspaceFrameFromContext();
+      }
+      this.syncValidationFocusFromOperatorContext();
+      this.syncUrlState();
+    };
+    window.addEventListener('wm:operator-context-changed', this.boundOperatorContextHandler);
+    this.renderOperatorContextChips();
+    this.syncValidationFocusFromOperatorContext();
+  }
+
+  private getOperatorTimeRangeLabel(range: TimeRange): string {
+    const isKoreanUi = getCurrentLanguage() === 'ko';
+    const labels: Record<string, string> = isKoreanUi
+      ? {
+          '1h': '1시간',
+          '6h': '6시간',
+          '24h': '24시간',
+          '48h': '48시간',
+          '7d': '7일',
+          all: '전체',
+        }
+      : {
+          '1h': '1h',
+          '6h': '6h',
+          '24h': '24h',
+          '48h': '48h',
+          '7d': '7d',
+          all: 'All',
+        };
+    return labels[range] ?? range;
+  }
+
+  private getOperatorViewLabel(view: MapView): string {
+    const labels: Record<MapView, string> = {
+      global: t('components.deckgl.views.global'),
+      america: t('components.deckgl.views.americas'),
+      mena: t('components.deckgl.views.mena'),
+      eu: t('components.deckgl.views.europe'),
+      asia: t('components.deckgl.views.asia'),
+      latam: t('components.deckgl.views.latam'),
+      africa: t('components.deckgl.views.africa'),
+      oceania: t('components.deckgl.views.oceania'),
+    };
+    return labels[view] ?? view;
+  }
+
+  private renderOperatorContextChips(): void {
+    const workspace = getWorkspaceDefinition(this.ctx.operatorContext.workspaceId, SITE_VARIANT);
+    const workspaceEl = document.getElementById('operatorContextWorkspace');
+    if (workspaceEl) workspaceEl.textContent = workspace.label;
+
+    const regionEl = document.getElementById('operatorContextRegion');
+    if (regionEl) regionEl.textContent = this.getOperatorViewLabel(this.ctx.operatorContext.mapView);
+
+    const timeRangeEl = document.getElementById('operatorContextTimeRange');
+    if (timeRangeEl) timeRangeEl.textContent = this.getOperatorTimeRangeLabel(this.ctx.operatorContext.timeRange);
+
+    const themeChipEl = document.getElementById('operatorContextThemeChip');
+    const themeEl = document.getElementById('operatorContextTheme');
+    const selectedTheme = this.ctx.operatorContext.selectedThemeId;
+    if (themeEl) {
+      themeEl.textContent = selectedTheme ? selectedTheme.replace(/-/g, ' ') : '';
+    }
+    if (themeChipEl) {
+      if (selectedTheme) {
+        themeChipEl.removeAttribute('hidden');
+      } else {
+        themeChipEl.setAttribute('hidden', 'hidden');
+      }
+    }
+
+    const countryChipEl = document.getElementById('operatorContextCountryChip');
+    const countryEl = document.getElementById('operatorContextCountry');
+    const countryCode = this.ctx.operatorContext.selectedCountryCode;
+    if (countryEl) {
+      countryEl.textContent = countryCode
+        ? (this.ctx.countryBriefPage?.getName() ?? getCountryNameByCode(countryCode) ?? countryCode)
+        : '';
+    }
+    if (countryChipEl) {
+      if (countryCode) {
+        countryChipEl.removeAttribute('hidden');
+      } else {
+        countryChipEl.setAttribute('hidden', 'hidden');
+      }
+    }
+  }
+
+  private getThemeWorkspacePeriod(range: TimeRange): 'week' | 'month' | 'quarter' | 'year' {
+    switch (range) {
+      case '1h':
+      case '6h':
+      case '24h':
+      case '48h':
+      case '7d':
+        return 'week';
+      case 'all':
+      default:
+        return 'quarter';
+    }
+  }
+
+  private buildThemeWorkspaceEmbedUrl(): string {
+    const url = new URL('/event-dashboard.html', window.location.origin);
+    url.searchParams.set('embed', '1');
+    return url.toString();
+  }
+
+  private buildThemeWorkspaceStandaloneUrl(): string {
+    const url = new URL('/event-dashboard.html', window.location.origin);
+    url.searchParams.set('period', this.getThemeWorkspacePeriod(this.ctx.operatorContext.timeRange));
+    if (this.ctx.operatorContext.selectedThemeId) {
+      url.searchParams.set('theme', this.ctx.operatorContext.selectedThemeId);
+    }
+    return url.toString();
+  }
+
+  private postThemeWorkspaceContext(): void {
+    const frame = document.getElementById('themeWorkspaceFrame') as HTMLIFrameElement | null;
+    const targetWindow = frame?.contentWindow;
+    if (!targetWindow) return;
+    targetWindow.postMessage({
+      source: 'operator-shell',
+      type: 'wm-theme-workspace-context',
+      payload: {
+        themeId: this.ctx.operatorContext.selectedThemeId,
+        period: this.getThemeWorkspacePeriod(this.ctx.operatorContext.timeRange),
+        workspaceId: this.activeWorkspace,
+      },
+    }, window.location.origin);
+  }
+
+  private syncThemeWorkspaceFrameFromContext(force = false): void {
+    const frame = document.getElementById('themeWorkspaceFrame') as HTMLIFrameElement | null;
+    const standaloneLink = document.getElementById('themeWorkspaceOpenStandalone') as HTMLAnchorElement | null;
+    const validationButton = document.getElementById('themeWorkspaceOpenValidation') as HTMLButtonElement | null;
+    const summary = document.getElementById('themeWorkspaceSummary');
+    if (!frame) return;
+
+    const embedUrl = this.buildThemeWorkspaceEmbedUrl();
+    if (force || !frame.src || frame.src !== embedUrl) {
+      frame.src = embedUrl;
+    } else {
+      this.postThemeWorkspaceContext();
+    }
+    if (standaloneLink) {
+      standaloneLink.href = this.buildThemeWorkspaceStandaloneUrl();
+    }
+    if (summary) {
+      summary.textContent = this.ctx.operatorContext.selectedThemeId
+        ? `Focused on ${this.ctx.operatorContext.selectedThemeId.replace(/-/g, ' ')}. Move into validation without losing the live evidence trail.`
+        : 'Follow themes, structural alerts, and evidence lanes without leaving the workbench.';
+    }
+    if (validationButton) {
+      validationButton.disabled = !this.ctx.operatorContext.selectedThemeId;
+    }
+  }
+
+  private setupThemeWorkspaceMessageBridge(): void {
+    if (this.boundThemeWorkspaceMessageHandler) {
+      window.removeEventListener('message', this.boundThemeWorkspaceMessageHandler);
+    }
+    this.boundThemeWorkspaceMessageHandler = (event: MessageEvent) => {
+      const frame = document.getElementById('themeWorkspaceFrame') as HTMLIFrameElement | null;
+      if (!frame?.contentWindow || event.source !== frame.contentWindow) return;
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as {
+        source?: string;
+        type?: string;
+        payload?: { theme?: string | null; period?: string | null };
+      } | null;
+      if (!data || data.source !== 'theme-workspace') return;
+      if (data.type === 'wm-theme-workspace-ready') {
+        this.postThemeWorkspaceContext();
+        return;
+      }
+      if (data.type !== 'wm-theme-workspace-context') return;
+
+      const nextTheme = this.normalizeThemeId(data.payload?.theme ?? null);
+      const currentTheme = this.normalizeThemeId(this.ctx.operatorContext.selectedThemeId);
+      if (nextTheme !== currentTheme) {
+        this.ctx.setOperatorContext({ selectedThemeId: nextTheme });
+      }
+      const nextPeriod = String(data.payload?.period || '').trim().toLowerCase();
+      if (nextPeriod) {
+        const timeRange = nextPeriod === 'week'
+          ? '7d'
+          : nextPeriod === 'month'
+            ? 'all'
+            : nextPeriod === 'quarter'
+              ? 'all'
+              : nextPeriod === 'year'
+                ? 'all'
+                : null;
+        if (timeRange && timeRange !== this.ctx.operatorContext.timeRange) {
+          this.ctx.setOperatorContext({ timeRange });
+        }
+      }
+    };
+    window.addEventListener('message', this.boundThemeWorkspaceMessageHandler);
+  }
+
+  private setupThemeWorkspaceShell(): void {
+    const frame = document.getElementById('themeWorkspaceFrame') as HTMLIFrameElement | null;
+    const validationButton = document.getElementById('themeWorkspaceOpenValidation') as HTMLButtonElement | null;
+    if (!frame) return;
+    validationButton?.addEventListener('click', () => {
+      this.openValidationWorkspace(this.ctx.operatorContext.selectedThemeId);
+    });
+    this.setupThemeWorkspaceMessageBridge();
+    frame.addEventListener('load', () => {
+      this.postThemeWorkspaceContext();
+    });
+    this.syncThemeWorkspaceFrameFromContext(true);
+  }
+
+  private ensureDeferredMapBootstrap(): void {
+    if (this.ctx.map || this.boundDeferredMapBootstrapHandler) return;
+    this.boundDeferredMapBootstrapHandler = () => {
+      if (this.boundDeferredMapBootstrapHandler) {
+        window.removeEventListener('wm:map-mounted', this.boundDeferredMapBootstrapHandler);
+        this.boundDeferredMapBootstrapHandler = null;
+      }
+      this.setupMapLayerHandlers();
+      this.setupUrlStateSync();
+    };
+    window.addEventListener('wm:map-mounted', this.boundDeferredMapBootstrapHandler, { once: true });
+  }
+
+  private setupSourceDrawer(): void {
+    const drawer = document.getElementById('sourceDrawer');
+    if (!drawer) return;
+
+    const setOpen = (open: boolean) => {
+      drawer.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+      document.documentElement.classList.toggle('source-drawer-open', open);
+    };
+
+    document.getElementById('sourceDrawerBtn')?.addEventListener('click', () => {
+      const next = !drawer.classList.contains('open');
+      setOpen(next);
+    });
+
+    document.getElementById('sourceDrawerClose')?.addEventListener('click', () => {
+      setOpen(false);
+    });
+
+    drawer.querySelectorAll<HTMLElement>('[data-close-source-drawer]').forEach((el) => {
+      el.addEventListener('click', () => setOpen(false));
     });
   }
 
@@ -800,7 +1210,14 @@ export class EventHandlerManager implements AppModule {
   }
 
   setupUrlStateSync(): void {
-    if (!this.ctx.map) return;
+    if (!this.ctx.map) {
+      this.ensureDeferredMapBootstrap();
+      return;
+    }
+    if (this.urlStateSyncBound) {
+      this.syncUrlState();
+      return;
+    }
     const update = debounce(() => {
       this.syncUrlState();
     }, 250);
@@ -813,8 +1230,18 @@ export class EventHandlerManager implements AppModule {
         if (regionSelect.value !== state.view) {
           regionSelect.value = state.view;
         }
+        if (
+          state.view !== this.ctx.operatorContext.mapView
+          || state.timeRange !== this.ctx.operatorContext.timeRange
+        ) {
+          this.ctx.setOperatorContext({
+            mapView: state.view,
+            timeRange: state.timeRange,
+          });
+        }
       }
     });
+    this.urlStateSyncBound = true;
     update();
   }
 
@@ -825,16 +1252,17 @@ export class EventHandlerManager implements AppModule {
   }
 
   getShareUrl(): string | null {
-    if (!this.ctx.map) return null;
-    const state = this.ctx.map.getState();
-    const center = this.ctx.map.getCenter();
+    const state = this.ctx.map?.getState();
+    const center = this.ctx.map?.getCenter();
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
     return buildMapUrl(baseUrl, {
-      view: state.view,
-      zoom: state.zoom,
+      workspace: this.activeWorkspace,
+      theme: this.ctx.operatorContext.selectedThemeId ?? undefined,
+      view: state?.view ?? this.ctx.operatorContext.mapView,
+      zoom: state?.zoom ?? this.ctx.initialUrlState?.zoom ?? 1,
       center,
-      timeRange: state.timeRange,
-      layers: state.layers,
+      timeRange: state?.timeRange ?? this.ctx.operatorContext.timeRange,
+      layers: state?.layers ?? this.ctx.mapLayers,
       country: this.ctx.countryBriefPage?.isVisible() ? (this.ctx.countryBriefPage.getCode() ?? undefined) : undefined,
     });
   }
@@ -1041,7 +1469,13 @@ export class EventHandlerManager implements AppModule {
   }
 
   setupMapLayerHandlers(): void {
-    this.ctx.map?.setOnLayerChange((layer, enabled, source) => {
+    if (!this.ctx.map) {
+      this.ensureDeferredMapBootstrap();
+      return;
+    }
+    if (this.mapLayerHandlersBound) return;
+
+    this.ctx.map.setOnLayerChange((layer, enabled, source) => {
       console.log(`[App.onLayerChange] ${layer}: ${enabled} (${source})`);
       trackMapLayerToggle(layer, enabled, source);
       this.ctx.mapLayers[layer] = enabled;
@@ -1069,6 +1503,7 @@ export class EventHandlerManager implements AppModule {
         this.callbacks.loadDataForLayer(layer);
       }
     });
+    this.mapLayerHandlersBound = true;
   }
 
   setupPanelViewTracking(): void {

@@ -281,8 +281,25 @@ fn require_trusted_window(_label: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_local_api_token(webview: Webview, state: tauri::State<'_, LocalApiState>) -> Result<String, String> {
+fn ensure_local_api_started(app: AppHandle, webview: Webview) -> Result<u16, String> {
     require_trusted_window(webview.label())?;
+    start_local_api(&app)?;
+    let state = app.state::<LocalApiState>();
+    state
+        .port
+        .lock()
+        .map_err(|_| "Failed to lock port state".to_string())?
+        .ok_or_else(|| "Port not yet assigned".to_string())
+}
+
+#[tauri::command]
+fn get_local_api_token(
+    app: AppHandle,
+    webview: Webview,
+    state: tauri::State<'_, LocalApiState>,
+) -> Result<String, String> {
+    require_trusted_window(webview.label())?;
+    start_local_api(&app)?;
     let token = state
         .token
         .lock()
@@ -303,9 +320,16 @@ fn get_desktop_runtime_info(state: tauri::State<'_, LocalApiState>) -> DesktopRu
 }
 
 #[tauri::command]
-fn get_local_api_port(webview: Webview, state: tauri::State<'_, LocalApiState>) -> Result<u16, String> {
+fn get_local_api_port(
+    app: AppHandle,
+    webview: Webview,
+    state: tauri::State<'_, LocalApiState>,
+) -> Result<u16, String> {
     require_trusted_window(webview.label())?;
-    state.port.lock()
+    start_local_api(&app)?;
+    state
+        .port
+        .lock()
         .map_err(|_| "Failed to lock port state".to_string())?
         .ok_or_else(|| "Port not yet assigned".to_string())
 }
@@ -1513,6 +1537,7 @@ fn start_local_api(app: &AppHandle) -> Result<(), String> {
         .env("LOCAL_API_RESOURCE_DIR", &resource_for_node)
         .env("LOCAL_API_DATA_DIR", &data_dir)
         .env("LOCAL_API_MODE", "tauri-sidecar")
+        .env("LOCAL_API_BACKGROUND_AUTOMATION", "false")
         .env("LOCAL_API_TOKEN", &local_api_token)
         .stdout(Stdio::from(log_file))
         .stderr(Stdio::from(log_file_err));
@@ -1782,6 +1807,7 @@ fn main() {
             get_all_secrets,
             set_secret,
             delete_secret,
+            ensure_local_api_started,
             get_local_api_token,
             get_local_api_port,
             get_desktop_runtime_info,
@@ -1819,14 +1845,11 @@ fn main() {
                 }
             }
 
-            if let Err(err) = start_local_api(&app.handle()) {
-                append_desktop_log(
-                    &app.handle(),
-                    "ERROR",
-                    &format!("local API sidecar failed to start: {err}"),
-                );
-                eprintln!("[tauri] local API sidecar failed to start: {err}");
-            }
+            append_desktop_log(
+                &app.handle(),
+                "INFO",
+                "local API sidecar lazy-start is enabled; startup defers until the renderer requests local runtime services",
+            );
 
             Ok(())
         })

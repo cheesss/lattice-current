@@ -8,6 +8,7 @@ import type {
 
 // String key constants
 export const SNAPSHOT_KEY = 'investment-intelligence:v1';
+export const EXPERIMENT_REGISTRY_KEY = 'investment-intelligence-experiment-registry:v1';
 export const HISTORY_KEY = 'investment-intelligence-history:v1';
 export const TRACKED_IDEAS_KEY = 'investment-intelligence-tracked-ideas:v1';
 export const MARKET_HISTORY_KEY = 'investment-intelligence-market-history:v1';

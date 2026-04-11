@@ -33,7 +33,7 @@ import { APP_BRAND } from '@/config/brand';
 import { renderIntelViewTabs, fetchViewData, renderIntelView, mountIntelViewCharts, type IntelView } from '@/views/intel-view-registry';
 
 const AUTO_REFRESH_MS = 45_000;
-type BacktestHubView = 'overview' | 'decision' | 'data' | 'history' | 'intel';
+type BacktestHubView = 'mission' | 'decision' | 'data' | 'history' | 'intel';
 type BacktestHubLocale = 'en' | 'ko';
 const HUB_LOCALE_STORAGE_KEY = 'wm:backtest-hub:locale';
 let activeHubLocale: BacktestHubLocale = 'en';
@@ -46,8 +46,8 @@ const HUB_KO_COPY: Record<string, string> = {
   'Running Replay...': '리플레이 실행 중...',
   'Run Replay Now': '지금 리플레이 실행',
   'Run Replay': '리플레이 실행',
-  Overview: '개요',
-  'Latest runs and posture': '최신 실행과 포지션 상태',
+  Mission: '미션',
+  'Live replay posture': '최신 실행과 포지션 상태',
   Decision: '의사결정',
   'Themes and live guidance': '테마와 현재 행동 가이드',
   Data: '데이터',
@@ -830,7 +830,7 @@ function renderRunInterpretation(run: HistoricalReplayRun | null): string {
   `).join('');
 }
 
-function renderSelectedRunOverview(run: HistoricalReplayRun | null): string {
+function renderSelectedRunSummary(run: HistoricalReplayRun | null): string {
   if (!run) {
     return `<div class="backtest-hub-empty">${hubLabel('No replay run is available yet.', '아직 표시할 리플레이 실행이 없습니다.')}</div>`;
   }
@@ -953,7 +953,7 @@ function renderThemeDriftMap(snapshot: ThemeDiagnosticsSnapshot, opsSnapshot: Da
   `;
 }
 
-function renderSourceFamilyOverview(snapshot: DataFlowOpsSnapshot): string {
+function renderSourceFamilyCoverage(snapshot: DataFlowOpsSnapshot): string {
   const families = snapshot.coverage.sourceFamilies
     .slice()
     .sort((left, right) => right.frameCount - left.frameCount)
@@ -1056,7 +1056,7 @@ function renderProviderMix(snapshot: DataFlowOpsSnapshot): string {
 
 function renderViewTabs(activeView: BacktestHubView): string {
   const tabs: Array<{ id: BacktestHubView; label: string; note: string }> = [
-    { id: 'overview', label: hubLabel('Overview', '개요'), note: hubLabel('Latest runs and posture', '최신 실행과 포지션 상태') },
+    { id: 'mission', label: hubLabel('Mission', '미션'), note: hubLabel('Live replay posture', '최신 실행과 포지션 상태') },
     { id: 'decision', label: hubLabel('Decision', '의사결정'), note: hubLabel('Themes and live guidance', '테마와 현재 행동 가이드') },
     { id: 'data', label: hubLabel('Data', '데이터'), note: hubLabel('Coverage and dataset flow', '커버리지와 처리 흐름') },
     { id: 'history', label: hubLabel('History', '히스토리'), note: hubLabel('Run history and drift', '실행 이력과 드리프트') },
@@ -1340,8 +1340,8 @@ function renderViewSectionLead(view: BacktestHubView): string {
     `;
   }
   const content = {
-    overview: {
-      title: hubLabel('Overview mode', '개요 모드'),
+    mission: {
+      title: hubLabel('Mission mode', '미션 모드'),
       body: hubLabel(
         'Start here when you want the shortest path from pipeline state to the latest replay outcome.',
         '파이프라인 상태부터 최신 리플레이 결과까지 가장 짧은 흐름으로 보고 싶을 때 여기서 시작하세요.',
@@ -1404,7 +1404,7 @@ function renderRunWorkspace(
   }
   return `
     <div class="backtest-lab-run-list">${renderRunButtons(runs, selectedRunId)}</div>
-    ${renderSelectedRunOverview(selectedRun)}
+      ${renderSelectedRunSummary(selectedRun)}
   `;
 }
 
@@ -1431,7 +1431,7 @@ class BacktestHubWindow {
   private snapshot: DataFlowOpsSnapshot | null = null;
   private runs: HistoricalReplayRun[] = [];
   private selectedRunId: string | null = null;
-  private view: BacktestHubView = 'overview';
+  private view: BacktestHubView = 'mission';
   private locale: BacktestHubLocale = resolveInitialHubLocale();
   private pendingAction: 'replay' | 'scheduler' | null = null;
   private actionMessage: { tone: DataFlowOpsStatusTone | 'positive' | 'negative' | 'neutral'; text: string } | null = null;
@@ -2002,13 +2002,13 @@ class BacktestHubWindow {
 
         ${viewLead}
 
-        ${this.view === 'intel' ? '' : `<div class="backtest-hub-grid backtest-hub-grid-three" data-view-anchor="overview">
+          ${this.view === 'intel' ? '' : `<div class="backtest-hub-grid backtest-hub-grid-three" data-view-anchor="mission">
           ${renderRunComparisonCard(latestReplaySummary, hubLabel('Latest Replay', '최신 리플레이'))}
           ${renderRunComparisonCard(latestWalkForwardSummary, hubLabel('Latest Walk-forward', '최신 워크포워드'))}
           ${renderRunComparisonCard(currentLike, hubLabel('Current-like', '현재 유사 구간'), { emptyText: currentLikeEmptyText, note: currentLikeNote })}
         </div>
 
-        <div class="backtest-hub-grid backtest-hub-grid-two" data-view-anchor="overview">
+            <div class="backtest-hub-grid backtest-hub-grid-two" data-view-anchor="mission">
           <section class="investment-subcard backtest-hub-panel">
             <div class="investment-subcard-head">
               <div>
@@ -2096,7 +2096,7 @@ class BacktestHubWindow {
               <span class="investment-mini-label">${snapshot.coverage.sourceFamilyCount} ${hubLabel('families', '패밀리')}</span>
             </div>
             <div class="backtest-hub-theme-list">
-              ${renderSourceFamilyOverview(snapshot)}
+            ${renderSourceFamilyCoverage(snapshot)}
             </div>
           </section>
           <section class="investment-subcard backtest-hub-panel">

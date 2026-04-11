@@ -1,8 +1,10 @@
 import os from 'node:os';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
+import { readdir, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+
+const CODEX_PROMPT_METRICS_PATH = path.resolve('data', 'codex-prompt-metrics.json');
 
 function getSafeEnv() {
   const keys = [
@@ -93,7 +95,72 @@ export function parseJsonObject(rawText) {
   }
 }
 
-export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000) {
+async function loadPromptMetrics() {
+  try {
+    const raw = await readFile(CODEX_PROMPT_METRICS_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : { prompts: {}, history: [] };
+  } catch {
+    return { prompts: {}, history: [] };
+  }
+}
+
+async function persistPromptMetrics(metrics) {
+  await mkdir(path.dirname(CODEX_PROMPT_METRICS_PATH), { recursive: true });
+  await writeFile(CODEX_PROMPT_METRICS_PATH, JSON.stringify(metrics, null, 2));
+}
+
+async function recordPromptMetric(meta, result, durationMs) {
+  const label = String(meta?.label || 'unlabeled').trim() || 'unlabeled';
+  const metrics = await loadPromptMetrics();
+  const prompts = metrics.prompts || {};
+  const promptEntry = prompts[label] || {
+    label,
+    totalCalls: 0,
+    successCount: 0,
+    parseSuccessCount: 0,
+    parseFailCount: 0,
+    timeoutCount: 0,
+    avgDurationMs: 0,
+    lastDurationMs: 0,
+    lastCode: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    lastError: '',
+  };
+  promptEntry.totalCalls += 1;
+  if (result.code === 0) promptEntry.successCount += 1;
+  if (result.parsed) promptEntry.parseSuccessCount += 1;
+  else promptEntry.parseFailCount += 1;
+  const stderrText = String(result.stderr || result.message || '').toLowerCase();
+  const timedOut = result.code !== 0 && (stderrText.includes('timed out') || stderrText.includes('timeout'));
+  if (timedOut) promptEntry.timeoutCount += 1;
+  promptEntry.lastDurationMs = durationMs;
+  promptEntry.avgDurationMs = Number((((promptEntry.avgDurationMs * (promptEntry.totalCalls - 1)) + durationMs) / promptEntry.totalCalls).toFixed(2));
+  promptEntry.lastCode = result.code;
+  if (result.code === 0 && result.parsed) {
+    promptEntry.lastSuccessAt = new Date().toISOString();
+    promptEntry.lastError = '';
+  } else {
+    promptEntry.lastFailureAt = new Date().toISOString();
+    promptEntry.lastError = String(result.stderr || result.message || '').slice(0, 240);
+  }
+  prompts[label] = promptEntry;
+  const history = Array.isArray(metrics.history) ? metrics.history : [];
+  history.unshift({
+    at: new Date().toISOString(),
+    label,
+    code: result.code,
+    parsed: Boolean(result.parsed),
+    durationMs,
+    stderr: String(result.stderr || result.message || '').slice(0, 240),
+  });
+  metrics.prompts = prompts;
+  metrics.history = history.slice(0, 120);
+  await persistPromptMetrics(metrics);
+}
+
+export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) {
   const command = await resolveCodexCommand();
   const args = ['exec'];
   if (process.env.CODEX_MODEL?.trim()) {
@@ -102,6 +169,7 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000) {
   args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto');
 
   return new Promise((resolve) => {
+    const startedAt = Date.now();
     const child = spawn(command, args, {
       cwd: process.cwd(),
       env: getSafeEnv(),
@@ -126,23 +194,29 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000) {
     child.on('close', (code) => {
       clearTimeout(timer);
       const message = parseCodexJsonOutput(stdout) || stdout;
-      resolve({
+      const result = {
         code: Number(code ?? 1),
         stdout,
         stderr,
         message,
         parsed: parseJsonObject(message),
-      });
+      };
+      const durationMs = Date.now() - startedAt;
+      recordPromptMetric(meta, result, durationMs).catch(() => {});
+      resolve(result);
     });
     child.on('error', (error) => {
       clearTimeout(timer);
-      resolve({
+      const result = {
         code: 1,
         stdout,
         stderr: `${stderr}\n${error.message}`.trim(),
         message: '',
         parsed: null,
-      });
+      };
+      const durationMs = Date.now() - startedAt;
+      recordPromptMetric(meta, result, durationMs).catch(() => {});
+      resolve(result);
     });
   });
 }

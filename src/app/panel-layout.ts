@@ -13,7 +13,6 @@ import {
   EconomicPanel,
   GdeltIntelPanel,
   LiveNewsPanel,
-  LiveWebcamsPanel,
   CIIPanel,
   CascadePanel,
   StrategicRiskPanel,
@@ -73,12 +72,11 @@ import {
   STORAGE_KEYS,
   SITE_VARIANT,
 } from '@/config';
+import { isSourceDrawerOnlyPanelKey } from '@/config/panels';
 import {
   getWorkspaceDefinition,
   getWorkspaceDefinitions,
-  LEGACY_WORKSPACE_STORAGE_KEY,
   type WorkspaceDefinition,
-  WORKSPACE_STORAGE_KEY,
 } from '@/config/workspaces';
 import { APP_BRAND } from '@/config/brand';
 import { BETA_MODE } from '@/config/beta';
@@ -96,6 +94,92 @@ export interface PanelLayoutCallbacks {
   loadSecurityAdvisories?: () => Promise<void>;
 }
 
+function shouldCreateStandaloneSourcePanel(key: string): boolean {
+  return !isSourceDrawerOnlyPanelKey(key);
+}
+
+function sourceCategoryLabel(key: string): string {
+  return DEFAULT_PANELS[key]?.name
+    ?? key
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+}
+
+function renderSourceDrawer(): string {
+  const cards: string[] = [];
+  const feedEntries = Object.entries(FEEDS as Record<string, unknown>)
+    .filter(([key, value]) => isSourceDrawerOnlyPanelKey(key) && Array.isArray(value))
+    .map(([key, value]) => ({
+      key,
+      label: sourceCategoryLabel(key),
+      feeds: value as Array<{ name?: string }>,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  for (const entry of feedEntries) {
+    const preview = entry.feeds
+      .map((feed) => String(feed?.name || '').trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    cards.push(`
+      <article class="source-drawer-card">
+        <div class="source-drawer-card-head">
+          <strong>${escapeHtml(entry.label)}</strong>
+          <span>${entry.feeds.length} feeds</span>
+        </div>
+        <p>${escapeHtml(preview.join(' | ') || 'Dynamic feed bundle')}</p>
+      </article>
+    `);
+  }
+
+  if (Array.isArray(INTEL_SOURCES) && INTEL_SOURCES.length > 0) {
+    const preview = INTEL_SOURCES
+      .map((feed) => String(feed?.name || '').trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    cards.unshift(`
+      <article class="source-drawer-card source-drawer-card-highlight">
+        <div class="source-drawer-card-head">
+          <strong>${escapeHtml(sourceCategoryLabel('intel'))}</strong>
+          <span>${INTEL_SOURCES.length} feeds</span>
+        </div>
+        <p>${escapeHtml(preview.join(' | ') || 'OSINT and intelligence bundle')}</p>
+      </article>
+    `);
+  }
+
+  cards.unshift(`
+    <article class="source-drawer-card source-drawer-card-highlight">
+      <div class="source-drawer-card-head">
+        <strong>Signal-first source model</strong>
+        <span>Core rule</span>
+      </div>
+      <p>Source categories stay available, but they no longer occupy the main workspace. The core UI consumes normalized signals instead of feed tiles.</p>
+    </article>
+  `);
+
+  return `
+    <aside class="source-drawer" id="sourceDrawer" aria-hidden="true">
+      <div class="source-drawer-backdrop" data-close-source-drawer="true"></div>
+      <section class="source-drawer-panel" aria-label="Source categories">
+        <div class="source-drawer-head">
+          <div class="source-drawer-copy">
+            <span class="source-drawer-kicker">Sources</span>
+            <strong>Source categories moved behind the signal surface</strong>
+            <p>Use this drawer to inspect source bundles without turning each category into a standalone dashboard panel.</p>
+          </div>
+          <button type="button" class="workspace-link-btn" id="sourceDrawerClose">Close</button>
+        </div>
+        <div class="source-drawer-grid">
+          ${cards.join('')}
+        </div>
+      </section>
+    </aside>
+  `;
+}
+
 function renderWorkspaceStoryCards(workspace: WorkspaceDefinition): string {
   return workspace.flowSteps.map((step) => `
     <article class="workspace-story-card">
@@ -111,6 +195,90 @@ function renderWorkspaceFocusAreas(workspace: WorkspaceDefinition): string {
     .join('');
 }
 
+function renderOperatorContextBar(ctx: AppContext): string {
+  const workspace = getWorkspaceDefinition(ctx.operatorContext.workspaceId, SITE_VARIANT);
+  const viewLabels: Record<string, string> = {
+    global: t('components.deckgl.views.global'),
+    america: t('components.deckgl.views.americas'),
+    mena: t('components.deckgl.views.mena'),
+    eu: t('components.deckgl.views.europe'),
+    asia: t('components.deckgl.views.asia'),
+    latam: t('components.deckgl.views.latam'),
+    africa: t('components.deckgl.views.africa'),
+    oceania: t('components.deckgl.views.oceania'),
+  };
+  const timeRangeLabels: Record<string, string> = {
+    '1h': '1h',
+    '6h': '6h',
+    '24h': '24h',
+    '48h': '48h',
+    '7d': '7d',
+    all: t('common.all'),
+  };
+  const selectedTheme = ctx.operatorContext.selectedThemeId;
+  const selectedCountry = ctx.operatorContext.selectedCountryCode;
+  return `
+    <div class="operator-context-bar" id="operatorContextBar" aria-label="Active operator context">
+      <span class="operator-context-chip">
+        <span class="operator-context-label">Workspace</span>
+        <strong class="operator-context-value" id="operatorContextWorkspace">${escapeHtml(workspace.label)}</strong>
+      </span>
+      <span class="operator-context-chip">
+        <span class="operator-context-label">Region</span>
+        <strong class="operator-context-value" id="operatorContextRegion">${escapeHtml(viewLabels[ctx.operatorContext.mapView] ?? ctx.operatorContext.mapView)}</strong>
+      </span>
+      <span class="operator-context-chip">
+        <span class="operator-context-label">Range</span>
+        <strong class="operator-context-value" id="operatorContextTimeRange">${escapeHtml(timeRangeLabels[ctx.operatorContext.timeRange] ?? ctx.operatorContext.timeRange)}</strong>
+      </span>
+      <span class="operator-context-chip" id="operatorContextThemeChip"${selectedTheme ? '' : ' hidden'}>
+        <span class="operator-context-label">Theme</span>
+        <strong class="operator-context-value" id="operatorContextTheme">${escapeHtml(selectedTheme ?? '')}</strong>
+      </span>
+      <span class="operator-context-chip" id="operatorContextCountryChip"${selectedCountry ? '' : ' hidden'}>
+        <span class="operator-context-label">Country</span>
+        <strong class="operator-context-value" id="operatorContextCountry">${escapeHtml(selectedCountry ?? '')}</strong>
+      </span>
+    </div>
+  `;
+}
+
+function renderThemeWorkspaceShell(ctx: AppContext): string {
+  const selectedTheme = ctx.operatorContext.selectedThemeId;
+  const showThemeWorkspace = ctx.operatorContext.workspaceId === 'brief' || ctx.operatorContext.workspaceId === 'watch';
+  const shellClass = showThemeWorkspace ? 'theme-workspace-shell' : 'theme-workspace-shell workspace-hidden';
+  return `
+    <section class="${shellClass}" id="themeWorkspaceShell" aria-label="Theme workspace">
+      <div class="theme-workspace-shell-head">
+        <div class="theme-workspace-shell-copy">
+          <span class="theme-workspace-shell-kicker">Theme Workspace</span>
+          <strong>Structural change briefing inside the main shell</strong>
+          <span id="themeWorkspaceSummary">${selectedTheme ? `Focused on ${escapeHtml(selectedTheme)}` : 'Follow themes, structural alerts, and evidence lanes without leaving the workbench.'}</span>
+        </div>
+        <div class="theme-workspace-shell-actions">
+          <button
+            type="button"
+            class="workspace-link-btn primary"
+            id="themeWorkspaceOpenValidation"
+            ${selectedTheme ? '' : 'disabled'}
+          >Open validation</button>
+          <a class="workspace-link-btn" id="themeWorkspaceOpenStandalone" href="/event-dashboard.html" target="_blank" rel="noopener">Open standalone</a>
+        </div>
+      </div>
+      <div class="theme-workspace-shell-body">
+        <iframe
+          id="themeWorkspaceFrame"
+          class="theme-workspace-frame"
+          src="/event-dashboard.html"
+          title="Theme Workspace"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+      </div>
+    </section>
+  `;
+}
+
 export class PanelLayoutManager implements AppModule {
   private ctx: AppContext;
   private callbacks: PanelLayoutCallbacks;
@@ -118,6 +286,8 @@ export class PanelLayoutManager implements AppModule {
   private criticalBannerEl: HTMLElement | null = null;
   private readonly applyTimeRangeFilterDebounced: () => void;
   private densityUnsubscribe: (() => void) | null = null;
+  private mapBindingsApplied = false;
+  private initialUrlStateApplied = false;
 
   constructor(ctx: AppContext, callbacks: PanelLayoutCallbacks) {
     this.ctx = ctx;
@@ -125,6 +295,12 @@ export class PanelLayoutManager implements AppModule {
     this.applyTimeRangeFilterDebounced = debounce(() => {
       this.applyTimeRangeFilterToNewsPanels();
     }, 120);
+  }
+
+  private dispatchMapFocus(lat: number, lon: number, zoom = 4): void {
+    window.dispatchEvent(new CustomEvent('wm:focus-news-location', {
+      detail: { lat, lon, zoom },
+    }));
   }
 
   init(): void {
@@ -165,6 +341,9 @@ export class PanelLayoutManager implements AppModule {
 
   renderLayout(): void {
     const workspaceStrip = this.renderWorkspaceStrip();
+    const operatorContextBar = renderOperatorContextBar(this.ctx);
+    const themeWorkspaceShell = renderThemeWorkspaceShell(this.ctx);
+    const sourceDrawer = SITE_VARIANT === 'happy' ? '' : renderSourceDrawer();
     this.ctx.container.innerHTML = `
       <div class="header">
         <div class="header-left">
@@ -213,16 +392,17 @@ export class PanelLayoutManager implements AppModule {
           </div>
           <div class="region-selector">
             <select id="regionSelect" class="region-select">
-              <option value="global">${t('components.deckgl.views.global')}</option>
-              <option value="america">${t('components.deckgl.views.americas')}</option>
-              <option value="mena">${t('components.deckgl.views.mena')}</option>
-              <option value="eu">${t('components.deckgl.views.europe')}</option>
-              <option value="asia">${t('components.deckgl.views.asia')}</option>
-              <option value="latam">${t('components.deckgl.views.latam')}</option>
-              <option value="africa">${t('components.deckgl.views.africa')}</option>
-              <option value="oceania">${t('components.deckgl.views.oceania')}</option>
+              <option value="global"${this.ctx.operatorContext.mapView === 'global' ? ' selected' : ''}>${t('components.deckgl.views.global')}</option>
+              <option value="america"${this.ctx.operatorContext.mapView === 'america' ? ' selected' : ''}>${t('components.deckgl.views.americas')}</option>
+              <option value="mena"${this.ctx.operatorContext.mapView === 'mena' ? ' selected' : ''}>${t('components.deckgl.views.mena')}</option>
+              <option value="eu"${this.ctx.operatorContext.mapView === 'eu' ? ' selected' : ''}>${t('components.deckgl.views.europe')}</option>
+              <option value="asia"${this.ctx.operatorContext.mapView === 'asia' ? ' selected' : ''}>${t('components.deckgl.views.asia')}</option>
+              <option value="latam"${this.ctx.operatorContext.mapView === 'latam' ? ' selected' : ''}>${t('components.deckgl.views.latam')}</option>
+              <option value="africa"${this.ctx.operatorContext.mapView === 'africa' ? ' selected' : ''}>${t('components.deckgl.views.africa')}</option>
+              <option value="oceania"${this.ctx.operatorContext.mapView === 'oceania' ? ' selected' : ''}>${t('components.deckgl.views.oceania')}</option>
             </select>
           </div>
+          ${operatorContextBar}
         </div>
         <div class="header-right">
           <div class="header-hub-quicknav" aria-label="Desk shortcuts">
@@ -270,6 +450,8 @@ export class PanelLayoutManager implements AppModule {
         <div class="terminal-tape-headline" id="terminalTapeHeadline">Waiting for live headlines...</div>
       </div>`}
       ${workspaceStrip}
+      ${themeWorkspaceShell}
+      ${sourceDrawer}
       <div class="main-content">
         <div class="map-section" id="mapSection">
           <div class="panel-header">
@@ -295,22 +477,16 @@ export class PanelLayoutManager implements AppModule {
   }
 
   private renderWorkspaceStrip(): string {
-    const activeWorkspace = getWorkspaceDefinition(
-      localStorage.getItem(WORKSPACE_STORAGE_KEY) || localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY),
-      SITE_VARIANT,
-    );
+    const activeWorkspace = getWorkspaceDefinition(this.ctx.operatorContext.workspaceId, SITE_VARIANT);
     const availablePanels = new Set(Object.keys(DEFAULT_PANELS));
-    const workspaceDefs = getWorkspaceDefinitions(SITE_VARIANT).filter((workspace) => {
-      if (workspace.id === 'all') return true;
-      return workspace.panelKeys.some((key) => availablePanels.has(key));
-    });
+    const workspaceDefs = getWorkspaceDefinitions(SITE_VARIANT).filter((workspace) =>
+      workspace.panelKeys.some((key) => availablePanels.has(key)),
+    );
     const featuredLabels = activeWorkspace.featuredPanels
       .map((key) => this.ctx.panelSettings[key]?.name ?? DEFAULT_PANELS[key]?.name ?? null)
       .filter((value): value is string => Boolean(value))
       .slice(0, 4);
-    const visibleCount = activeWorkspace.id === 'all'
-      ? Math.max(0, availablePanels.size - 1)
-      : activeWorkspace.panelKeys.filter((key) => availablePanels.has(key)).length;
+    const visibleCount = activeWorkspace.panelKeys.filter((key) => availablePanels.has(key)).length;
     const curatedCount = Math.max(
       featuredLabels.length,
       activeWorkspace.featuredPanels.filter((key) => availablePanels.has(key)).length,
@@ -348,6 +524,7 @@ export class PanelLayoutManager implements AppModule {
             <strong id="workspaceIntentTitle">${escapeHtml(activeWorkspace.heroTitle)}</strong>
             <p id="workspaceIntentSummary">${escapeHtml(activeWorkspace.heroSummary)}</p>
             <div class="workspace-intent-actions">
+              ${SITE_VARIANT === 'happy' ? '' : '<button class="workspace-link-btn" type="button" id="sourceDrawerBtn">Open Sources</button>'}
               <button class="workspace-link-btn primary" type="button" data-open-hub="analysis">Open ${APP_BRAND.hubs.analysis}</button>
               ${SITE_VARIANT === 'happy' ? '' : `<button class="workspace-link-btn" type="button" data-open-hub="codex">Open ${APP_BRAND.hubs.codex}</button>`}
               ${SITE_VARIANT === 'happy' ? '' : `<button class="workspace-link-btn" type="button" data-open-hub="backtest">Open ${APP_BRAND.hubs.backtest}</button>`}
@@ -426,7 +603,7 @@ export class PanelLayoutManager implements AppModule {
       console.log('[Banner] View Region clicked:', top.theaterId, 'lat:', top.centerLat, 'lon:', top.centerLon);
       trackCriticalBannerAction('view', top.theaterId);
       if (typeof top.centerLat === 'number' && typeof top.centerLon === 'number') {
-        this.ctx.map?.setCenter(top.centerLat, top.centerLon, 4);
+        this.dispatchMapFocus(top.centerLat, top.centerLon, 4);
       } else {
         console.error('[Banner] Missing coordinates for', top.theaterId);
       }
@@ -472,35 +649,64 @@ export class PanelLayoutManager implements AppModule {
     btn.title = meta?.description ?? 'Toggle information density';
   }
 
+  public ensureMapMounted(forceRender = false): boolean {
+    if (!this.ctx.map) {
+      const mapContainer = document.getElementById('mapContainer') as HTMLElement | null;
+      if (!mapContainer) return false;
+      mapContainer.innerHTML = '';
+      this.ctx.map = new MapContainer(mapContainer, {
+        zoom: this.ctx.isMobile ? 2.5 : 1.0,
+        pan: { x: 0, y: 0 },
+        view: this.ctx.operatorContext.mapView,
+        layers: this.ctx.mapLayers,
+        timeRange: this.ctx.operatorContext.timeRange,
+      });
+
+      this.ctx.map.initEscalationGetters();
+      this.ctx.currentTimeRange = this.ctx.map.getTimeRange();
+      this.ctx.setOperatorContext({
+        mapView: this.ctx.map.getState().view,
+        timeRange: this.ctx.currentTimeRange,
+      }, { persist: false });
+      this.bindMapStateBridge();
+      this.applyInitialUrlState();
+      window.dispatchEvent(new CustomEvent('wm:map-mounted'));
+    }
+
+    if (forceRender) {
+      this.ctx.map?.render();
+    }
+    return !!this.ctx.map;
+  }
+
+  private bindMapStateBridge(): void {
+    if (!this.ctx.map || this.mapBindingsApplied) return;
+    this.ctx.map.onTimeRangeChanged((range) => {
+      this.ctx.currentTimeRange = range;
+      this.ctx.setOperatorContext({ timeRange: range }, { persist: false });
+      this.applyTimeRangeFilterDebounced();
+    });
+    this.mapBindingsApplied = true;
+  }
+
   private createPanels(): void {
     const panelsGrid = document.getElementById('panelsGrid')!;
+    if (getWorkspaceDefinition(this.ctx.operatorContext.workspaceId, SITE_VARIANT).showMap) {
+      this.ensureMapMounted();
+    }
 
-    const mapContainer = document.getElementById('mapContainer') as HTMLElement;
-    this.ctx.map = new MapContainer(mapContainer, {
-      zoom: this.ctx.isMobile ? 2.5 : 1.0,
-      pan: { x: 0, y: 0 },
-      view: this.ctx.isMobile ? 'mena' : 'global',
-      layers: this.ctx.mapLayers,
-      timeRange: '7d',
-    });
+    const createSourceNewsPanel = (key: string, label: string): NewsPanel | null => {
+      if (!shouldCreateStandaloneSourcePanel(key)) return null;
+      const panel = new NewsPanel(key, label);
+      this.attachRelatedAssetHandlers(panel);
+      this.ctx.newsPanels[key] = panel;
+      this.ctx.panels[key] = panel;
+      return panel;
+    };
 
-    this.ctx.map.initEscalationGetters();
-    this.ctx.currentTimeRange = this.ctx.map.getTimeRange();
-
-    const politicsPanel = new NewsPanel('politics', t('panels.politics'));
-    this.attachRelatedAssetHandlers(politicsPanel);
-    this.ctx.newsPanels['politics'] = politicsPanel;
-    this.ctx.panels['politics'] = politicsPanel;
-
-    const techPanel = new NewsPanel('tech', t('panels.tech'));
-    this.attachRelatedAssetHandlers(techPanel);
-    this.ctx.newsPanels['tech'] = techPanel;
-    this.ctx.panels['tech'] = techPanel;
-
-    const financePanel = new NewsPanel('finance', t('panels.finance'));
-    this.attachRelatedAssetHandlers(financePanel);
-    this.ctx.newsPanels['finance'] = financePanel;
-    this.ctx.panels['finance'] = financePanel;
+    createSourceNewsPanel('politics', t('panels.politics'));
+    createSourceNewsPanel('tech', t('panels.tech'));
+    createSourceNewsPanel('finance', t('panels.finance'));
 
     const heatmapPanel = new HeatmapPanel();
     this.ctx.panels['heatmap'] = heatmapPanel;
@@ -522,108 +728,30 @@ export class PanelLayoutManager implements AppModule {
     const predictionPanel = new PredictionPanel();
     this.ctx.panels['polymarket'] = predictionPanel;
 
-    const govPanel = new NewsPanel('gov', t('panels.gov'));
-    this.attachRelatedAssetHandlers(govPanel);
-    this.ctx.newsPanels['gov'] = govPanel;
-    this.ctx.panels['gov'] = govPanel;
-
-    const intelPanel = new NewsPanel('intel', t('panels.intel'));
-    this.attachRelatedAssetHandlers(intelPanel);
-    this.ctx.newsPanels['intel'] = intelPanel;
-    this.ctx.panels['intel'] = intelPanel;
+    createSourceNewsPanel('gov', t('panels.gov'));
+    createSourceNewsPanel('intel', t('panels.intel'));
 
     const cryptoPanel = new CryptoPanel();
     this.ctx.panels['crypto'] = cryptoPanel;
 
-    const middleeastPanel = new NewsPanel('middleeast', t('panels.middleeast'));
-    this.attachRelatedAssetHandlers(middleeastPanel);
-    this.ctx.newsPanels['middleeast'] = middleeastPanel;
-    this.ctx.panels['middleeast'] = middleeastPanel;
-
-    const layoffsPanel = new NewsPanel('layoffs', t('panels.layoffs'));
-    this.attachRelatedAssetHandlers(layoffsPanel);
-    this.ctx.newsPanels['layoffs'] = layoffsPanel;
-    this.ctx.panels['layoffs'] = layoffsPanel;
-
-    const aiPanel = new NewsPanel('ai', t('panels.ai'));
-    this.attachRelatedAssetHandlers(aiPanel);
-    this.ctx.newsPanels['ai'] = aiPanel;
-    this.ctx.panels['ai'] = aiPanel;
-
-    const startupsPanel = new NewsPanel('startups', t('panels.startups'));
-    this.attachRelatedAssetHandlers(startupsPanel);
-    this.ctx.newsPanels['startups'] = startupsPanel;
-    this.ctx.panels['startups'] = startupsPanel;
-
-    const vcblogsPanel = new NewsPanel('vcblogs', t('panels.vcblogs'));
-    this.attachRelatedAssetHandlers(vcblogsPanel);
-    this.ctx.newsPanels['vcblogs'] = vcblogsPanel;
-    this.ctx.panels['vcblogs'] = vcblogsPanel;
-
-    const regionalStartupsPanel = new NewsPanel('regionalStartups', t('panels.regionalStartups'));
-    this.attachRelatedAssetHandlers(regionalStartupsPanel);
-    this.ctx.newsPanels['regionalStartups'] = regionalStartupsPanel;
-    this.ctx.panels['regionalStartups'] = regionalStartupsPanel;
-
-    const unicornsPanel = new NewsPanel('unicorns', t('panels.unicorns'));
-    this.attachRelatedAssetHandlers(unicornsPanel);
-    this.ctx.newsPanels['unicorns'] = unicornsPanel;
-    this.ctx.panels['unicorns'] = unicornsPanel;
-
-    const acceleratorsPanel = new NewsPanel('accelerators', t('panels.accelerators'));
-    this.attachRelatedAssetHandlers(acceleratorsPanel);
-    this.ctx.newsPanels['accelerators'] = acceleratorsPanel;
-    this.ctx.panels['accelerators'] = acceleratorsPanel;
-
-    const fundingPanel = new NewsPanel('funding', t('panels.funding'));
-    this.attachRelatedAssetHandlers(fundingPanel);
-    this.ctx.newsPanels['funding'] = fundingPanel;
-    this.ctx.panels['funding'] = fundingPanel;
-
-    const producthuntPanel = new NewsPanel('producthunt', t('panels.producthunt'));
-    this.attachRelatedAssetHandlers(producthuntPanel);
-    this.ctx.newsPanels['producthunt'] = producthuntPanel;
-    this.ctx.panels['producthunt'] = producthuntPanel;
-
-    const securityPanel = new NewsPanel('security', t('panels.security'));
-    this.attachRelatedAssetHandlers(securityPanel);
-    this.ctx.newsPanels['security'] = securityPanel;
-    this.ctx.panels['security'] = securityPanel;
-
-    const policyPanel = new NewsPanel('policy', t('panels.policy'));
-    this.attachRelatedAssetHandlers(policyPanel);
-    this.ctx.newsPanels['policy'] = policyPanel;
-    this.ctx.panels['policy'] = policyPanel;
-
-    const hardwarePanel = new NewsPanel('hardware', t('panels.hardware'));
-    this.attachRelatedAssetHandlers(hardwarePanel);
-    this.ctx.newsPanels['hardware'] = hardwarePanel;
-    this.ctx.panels['hardware'] = hardwarePanel;
-
-    const cloudPanel = new NewsPanel('cloud', t('panels.cloud'));
-    this.attachRelatedAssetHandlers(cloudPanel);
-    this.ctx.newsPanels['cloud'] = cloudPanel;
-    this.ctx.panels['cloud'] = cloudPanel;
-
-    const devPanel = new NewsPanel('dev', t('panels.dev'));
-    this.attachRelatedAssetHandlers(devPanel);
-    this.ctx.newsPanels['dev'] = devPanel;
-    this.ctx.panels['dev'] = devPanel;
-
-    const githubPanel = new NewsPanel('github', t('panels.github'));
-    this.attachRelatedAssetHandlers(githubPanel);
-    this.ctx.newsPanels['github'] = githubPanel;
-    this.ctx.panels['github'] = githubPanel;
-
-    const ipoPanel = new NewsPanel('ipo', t('panels.ipo'));
-    this.attachRelatedAssetHandlers(ipoPanel);
-    this.ctx.newsPanels['ipo'] = ipoPanel;
-    this.ctx.panels['ipo'] = ipoPanel;
-
-    const thinktanksPanel = new NewsPanel('thinktanks', t('panels.thinktanks'));
-    this.attachRelatedAssetHandlers(thinktanksPanel);
-    this.ctx.newsPanels['thinktanks'] = thinktanksPanel;
-    this.ctx.panels['thinktanks'] = thinktanksPanel;
+    createSourceNewsPanel('middleeast', t('panels.middleeast'));
+    createSourceNewsPanel('layoffs', t('panels.layoffs'));
+    createSourceNewsPanel('ai', t('panels.ai'));
+    createSourceNewsPanel('startups', t('panels.startups'));
+    createSourceNewsPanel('vcblogs', t('panels.vcblogs'));
+    createSourceNewsPanel('regionalStartups', t('panels.regionalStartups'));
+    createSourceNewsPanel('unicorns', t('panels.unicorns'));
+    createSourceNewsPanel('accelerators', t('panels.accelerators'));
+    createSourceNewsPanel('funding', t('panels.funding'));
+    createSourceNewsPanel('producthunt', t('panels.producthunt'));
+    createSourceNewsPanel('security', t('panels.security'));
+    createSourceNewsPanel('policy', t('panels.policy'));
+    createSourceNewsPanel('hardware', t('panels.hardware'));
+    createSourceNewsPanel('cloud', t('panels.cloud'));
+    createSourceNewsPanel('dev', t('panels.dev'));
+    createSourceNewsPanel('github', t('panels.github'));
+    createSourceNewsPanel('ipo', t('panels.ipo'));
+    createSourceNewsPanel('thinktanks', t('panels.thinktanks'));
 
     const economicPanel = new EconomicPanel();
     this.ctx.panels['economic'] = economicPanel;
@@ -636,27 +764,13 @@ export class PanelLayoutManager implements AppModule {
       this.ctx.panels['supply-chain'] = supplyChainPanel;
     }
 
-    const africaPanel = new NewsPanel('africa', t('panels.africa'));
-    this.attachRelatedAssetHandlers(africaPanel);
-    this.ctx.newsPanels['africa'] = africaPanel;
-    this.ctx.panels['africa'] = africaPanel;
-
-    const latamPanel = new NewsPanel('latam', t('panels.latam'));
-    this.attachRelatedAssetHandlers(latamPanel);
-    this.ctx.newsPanels['latam'] = latamPanel;
-    this.ctx.panels['latam'] = latamPanel;
-
-    const asiaPanel = new NewsPanel('asia', t('panels.asia'));
-    this.attachRelatedAssetHandlers(asiaPanel);
-    this.ctx.newsPanels['asia'] = asiaPanel;
-    this.ctx.panels['asia'] = asiaPanel;
-
-    const energyPanel = new NewsPanel('energy', t('panels.energy'));
-    this.attachRelatedAssetHandlers(energyPanel);
-    this.ctx.newsPanels['energy'] = energyPanel;
-    this.ctx.panels['energy'] = energyPanel;
+    createSourceNewsPanel('africa', t('panels.africa'));
+    createSourceNewsPanel('latam', t('panels.latam'));
+    createSourceNewsPanel('asia', t('panels.asia'));
+    createSourceNewsPanel('energy', t('panels.energy'));
 
     for (const key of Object.keys(FEEDS)) {
+      if (!shouldCreateStandaloneSourcePanel(key)) continue;
       if (this.ctx.newsPanels[key]) continue;
       if (!Array.isArray((FEEDS as Record<string, unknown>)[key])) continue;
       const panelKey = this.ctx.panels[key] && !this.ctx.newsPanels[key] ? `${key}-news` : key;
@@ -670,10 +784,12 @@ export class PanelLayoutManager implements AppModule {
     }
 
     if (SITE_VARIANT === 'full') {
-      const glintFeedPanel = new NewsPanel('glint-feed', 'Glint Feed');
-      this.attachRelatedAssetHandlers(glintFeedPanel);
-      this.ctx.newsPanels['glint-feed'] = glintFeedPanel;
-      this.ctx.panels['glint-feed'] = glintFeedPanel;
+      if (shouldCreateStandaloneSourcePanel('glint-feed')) {
+        const glintFeedPanel = new NewsPanel('glint-feed', 'Glint Feed');
+        this.attachRelatedAssetHandlers(glintFeedPanel);
+        this.ctx.newsPanels['glint-feed'] = glintFeedPanel;
+        this.ctx.panels['glint-feed'] = glintFeedPanel;
+      }
 
       const gdeltIntelPanel = new GdeltIntelPanel();
       this.ctx.panels['gdelt-intel'] = gdeltIntelPanel;
@@ -692,32 +808,32 @@ export class PanelLayoutManager implements AppModule {
 
       const strategicRiskPanel = new StrategicRiskPanel();
       strategicRiskPanel.setLocationClickHandler((lat, lon) => {
-        this.ctx.map?.setCenter(lat, lon, 4);
+        this.dispatchMapFocus(lat, lon, 4);
       });
       this.ctx.panels['strategic-risk'] = strategicRiskPanel;
 
       const strategicPosturePanel = new StrategicPosturePanel();
       strategicPosturePanel.setLocationClickHandler((lat, lon) => {
         console.log('[App] StrategicPosture handler called:', { lat, lon, hasMap: !!this.ctx.map });
-        this.ctx.map?.setCenter(lat, lon, 4);
+        this.dispatchMapFocus(lat, lon, 4);
       });
       this.ctx.panels['strategic-posture'] = strategicPosturePanel;
 
       const ucdpEventsPanel = new UcdpEventsPanel();
       ucdpEventsPanel.setEventClickHandler((lat, lon) => {
-        this.ctx.map?.setCenter(lat, lon, 5);
+        this.dispatchMapFocus(lat, lon, 5);
       });
       this.ctx.panels['ucdp-events'] = ucdpEventsPanel;
 
       const displacementPanel = new DisplacementPanel();
       displacementPanel.setCountryClickHandler((lat, lon) => {
-        this.ctx.map?.setCenter(lat, lon, 4);
+        this.dispatchMapFocus(lat, lon, 4);
       });
       this.ctx.panels['displacement'] = displacementPanel;
 
       const climatePanel = new ClimateAnomalyPanel();
       climatePanel.setZoneClickHandler((lat, lon) => {
-        this.ctx.map?.setCenter(lat, lon, 4);
+        this.dispatchMapFocus(lat, lon, 4);
       });
       this.ctx.panels['climate'] = climatePanel;
 
@@ -727,7 +843,9 @@ export class PanelLayoutManager implements AppModule {
 
     if (SITE_VARIANT === 'finance') {
       const investmentsPanel = new InvestmentsPanel((inv) => {
-        focusInvestmentOnMap(this.ctx.map, this.ctx.mapLayers, inv.lat, inv.lon);
+        if (this.ensureMapMounted(true)) {
+          focusInvestmentOnMap(this.ctx.map, this.ctx.mapLayers, inv.lat, inv.lon);
+        }
       });
       this.ctx.panels['gcc-investments'] = investmentsPanel;
     }
@@ -736,10 +854,9 @@ export class PanelLayoutManager implements AppModule {
       const liveNewsPanel = new LiveNewsPanel();
       this.ctx.panels['live-news'] = liveNewsPanel;
 
-      const liveWebcamsPanel = new LiveWebcamsPanel();
-      this.ctx.panels['live-webcams'] = liveWebcamsPanel;
-
-      this.ctx.panels['events'] = new TechEventsPanel('events');
+      if (shouldCreateStandaloneSourcePanel('events')) {
+        this.ctx.panels['events'] = new TechEventsPanel('events');
+      }
 
       const serviceStatusPanel = new ServiceStatusPanel();
       this.ctx.panels['service-status'] = serviceStatusPanel;
@@ -870,16 +987,13 @@ export class PanelLayoutManager implements AppModule {
       }
     });
 
-    this.ctx.map.onTimeRangeChanged((range) => {
-      this.ctx.currentTimeRange = range;
-      this.applyTimeRangeFilterDebounced();
-    });
+    this.bindMapStateBridge();
 
     if (!this.ctx.analysisHubPage) {
       this.ctx.analysisHubPage = new AnalysisHubPage({
         getSnapshot: () => this.buildAnalysisHubSnapshot(),
         onFocusMap: (lat, lon, zoom = 4) => {
-          this.ctx.map?.setCenter(lat, lon, zoom);
+          this.dispatchMapFocus(lat, lon, zoom);
         },
       });
     }
@@ -1036,7 +1150,7 @@ export class PanelLayoutManager implements AppModule {
   }
 
   private applyInitialUrlState(): void {
-    if (!this.ctx.initialUrlState || !this.ctx.map) return;
+    if (this.initialUrlStateApplied || !this.ctx.initialUrlState || !this.ctx.map) return;
 
     const { view, zoom, lat, lon, timeRange, layers } = this.ctx.initialUrlState;
 
@@ -1068,6 +1182,12 @@ export class PanelLayoutManager implements AppModule {
     if (regionSelect && currentView) {
       regionSelect.value = currentView;
     }
+    this.ctx.currentTimeRange = this.ctx.map.getTimeRange();
+    this.ctx.setOperatorContext({
+      mapView: currentView,
+      timeRange: this.ctx.currentTimeRange,
+    }, { persist: false });
+    this.initialUrlStateApplied = true;
   }
 
   private getSavedPanelOrder(): string[] {
@@ -1091,44 +1211,50 @@ export class PanelLayoutManager implements AppModule {
   private attachRelatedAssetHandlers(panel: NewsPanel): void {
     panel.setRelatedAssetHandlers({
       onRelatedAssetClick: (asset) => this.handleRelatedAssetClick(asset),
-      onRelatedAssetsFocus: (assets) => this.ctx.map?.highlightAssets(assets),
+      onRelatedAssetsFocus: (assets) => {
+        if (this.ensureMapMounted()) {
+          this.ctx.map?.highlightAssets(assets);
+        }
+      },
       onRelatedAssetsClear: () => this.ctx.map?.highlightAssets(null),
     });
   }
 
   private handleRelatedAssetClick(asset: RelatedAsset): void {
-    if (!this.ctx.map) return;
+    if (!this.ensureMapMounted(true)) return;
+    const map = this.ctx.map;
+    if (!map) return;
 
     switch (asset.type) {
       case 'pipeline':
-        this.ctx.map.enableLayer('pipelines');
+        map.enableLayer('pipelines');
         this.ctx.mapLayers.pipelines = true;
         saveToStorage(STORAGE_KEYS.mapLayers, this.ctx.mapLayers);
-        this.ctx.map.triggerPipelineClick(asset.id);
+        map.triggerPipelineClick(asset.id);
         break;
       case 'cable':
-        this.ctx.map.enableLayer('cables');
+        map.enableLayer('cables');
         this.ctx.mapLayers.cables = true;
         saveToStorage(STORAGE_KEYS.mapLayers, this.ctx.mapLayers);
-        this.ctx.map.triggerCableClick(asset.id);
+        map.triggerCableClick(asset.id);
         break;
       case 'datacenter':
-        this.ctx.map.enableLayer('datacenters');
+        map.enableLayer('datacenters');
         this.ctx.mapLayers.datacenters = true;
         saveToStorage(STORAGE_KEYS.mapLayers, this.ctx.mapLayers);
-        this.ctx.map.triggerDatacenterClick(asset.id);
+        map.triggerDatacenterClick(asset.id);
         break;
       case 'base':
-        this.ctx.map.enableLayer('bases');
+        map.enableLayer('bases');
         this.ctx.mapLayers.bases = true;
         saveToStorage(STORAGE_KEYS.mapLayers, this.ctx.mapLayers);
-        this.ctx.map.triggerBaseClick(asset.id);
+        map.triggerBaseClick(asset.id);
         break;
       case 'nuclear':
-        this.ctx.map.enableLayer('nuclear');
+        map.enableLayer('nuclear');
         this.ctx.mapLayers.nuclear = true;
         saveToStorage(STORAGE_KEYS.mapLayers, this.ctx.mapLayers);
-        this.ctx.map.triggerNuclearClick(asset.id);
+        map.triggerNuclearClick(asset.id);
         break;
     }
   }

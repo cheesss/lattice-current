@@ -31,6 +31,14 @@ export const EMERGING_TECH_SCHEMA_STATEMENTS = [
       diversity INTEGER NOT NULL DEFAULT 0,
       cohesion DOUBLE PRECISION,
       parent_theme TEXT,
+      normalized_theme TEXT,
+      normalized_parent_theme TEXT,
+      normalized_category TEXT,
+      promotion_state TEXT NOT NULL DEFAULT 'watch'
+        CHECK (promotion_state IN ('canonical', 'watch', 'suppressed')),
+      suppression_reason TEXT,
+      quality_flags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      taxonomy_version TEXT,
       key_companies TEXT[] NOT NULL DEFAULT '{}'::text[],
       key_technologies TEXT[] NOT NULL DEFAULT '{}'::text[],
       codex_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -41,8 +49,41 @@ export const EMERGING_TECH_SCHEMA_STATEMENTS = [
     );
   `,
   `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS normalized_theme TEXT;
+  `,
+  `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS normalized_parent_theme TEXT;
+  `,
+  `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS normalized_category TEXT;
+  `,
+  `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS promotion_state TEXT NOT NULL DEFAULT 'watch'
+        CHECK (promotion_state IN ('canonical', 'watch', 'suppressed'));
+  `,
+  `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS suppression_reason TEXT;
+  `,
+  `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS quality_flags JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `,
+  `
+    ALTER TABLE discovery_topics
+      ADD COLUMN IF NOT EXISTS taxonomy_version TEXT;
+  `,
+  `
     CREATE INDEX IF NOT EXISTS idx_discovery_topics_status
       ON discovery_topics(status);
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS idx_discovery_topics_promotion_state
+      ON discovery_topics(promotion_state, normalized_category, updated_at DESC);
   `,
   `
     CREATE INDEX IF NOT EXISTS idx_discovery_topics_momentum

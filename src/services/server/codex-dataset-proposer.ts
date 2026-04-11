@@ -18,7 +18,8 @@ const CODEX_TIMEOUT_MS = 95_000;
 function buildExecArgs(prompt: string): string[] {
   const args = ['exec'];
   if (process.env.CODEX_MODEL?.trim()) args.push('--model', process.env.CODEX_MODEL.trim());
-  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto', prompt);
+  void prompt;
+  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto');
   return args;
 }
 
@@ -64,20 +65,19 @@ async function resolveCodexCommand(): Promise<string> {
 
 async function runCodexCli(args: string[], timeoutMs = CODEX_TIMEOUT_MS): Promise<CodexExecResult> {
   const command = await resolveCodexCommand();
-  // If the last argument (prompt) is very long, pipe it via stdin instead
-  const lastArg = args.length > 0 ? args[args.length - 1] ?? '' : '';
-  const usePipedPrompt = lastArg.length > 6000;
-  const spawnArgs = usePipedPrompt ? args.slice(0, -1) : args;
+  const useStdinPrompt = args[0] === 'exec' && args.includes('--full-auto');
+  const prompt = useStdinPrompt ? String(args[args.length - 1] ?? '') : '';
+  const spawnArgs = useStdinPrompt ? args.slice(0, -1) : args;
   return new Promise((resolve) => {
     const child = spawn(command, spawnArgs, {
       cwd: process.cwd(),
       env: getSafeEnv(),
-      stdio: [usePipedPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      stdio: [useStdinPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: process.platform === 'win32',
     });
-    if (usePipedPrompt) {
-      child.stdin?.write(lastArg);
+    if (useStdinPrompt) {
+      child.stdin?.write(prompt);
       child.stdin?.end();
     }
     let stdout = '';
@@ -143,6 +143,9 @@ export interface BackfillCurationAction {
   url?: string;
   name?: string;
   theme?: string;
+  relationType?: string;
+  transmissionOrder?: string;
+  transmissionPath?: string;
 }
 
 export interface BackfillCurationContext {
@@ -172,10 +175,30 @@ export interface BackfillCurationPlan {
 function buildPrompt(theme: DatasetDiscoveryThemeInput, evidence?: ProposalEvidenceBundle | null): string {
   return [
     'You are a historical dataset planner for macro and geopolitical replay.',
-    'Return strict JSON only. No markdown.',
-    'Use only providers: fred, alfred, gdelt-doc, coingecko, acled.',
+    'Your job is to decide which missing historical datasets would materially improve replay coverage for this theme.',
+    '',
+    'Analyze in this order:',
+    '1. What evidence is still missing: macro, conflict/event, market proxy, commodity linkage, policy layer, logistics, funding, or adjacent second-order signals?',
+    '2. What direct and indirect transmission paths would make this theme more explainable if additional history were fetched?',
+    '3. Which of the allowed providers best fills that direct or indirect evidence gap?',
+    '4. What exact fetch arguments would keep the dataset narrow, relevant, and point-in-time safe?',
+    '5. Which proposals are high-signal enough to justify ingestion now?',
+    '',
+    'Rules:',
+    '- Use only providers: fred, alfred, gdelt-doc, coingecko, acled.',
+    '- Prefer fewer, higher-signal proposals over broad noisy coverage.',
+    '- Do not propose datasets that duplicate what the theme already clearly has.',
+    '- It is valid to recommend an indirect or adjacent dataset if it explains a credible second-order or third-order transmission path.',
+    '- Good adjacent examples include supply chain strain, power demand, insurance pricing, export controls, logistics bottlenecks, financing conditions, labor or capex proxies.',
+    '- Every proposal must include a concrete rationale and query summary.',
+    '- If no proposal is justified, return an empty proposals array.',
+    '',
+    'Output rules:',
+    '- Return strict JSON only. No markdown.',
+    '- The response must match this schema exactly.',
+    '',
     'JSON schema:',
-    '{ "proposals": [ { "id": "...", "label": "...", "provider": "gdelt-doc", "confidence": 0-100, "rationale": "...", "querySummary": "...", "fetchArgs": { } } ] }',
+    '{ "proposals": [ { "id": "...", "label": "...", "provider": "gdelt-doc", "confidence": 0-100, "rationale": "what gap this closes and why", "querySummary": "what will be fetched", "relationType": "direct|adjacent|second-order|third-order", "transmissionPath": "one short sentence describing the mechanism", "fetchArgs": { } } ] }',
     `Theme: ${theme.label}`,
     `Triggers: ${theme.triggers.join(', ') || '(none)'}`,
     `Sectors: ${theme.sectors.join(', ') || '(none)'}`,
@@ -201,9 +224,30 @@ function buildBackfillPrompt(context: BackfillCurationContext): string {
     .join('\n');
   return [
     'You are a signal-first corpus curator for emerging technology discovery.',
-    'Return strict JSON only. No markdown.',
+    'Your job is to decide whether the corpus needs more history, more source diversity, or a new theme action.',
+    '',
+    'Analyze in this order:',
+    '1. What is weak right now: corpus volume, source diversity, topic discovery quality, or category coverage?',
+    '2. Which action type best fixes that weakness: backfill-source, add-rss, or add-theme?',
+    '3. Which direct, adjacent, second-order, or third-order evidence lanes are missing?',
+    '4. Is the action narrow and concrete enough to execute safely?',
+    '',
+    'Rules:',
+    '- Maximum 3 actions.',
+    '- Prefer backfill-source when historical coverage is weak.',
+    '- Use add-rss for targeted direct coverage or adjacent evidence coverage when it supports a credible indirect transmission path.',
+    '- Use add-theme only when a structurally distinct theme is repeatedly visible, even if the investable angle is second-order or third-order rather than headline-direct.',
+    '- It is valid to recommend non-obvious but credibly linked sources around supply chains, policy, insurance, logistics, financing, power, or labor if they improve explanatory depth.',
+    '- Do not exceed budget.',
+    '- Every action must include a concrete reason and expected impact.',
+    '- If no action is justified, return an empty actions array.',
+    '',
+    'Output rules:',
+    '- Return strict JSON only. No markdown.',
+    '- The response must match this schema exactly.',
+    '',
     'JSON schema:',
-    '{ "diagnosis": "string", "actions": [ { "type": "backfill-source" | "add-rss" | "add-theme", "source": "string", "args": {}, "reason": "string", "priority": "high|medium|low", "expectedImpact": "string" } ] }',
+    '{ "diagnosis": "string", "actions": [ { "type": "backfill-source" | "add-rss" | "add-theme", "source": "string", "args": {}, "reason": "string", "priority": "high|medium|low", "expectedImpact": "string", "relationType": "direct|adjacent|second-order|third-order", "transmissionPath": "one short sentence describing the missing evidence lane" } ] }',
     `Corpus total articles: ${context.stats.totalArticles}`,
     `Sources: ${JSON.stringify(context.stats.sourcesBreakdown)}`,
     `Recent topics (30d): ${context.stats.recentTopics}`,
@@ -213,12 +257,6 @@ function buildBackfillPrompt(context: BackfillCurationContext): string {
     `Remaining daily budget: ${JSON.stringify(context.budgets?.daily || {})}`,
     'Allowed backfill sources:',
     whitelist,
-    'Rules:',
-    '- Maximum 3 actions.',
-    '- Prefer backfill-source when coverage is weak.',
-    '- Do not exceed budget.',
-    '- Use add-rss only for targeted follow-up coverage.',
-    '- Every action must include a concrete reason.',
   ].join('\n');
 }
 
@@ -236,6 +274,8 @@ function normalizeBackfillAction(raw: Record<string, unknown>): BackfillCuration
       reason: String(raw.reason || 'backfill coverage gap').trim() || 'backfill coverage gap',
       priority: String(raw.priority || 'medium').trim() as BackfillCurationAction['priority'],
       expectedImpact: String(raw.expectedImpact || '').trim() || undefined,
+      relationType: String(raw.relationType || '').trim().toLowerCase() || undefined,
+      transmissionPath: String(raw.transmissionPath || '').trim() || undefined,
     };
   }
   if (type === 'add-rss') {
@@ -249,6 +289,8 @@ function normalizeBackfillAction(raw: Record<string, unknown>): BackfillCuration
       reason: String(raw.reason || 'add rss coverage').trim() || 'add rss coverage',
       priority: String(raw.priority || 'medium').trim() as BackfillCurationAction['priority'],
       expectedImpact: String(raw.expectedImpact || '').trim() || undefined,
+      relationType: String(raw.relationType || '').trim().toLowerCase() || undefined,
+      transmissionPath: String(raw.transmissionPath || '').trim() || undefined,
     };
   }
   if (type === 'add-theme') {
@@ -259,6 +301,8 @@ function normalizeBackfillAction(raw: Record<string, unknown>): BackfillCuration
       reason: String(raw.reason || 'add theme coverage').trim() || 'add theme coverage',
       priority: String(raw.priority || 'medium').trim() as BackfillCurationAction['priority'],
       expectedImpact: String(raw.expectedImpact || '').trim() || undefined,
+      relationType: String(raw.relationType || '').trim().toLowerCase() || undefined,
+      transmissionPath: String(raw.transmissionPath || '').trim() || undefined,
     };
   }
   return null;

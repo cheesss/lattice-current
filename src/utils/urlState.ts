@@ -1,5 +1,6 @@
 import type { MapLayers } from '@/types';
 import type { MapView, TimeRange } from '@/components/Map';
+import { resolveWorkspaceId, type WorkspaceId } from '@/config/workspaces';
 
 const LAYER_KEYS: (keyof MapLayers)[] = [
   'conflicts',
@@ -40,8 +41,9 @@ const LAYER_KEYS: (keyof MapLayers)[] = [
 
 const TIME_RANGES: TimeRange[] = ['1h', '6h', '24h', '48h', '7d', 'all'];
 const VIEW_VALUES: MapView[] = ['global', 'america', 'mena', 'eu', 'asia', 'latam', 'africa', 'oceania'];
-
 export interface ParsedMapUrlState {
+  workspace?: WorkspaceId;
+  theme?: string;
   view?: MapView;
   zoom?: number;
   lat?: number;
@@ -63,6 +65,12 @@ export function parseMapUrlState(
 
   const viewParam = params.get('view');
   const view = VIEW_VALUES.includes(viewParam as MapView) ? (viewParam as MapView) : undefined;
+
+  const workspaceParam = params.get('workspace');
+  const workspace = workspaceParam ? resolveWorkspaceId(workspaceParam) : undefined;
+
+  const themeParam = params.get('theme');
+  const theme = themeParam ? themeParam.trim().toLowerCase() : undefined;
 
   const zoomParam = params.get('zoom');
   const zoomValue = zoomParam ? Number.parseFloat(zoomParam) : NaN;
@@ -109,6 +117,8 @@ export function parseMapUrlState(
   }
 
   return {
+    workspace,
+    theme,
     view,
     zoom,
     lat,
@@ -123,6 +133,8 @@ export function parseMapUrlState(
 export function buildMapUrl(
   baseUrl: string,
   state: {
+    workspace?: WorkspaceId;
+    theme?: string;
     view: MapView;
     zoom: number;
     center?: { lat: number; lon: number } | null;
@@ -141,6 +153,12 @@ export function buildMapUrl(
   }
 
   params.set('zoom', state.zoom.toFixed(2));
+  if (state.workspace) {
+    params.set('workspace', state.workspace);
+  }
+  if (state.theme) {
+    params.set('theme', state.theme);
+  }
   params.set('view', state.view);
   params.set('timeRange', state.timeRange);
 

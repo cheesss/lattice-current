@@ -45,6 +45,7 @@ import type { OntologyGraphSnapshot } from '@/services/ontology-graph';
 import type { OntologyLedgerEvent, OntologyReplayState } from '@/services/ontology-event-store';
 import type { StixBundle } from '@/services/stix-intel';
 import type { InvestmentIntelligenceSnapshot } from '@/services/investment-intelligence';
+import type { OperatorContext, OperatorContextPatch } from '@/types/operator-context';
 
 export interface CountryBriefSignals {
   criticalNews: number;
@@ -127,6 +128,8 @@ export interface AppContext {
 
   disabledSources: Set<string>;
   currentTimeRange: TimeRange;
+  operatorContext: OperatorContext;
+  setOperatorContext: (patch: OperatorContextPatch, options?: { persist?: boolean }) => OperatorContext;
 
   inFlight: Set<string>;
   seenGeoAlerts: Set<string>;

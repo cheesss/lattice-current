@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { repoPath } from './_workspace-paths.mjs';
+
+test('trend dashboard promotes theme objects and personalized workflow', () => {
+  const source = readFileSync(repoPath('event-dashboard.html'), 'utf8');
+
+  assert.match(source, /My Themes And Theme Brief/);
+  assert.match(source, /Followed Themes/);
+  assert.match(source, /Weekly Structural Briefing/);
+  assert.match(source, /Structural Alerts/);
+  assert.match(source, /Discovery Triage/);
+  assert.match(source, /Weekly saved snapshot/);
+  assert.match(source, /Suggested Themes/);
+  assert.match(source, /Since Last Visit/);
+  assert.match(source, /theme-brief\//);
+  assert.match(source, /followed-theme-briefing/);
+  assert.match(source, /saved \${fmtDate/);
+  assert.match(source, /followTheme\(/);
+  assert.match(source, /muteTheme\(/);
+  assert.match(source, /What Changed/);
+  assert.match(source, /Why It Matters/);
+  assert.match(source, /Evidence/);
+  assert.match(source, /Related Entities/);
+  assert.match(source, /Adjacent Pathways/);
+  assert.match(source, /Risks/);
+  assert.match(source, /Watch Next/);
+  assert.match(source, /Notebook Hooks/);
+  assert.match(source, /Save note/);
+  assert.match(source, /Share link/);
+  assert.match(source, /Export MD/);
+  assert.match(source, /theme-brief-notebook\//);
+  assert.match(source, /theme-brief-export\//);
+  assert.match(source, /structural-alerts/);
+  assert.match(source, /discovery-triage/);
+  assert.match(source, /loadStructuralAlerts\(/);
+  assert.match(source, /loadDiscoveryTriage\(/);
+  assert.match(source, /applyDiscoveryTriageDecision\(/);
+  assert.match(source, /theme-last-viewed/);
+});

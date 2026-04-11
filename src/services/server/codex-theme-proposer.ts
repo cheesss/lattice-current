@@ -57,7 +57,8 @@ function buildExecArgs(prompt: string): string[] {
   if (process.env.CODEX_MODEL?.trim()) {
     args.push('--model', process.env.CODEX_MODEL.trim());
   }
-  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto', prompt);
+  void prompt;
+  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto');
   return args;
 }
 
@@ -161,20 +162,19 @@ async function resolveCodexCommand(): Promise<string> {
 
 async function runCodexCli(args: string[], timeoutMs = CODEX_TIMEOUT_MS): Promise<CodexExecResult> {
   const command = await resolveCodexCommand();
-  // If the last argument (prompt) is very long, pipe it via stdin instead
-  const lastArg = args.length > 0 ? args[args.length - 1] ?? '' : '';
-  const usePipedPrompt = lastArg.length > 6000;
-  const spawnArgs = usePipedPrompt ? args.slice(0, -1) : args;
+  const useStdinPrompt = args[0] === 'exec' && args.includes('--full-auto');
+  const prompt = useStdinPrompt ? String(args[args.length - 1] ?? '') : '';
+  const spawnArgs = useStdinPrompt ? args.slice(0, -1) : args;
   return new Promise((resolve) => {
     const child = spawn(command, spawnArgs, {
       cwd: process.cwd(),
       env: getSafeEnv(),
-      stdio: [usePipedPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      stdio: [useStdinPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: process.platform === 'win32',
     });
-    if (usePipedPrompt) {
-      child.stdin?.write(lastArg);
+    if (useStdinPrompt) {
+      child.stdin?.write(prompt);
       child.stdin?.end();
     }
     let stdout = '';
@@ -211,15 +211,16 @@ function buildThemePrompt(
   return [
     'You are a world-class macro strategist and thematic investment researcher.',
     'Your role: discover non-obvious, high-conviction investment themes from global news signals.',
+    'This is not open-ended brainstorming. You must decide whether the theme is distinct, durable, and investable.',
     'Return strict JSON only. No markdown.',
     '',
-    '## Thinking Framework',
-    '1. DIRECT effects: What sectors/assets are directly impacted?',
-    '2. SECOND-ORDER effects: What happens downstream? (e.g., oil shock \u2192 shipping costs \u2192 retail margins)',
-    '3. CONTRARIAN plays: What does the crowd get wrong? What\'s the opposite trade?',
-    '4. CROSS-ASSET linkages: How does this theme transmit across equities, bonds, FX, commodities?',
-    '5. REGIONAL spillovers: Which non-obvious countries/regions are affected?',
-    '6. TEMPORAL dynamics: Is this a 1-day panic or a multi-week structural shift?',
+    '## Analysis Framework',
+    '1. Distinctness: Is the proposed theme meaningfully different from the existing themes listed below?',
+    '2. Direct effects: Which sectors and assets are directly exposed?',
+    '3. Second-order effects: What happens downstream? (for example oil shock -> shipping costs -> retail margins)',
+    '4. Cross-asset linkages: How does this transmit across equities, bonds, FX, commodities, or rates?',
+    '5. Temporal dynamics: Is this a short-lived panic or a multi-week structural shift?',
+    '6. Coherence: Do the thesis, triggers, invalidation conditions, and assets clearly fit together?',
     '',
     '## Requirements',
     '- Propose themes DISTINCT from existing ones \u2014 avoid overlapping triggers',
@@ -230,6 +231,7 @@ function buildThemePrompt(
     '- Propose 4-8 liquid assets per theme with clear directional thesis',
     '- Consider supply chain, insurance, logistics, and infrastructure angles',
     '- Think about volatility plays (VIX, options-like ETFs) and relative value',
+    '- If the theme is not distinct, durable, and investable, return a low-confidence but internally coherent result rather than vague filler',
     '',
     '## JSON Schema',
     '{',

@@ -24,7 +24,6 @@ import {
   clusterNews,
   analyzeCorrelations,
   fetchWeatherAlerts,
-  fetchFredData,
   fetchInternetOutages,
   isOutagesConfigured,
   fetchAisSignals,
@@ -47,18 +46,8 @@ import {
   fetchPizzIntStatus,
   fetchGdeltTensions,
   fetchNaturalEvents,
-  fetchRecentAwards,
-  fetchOilAnalytics,
-  fetchBisData,
   fetchCyberThreats,
   drainTrendingSignals,
-  fetchTradeRestrictions,
-  fetchTariffTrends,
-  fetchTradeFlows,
-  fetchTradeBarriers,
-  fetchShippingRates,
-  fetchChokepointStatus,
-  fetchCriticalMinerals,
   fetchGlintGeoMarkers,
   fetchGlintCountrySignals,
   fetchGlintFeedRecords,
@@ -68,8 +57,6 @@ import {
   isGlintGeoEnabled,
   buildOpenbbIntelSnapshot,
   fetchOpenbbPrimaryTape,
-  fetchPortWatchSnapshot,
-  toPortWatchAisOverlays,
   fetchGpsInterference,
   fetchTelegramFeed,
   fetchArxivPapers,
@@ -117,6 +104,7 @@ import {
   networkCapturesToApiDiscoveryCandidates,
   recomputeMultiHopInferences,
   listMultiHopInferences,
+  hydratePersistedExperimentRegistry,
   recomputeInvestmentIntelligence,
 } from '@/services';
 import { mlWorker } from '@/services/ml-worker';
@@ -135,8 +123,9 @@ import { fetchConflictEvents, fetchUcdpClassifications, fetchHapiSummary, fetchU
 import { fetchUnhcrPopulation } from '@/services/displacement';
 import { fetchClimateAnomalies } from '@/services/climate';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
-import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
-import { isFeatureAvailable, secretsReady } from '@/services/runtime-config';
+import { debounce } from '@/utils';
+import { createLogger } from '@/utils/logger';
+import { secretsReady } from '@/services/runtime-config';
 import { canUseLocalAgentEndpoints, hasLocalAgentEndpointSupport, isDesktopRuntime, toRuntimeUrl } from '@/services/runtime';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { getCurrentLanguage, t } from '@/services/i18n';
@@ -154,14 +143,11 @@ import {
   InsightsPanel,
   CIIPanel,
   StrategicPosturePanel,
-  EconomicPanel,
   TechReadinessPanel,
   UcdpEventsPanel,
   DisplacementPanel,
   ClimateAnomalyPanel,
   PopulationExposurePanel,
-  TradePolicyPanel,
-  SupplyChainPanel,
   CrossAssetTapePanel,
   EventImpactScreenerPanel,
   CountryExposureMatrixPanel,
@@ -204,8 +190,11 @@ import {
 } from '@/services/oref-alerts';
 import { dispatchOrefBreakingAlert } from '@/services/breaking-news-alerts';
 import type { GlintFeedRecord, GlintNewsLocation } from '@/services/glint';
+import { MarketEconomicDataManager } from '@/app/data-loader/market-economic-data-manager';
+import { TradeSupplyChainDataManager } from '@/app/data-loader/trade-supply-chain-data-manager';
 
 const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
+const dataLoaderLogger = createLogger('data-loader');
 
 type MapNewsLocation = {
   lat: number;
@@ -336,12 +325,29 @@ export class DataLoaderManager implements AppModule {
   private readonly refreshCiiPanelDebounced = debounce(() => {
     (this.ctx.panels['cii'] as CIIPanel | undefined)?.refresh();
   }, 650);
+  private readonly marketEconomicManager: MarketEconomicDataManager;
+  private readonly tradeSupplyChainManager: TradeSupplyChainDataManager;
 
   public updateSearchIndex: () => void = () => {};
 
   constructor(ctx: AppContext, callbacks: DataLoaderCallbacks) {
     this.ctx = ctx;
     this.callbacks = callbacks;
+    this.marketEconomicManager = new MarketEconomicDataManager(this.ctx, {
+      ensureOpenbbStartupHealth: () => this.ensureOpenbbStartupHealth(),
+      shouldRefreshOpenbbIntel: () => this.shouldRefreshOpenbbIntel(),
+      loadMarketsOpenbbFirst: () => this.loadMarketsOpenbbFirst(),
+      loadMarketsFallbackOnly: () => this.loadMarketsFallbackOnly(),
+      refreshOpenbbIntel: () => this.refreshOpenbbIntelDebounced(),
+      schedulePersistence: () => this.scheduleIntelligenceFabricPersistence(),
+    });
+    this.tradeSupplyChainManager = new TradeSupplyChainDataManager(this.ctx, {
+      setPortWatchOverlays: (disruptions, density) => {
+        this.portWatchOverlayDisruptions = disruptions;
+        this.portWatchOverlayDensity = density;
+      },
+      reloadAisSignals: () => this.loadAisSignals(),
+    });
   }
 
   init(): void {
@@ -456,7 +462,7 @@ export class DataLoaderManager implements AppModule {
     try {
       await persistIntelligenceFabricSnapshotFromContext(this.ctx);
     } catch (error) {
-      console.warn('[data-loader] intelligence fabric persistence failed', error);
+      dataLoaderLogger.warn('intelligence fabric persistence failed', { error: String(error) });
     } finally {
       this.persistFabricInFlight = false;
     }
@@ -1173,15 +1179,18 @@ export class DataLoaderManager implements AppModule {
           feature: 'investment-intelligence',
           inputCount: (this.ctx.latestClusters ?? []).length + (this.ctx.latestMarkets ?? []).length,
         },
-        async () => recomputeInvestmentIntelligence({
-          clusters: this.ctx.latestClusters ?? [],
-          markets: this.ctx.latestMarkets ?? [],
-          transmission: this.ctx.intelligenceCache.eventMarketTransmission ?? null,
-          sourceCredibility: this.ctx.intelligenceCache.sourceCredibility ?? [],
-          reports: this.ctx.intelligenceCache.scheduledReports ?? [],
-          keywordGraph: this.ctx.intelligenceCache.keywordGraph ?? null,
-          context: 'live',
-        }).catch(() => null),
+        async () => {
+          await hydratePersistedExperimentRegistry().catch(() => null);
+          return recomputeInvestmentIntelligence({
+            clusters: this.ctx.latestClusters ?? [],
+            markets: this.ctx.latestMarkets ?? [],
+            transmission: this.ctx.intelligenceCache.eventMarketTransmission ?? null,
+            sourceCredibility: this.ctx.intelligenceCache.sourceCredibility ?? [],
+            reports: this.ctx.intelligenceCache.scheduledReports ?? [],
+            keywordGraph: this.ctx.intelligenceCache.keywordGraph ?? null,
+            context: 'live',
+          }).catch(() => null);
+        },
         (result) => ({ outputCount: result?.ideaCards?.length ?? 0 }),
       );
     } catch (error) {
@@ -2104,19 +2113,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadMarkets(): Promise<void> {
-    await this.ensureOpenbbStartupHealth();
-
-    if (this.shouldRefreshOpenbbIntel()) {
-      const openbbLoaded = await this.loadMarketsOpenbbFirst();
-      if (!openbbLoaded) {
-        await this.loadMarketsFallbackOnly();
-      }
-    } else {
-      await this.loadMarketsFallbackOnly();
-    }
-
-    this.refreshOpenbbIntelDebounced();
-    this.scheduleIntelligenceFabricPersistence?.();
+    await this.marketEconomicManager.loadMarkets();
   }
 
   private async loadMarketsOpenbbFirst(): Promise<boolean> {
@@ -3419,237 +3416,27 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadFredData(): Promise<void> {
-    const economicPanel = this.ctx.panels['economic'] as EconomicPanel;
-    const cbInfo = getCircuitBreakerCooldownInfo('FRED Economic');
-    if (cbInfo.onCooldown) {
-      economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${cbInfo.remainingSeconds}s)`);
-      this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
-      return;
-    }
-
-    try {
-      economicPanel?.setLoading(true);
-      const data = await fetchFredData();
-
-      const postInfo = getCircuitBreakerCooldownInfo('FRED Economic');
-      if (postInfo.onCooldown) {
-        economicPanel?.setErrorState(true, `Temporarily unavailable (retry in ${postInfo.remainingSeconds}s)`);
-        this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
-        return;
-      }
-
-      if (data.length === 0) {
-        if (!isFeatureAvailable('economicFred')) {
-          economicPanel?.setErrorState(true, 'FRED_API_KEY not configured - add in Settings');
-          this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
-          return;
-        }
-        economicPanel?.showRetrying();
-        await new Promise(r => setTimeout(r, 20_000));
-        const retryData = await fetchFredData();
-        if (retryData.length === 0) {
-          economicPanel?.setErrorState(true, 'FRED data temporarily unavailable - will retry');
-          this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
-          return;
-        }
-        economicPanel?.setErrorState(false);
-        economicPanel?.update(retryData);
-        this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
-        dataFreshness.recordUpdate('economic', retryData.length);
-        return;
-      }
-
-      economicPanel?.setErrorState(false);
-      economicPanel?.update(data);
-      // Push FRED data to signal_history for analysis engine
-      void pushMarketSignalsBatch(
-        data
-          .filter((item) => item.id && typeof item.value === 'number')
-          .map((item) => ({
-            symbol: item.id,
-            price: item.value as number,
-          })),
-      ).catch(() => {});
-      this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
-      dataFreshness.recordUpdate('economic', data.length);
-    } catch {
-      if (isFeatureAvailable('economicFred')) {
-        economicPanel?.showRetrying();
-        try {
-          await new Promise(r => setTimeout(r, 20_000));
-          const retryData = await fetchFredData();
-          if (retryData.length > 0) {
-            economicPanel?.setErrorState(false);
-            economicPanel?.update(retryData);
-            this.ctx.statusPanel?.updateApi('FRED', { status: 'ok' });
-            dataFreshness.recordUpdate('economic', retryData.length);
-            return;
-          }
-        } catch { /* fall through */ }
-      }
-      this.ctx.statusPanel?.updateApi('FRED', { status: 'error' });
-      economicPanel?.setErrorState(true, 'FRED data temporarily unavailable - will retry');
-      economicPanel?.setLoading(false);
-    }
+    await this.marketEconomicManager.loadFredData();
   }
 
   async loadOilAnalytics(): Promise<void> {
-    const economicPanel = this.ctx.panels['economic'] as EconomicPanel;
-    try {
-      const data = await fetchOilAnalytics();
-      economicPanel?.updateOil(data);
-      const hasData = !!(data.wtiPrice || data.brentPrice || data.usProduction || data.usInventory);
-      this.ctx.statusPanel?.updateApi('EIA', { status: hasData ? 'ok' : 'error' });
-      if (hasData) {
-        const metricCount = [data.wtiPrice, data.brentPrice, data.usProduction, data.usInventory].filter(Boolean).length;
-        dataFreshness.recordUpdate('oil', metricCount || 1);
-      } else {
-        dataFreshness.recordError('oil', 'Oil analytics returned no values');
-      }
-    } catch (e) {
-      console.error('[App] Oil analytics failed:', e);
-      this.ctx.statusPanel?.updateApi('EIA', { status: 'error' });
-      dataFreshness.recordError('oil', String(e));
-    }
+    await this.marketEconomicManager.loadOilAnalytics();
   }
 
   async loadGovernmentSpending(): Promise<void> {
-    const economicPanel = this.ctx.panels['economic'] as EconomicPanel;
-    try {
-      const data = await fetchRecentAwards({ daysBack: 7, limit: 15 });
-      economicPanel?.updateSpending(data);
-      this.ctx.statusPanel?.updateApi('USASpending', { status: data.awards.length > 0 ? 'ok' : 'error' });
-      if (data.awards.length > 0) {
-        dataFreshness.recordUpdate('spending', data.awards.length);
-      } else {
-        dataFreshness.recordError('spending', 'No awards returned');
-      }
-    } catch (e) {
-      console.error('[App] Government spending failed:', e);
-      this.ctx.statusPanel?.updateApi('USASpending', { status: 'error' });
-      dataFreshness.recordError('spending', String(e));
-    }
+    await this.marketEconomicManager.loadGovernmentSpending();
   }
 
   async loadBisData(): Promise<void> {
-    const economicPanel = this.ctx.panels['economic'] as EconomicPanel;
-    try {
-      const data = await fetchBisData();
-      economicPanel?.updateBis(data);
-      const hasData = data.policyRates.length > 0;
-      this.ctx.statusPanel?.updateApi('BIS', { status: hasData ? 'ok' : 'error' });
-      if (hasData) {
-        dataFreshness.recordUpdate('bis', data.policyRates.length);
-      }
-    } catch (e) {
-      console.error('[App] BIS data failed:', e);
-      this.ctx.statusPanel?.updateApi('BIS', { status: 'error' });
-      dataFreshness.recordError('bis', String(e));
-    }
+    await this.marketEconomicManager.loadBisData();
   }
 
   async loadTradePolicy(): Promise<void> {
-    const tradePanel = this.ctx.panels['trade-policy'] as TradePolicyPanel | undefined;
-    if (!tradePanel) return;
-
-    try {
-      const [restrictions, tariffs, flows, barriers] = await Promise.all([
-        fetchTradeRestrictions([], 50),
-        fetchTariffTrends('840', '156', '', 10),
-        fetchTradeFlows('840', '156', 10),
-        fetchTradeBarriers([], '', 50),
-      ]);
-
-      tradePanel.updateRestrictions(restrictions);
-      tradePanel.updateTariffs(tariffs);
-      tradePanel.updateFlows(flows);
-      tradePanel.updateBarriers(barriers);
-
-      const totalItems = restrictions.restrictions.length + tariffs.datapoints.length + flows.flows.length + barriers.barriers.length;
-      const anyUnavailable = restrictions.upstreamUnavailable || tariffs.upstreamUnavailable || flows.upstreamUnavailable || barriers.upstreamUnavailable;
-
-      this.ctx.statusPanel?.updateApi('WTO', { status: anyUnavailable ? 'warning' : totalItems > 0 ? 'ok' : 'error' });
-
-      if (totalItems > 0) {
-        dataFreshness.recordUpdate('wto_trade', totalItems);
-      } else if (anyUnavailable) {
-        dataFreshness.recordError('wto_trade', 'WTO upstream temporarily unavailable');
-      }
-    } catch (e) {
-      console.error('[App] Trade policy failed:', e);
-      this.ctx.statusPanel?.updateApi('WTO', { status: 'error' });
-      dataFreshness.recordError('wto_trade', String(e));
-    }
+    await this.tradeSupplyChainManager.loadTradePolicy();
   }
 
   async loadSupplyChain(): Promise<void> {
-    const scPanel = this.ctx.panels['supply-chain'] as SupplyChainPanel | undefined;
-    if (!scPanel) return;
-
-    try {
-      const [shipping, chokepoints, minerals, portWatch] = await Promise.allSettled([
-        fetchShippingRates(),
-        fetchChokepointStatus(),
-        fetchCriticalMinerals(),
-        fetchPortWatchSnapshot(),
-      ]);
-
-      const shippingData = shipping.status === 'fulfilled' ? shipping.value : null;
-      const chokepointData = chokepoints.status === 'fulfilled' ? chokepoints.value : null;
-      const mineralsData = minerals.status === 'fulfilled' ? minerals.value : null;
-      const portWatchData = portWatch.status === 'fulfilled' ? portWatch.value : null;
-
-      if (shippingData) scPanel.updateShippingRates(shippingData);
-      if (chokepointData) scPanel.updateChokepointStatus(chokepointData);
-      if (mineralsData) scPanel.updateCriticalMinerals(mineralsData);
-
-      let portWatchCount = 0;
-      if (portWatchData) {
-        const overlays = toPortWatchAisOverlays(portWatchData);
-        this.portWatchOverlayDisruptions = overlays.disruptions;
-        this.portWatchOverlayDensity = overlays.density;
-        portWatchCount = overlays.disruptions.length + overlays.density.length;
-        this.ctx.statusPanel?.updateApi('PortWatch', {
-          status: portWatchData.upstreamUnavailable ? 'warning' : portWatchCount > 0 ? 'ok' : 'warning',
-        });
-        if (portWatchCount > 0) {
-          dataFreshness.recordUpdate('portwatch', portWatchCount);
-        } else if (portWatchData.upstreamUnavailable) {
-          dataFreshness.recordError('portwatch', 'PortWatch upstream unavailable');
-        }
-        if (this.ctx.mapLayers.ais) {
-          void this.loadAisSignals();
-        }
-      } else {
-        this.ctx.statusPanel?.updateApi('PortWatch', { status: 'error' });
-        dataFreshness.recordError('portwatch', 'PortWatch fetch failed');
-      }
-
-      const totalItems = (shippingData?.indices.length || 0)
-        + (chokepointData?.chokepoints.length || 0)
-        + (mineralsData?.minerals.length || 0)
-        + portWatchCount;
-      const anyUnavailable = Boolean(
-        shippingData?.upstreamUnavailable
-        || chokepointData?.upstreamUnavailable
-        || mineralsData?.upstreamUnavailable
-        || portWatchData?.upstreamUnavailable,
-      );
-
-      this.ctx.statusPanel?.updateApi('SupplyChain', { status: anyUnavailable ? 'warning' : totalItems > 0 ? 'ok' : 'error' });
-
-      if (totalItems > 0) {
-        dataFreshness.recordUpdate('supply_chain', totalItems);
-      } else if (anyUnavailable) {
-        dataFreshness.recordError('supply_chain', 'Supply chain upstream temporarily unavailable');
-      }
-    } catch (e) {
-      console.error('[App] Supply chain failed:', e);
-      this.ctx.statusPanel?.updateApi('SupplyChain', { status: 'error' });
-      this.ctx.statusPanel?.updateApi('PortWatch', { status: 'error' });
-      dataFreshness.recordError('portwatch', String(e));
-      dataFreshness.recordError('supply_chain', String(e));
-    }
+    await this.tradeSupplyChainManager.loadSupplyChain();
   }
 
   updateMonitorResults(): void {

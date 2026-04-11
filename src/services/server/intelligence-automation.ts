@@ -13,6 +13,7 @@ import {
   getInvestmentThemeDefinition,
   ingestCodexCandidateExpansionProposals,
   setAutomatedThemeCatalog,
+  syncExperimentRegistrySnapshot,
   type InvestmentThemeDefinition,
 } from '../investment-intelligence';
 import {
@@ -3006,6 +3007,7 @@ export async function runIntelligenceAutomationCycle(args: {
       replayRuns: fallbackRuns,
     });
     state.experimentRegistry = tuned;
+    await syncExperimentRegistrySnapshot(tuned);
     state.lastSelfTuningAt = nowIso();
     tuningAction = tuned.history[tuned.history.length - 1]?.action || 'observe';
     appendRun(state, {

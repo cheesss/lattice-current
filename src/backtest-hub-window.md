@@ -1,39 +1,45 @@
 # `backtest-hub-window.ts`
 
-## 역할
+This file renders the standalone replay and validation workspace used by the
+`Validate` flow.
 
-브라우저 전용 `Replay Studio` 전체 페이지를 렌더링한다. 이 파일은 백테스트 결과 화면이 아니라, 아래 세 층을 합친 operator workspace다.
+## Purpose
 
-- backtest run history
-- current decision support
-- data/pipeline health
+The hub is not the primary product shell. It is an advanced review surface for:
 
-## 내부 구조
+- replay run history
+- current decision-support snapshots
+- dataset and pipeline health
+- follow-up actions when signal quality degrades
 
-- `DataFlowOpsSnapshot`를 읽어 파이프라인 상태와 dataset health를 받는다.
-- `HistoricalReplayRun` 목록을 읽어 replay/walk-forward/current-like 비교 카드를 만든다.
-- `investment-intelligence.ts`에서 현재 decision bucket을 만들어 `Act Now / Defensive / Avoid / Watch`를 보여준다.
+## Main inputs
 
-## 탭 시스템
+- `DataFlowOpsSnapshot`
+  - pipeline posture, dataset health, blockers, and freshness
+- `HistoricalReplayRun`
+  - archived replay runs and per-run diagnostics
+- `investment-intelligence.ts`
+  - current decision buckets such as `Act Now`, `Defensive`, `Avoid`, and `Watch`
 
-- `overview`
+## Views
+
+- `mission`
 - `decision`
 - `data`
 - `history`
+- `intel`
 
-탭은 `data-action="set-view"` 이벤트 위임으로 동작한다.
+These are driven through delegated click handling on `data-action="set-view"`.
 
-## 주요 계산
+## Key responsibilities
 
-- latest replay/walk-forward/current-like summary 카드
-- run selection + selected run interpretation
-- dataset health table
-- source family coverage
-- guided flow / next action recommendation
+- summarize the latest replay and pipeline state
+- let the operator select a replay run and inspect the outcome
+- show corpus health and source-family coverage
+- guide the next action when replay output is thin or stale
 
-## 자주 헷갈리는 점
+## Important caveats
 
-- `Current-like`는 항상 최신 replay와 같은 뜻이 아니다.
-- decision bucket은 live snapshot 기반일 수 있고, replay-backed 결과와 완전히 같지 않다.
-- `No idea`는 UI 고장이 아니라 thin corpus일 수 있다.
-
+- `current-like` is not the same thing as the latest replay result
+- decision buckets are driven by the live snapshot and should not be treated as a full replay substitute
+- `no idea` usually means a thin corpus or blocked inputs, not a broken page

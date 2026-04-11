@@ -5,8 +5,8 @@ export const AUTOMATION_BUDGETS = Object.freeze({
   daily: Object.freeze({
     backfillCalls: 5,
     backfillItems: 100000,
-    codexCalls: 50,
-    rssRegistrations: 10,
+    codexCalls: 300,
+    rssRegistrations: 30,
     symbolRegistrations: 20,
     themeRegistrations: 5,
     selfHealingActions: 20,
@@ -19,7 +19,7 @@ export const AUTOMATION_BUDGETS = Object.freeze({
   }),
   hourly: Object.freeze({
     backfillCalls: 2,
-    codexCalls: 8,
+    codexCalls: 40,
   }),
 });
 

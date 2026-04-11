@@ -213,11 +213,29 @@ function buildCandidatePrompt(input: {
 
   return [
     'You are a candidate-expansion planner for macro and geopolitical investment intelligence.',
-    'Return strict JSON only. No markdown.',
     'Propose liquid, backtestable additional candidates for the given theme.',
+    'This is not a brainstorming list. Each proposed candidate must close a real coverage gap and fit the theme thesis.',
+    '',
+    'Analyze in this order:',
+    '1. Which coverage gaps matter most for this theme?',
+    '2. Which direct, second-order, third-order, fourth-order, or proxy transmission paths matter most for this theme?',
+    '3. Which liquid symbols best close those gaps without duplicating existing symbols, even if they are indirect beneficiaries, suppliers, infrastructure names, insurers, financiers, or regional proxies?',
+    '4. Why does each symbol fit the theme mechanism, and what is the transmission path from theme to asset?',
+    '5. Which direction and role make the most sense?',
+    '',
+    'Rules:',
     'Do not repeat existing symbols.',
     'Only use asset kinds: etf, equity, commodity, fx, rate, crypto.',
     'Prefer liquid ETFs or large liquid equities unless the gap strongly requires otherwise.',
+    '- Every proposal must map clearly to the thesis or the listed coverage gaps.',
+    '- Indirect candidates are allowed if the transmission path is concrete and durable.',
+    '- Non-obvious candidates are desirable when they capture second-order or third-order effects better than the crowded direct trade.',
+    '- If a gap cannot be closed with a liquid symbol, omit it rather than forcing a weak candidate.',
+    '',
+    'Output rules:',
+    '- Return strict JSON only. No markdown.',
+    '- Do not include commentary outside JSON.',
+    '- The response must match this schema exactly.',
     'JSON schema:',
     '{',
     '  "proposals": [',
@@ -229,6 +247,9 @@ function buildCandidatePrompt(input: {
     '      "commodity": "crude oil",',
     '      "direction": "long",',
     '      "role": "primary",',
+    '      "relationType": "direct-beneficiary|supplier|infrastructure|input-cost|customer|financing|insurance|policy-beneficiary|policy-loser|regional-proxy|hedge|substitute",',
+    '      "transmissionOrder": "direct|second-order|third-order|fourth-order|proxy",',
+    '      "transmissionPath": "one short sentence on how the theme affects this asset",',
     '      "confidence": 0-100,',
     '      "reason": "one sentence",',
     '      "supportingSignals": ["...", "..."]',
@@ -286,6 +307,14 @@ function normalizeRole(value: unknown): CodexCandidateExpansionProposal['role'] 
   return 'primary';
 }
 
+function normalizeTransmissionOrder(value: unknown): CodexCandidateExpansionProposal['transmissionOrder'] {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'second-order' || normalized === 'third-order' || normalized === 'fourth-order' || normalized === 'proxy') {
+    return normalized;
+  }
+  return 'direct';
+}
+
 function normalizeProposals(raw: unknown): CodexCandidateExpansionProposal[] {
   return Array.isArray(raw)
     ? raw
@@ -297,6 +326,9 @@ function normalizeProposals(raw: unknown): CodexCandidateExpansionProposal[] {
         commodity: (proposal as Record<string, unknown>).commodity ? String((proposal as Record<string, unknown>).commodity).trim().toLowerCase() : null,
         direction: normalizeDirection((proposal as Record<string, unknown>).direction),
         role: normalizeRole((proposal as Record<string, unknown>).role),
+        relationType: String((proposal as Record<string, unknown>).relationType || '').trim().toLowerCase() || undefined,
+        transmissionOrder: normalizeTransmissionOrder((proposal as Record<string, unknown>).transmissionOrder),
+        transmissionPath: String((proposal as Record<string, unknown>).transmissionPath || '').trim().slice(0, 220) || undefined,
         confidence: Math.max(25, Math.min(95, Math.round(Number((proposal as Record<string, unknown>).confidence) || 62))),
         reason: String((proposal as Record<string, unknown>).reason || 'Codex candidate proposal').trim().slice(0, 280),
         supportingSignals: Array.isArray((proposal as Record<string, unknown>).supportingSignals)

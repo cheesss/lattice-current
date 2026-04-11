@@ -229,6 +229,12 @@ export interface InvestmentIdeaCard {
   backtestHitRate?: number | null;
   backtestAvgReturnPct?: number | null;
   exitReason?: string | null;
+  // Meta-model predictions (from event-decision engine)
+  alphaProb?: number | null;
+  expectedAlpha?: number | null;
+  downsideRisk?: number | null;
+  timeToPeak?: string | null;
+  evidenceGrade?: string | null;
 }
 
 export interface ThemeDiagnosticsRow {
@@ -522,6 +528,14 @@ export interface IntegrationMetadata {
   alertsFired?: Array<{ ruleId: string; severity: string; message: string }>;
   riskGateSummary?: { ideaGateRejected: number; portfolioGateReduced: number } | null;
   sourceQualityWeight?: number;
+  signalRuntime?: {
+    source: 'live-signal-history' | 'derived-market-transmission' | 'missing';
+    coverage: number;
+    signalCapturedAt: string | null;
+    transmissionGeneratedAt: string | null;
+    transmissionFreshnessHours: number | null;
+    transmissionFresh: boolean;
+  } | null;
   stageTimings?: Record<string, number>;
   pipelineErrors?: Array<{ stage: string; error: string; degraded: boolean }>;
 }
@@ -754,6 +768,9 @@ export interface CodexCandidateExpansionProposal {
   confidence?: number;
   reason?: string;
   supportingSignals?: string[];
+  relationType?: string;
+  transmissionOrder?: 'direct' | 'second-order' | 'third-order' | 'fourth-order' | 'proxy';
+  transmissionPath?: string;
 }
 
 export interface LocalCodexCandidateExpansionResponse {

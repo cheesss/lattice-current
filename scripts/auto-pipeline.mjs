@@ -4,7 +4,9 @@ import pg from 'pg';
 import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig, resolveOllamaChatConfig } from './_shared/nas-runtime.mjs';
 import { ensureArticleAnalysisTables } from './_shared/article-analysis-schema.mjs';
+import { classifyArticleAgainstTaxonomy, resolveThemeTaxonomy } from './_shared/theme-taxonomy.mjs';
 import { scoreThemeSymbolMappings } from './_shared/theme-symbol-quality.mjs';
+import { createWhereBuilder } from './_shared/query-builder.mjs';
 
 loadOptionalEnvFile();
 
@@ -13,6 +15,7 @@ const DEFAULT_LIMIT = 10000;
 const STEP_SET = new Set([1, 2, 3, 4, 5]);
 export const AUTO_THEME_CONFIDENT_THRESHOLD = 0.72;
 export const AUTO_THEME_UNCERTAIN_THRESHOLD = 0.62;
+const AUTO_THEME_UPSERT_CHUNK_SIZE = 400;
 let pgConfig = null;
 let pgConfigError = null;
 
@@ -57,6 +60,203 @@ export function classifyAutoThemeCandidate(bestTheme, bestSim) {
   };
 }
 
+function normalizeThemeLabel(value) {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function normalizeKeywordArray(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+}
+
+export function buildAutoThemeRecord(candidate, bestThemeArg, bestSimArg, methodArg = 'embedding-batch') {
+  const candidateRow = typeof candidate === 'object' && candidate
+    ? candidate
+    : {
+      article_id: candidate,
+      best_theme: bestThemeArg,
+      best_sim: bestSimArg,
+    };
+  const articleId = Number(candidateRow.article_id || candidateRow.articleId);
+  const bestTheme = candidateRow.best_theme || candidateRow.bestTheme || bestThemeArg;
+  const bestSim = Number(candidateRow.best_sim ?? candidateRow.bestSim ?? bestSimArg ?? 0);
+  const taxonomyMatch = classifyArticleAgainstTaxonomy({
+    title: candidateRow.title,
+    source: candidateRow.source,
+    keywords: normalizeKeywordArray(candidateRow.keywords),
+    embeddingTheme: bestTheme,
+    embeddingSimilarity: bestSim,
+  });
+  const classification = classifyAutoThemeCandidate(bestTheme, bestSim);
+  const sourceTheme = normalizeThemeLabel(bestTheme);
+  const taxonomySourceTheme = taxonomyMatch.theme !== 'unknown'
+    ? taxonomyMatch.theme
+    : classification.autoTheme !== 'unknown'
+      ? classification.autoTheme
+      : null;
+  const taxonomy = resolveThemeTaxonomy(taxonomySourceTheme);
+  const canonicalTheme = taxonomy.themeKey
+    || (taxonomyMatch.theme !== 'unknown' ? taxonomyMatch.theme : null)
+    || (classification.autoTheme !== 'unknown' ? classification.autoTheme : null);
+  const effectiveConfidence = Math.max(
+    Number(classification.confidence || 0),
+    Number(taxonomyMatch.confidence || 0),
+  );
+  const effectiveClassification = classifyAutoThemeCandidate(canonicalTheme, effectiveConfidence);
+
+  return {
+    articleId,
+    autoTheme: canonicalTheme || effectiveClassification.autoTheme,
+    sourceTheme,
+    confidence: effectiveClassification.confidence,
+    confidenceTier: effectiveClassification.tier,
+    method: methodArg,
+    themeKey: taxonomy.themeKey,
+    themeLabel: taxonomy.themeLabel,
+    themeType: taxonomy.themeType,
+    parentTheme: taxonomy.parentTheme,
+    parentThemeLabel: taxonomy.parentThemeLabel,
+    themeCategory: taxonomy.category,
+    lifecycleHint: taxonomy.lifecycleHint,
+    taxonomyVersion: taxonomy.taxonomyVersion,
+  };
+}
+
+export async function bulkUpsertAutoArticleThemes(client, records) {
+  if (!Array.isArray(records) || records.length === 0) {
+    return 0;
+  }
+
+  let processed = 0;
+  for (let offset = 0; offset < records.length; offset += AUTO_THEME_UPSERT_CHUNK_SIZE) {
+    const chunk = records.slice(offset, offset + AUTO_THEME_UPSERT_CHUNK_SIZE);
+    const values = [];
+    const placeholders = chunk.map((record, index) => {
+      const base = index * 14;
+      values.push(
+        record.articleId,
+        record.autoTheme,
+        record.sourceTheme,
+        record.confidence,
+        record.confidenceTier,
+        record.method,
+        record.themeKey,
+        record.themeLabel,
+        record.themeType,
+        record.parentTheme,
+        record.parentThemeLabel,
+        record.themeCategory,
+        record.lifecycleHint,
+        record.taxonomyVersion,
+      );
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14})`;
+    }).join(',\n');
+
+    await client.query(`
+      INSERT INTO auto_article_themes (
+        article_id, auto_theme, source_theme, confidence, confidence_tier, method,
+        theme_key, theme_label, theme_type, parent_theme, parent_theme_label,
+        theme_category, lifecycle_hint, taxonomy_version
+      )
+      VALUES ${placeholders}
+      ON CONFLICT (article_id) DO UPDATE SET
+        auto_theme = EXCLUDED.auto_theme,
+        source_theme = EXCLUDED.source_theme,
+        confidence = EXCLUDED.confidence,
+        confidence_tier = EXCLUDED.confidence_tier,
+        method = EXCLUDED.method,
+        theme_key = EXCLUDED.theme_key,
+        theme_label = EXCLUDED.theme_label,
+        theme_type = EXCLUDED.theme_type,
+        parent_theme = EXCLUDED.parent_theme,
+        parent_theme_label = EXCLUDED.parent_theme_label,
+        theme_category = EXCLUDED.theme_category,
+        lifecycle_hint = EXCLUDED.lifecycle_hint,
+        taxonomy_version = EXCLUDED.taxonomy_version,
+        updated_at = NOW()
+    `, values);
+
+    processed += chunk.length;
+  }
+
+  return processed;
+}
+
+async function fetchUnclassifiedThemeCandidates(client, options) {
+  const builder = createWhereBuilder([
+    'a.embedding IS NOT NULL',
+    'NOT EXISTS (SELECT 1 FROM auto_article_themes t WHERE t.article_id = a.id)',
+  ]);
+
+  if (options.since) {
+    builder.addValue(options.since, (placeholder) => `a.published_at >= ${placeholder}::timestamptz`);
+  }
+  const { whereClause, params } = builder.build();
+  params.push(options.limit);
+  const limitParamIndex = params.length;
+
+  const { rows } = await client.query(`
+    SELECT
+      a.id AS article_id,
+      a.title,
+      a.source,
+      aa.keywords,
+      (
+        SELECT lo.theme
+        FROM labeled_outcomes lo
+        JOIN articles anchor ON anchor.id = lo.article_id
+        WHERE lo.horizon = '2w'
+          AND anchor.embedding IS NOT NULL
+        ORDER BY anchor.embedding <=> a.embedding
+        LIMIT 1
+      ) AS best_theme,
+      (
+        SELECT 1 - (anchor.embedding <=> a.embedding)
+        FROM articles anchor
+        JOIN labeled_outcomes lo ON lo.article_id = anchor.id
+        WHERE lo.horizon = '2w'
+          AND anchor.embedding IS NOT NULL
+        ORDER BY anchor.embedding <=> a.embedding
+        LIMIT 1
+      ) AS best_sim
+    FROM articles a
+    LEFT JOIN article_analysis aa ON aa.article_id = a.id
+    ${whereClause}
+    ORDER BY a.published_at DESC
+    LIMIT $${limitParamIndex}
+  `, params);
+
+  return rows;
+}
+
+async function backfillThemeTaxonomyMetadata(client, limit) {
+  const effectiveLimit = Number.isFinite(Number(limit)) && Number(limit) > 0
+    ? Math.floor(Number(limit))
+    : DEFAULT_LIMIT;
+
+  const { rows } = await client.query(`
+    SELECT article_id, auto_theme, confidence, method
+    FROM auto_article_themes
+    WHERE theme_key IS NULL
+       OR theme_category IS NULL
+       OR lifecycle_hint IS NULL
+       OR confidence_tier IS NULL
+       OR taxonomy_version IS NULL
+    ORDER BY updated_at DESC NULLS LAST, article_id DESC
+    LIMIT $1
+  `, [effectiveLimit]);
+
+  const records = rows.map((row) => buildAutoThemeRecord({
+    article_id: row.article_id,
+    best_theme: row.auto_theme,
+    best_sim: row.confidence,
+  }, null, null, row.method || 'embedding-batch'));
+  return bulkUpsertAutoArticleThemes(client, records);
+}
+
 export function parseArgs(argv = process.argv.slice(2)) {
   const result = {
     steps: [],
@@ -88,16 +288,54 @@ function shouldRunStep(step, options) {
   return options.steps.length === 0 || options.steps.includes(step);
 }
 
-async function ensureAutoPipelineTables(client) {
+export async function ensureAutoPipelineTables(client) {
   await ensureArticleAnalysisTables(client);
   await client.query(`
     CREATE TABLE IF NOT EXISTS auto_article_themes (
       article_id INTEGER PRIMARY KEY REFERENCES articles(id),
       auto_theme TEXT,
+      source_theme TEXT,
       confidence DOUBLE PRECISION DEFAULT 0,
+      confidence_tier TEXT,
       method TEXT DEFAULT 'embedding-cluster',
+      theme_key TEXT,
+      theme_label TEXT,
+      theme_type TEXT,
+      parent_theme TEXT,
+      parent_theme_label TEXT,
+      theme_category TEXT,
+      lifecycle_hint TEXT,
+      taxonomy_version TEXT,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS source_theme TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS confidence_tier TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS theme_key TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS theme_label TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS theme_type TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS parent_theme TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS parent_theme_label TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS theme_category TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS lifecycle_hint TEXT;
+    ALTER TABLE auto_article_themes
+      ADD COLUMN IF NOT EXISTS taxonomy_version TEXT;
+
+    CREATE INDEX IF NOT EXISTS idx_auto_article_themes_theme_key
+      ON auto_article_themes (theme_key, confidence DESC);
+    CREATE INDEX IF NOT EXISTS idx_auto_article_themes_parent_theme
+      ON auto_article_themes (parent_theme, confidence DESC);
+    CREATE INDEX IF NOT EXISTS idx_auto_article_themes_theme_category
+      ON auto_article_themes (theme_category, confidence DESC);
 
     CREATE TABLE IF NOT EXISTS auto_theme_symbol_candidates (
       id SERIAL PRIMARY KEY,
@@ -195,66 +433,14 @@ async function ensureAutoPipelineTables(client) {
 
 async function step1ClassifyThemes(client, options) {
   await ensureAutoPipelineTables(client);
-  const params = [];
-  const conditions = [
-    'a.embedding IS NOT NULL',
-    'NOT EXISTS (SELECT 1 FROM auto_article_themes t WHERE t.article_id = a.id)',
-  ];
+  const scoredRows = await fetchUnclassifiedThemeCandidates(client, options);
+  const records = scoredRows.map((row) => buildAutoThemeRecord(row, null, null, 'embedding-batch'));
 
-  if (options.since) {
-    params.push(options.since);
-    conditions.push(`a.published_at >= $${params.length}::timestamptz`);
-  }
-  params.push(options.limit);
-  const limitParamIndex = params.length;
-  params.push(AUTO_THEME_CONFIDENT_THRESHOLD);
-  const confidentThresholdParamIndex = params.length;
-  params.push(AUTO_THEME_UNCERTAIN_THRESHOLD);
-  const uncertainThresholdParamIndex = params.length;
-
-  await client.query(`
-    INSERT INTO auto_article_themes (article_id, auto_theme, confidence, method)
-    SELECT
-      scored.article_id,
-      CASE
-        WHEN scored.best_sim >= $${confidentThresholdParamIndex} THEN scored.best_theme
-        WHEN scored.best_sim >= $${uncertainThresholdParamIndex} THEN COALESCE(scored.best_theme, 'unknown')
-        ELSE 'unknown'
-      END AS auto_theme,
-      COALESCE(scored.best_sim, 0),
-      'embedding-batch'
-    FROM (
-      SELECT
-        a.id AS article_id,
-        (
-          SELECT lo.theme
-          FROM labeled_outcomes lo
-          JOIN articles anchor ON anchor.id = lo.article_id
-          WHERE lo.horizon = '2w'
-            AND anchor.embedding IS NOT NULL
-          ORDER BY anchor.embedding <=> a.embedding
-          LIMIT 1
-        ) AS best_theme,
-        (
-          SELECT 1 - (anchor.embedding <=> a.embedding)
-          FROM articles anchor
-          JOIN labeled_outcomes lo ON lo.article_id = anchor.id
-          WHERE lo.horizon = '2w'
-            AND anchor.embedding IS NOT NULL
-          ORDER BY anchor.embedding <=> a.embedding
-          LIMIT 1
-        ) AS best_sim
-      FROM articles a
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY a.published_at DESC
-      LIMIT $${limitParamIndex}
-    ) scored
-    ON CONFLICT (article_id) DO UPDATE SET
-      auto_theme = EXCLUDED.auto_theme,
-      confidence = EXCLUDED.confidence,
-      method = EXCLUDED.method,
-      updated_at = NOW()
-  `, params);
+  await bulkUpsertAutoArticleThemes(client, records);
+  await backfillThemeTaxonomyMetadata(
+    client,
+    Math.max(Number(options.limit) || DEFAULT_LIMIT, AUTO_THEME_UPSERT_CHUNK_SIZE),
+  );
 
   const { rows } = await client.query(`
     SELECT auto_theme, COUNT(*)::int AS count
@@ -501,22 +687,21 @@ async function step2RefreshThemeSymbols(client) {
 }
 
 async function step3LabelOutcomes(client, options) {
-  const queryParams = [];
-  const conditions = [
+  const builder = createWhereBuilder([
     `t.auto_theme <> 'unknown'`,
     `NOT EXISTS (SELECT 1 FROM labeled_outcomes lo WHERE lo.article_id = t.article_id)`,
-  ];
+  ]);
   if (options.since) {
-    queryParams.push(options.since);
-    conditions.push(`a.published_at >= $${queryParams.length}::timestamptz`);
+    builder.addValue(options.since, (placeholder) => `a.published_at >= ${placeholder}::timestamptz`);
   }
+  const { whereClause, params: queryParams } = builder.build();
   queryParams.push(options.limit);
 
   const { rows: newArticles } = await client.query(`
     SELECT t.article_id, t.auto_theme, a.published_at
     FROM auto_article_themes t
     JOIN articles a ON a.id = t.article_id
-    WHERE ${conditions.join(' AND ')}
+    ${whereClause}
     ORDER BY a.published_at DESC
     LIMIT $${queryParams.length}
   `, queryParams);
@@ -654,7 +839,16 @@ async function step4RefreshAnalysisArtifacts(client, options) {
       LIMIT 5
     `, [pair.theme]);
 
-    const prompt = `Summarize in one concise Korean sentence why ${pair.symbol} reacts to ${pair.theme} news. Use only causal mechanism language.\n\nContext:\n${titles.map((row) => `- ${row.title}`).join('\n')}`;
+    const prompt = [
+      `Summarize why ${pair.symbol} reacts to ${pair.theme} news in exactly one concise Korean sentence.`,
+      'This is a causal explanation, not a trading opinion.',
+      'Use only the supplied headlines.',
+      'Focus on transmission mechanism such as demand, supply, regulation, rates, sentiment, or commodity linkage.',
+      'Do not mention prompt rules or add bullet points.',
+      '',
+      'Context:',
+      ...titles.map((row) => `- ${row.title}`),
+    ].join('\n');
     try {
       const response = await fetch(chatConfig.endpoint.replace(/\/api\/chat$/, '/api/generate'), {
         method: 'POST',

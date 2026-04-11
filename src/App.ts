@@ -28,6 +28,9 @@ import { BETA_MODE } from '@/config/beta';
 import { trackEvent, trackDeeplinkOpened } from '@/services/analytics';
 import { preloadCountryGeometry, getCountryNameByCode } from '@/services/country-geometry';
 import { initI18n } from '@/services/i18n';
+import { getWorkspaceDefinition } from '@/config/workspaces';
+import { loadOperatorContext, mergeOperatorContext, persistOperatorContext } from '@/services/operator-context';
+import { createLogger } from '@/utils/logger';
 
 import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount } from '@/config/feeds';
 import { fetchBootstrapData, getBootstrapHydrationStatus } from '@/services/bootstrap';
@@ -41,6 +44,7 @@ import { EventHandlerManager } from '@/app/event-handlers';
 import { resolveUserRegion, resolvePreciseUserCoordinates, type PreciseCoordinates } from '@/utils/user-location';
 
 const CYBER_LAYER_ENABLED = import.meta.env.VITE_ENABLE_CYBER_LAYER === 'true';
+const appLogger = createLogger('App');
 
 export type { CountryBriefSignals } from '@/app/app-context';
 
@@ -81,10 +85,10 @@ export class App {
     // Check if variant changed - reset all settings to variant defaults
     const storedVariant = localStorage.getItem('worldmonitor-variant');
     const currentVariant = SITE_VARIANT;
-    console.log(`[App] Variant check: stored="${storedVariant}", current="${currentVariant}"`);
+    appLogger.info('Variant check', { storedVariant, currentVariant });
     if (storedVariant !== currentVariant) {
       // Variant changed - use defaults for new variant, clear old settings
-      console.log('[App] Variant changed - resetting to defaults');
+      appLogger.info('Variant changed - resetting to defaults');
       localStorage.setItem('worldmonitor-variant', currentVariant);
       localStorage.removeItem(STORAGE_KEYS.mapLayers);
       localStorage.removeItem(STORAGE_KEYS.panels);
@@ -111,7 +115,9 @@ export class App {
           panelSettings[key] = { ...config };
         }
       }
-      console.log('[App] Loaded panel settings from storage:', Object.entries(panelSettings).filter(([_, v]) => !v.enabled).map(([k]) => k));
+      appLogger.debug('Loaded panel settings from storage', {
+        disabledPanels: Object.entries(panelSettings).filter(([_, v]) => !v.enabled).map(([k]) => k),
+      });
 
       // One-time migration: reorder panels for existing users (v1.9 panel layout)
       const PANEL_ORDER_MIGRATION_KEY = 'worldmonitor-panel-order-v1.9';
@@ -127,7 +133,7 @@ export class App {
             newOrder.push(...priorityPanels.filter(p => order.includes(p)));
             newOrder.push(...filtered);
             localStorage.setItem(PANEL_ORDER_KEY, JSON.stringify(newOrder));
-            console.log('[App] Migrated panel order to v1.9 layout');
+            appLogger.info('Migrated panel order to v1.9 layout');
           } catch {
             // Invalid saved order, will use defaults
           }
@@ -149,7 +155,7 @@ export class App {
               if (order.includes('insights')) newOrder.push('insights');
               newOrder.push(...filtered);
               localStorage.setItem(PANEL_ORDER_KEY, JSON.stringify(newOrder));
-              console.log('[App] Tech variant: Migrated insights panel to top');
+              appLogger.info('Tech variant migration moved insights panel to top');
             } catch {
               // Invalid saved order, will use defaults
             }
@@ -194,7 +200,7 @@ export class App {
             const filtered = order.filter((key) => !preferred.includes(key));
             const nextOrder = [...preferred, ...filtered];
             localStorage.setItem(PANEL_ORDER_KEY, JSON.stringify(nextOrder));
-            console.log('[App] Applied signal-first panel order migration (v2.6)');
+            appLogger.info('Applied signal-first panel order migration', { migration: 'v2.6' });
           } catch {
             // invalid saved order; default order will apply
           }
@@ -213,7 +219,7 @@ export class App {
         localStorage.removeItem(PANEL_ORDER_KEY + '-bottom');
         localStorage.removeItem(PANEL_ORDER_KEY + '-bottom-set');
         localStorage.removeItem(PANEL_SPANS_KEY);
-        console.log('[App] Applied layout reset migration (v2.5): cleared panel order/spans');
+        appLogger.info('Applied layout reset migration', { migration: 'v2.5' });
       }
       localStorage.setItem(LAYOUT_RESET_MIGRATION_KEY, 'done');
     }
@@ -260,7 +266,10 @@ export class App {
         saveToStorage(STORAGE_KEYS.disabledFeeds, defaultDisabled);
         localStorage.setItem(baseKey, 'done');
         const total = getTotalFeedCount();
-        console.log(`[App] Sources reduction: ${defaultDisabled.length} disabled, ${total - defaultDisabled.length} enabled`);
+          appLogger.info('Applied source reduction defaults', {
+            disabledCount: defaultDisabled.length,
+            enabledCount: total - defaultDisabled.length,
+          });
       }
       // Locale boost: additively enable locale-matched sources (runs once per locale)
       const userLang = ((navigator.language ?? 'en').split('-')[0] ?? 'en').toLowerCase();
@@ -271,13 +280,28 @@ export class App {
           const current = loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []);
           const updated = current.filter(name => !boosted.has(name));
           saveToStorage(STORAGE_KEYS.disabledFeeds, updated);
-          console.log(`[App] Locale boost (${userLang}): enabled ${current.length - updated.length} sources`);
+            appLogger.info('Applied locale source boost', {
+              language: userLang,
+              enabledSourceCount: current.length - updated.length,
+            });
         }
         localStorage.setItem(localeKey, 'done');
       }
     }
 
     const disabledSources = new Set(loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []));
+    const initialWorkspace = getWorkspaceDefinition(
+      initialUrlState.workspace || localStorage.getItem('lattice-current-workspace') || localStorage.getItem('worldmonitor-workspace'),
+      SITE_VARIANT,
+    ).id;
+    const initialOperatorContext = loadOperatorContext({
+      workspaceId: initialWorkspace,
+      selectedThemeId: initialUrlState.theme ?? null,
+      mapView: initialUrlState.view ?? (isMobile ? 'mena' : 'global'),
+      timeRange: initialUrlState.timeRange ?? '7d',
+      selectedCountryCode: initialUrlState.country ?? null,
+      selectedGeoEntityId: initialUrlState.country ?? null,
+    });
 
     // Build shared state object
     this.state = {
@@ -297,7 +321,20 @@ export class App {
       intelligenceCache: {},
       cyberThreatsCache: null,
       disabledSources,
-      currentTimeRange: '7d',
+      currentTimeRange: initialOperatorContext.timeRange,
+      operatorContext: initialOperatorContext,
+      setOperatorContext: (patch, options) => {
+        const next = mergeOperatorContext(this.state.operatorContext, patch);
+        const changed = JSON.stringify(next) !== JSON.stringify(this.state.operatorContext);
+        this.state.operatorContext = next;
+        if (options?.persist !== false) {
+          persistOperatorContext(next);
+        }
+        if (changed && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('wm:operator-context-changed', { detail: next }));
+        }
+        return next;
+      },
       inFlight: new Set(),
       seenGeoAlerts: new Set(),
       monitors,
@@ -366,6 +403,7 @@ export class App {
       loadAllData: () => this.dataLoader.loadAllData(),
       flushStaleRefreshes: () => this.refreshScheduler.flushStaleRefreshes(),
       setHiddenSince: (ts) => this.refreshScheduler.setHiddenSince(ts),
+      ensureMapMounted: (forceRender) => this.panelLayout.ensureMapMounted(forceRender),
       loadDataForLayer: (layer) => { void this.dataLoader.loadDataForLayer(layer as keyof MapLayers); },
       waitForAisData: () => this.dataLoader.waitForAisData(),
       syncDataFreshnessWithLayers: () => this.dataLoader.syncDataFreshnessWithLayers(),
@@ -539,6 +577,12 @@ export class App {
     this.eventHandlers.setupUrlStateSync();
 
     this.state.countryBriefPage?.onStateChange?.(() => {
+      const visible = this.state.countryBriefPage?.isVisible() === true;
+      const countryCode = visible ? (this.state.countryBriefPage?.getCode() ?? null) : null;
+      this.state.setOperatorContext({
+        selectedCountryCode: countryCode,
+        selectedGeoEntityId: countryCode,
+      }, { persist: false });
       this.eventHandlers.syncUrlState();
     });
 
@@ -570,7 +614,7 @@ export class App {
     // Phase 7: Refresh scheduling
     this.setupRefreshIntervals();
     this.eventHandlers.setupSnapshotSaving();
-    cleanOldSnapshots().catch((e) => console.warn('[Storage] Snapshot cleanup failed:', e));
+    cleanOldSnapshots().catch((e) => appLogger.warn('Snapshot cleanup failed', { error: String(e) }));
 
     // Phase 8: Update checks
     this.desktopUpdater.init();
@@ -638,6 +682,21 @@ export class App {
     }
   }
 
+  private isPanelVisibleInActiveWorkspace(panelKey: string): boolean {
+    const panel = this.state.panels[panelKey];
+    if (!panel) return false;
+    const element = panel.getElement();
+    return element.offsetParent !== null && !element.classList.contains('workspace-hidden');
+  }
+
+  private isMapSectionVisible(): boolean {
+    const mapSection = document.getElementById('mapSection');
+    return !!mapSection
+      && mapSection.offsetParent !== null
+      && !mapSection.classList.contains('workspace-hidden')
+      && !mapSection.classList.contains('hidden');
+  }
+
   private setupRefreshIntervals(): void {
     // Always refresh news for all variants
     this.refreshScheduler.scheduleRefresh('news', () => this.dataLoader.loadNews(), REFRESH_INTERVALS.feeds);
@@ -673,44 +732,50 @@ export class App {
       'service-status',
       () => (this.state.panels['service-status'] as ServiceStatusPanel).fetchStatus(),
       60_000,
-      () => !!this.state.panels['service-status']
+      () => this.isPanelVisibleInActiveWorkspace('service-status'),
+      'service-status',
     );
     this.refreshScheduler.scheduleRefresh(
       'stablecoins',
       () => (this.state.panels['stablecoins'] as StablecoinPanel).fetchData(),
       3 * 60_000,
-      () => !!this.state.panels['stablecoins']
+      () => this.isPanelVisibleInActiveWorkspace('stablecoins'),
+      'stablecoins',
     );
     this.refreshScheduler.scheduleRefresh(
       'etf-flows',
       () => (this.state.panels['etf-flows'] as ETFFlowsPanel).fetchData(),
       3 * 60_000,
-      () => !!this.state.panels['etf-flows']
+      () => this.isPanelVisibleInActiveWorkspace('etf-flows'),
+      'etf-flows',
     );
     this.refreshScheduler.scheduleRefresh(
       'macro-signals',
       () => (this.state.panels['macro-signals'] as MacroSignalsPanel).fetchData(),
       3 * 60_000,
-      () => !!this.state.panels['macro-signals']
+      () => this.isPanelVisibleInActiveWorkspace('macro-signals'),
+      'macro-signals',
     );
     this.refreshScheduler.scheduleRefresh(
       'event-intelligence',
       () => (this.state.panels['event-intelligence'] as EventIntelligencePanel).refresh(),
       60_000,
-      () => !!this.state.panels['event-intelligence'],
+      () => this.isPanelVisibleInActiveWorkspace('event-intelligence'),
       'event-intelligence',
     );
     this.refreshScheduler.scheduleRefresh(
       'strategic-posture',
       () => (this.state.panels['strategic-posture'] as StrategicPosturePanel).refresh(),
       15 * 60_000,
-      () => !!this.state.panels['strategic-posture']
+      () => this.isPanelVisibleInActiveWorkspace('strategic-posture'),
+      'strategic-posture',
     );
     this.refreshScheduler.scheduleRefresh(
       'strategic-risk',
       () => (this.state.panels['strategic-risk'] as StrategicRiskPanel).refresh(),
       5 * 60_000,
-      () => !!this.state.panels['strategic-risk']
+      () => this.isPanelVisibleInActiveWorkspace('strategic-risk'),
+      'strategic-risk',
     );
 
     // Server-side temporal anomalies (news + satellite_fires)
@@ -720,8 +785,18 @@ export class App {
 
     // WTO trade policy data — annual data, poll every 10 min to avoid hammering upstream
     if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance') {
-      this.refreshScheduler.scheduleRefresh('tradePolicy', () => this.dataLoader.loadTradePolicy(), 10 * 60 * 1000);
-      this.refreshScheduler.scheduleRefresh('supplyChain', () => this.dataLoader.loadSupplyChain(), 10 * 60 * 1000);
+      this.refreshScheduler.scheduleRefresh(
+        'tradePolicy',
+        () => this.dataLoader.loadTradePolicy(),
+        10 * 60 * 1000,
+        () => this.isPanelVisibleInActiveWorkspace('trade-policy'),
+      );
+      this.refreshScheduler.scheduleRefresh(
+        'supplyChain',
+        () => this.dataLoader.loadSupplyChain(),
+        10 * 60 * 1000,
+        () => this.isPanelVisibleInActiveWorkspace('supply-chain'),
+      );
     }
 
     // Telegram Intel (near real-time, 60s refresh)
@@ -735,15 +810,32 @@ export class App {
     // Refresh intelligence signals for CII (geopolitical variant only)
     if (SITE_VARIANT === 'full') {
       if (isGlintGeoEnabled()) {
-        this.refreshScheduler.scheduleRefresh('glintRealtime', () => this.dataLoader.refreshGlintRealtime(), 45 * 1000);
+        this.refreshScheduler.scheduleRefresh(
+          'glintRealtime',
+          () => this.dataLoader.refreshGlintRealtime(),
+          45 * 1000,
+          () => this.isMapSectionVisible()
+            || this.isPanelVisibleInActiveWorkspace('cii')
+            || this.isPanelVisibleInActiveWorkspace('strategic-posture')
+            || this.isPanelVisibleInActiveWorkspace('strategic-risk'),
+        );
       }
-      this.refreshScheduler.scheduleRefresh('intelligence', () => {
-        const { military, iranEvents } = this.state.intelligenceCache;
-        this.state.intelligenceCache = {};
-        if (military) this.state.intelligenceCache.military = military;
-        if (iranEvents) this.state.intelligenceCache.iranEvents = iranEvents;
-        return this.dataLoader.loadIntelligenceSignals();
-      }, 15 * 60 * 1000);
+      this.refreshScheduler.scheduleRefresh(
+        'intelligence',
+        () => {
+          const { military, iranEvents } = this.state.intelligenceCache;
+          this.state.intelligenceCache = {};
+          if (military) this.state.intelligenceCache.military = military;
+          if (iranEvents) this.state.intelligenceCache.iranEvents = iranEvents;
+          return this.dataLoader.loadIntelligenceSignals();
+        },
+        15 * 60 * 1000,
+        () => this.isMapSectionVisible()
+          || this.isPanelVisibleInActiveWorkspace('cii')
+          || this.isPanelVisibleInActiveWorkspace('strategic-posture')
+          || this.isPanelVisibleInActiveWorkspace('strategic-risk')
+          || this.isPanelVisibleInActiveWorkspace('event-intelligence'),
+      );
     }
 
     // Run autonomous API-source discovery and multimodal extraction on dedicated loops.

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { ensureArticleAnalysisTables } from './_shared/article-analysis-schema.mjs';
 import { buildFastArticleAnalysis, collectTrendKeywordStats } from './_shared/text-keywords.mjs';
+import { createWhereBuilder } from './_shared/query-builder.mjs';
 
 loadOptionalEnvFile();
 
@@ -34,11 +35,10 @@ export function parseArgs(argv = process.argv.slice(2)) {
 }
 
 function buildArticleQuery(options) {
-  const conditions = ['a.title IS NOT NULL', 'LENGTH(a.title) >= 10'];
-  const params = [];
+  const builder = createWhereBuilder(['a.title IS NOT NULL', 'LENGTH(a.title) >= 10']);
 
   if (!options.refreshExisting) {
-    conditions.push(`NOT EXISTS (
+    builder.addRaw(`NOT EXISTS (
       SELECT 1
       FROM article_analysis aa
       WHERE aa.article_id = a.id
@@ -47,9 +47,10 @@ function buildArticleQuery(options) {
   }
 
   if (options.since) {
-    params.push(options.since);
-    conditions.push(`a.published_at >= $${params.length}::timestamptz`);
+    builder.addValue(options.since, (placeholder) => `a.published_at >= ${placeholder}::timestamptz`);
   }
+
+  const { whereClause, params } = builder.build();
 
   let limitClause = '';
   if (options.limit > 0) {
@@ -61,7 +62,7 @@ function buildArticleQuery(options) {
     sql: `
       SELECT a.id, a.title, a.summary, a.theme, a.published_at
       FROM articles a
-      WHERE ${conditions.join(' AND ')}
+      ${whereClause}
       ORDER BY a.published_at DESC
       ${limitClause}
     `,

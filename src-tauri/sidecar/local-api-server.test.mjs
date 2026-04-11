@@ -7,7 +7,12 @@ import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { __setCodexRunnerForTests, createLocalApiServer } from './local-api-server.mjs';
+import { __setCodexRunnerForTests, createLocalApiServer, resolveConfig } from './local-api-server.mjs';
+
+test('resolveConfig disables background automation by default for tauri-sidecar mode', () => {
+  const config = resolveConfig({ mode: 'tauri-sidecar', logger: { log() {}, warn() {}, error() {} } });
+  assert.equal(config.backgroundAutomationEnabled, false);
+});
 
 async function listen(server, host = '127.0.0.1', port = 0) {
   await new Promise((resolve, reject) => {

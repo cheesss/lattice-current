@@ -1,741 +1,2072 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lattice Event Intelligence</title>
+<title>Lattice Signal Intelligence</title>
 <style>
-:root{--bg:#0a0f0a;--surface:#141a14;--surface2:#1a221a;--border:#1e2e1e;--text:#e0e8e0;--dim:#6a7a6a;--accent:#4aff8a;--neg:#ff5a5a;--pos:#4aff8a;--warn:#ffaa33;--blue:#6a8aff}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'SF Mono','Fira Code',monospace;background:var(--bg);color:var(--text);font-size:12px;line-height:1.5}
-.container{max-width:1600px;margin:0 auto;padding:12px}
-h1{color:var(--accent);font-size:16px;margin-bottom:4px}
-.subtitle{color:var(--dim);margin-bottom:12px;font-size:11px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px;min-height:60px}
-.card-title{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-.card-title .badge{background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:10px;color:var(--dim)}
+:root{--bg:#0a0d09;--surface:#171f16;--surface2:#202a1f;--border:#2f3d2e;--text:#edf3e7;--muted:#8fa286;--accent:#c5ff6d;--accent2:#7ee081;--amber:#f3b562;--red:#ff7a6b;--teal:#67d1c5;--blue:#7ca9ff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at top left,rgba(197,255,109,.08),transparent 28%),radial-gradient(circle at top right,rgba(243,181,98,.08),transparent 24%),linear-gradient(180deg,#090c08 0%,#0d120c 40%,#0a0d09 100%);color:var(--text);font-family:SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;font-size:12px;line-height:1.55}
+a{color:var(--text)}
+.container{max-width:1680px;margin:0 auto;padding:18px}
+.hero,.section-block,.surface-drawer{border:1px solid rgba(255,255,255,.05);border-radius:18px;background:rgba(17,23,15,.8)}
+.hero{display:flex;justify-content:space-between;gap:18px;padding:20px}
+.eyebrow{color:var(--amber);text-transform:uppercase;letter-spacing:.22em;font-size:10px;margin-bottom:8px}
+h1{font-size:28px;line-height:1.1;letter-spacing:.04em;color:var(--accent);margin-bottom:10px}
+.subtitle{max-width:860px;color:var(--muted);font-size:13px}
+.hero-actions{min-width:380px;display:flex;flex-direction:column;gap:12px;align-items:flex-end}
+.tabs,.toolbar,.inline-toolbar,.pill-row,.legend,.event-reactions{display:flex;gap:8px;flex-wrap:wrap}
+.tab,.btn,select{appearance:none;border:1px solid var(--border);border-radius:999px;background:var(--surface2);color:var(--text);font:inherit}
+.tab,.btn{padding:8px 14px;cursor:pointer}
+.tab.active{background:linear-gradient(135deg,rgba(197,255,109,.22),rgba(126,224,129,.12));border-color:rgba(197,255,109,.5);color:var(--accent)}
+.select-label,#last-update,.muted,.meta-line{color:var(--muted);font-size:11px}
+select{padding:7px 12px;min-width:168px}
+.hero-grid,.grid2,.grid3,.reference-grid,.mini-grid,.pyramid-grid,.category-grid,.kpi-grid,.primary-grid{display:grid;gap:12px}
+.hero-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:16px}
+.hero-grid.hero-grid-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid2,.reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mini-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pyramid-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.primary-grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+.span-5{grid-column:span 5}.span-7{grid-column:span 7}.span-2{grid-column:span 2}
+.section-block{margin-top:18px;padding:18px}
+.secondary-block{background:rgba(14,18,13,.62)}
+.section-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:14px}
+.section-kicker{color:var(--amber);text-transform:uppercase;letter-spacing:.18em;font-size:10px;margin-bottom:4px}
+.section-title{color:var(--accent);font-size:17px}
+.section-meta{text-align:right}
+.card,.subcard,.stage-column,.category-card,.insight-card,.interactive-row,.story-card,.stage-item,.kpi,.info-note{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:14px}
+.card{padding:14px}
+.accent-card{border-color:rgba(197,255,109,.18);background:linear-gradient(155deg,rgba(32,43,22,.95),rgba(20,26,17,.97))}
+.sticky-card{position:sticky;top:12px}
+.subcard,.category-card,.insight-card,.interactive-row,.story-card,.stage-item,.kpi,.info-note{padding:12px}
+.card-title,.subcard-title{color:var(--accent);text-transform:uppercase;letter-spacing:.14em}
+.card-title{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;margin-bottom:10px}
+.subcard-title{font-size:10px;margin-bottom:8px}
+.badge,.tag,.reaction-chip{display:inline-flex;align-items:center;border-radius:999px;font-size:10px}
+.badge{padding:4px 8px;background:rgba(255,255,255,.04);color:var(--muted)}
+.tag{padding:3px 8px;border:1px solid transparent}
+.tag-neutral{background:rgba(255,255,255,.05);color:var(--muted)}
+.tag-mainstream{background:rgba(103,209,197,.11);border-color:rgba(103,209,197,.22);color:var(--teal)}
+.tag-growing{background:rgba(126,224,129,.11);border-color:rgba(126,224,129,.22);color:var(--accent2)}
+.tag-emerging{background:rgba(197,255,109,.11);border-color:rgba(197,255,109,.22);color:var(--accent)}
+.tag-nascent{background:rgba(243,181,98,.12);border-color:rgba(243,181,98,.22);color:var(--amber)}
+.tag-declining{background:rgba(255,122,107,.12);border-color:rgba(255,122,107,.22);color:var(--red)}
+.pos{color:var(--accent2)}.neg{color:var(--red)}
+.loading{color:var(--muted);padding:12px 0}
+.story-list,.insight-list,.stage-body,.brief-list{display:flex;flex-direction:column;gap:10px}
+.theme-actions,.theme-chip-row{display:flex;gap:8px;flex-wrap:wrap}
+.story-card{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px}
+.story-rank{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:linear-gradient(135deg,rgba(197,255,109,.18),rgba(243,181,98,.16));color:var(--accent);font-size:16px}
+.story-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:4px}
+.story-summary,.stage-note{color:var(--muted);font-size:11px;margin-top:6px}
+.stage-head{padding:10px 10px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
+.stage-label{font-size:11px;text-transform:uppercase;letter-spacing:.14em}
+.table-wrap,.chart-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:11px}
-th{text-align:left;color:var(--dim);padding:3px 6px;border-bottom:1px solid var(--border);font-weight:normal}
-td{padding:3px 6px;border-bottom:1px solid #111}
-.pos{color:var(--pos)}.neg{color:var(--neg)}.warn{color:var(--warn)}.blue{color:var(--blue)}
-.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;margin:1px}
-.tag-hot{background:#2a1a0a;color:#ff8a33}.tag-warm{background:#1a1a0a;color:#ccaa33}.tag-cool{background:#0a1a2a;color:#6a8aff}
-.tag-pos{background:#0a2a0a;color:var(--pos)}.tag-neg{background:#2a0a0a;color:var(--neg)}.tag-neutral{background:#1a1a1a;color:var(--dim)}
-.heatmap-cell{width:100%;height:24px;display:flex;align-items:center;justify-content:center;border-radius:3px;font-size:10px;font-weight:bold}
-.sparkline{display:flex;align-items:end;gap:1px;height:30px}
-.sparkline-bar{flex:1;background:var(--accent);opacity:0.4;border-radius:1px;min-width:2px}
-.event-row{padding:6px;border-bottom:1px solid var(--border);cursor:pointer}
-.event-row:hover{background:var(--surface2)}
-.event-title{font-size:11px;color:var(--text);margin-bottom:2px}
-.event-meta{font-size:10px;color:var(--dim)}
-.event-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
-.reaction-chip{font-size:10px;padding:1px 4px;border-radius:2px;background:var(--surface2)}
-.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}
-.dot-green{background:var(--pos)}.dot-yellow{background:var(--warn)}.dot-red{background:var(--neg)}.dot-gray{background:var(--dim)}
-.loading{color:var(--dim);padding:10px;text-align:center;font-size:11px}
-.section-title{color:var(--accent);font-size:13px;margin:14px 0 8px;border-bottom:1px solid var(--border);padding-bottom:3px}
-.refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--accent);padding:3px 10px;border-radius:3px;cursor:pointer;font-family:inherit;font-size:10px}
-.refresh-btn:hover{background:var(--border)}
-#last-update{color:var(--dim);font-size:10px}
-.interactive-row{padding:8px;border:1px solid transparent;border-radius:4px;margin-bottom:6px;cursor:pointer;background:var(--surface)}
-.interactive-row:hover{background:var(--surface2);border-color:var(--border)}
-.interactive-row.active{border-color:var(--accent);background:rgba(74,255,138,0.06)}
-.detail-meta{font-size:10px;color:var(--dim);margin-top:4px}
-.detail-block{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-.pill-row{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+th,td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.05);text-align:left}
+th{color:var(--muted);font-weight:normal}
+.event-row{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.event-row:last-child{border-bottom:none}
+.event-title{font-size:12px;margin-bottom:4px}
+.reaction-chip{padding:3px 8px;background:rgba(255,255,255,.05)}
+.sparkline{display:flex;align-items:flex-end;gap:2px;height:34px;margin-top:8px}
+.sparkline-bar{flex:1;min-width:4px;border-radius:4px 4px 0 0;background:linear-gradient(180deg,rgba(197,255,109,.95),rgba(126,224,129,.4))}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.dot-green{background:var(--accent2)}.dot-yellow{background:var(--amber)}.dot-red{background:var(--red)}
+.line-key{display:inline-flex;align-items:center;gap:6px}.line-swatch{width:14px;height:3px;border-radius:3px}
+.detail-block{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05)}
+.theme-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);cursor:pointer}
+.theme-chip.active{border-color:rgba(197,255,109,.5);background:linear-gradient(135deg,rgba(197,255,109,.22),rgba(126,224,129,.12));color:var(--accent)}
+.theme-chip.muted{opacity:.6}
+.focus-strip{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;margin-bottom:12px}
+.map-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
+.focus-summary{display:flex;flex-direction:column;gap:10px}
+.focus-title{font-size:15px;color:var(--accent)}
+.focus-actions{display:flex;gap:8px;flex-wrap:wrap}
+.focus-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.step-list{display:flex;flex-direction:column;gap:8px}
+.step-item{padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:12px;background:rgba(255,255,255,.02)}
+.step-index{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:rgba(197,255,109,.18);color:var(--accent);font-size:10px;margin-right:8px}
+.jump-note{color:var(--muted);font-size:11px}
+.brief-pulse{box-shadow:0 0 0 1px rgba(197,255,109,.35),0 0 24px rgba(197,255,109,.15)}
+.inline-help{margin-bottom:10px}
+.brief-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.brief-hero{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.brief-copy{color:var(--text);font-size:12px}
+.brief-stats,.brief-provenance-list{display:flex;gap:8px;flex-wrap:wrap}
+.brief-stat{min-width:124px;padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:12px;background:rgba(255,255,255,.02)}
+.brief-stat-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+.brief-stat-value{margin-top:4px;font-size:14px;color:var(--text)}
+.delta-kpi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.brief-section{padding:12px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:rgba(255,255,255,.02)}
+.brief-section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
+.brief-section-title{color:var(--accent);text-transform:uppercase;letter-spacing:.14em;font-size:10px;margin-bottom:8px}
+.brief-item{padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:10px;background:rgba(255,255,255,.02)}
+.brief-item strong{display:block;margin-bottom:4px}
+.brief-item-copy{color:var(--text);font-size:12px}
+.map-primary-card{padding-bottom:16px}
+.map-secondary-card{max-width:720px}
+.embed-frame{display:block;width:100%;height:clamp(620px,72vh,860px);border:1px solid rgba(255,255,255,.06);border-radius:14px;background:#0b100c}
+.payload-preview{margin-top:8px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.02);color:var(--muted);font-size:11px;white-space:pre-wrap;word-break:break-word}
+.review-grid{display:flex;flex-direction:column;gap:10px}
+.review-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.review-card-title{display:flex;flex-direction:column;gap:4px}
+.review-card-title strong{font-size:12px;color:var(--text)}
+.lens-note{margin-bottom:10px}
+.snapshot-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.snapshot-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.snapshot-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.snapshot-row{padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:10px;background:rgba(255,255,255,.02)}
+.note-textarea,.note-input{width:100%;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:var(--text);padding:10px;font:inherit}
+.note-textarea{min-height:120px;resize:vertical}
+.brief-entity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.entity-card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.entity-name{font-size:12px;color:var(--text)}
+.section-note{color:var(--muted);font-size:11px;margin-top:6px}
+.theme-empty{color:var(--muted)}
+.surface-drawer{margin-top:18px;overflow:hidden}
+.surface-drawer>summary{cursor:pointer;list-style:none;padding:16px 18px;color:var(--muted);user-select:none}
+.surface-drawer>summary::-webkit-details-marker{display:none}
+.surface-drawer[open]>summary{color:var(--accent);border-bottom:1px solid rgba(255,255,255,.05)}
+.surface-drawer>summary::after{content:"+";float:right;color:var(--accent)}
+.surface-drawer[open]>summary::after{content:"-"}
+@media (max-width:1320px){.hero,.section-heading{flex-direction:column;align-items:flex-start}.hero-actions{min-width:0;align-items:flex-start}.hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.snapshot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3,.mini-grid,.pyramid-grid,.category-grid,.grid2,.reference-grid,.primary-grid,.kpi-grid,.map-grid{grid-template-columns:1fr}.span-5,.span-7,.span-2{grid-column:span 1}}
+@media (max-width:760px){.container{padding:12px}.hero{padding:16px}h1{font-size:22px}.hero-grid,.snapshot-grid{grid-template-columns:1fr}.story-card{grid-template-columns:1fr}.story-rank{width:34px;height:34px}.embed-frame{height:clamp(420px,58vh,560px)}}
 </style>
 </head>
 <body>
 <div class="container">
-  <div style="display:flex;justify-content:space-between;align-items:center">
+  <header class="hero">
     <div>
-      <h1>LATTICE EVENT INTELLIGENCE</h1>
-      <div class="subtitle">실시간 이벤트-종목 반응 분석 · 기술 트렌드 · 시장 상태</div>
+      <div class="eyebrow">Theme-Led Signal Intelligence</div>
+      <h1>LATTICE SIGNAL INTELLIGENCE</h1>
+      <div class="subtitle">The theme shell is now the primary product surface. Live signals, 2D geo context, Codex proposals, approvals, validation, and operator diagnostics are all reviewed from here instead of a separate legacy main page.</div>
     </div>
-    <div>
-      <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
-      <span id="last-update"></span>
+    <div class="hero-actions">
+      <div id="period-tabs" class="tabs"></div>
+      <div class="toolbar">
+        <label class="select-label">Evolution lens <select id="evolution-parent-select"></select></label>
+        <button class="btn" onclick="refreshAll()">Refresh</button>
+        <span id="last-update"></span>
+      </div>
     </div>
+  </header>
+
+  <div class="hero-grid hero-grid-summary">
+    <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div id="system-status" class="loading">Loading system state...</div></div>
+    <div class="card"><div class="card-title">Horizon Focus <span class="badge" id="current-period-badge">Quarterly</span></div><div id="horizon-summary" class="loading">Preparing horizon focus...</div></div>
+    <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Pick a theme from <strong>Curated Items</strong>, <strong>Trend Pyramid</strong>, or <strong>Structural Alerts</strong>.</div><div class="step-item"><span class="step-index">2</span>Use <strong>Open full brief</strong>. The detailed analysis loads in the <strong>Theme Brief</strong> workspace below.</div><div class="step-item"><span class="step-index">3</span><strong>Follow</strong> themes you care about. That builds a reusable weekly briefing and narrows the workspace around your themes.</div></div></div>
   </div>
 
-  <!-- Row 1: Status + Temperatures + Signals -->
-  <div class="grid3" style="margin-top:10px">
-    <div class="card">
-      <div class="card-title">System Status <span class="badge" id="status-badge">-</span></div>
-      <div id="system-status" class="loading">수집 중...</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Issue Temperature</div>
-      <div id="temperatures" class="loading">수집 중...</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Signal History (Latest)</div>
-      <div id="signals" class="loading">수집 중...</div>
-    </div>
-  </div>
+  <details class="surface-drawer">
+    <summary>Open Operator Controls, Automation, And Runtime Diagnostics</summary>
+    <section class="section-block secondary-block" style="margin-top:0;border:0;background:transparent;padding:18px 0 0">
+      <div class="grid2">
+        <div class="card"><div class="card-title">Automation Budget</div><div id="automation-budget" class="loading">Loading automation budget...</div></div>
+        <div class="card"><div class="card-title">Automation Audit</div><div id="automation-log" class="loading">Loading automation audit...</div></div>
+      </div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="card"><div class="card-title">System Health</div><div id="operator-health" class="loading">Loading system health...</div></div>
+        <div class="card"><div class="card-title">Data Quality</div><div id="operator-data-quality" class="loading">Loading data quality...</div></div>
+        <div class="card"><div class="card-title">Codex Quality</div><div id="operator-codex-quality" class="loading">Loading Codex quality...</div></div>
+      </div>
+    </section>
+  </details>
 
-  <div class="section-title">Automation Control Plane</div>
-  <div class="grid2" style="margin-top:4px">
-    <div class="card">
-      <div class="card-title">Automation Budget</div>
-      <div id="automation-budget" class="loading">Loading automation budget...</div>
+  <section class="section-block" id="workspace-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Workspace</div><div class="section-title">My Themes And Theme Brief</div></div>
+      <div class="section-meta">The product should revolve around themes you follow, not generic feeds.</div>
     </div>
-    <div class="card">
-      <div class="card-title">Automation Audit</div>
-      <div id="automation-log" class="loading">Loading automation activity...</div>
+    <div id="workspace-focus" class="focus-strip">
+      <div class="info-note">Preparing workspace focus...</div>
+      <div class="info-note">Loading next-step guidance...</div>
     </div>
-  </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">My Themes <span class="badge" id="my-themes-badge">0 followed</span></div>
+        <div id="my-themes" class="loading">Preparing followed themes and suggestions...</div>
+      </div>
+      <div class="card sticky-card" id="theme-brief-card">
+        <div class="card-title">Theme Brief <span class="badge" id="theme-brief-badge">No theme selected</span></div>
+        <div class="info-note inline-help" id="theme-brief-help">This is the detailed panel. Any <strong>Open full brief</strong> action updates this card and scrolls you back here.</div>
+        <div id="theme-brief" class="loading">Select a theme from the main trend surfaces to inspect what changed, why it matters, and what to watch next.</div>
+      </div>
+    </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Weekly Structural Briefing <span class="badge" id="followed-briefing-badge">Follow themes to activate</span></div>
+        <div id="followed-theme-briefing" class="loading">Preparing weekly structural briefing across followed themes...</div>
+      </div>
+      <div class="map-grid">
+        <div class="card map-primary-card">
+          <div class="card-title">2D Geo Lens <span class="badge" id="map-lens-badge">Flat map</span></div>
+          <div class="meta-line lens-note">Legacy risk regions, infrastructure, country interaction, and event markers stay available here without the globe surface.</div>
+          <iframe id="theme-map-lens" class="embed-frame" src="/event-map-lens.html?embed=1" title="2D Geo Lens"></iframe>
+        </div>
+        <div class="card map-secondary-card">
+          <div class="card-title">Proposal Inbox <span class="badge" id="proposal-inbox-badge">0 pending</span></div>
+          <div id="proposal-inbox" class="loading">Loading Codex proposal inbox...</div>
+        </div>
+      </div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="card">
+          <div class="card-title">Structural Alerts <span class="badge" id="structural-alerts-badge">Weekly</span></div>
+          <div id="structural-alerts" class="loading">Loading structural alerts...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Discovery Triage <span class="badge" id="discovery-triage-badge">Watch queue</span></div>
+          <div id="discovery-triage" class="loading">Loading discovery triage queue...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Approval Queue <span class="badge" id="approval-queue-badge">0 pending</span></div>
+          <div id="approval-queue" class="loading">Loading human approval queue...</div>
+        </div>
+      </div>
+      <div class="snapshot-grid">
+        <div class="card">
+          <div class="card-title">Geo Pressure <span class="badge" id="geo-pressure-badge">Regions</span></div>
+          <div id="geo-pressure-snapshot" class="loading">Loading geo pressure snapshot...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Risk Snapshot <span class="badge" id="risk-snapshot-badge">Field</span></div>
+          <div id="risk-snapshot" class="loading">Loading risk snapshot...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Macro Snapshot <span class="badge" id="macro-snapshot-badge">Signals</span></div>
+          <div id="macro-snapshot" class="loading">Loading macro snapshot...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Investment Snapshot <span class="badge" id="investment-snapshot-badge">Ideas</span></div>
+          <div id="investment-snapshot" class="loading">Loading investment snapshot...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Validation Snapshot <span class="badge" id="validation-snapshot-badge">Replay</span></div>
+          <div id="validation-snapshot" class="loading">Loading validation snapshot...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Transmission Snapshot <span class="badge" id="transmission-snapshot-badge">Links</span></div>
+          <div id="transmission-snapshot" class="loading">Loading transmission snapshot...</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Source Ops Snapshot <span class="badge" id="source-ops-snapshot-badge">Feeds</span></div>
+          <div id="source-ops-snapshot" class="loading">Loading source operations snapshot...</div>
+        </div>
+      </div>
+    </section>
 
-  <!-- Row 2: Today's Events -->
-  <div class="section-title">Today's Key Events</div>
-  <div class="card">
-    <div id="today-events" class="loading">이벤트 수집 중...</div>
-  </div>
+  <section class="section-block">
+    <div class="section-heading">
+      <div><div class="section-kicker">Primary Briefing</div><div class="section-title">Curated Trend Briefing</div></div>
+      <div class="section-meta" id="period-caption">Quarterly operating view</div>
+    </div>
+    <div class="primary-grid">
+      <div class="card span-7"><div class="card-title">Top Curated Items <span class="badge" id="curated-period-badge">Quarterly lens</span></div><div id="curated-items" class="loading">Loading curated trend items...</div></div>
+      <div class="card span-5"><div class="card-title">Trend Pyramid <span class="badge">Lifecycle</span></div><div id="trend-pyramid" class="loading">Loading lifecycle pyramid...</div></div>
+    </div>
+  </section>
 
-  <!-- Row 3: Heatmap + Trends -->
-  <div class="grid2" style="margin-top:4px">
-    <div class="card">
-      <div class="card-title">Sensitivity Heatmap (2-week)</div>
-      <div id="heatmap" class="loading">수집 중...</div>
+  <section class="section-block">
+    <div class="section-heading">
+      <div><div class="section-kicker">Rotation</div><div class="section-title">Theme Evolution And Structural Shifts</div></div>
+      <div class="section-meta">Read share migration inside a parent theme instead of isolated spikes.</div>
     </div>
-    <div class="card">
-      <div class="card-title">Technology Trends</div>
-      <div id="trends" class="loading">수집 중...</div>
+    <div class="grid2">
+      <div class="card"><div class="card-title">Theme Evolution <span class="badge" id="theme-evolution-badge">Technology</span></div><div id="theme-evolution" class="loading">Loading theme evolution...</div></div>
+      <div class="card"><div class="card-title">Quarterly / Yearly Insights <span class="badge" id="insight-period-badge">Quarter</span></div><div id="quarterly-insights" class="loading">Loading insight stack...</div></div>
     </div>
-  </div>
+  </section>
 
-  <div class="section-title">Emerging Technology Watchlist</div>
-  <div class="grid3" style="margin-top:4px">
-    <div class="card">
-      <div class="card-title">Top Topics</div>
-      <div id="emerging-tech-topics" class="loading">Loading emerging topics...</div>
+  <section class="section-block">
+    <div class="section-heading">
+      <div><div class="section-kicker">Breadth</div><div class="section-title">Category Trends And Deep Watch</div></div>
+      <div class="section-meta">Pair high-level category breadth with detailed emerging-theme context.</div>
     </div>
-    <div class="card">
-      <div class="card-title">Latest Reports</div>
-      <div id="emerging-tech-reports" class="loading">Loading reports...</div>
+    <div class="grid2">
+      <div class="card"><div class="card-title">Category Trends <span class="badge">Across domains</span></div><div id="category-trends" class="loading">Loading category trends...</div></div>
+      <div class="card">
+        <div class="card-title">Emerging Technology Watchlist <span class="badge">Research lane</span></div>
+        <div class="mini-grid">
+          <div class="subcard"><div class="subcard-title">Top Topics</div><div id="emerging-tech-topics" class="loading">Loading emerging topics...</div></div>
+          <div class="subcard"><div class="subcard-title">Latest Reports</div><div id="emerging-tech-reports" class="loading">Loading reports...</div></div>
+          <div class="subcard"><div class="subcard-title">Weekly Digest</div><div id="emerging-tech-digest" class="loading">Loading digest...</div></div>
+        </div>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-title">Weekly Digest</div>
-      <div id="emerging-tech-digest" class="loading">Loading digest...</div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card"><div class="card-title">Selected Topic</div><div id="emerging-tech-topic-detail" class="loading">Select a topic to inspect detail.</div></div>
+      <div class="card"><div class="card-title">Selected Report</div><div id="emerging-tech-report-detail" class="loading">Select a report to inspect detail.</div></div>
     </div>
-  </div>
+  </section>
 
-  <div class="grid2" style="margin-top:10px">
-    <div class="card">
-      <div class="card-title">Selected Topic</div>
-      <div id="emerging-tech-topic-detail" class="loading">Select a topic to inspect detail.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Selected Report</div>
-      <div id="emerging-tech-report-detail" class="loading">Select a report to inspect detail.</div>
-    </div>
-  </div>
+  <details class="surface-drawer">
+    <summary>Open Live Reference Surfaces</summary>
+    <section class="section-block secondary-block" style="margin-top:0;border:0;background:transparent;padding:18px 0 0">
+      <div class="section-heading">
+        <div><div class="section-kicker">Secondary</div><div class="section-title">Live Reference Surfaces</div></div>
+        <div class="section-meta">Useful context, but intentionally no longer the main product surface.</div>
+      </div>
+      <div class="grid3">
+        <div class="card"><div class="card-title">Today's Key Events</div><div id="today-events" class="loading">Loading recent events...</div></div>
+        <div class="card"><div class="card-title">Issue Temperature</div><div id="temperatures" class="loading">Loading issue temperatures...</div></div>
+        <div class="card"><div class="card-title">Technology Trends</div><div id="trends" class="loading">Loading technology trends...</div></div>
+      </div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="card"><div class="card-title">Codex Discoveries</div><div id="codex-latest" class="loading">Loading Codex activity...</div></div>
+        <div class="card"><div class="card-title">Anomalies</div><div id="anomalies" class="loading">Loading anomalies...</div></div>
+        <div class="card"><div class="card-title">Pending Validation</div><div id="pending" class="loading">Loading pending validations...</div></div>
+      </div>
+    </section>
+  </details>
 
-  <!-- Signal Timeline -->
-  <div class="section-title">Signal Timeline (30-day)</div>
-  <div class="card">
-    <div id="signal-timeline" class="loading">시그널 타임라인 수집 중...</div>
-  </div>
-
-  <!-- Correlation Matrix -->
-  <div class="section-title">Correlation Matrix</div>
-  <div class="card">
-    <div style="margin-bottom:6px">
-      <label style="color:var(--dim);font-size:10px">Theme:
-        <select id="corr-theme-select" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:10px;padding:2px 4px;border-radius:3px;font-family:inherit">
-          <option value="conflict">conflict</option>
-          <option value="trade_war">trade_war</option>
-          <option value="monetary_policy">monetary_policy</option>
-          <option value="energy_crisis">energy_crisis</option>
-        </select>
-      </label>
-      <button class="refresh-btn" onclick="loadCorrelation()" style="margin-left:6px">Load</button>
+  <details class="surface-drawer">
+    <summary>Open Tactical / Trading Reference Surfaces</summary>
+    <div class="reference-grid">
+      <div class="card"><div class="card-title">Signal History (Latest)</div><div id="signals" class="loading">Loading signals...</div></div>
+      <div class="card"><div class="card-title">Best Strategies</div><div id="whatif" class="loading">Loading tactical strategies...</div></div>
+      <div class="card"><div class="card-title">Sensitivity Heatmap (2-week)</div><div id="heatmap" class="loading">Loading sensitivity heatmap...</div></div>
+      <div class="card">
+        <div class="card-title">Correlation Matrix</div>
+        <div class="inline-toolbar" style="margin-bottom:8px">
+          <label class="select-label">Theme
+            <select id="corr-theme-select">
+              <option value="conflict">conflict</option>
+              <option value="trade_war">trade_war</option>
+              <option value="monetary_policy">monetary_policy</option>
+              <option value="energy_crisis">energy_crisis</option>
+            </select>
+          </label>
+          <button class="btn" onclick="loadCorrelation()">Load</button>
+        </div>
+        <div id="correlation-matrix" class="loading">Loading correlation matrix...</div>
+      </div>
+      <div class="card span-2"><div class="card-title">Signal Timeline (30-day)</div><div id="signal-timeline" class="loading">Loading signal timeline...</div></div>
+      <div class="card span-2"><div class="card-title">Regime Timeline (VIX-based)</div><div id="regime-timeline" class="loading">Loading regime timeline...</div></div>
+      <div class="card span-2"><div class="card-title">Regime-Conditional Impact</div><div id="regime" class="loading">Loading regime data...</div></div>
     </div>
-    <div id="correlation-matrix" class="loading">상관 데이터 수집 중...</div>
-  </div>
-
-  <!-- Regime Timeline -->
-  <div class="section-title">Regime Timeline (VIX-based)</div>
-  <div class="card">
-    <div id="regime-timeline" class="loading">레짐 타임라인 수집 중...</div>
-  </div>
-
-  <!-- Row 4: What-if + Anomalies + Codex + Pending -->
-  <div class="grid4" style="margin-top:4px">
-    <div class="card">
-      <div class="card-title">Best Strategies</div>
-      <div id="whatif" class="loading">수집 중...</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Anomalies</div>
-      <div id="anomalies" class="loading">수집 중...</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Codex Discoveries</div>
-      <div id="codex-latest" class="loading">수집 중...</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Pending Validation</div>
-      <div id="pending" class="loading">수집 중...</div>
-    </div>
-  </div>
-
-  <!-- Row 5: Regime Analysis -->
-  <div class="section-title">Regime-Conditional Impact</div>
-  <div class="card">
-    <div id="regime" class="loading">수집 중...</div>
-  </div>
+  </details>
 </div>
 
 <script>
 const API='http://localhost:46200/api';
-const fmt=(v,d=2)=>v!=null?Number(v).toFixed(d):'—';
-const pct=v=>v!=null?(Number(v)*100).toFixed(0)+'%':'—';
-const rc=v=>Number(v)>=0?'pos':'neg';
-const rf=v=>{const n=Number(v);return`<span class="${rc(v)}">${n>=0?'+':''}${n.toFixed(2)}%</span>`};
+const PERIODS={
+  week:{label:'Weekly',shortLabel:'Week',lens:'Use this when you want acceleration, novelty, and fast changes in attention breadth.'},
+  month:{label:'Monthly',shortLabel:'Month',lens:'Use this when you want confirmation, category breadth, and persistent follow-through.'},
+  quarter:{label:'Quarterly',shortLabel:'Quarter',lens:'Primary operating lens for structural shifts, lifecycle transitions, and sub-theme migration.'},
+  year:{label:'Yearly',shortLabel:'Year',lens:'Use this for mainstreaming, long adoption curves, and multi-cycle trend validation.'},
+};
+const EVOLUTION_PARENTS=[
+  {value:'technology-general',label:'Technology'},
+  {value:'science-general',label:'Science'},
+  {value:'geopolitics',label:'Geopolitics'},
+  {value:'macroeconomics',label:'Macroeconomics'},
+  {value:'society',label:'Society'},
+  {value:'environment',label:'Environment'},
+  {value:'health',label:'Health'},
+];
+const LINE_COLORS=['#c5ff6d','#67d1c5','#7ca9ff','#f3b562','#ff7a6b','#b995ff','#7ee081','#ffcd7a'];
+const state={
+  period:lsGet('period')||'quarter',
+  evolutionParent:lsGet('evolution-parent')||'technology-general',
+  myThemes:[],
+  mutedThemes:[],
+  currentTheme:'',
+};
+let EMBED_MODE=false;
+try{
+  const initialUrl=new URL(window.location.href);
+  const periodParam=String(initialUrl.searchParams.get('period')||'').trim().toLowerCase();
+  const themeParam=String(initialUrl.searchParams.get('theme')||'').trim().toLowerCase();
+  EMBED_MODE=initialUrl.searchParams.get('embed')==='1';
+  if(PERIODS[periodParam])state.period=periodParam;
+  if(themeParam&&themeParam!=='unknown')state.currentTheme=themeParam;
+}catch{}
+let selectedEmergingTopicId='';
+let selectedEmergingReportId='';
+let lastStatusSnapshot=null;
+let lastTrendRows=[];
+let lastDigestItems=[];
+let themeBriefCache={};
+let themeLastViewed={};
+let followedThemeBriefing={periodType:'week',itemCount:0,items:[]};
+let structuralAlertsPayload={items:[]};
+let discoveryTriagePayload={items:[],summary:{}};
+let proposalInboxPayload={proposals:[],approvals:[]};
 
 function lsGet(key){try{return JSON.parse(localStorage.getItem('ei_'+key));}catch{return null;}}
 function lsSet(key,val){try{localStorage.setItem('ei_'+key,JSON.stringify(val));}catch{}}
-let selectedEmergingTopicId='';
-let selectedEmergingReportId='';
+function postEmbedMessage(type,payload={}){if(!EMBED_MODE||window.parent===window)return;try{window.parent.postMessage({source:'theme-workspace',type,payload},window.location.origin);}catch{}}
+function getLensContext(){return{theme:state.currentTheme||null,period:getCurrentPeriod(),evolutionParent:state.evolutionParent||null,followedThemes:state.myThemes.slice(0,20)};}
+function getMapLensFrame(){return document.getElementById('theme-map-lens');}
+function pushMapLensContext(){
+  const badge=document.getElementById('map-lens-badge');
+  if(badge){
+    const label=state.currentTheme?humanizeTheme(state.currentTheme):getEvolutionParentLabel(state.evolutionParent)||'Global lens';
+    badge.textContent=`${label} | ${PERIODS[getCurrentPeriod()].shortLabel}`;
+  }
+  const frame=getMapLensFrame();
+  if(!frame||!frame.contentWindow)return;
+  try{
+    frame.contentWindow.postMessage({source:'theme-workspace',type:'wm-map-lens-context',payload:getLensContext()},window.location.origin);
+  }catch{}
+}
+function emitEmbeddedContext(){postEmbedMessage('wm-theme-workspace-context',getLensContext());pushMapLensContext();}
+async function applyEmbeddedContext(payload){
+  if(!EMBED_MODE||!payload||typeof payload!=='object')return;
+  const nextPeriod=String(payload.period||'').trim().toLowerCase();
+  const hasPeriod=!!PERIODS[nextPeriod];
+  const nextTheme=normalizeTheme(payload.themeId??payload.theme??'');
+  const shouldClearTheme=(payload.themeId===null||payload.theme===null||payload.themeId==='');
+  let periodChanged=false;
+  let themeChanged=false;
+  if(hasPeriod&&nextPeriod!==state.period){
+    state.period=nextPeriod;
+    lsSet('period',state.period);
+    periodChanged=true;
+  }
+  if(shouldClearTheme){
+    if(state.currentTheme){
+      state.currentTheme='';
+      ensureCurrentTheme();
+      themeChanged=true;
+    }
+  }else if(nextTheme&&nextTheme!=='unknown'&&nextTheme!==state.currentTheme){
+    state.currentTheme=nextTheme;
+    persistThemeState();
+    themeChanged=true;
+  }
+  if(!periodChanged&&!themeChanged)return;
+  updateShareUrl();
+  renderTabs();
+  renderEvolutionSelect();
+  renderHorizonSummary();
+  renderMyThemes();
+  renderWorkspaceFocus();
+  if(periodChanged){
+    await refreshTrendSurfaces();
+  }else{
+    await loadThemeBrief();
+  }
+  emitEmbeddedContext();
+}
+function updateShareUrl(){try{const url=new URL(window.location.href);if(state.currentTheme)url.searchParams.set('theme',state.currentTheme);else url.searchParams.delete('theme');url.searchParams.set('period',getCurrentPeriod());history.replaceState(null,'',url.toString());}catch{}emitEmbeddedContext();}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
-function fmtDate(value){if(!value)return'';const d=new Date(value);return Number.isNaN(d.getTime())?String(value).slice(0,10):d.toLocaleDateString();}
-function renderSourceQuality(score,breakdown){
-  const distinctSources=Array.isArray(breakdown?.distinctSources)?breakdown.distinctSources:[];
-  const sourceTypeCounts=breakdown?.sourceTypeCounts||{};
-  return `<div class="detail-meta">source quality ${fmt(score||0,2)} 夷?distinct sources ${distinctSources.length} 夷?types ${Object.keys(sourceTypeCounts).length}</div>`;
+function asArray(value){return Array.isArray(value)?value:value==null?[]:[value];}
+function normalizeTheme(value){return String(value||'').trim().toLowerCase();}
+function normalizeThemeList(values){return Array.from(new Set(asArray(values).map((value)=>normalizeTheme(value)).filter((value)=>value&&value!=='unknown')));}
+function isGenericBucketTheme(value){const theme=normalizeTheme(value);return theme.endsWith('-general');}
+function shouldShowDiscoveryTheme(value){const theme=normalizeTheme(value);return Boolean(theme&&theme!=='unknown'&&!isGenericBucketTheme(theme));}
+function readLabel(value){if(value==null)return'';if(typeof value==='string'||typeof value==='number')return String(value);for(const key of['label','name','title','theme','signal','symbol','id']){if(value[key]!=null)return String(value[key]);}return JSON.stringify(value);}
+function truncate(value,limit=140){const text=String(value??'');return text.length>limit?`${text.slice(0,limit-1)}...`:text;}
+function fmt(value,d=2){const n=Number(value);return Number.isFinite(n)?n.toFixed(d):'--';}
+function fmtWhole(value){const n=Number(value);return Number.isFinite(n)?n.toLocaleString():'--';}
+function normalizePercent(value){const n=Number(value);if(!Number.isFinite(n))return null;return Math.abs(n)<=1?n*100:n;}
+function pct(value,d=0){const p=normalizePercent(value);return p==null?'--':`${p.toFixed(d)}%`;}
+function fmtPercent(value,d=0){const p=normalizePercent(value);return p==null?'--':`${p>=0?'+':''}${p.toFixed(d)}%`;}
+function rf(value,d=2){const p=normalizePercent(value);if(p==null)return'--';return `<span class="${p>=0?'pos':'neg'}">${p>=0?'+':''}${p.toFixed(d)}%</span>`;}
+function fmtDate(value){if(!value)return'--';const date=new Date(value);return Number.isNaN(date.getTime())?String(value).slice(0,10):date.toLocaleDateString();}
+function fmtDateTime(value){if(!value)return'Never';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString();}
+function fmtAgeMs(value){const ms=Number(value);if(!Number.isFinite(ms)||ms<0)return'--';if(ms<60_000)return`${Math.round(ms/1000)}s`;if(ms<3_600_000)return`${Math.round(ms/60_000)}m`;if(ms<86_400_000)return`${Math.round(ms/3_600_000)}h`;return`${Math.round(ms/86_400_000)}d`;}
+function qualityClass(score){const n=Number(score);if(!Number.isFinite(n))return'tag-neutral';if(n>=0.8)return'tag-growing';if(n>=0.6)return'tag-nascent';return'tag-declining';}
+function humanizeTheme(value){return String(value||'').replace(/[_-]+/g,' ').replace(/\b\w/g,(char)=>char.toUpperCase()).trim();}
+function parseList(data,keys){for(const key of keys){if(Array.isArray(data?.[key]))return data[key];}return Array.isArray(data)?data:[];}
+function renderTags(items,className='tag-neutral',limit=8){return asArray(items).slice(0,limit).map((item)=>`<span class="tag ${className}">${escapeHtml(readLabel(item))}</span>`).join('');}
+function cacheToken(value){return String(value??'none').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'')||'none';}
+function renderThemeButtons(items,limit=6){return asArray(items).slice(0,limit).map((item)=>{const theme=normalizeTheme(item?.theme||item?.id||item?.label||item);if(!theme||theme==='unknown')return'';const label=item?.label||humanizeTheme(theme);return `<button class="theme-chip" onclick="openThemeBrief('${theme}')">${escapeHtml(label)}</button>`;}).join('');}
+function cachedBadge(ts){if(!ts)return'<span class="badge" style="color:var(--amber)">cached</span>';const label=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return `<span class="badge" style="color:var(--amber)">cached ${label}</span>`;}
+function stageClass(stage){const key=String(stage||'').toLowerCase();if(key.includes('mainstream'))return'tag-mainstream';if(key.includes('grow'))return'tag-growing';if(key.includes('emerg'))return'tag-emerging';if(key.includes('nascent'))return'tag-nascent';if(key.includes('declin'))return'tag-declining';return'tag-neutral';}
+function renderSourceQuality(score,breakdown){const distinctSources=Array.isArray(breakdown?.distinctSources)?breakdown.distinctSources:[];const sourceTypeCounts=breakdown?.sourceTypeCounts||{};return `<div class="meta-line">Source quality ${fmt(score||0,2)} | distinct sources ${distinctSources.length} | types ${Object.keys(sourceTypeCounts).length}</div>`;}
+function getCurrentPeriod(){return PERIODS[state.period]?state.period:'quarter';}
+function getEvolutionParentLabel(value){return EVOLUTION_PARENTS.find((item)=>item.value===value)?.label||value;}
+function getCuratedItems(data){const fromDigest=parseList(data?.digest,['items','entries','articles']);return fromDigest.length?fromDigest:parseList(data,['items','entries','articles']);}
+function getPyramidStage(data,key){if(Array.isArray(data?.[key]))return data[key];if(Array.isArray(data?.stages?.[key]))return data.stages[key];return[];}
+  function extractEvolutionSeries(data){
+    if(Array.isArray(data?.subThemes)){
+      return data.subThemes.map((item)=>({
+        name:item.label||item.theme||item.id||'series',
+        theme:item.theme||item.label||item.id||'series',
+        values:Array.isArray(item.sharePctSeries)?item.sharePctSeries:Array.isArray(item.values)?item.values:[],
+      }));
+  }
+  if(data?.subThemes&&typeof data.subThemes==='object'){
+    return Object.entries(data.subThemes).map(([name,values])=>({name,theme:name,values}));
+  }
+  if(Array.isArray(data?.series)){
+    return data.series.map((item)=>({name:item.name||item.theme||item.label||item.id||'series',theme:item.theme||item.name||item.label||item.id||'series',values:Array.isArray(item.values)?item.values:Array.isArray(item.data)?item.data:[]}));
+    }
+    return[];
+  }
+  function normalizePeriodLabel(period,index){
+    if(period==null)return `P${index+1}`;
+    if(typeof period==='string'||typeof period==='number')return String(period);
+    if(typeof period==='object'){
+      return String(period.label||period.key||period.periodStart||period.periodEnd||`P${index+1}`);
+    }
+    return `P${index+1}`;
+  }
+  function normalizeSeriesValue(value){if(value==null)return null;if(typeof value==='object')value=value.share_pct??value.sharePct??value.share??value.value??value.pct??value.percent??value.n;return normalizePercent(value);}
+function isThemeFollowed(theme){return state.myThemes.includes(normalizeTheme(theme));}
+function isThemeMuted(theme){return state.mutedThemes.includes(normalizeTheme(theme));}
+function persistThemeState(){lsSet('my-themes',state.myThemes);lsSet('muted-themes',state.mutedThemes);lsSet('current-theme',state.currentTheme||null);}
+function persistThemeViews(){lsSet('theme-last-viewed',themeLastViewed);}
+function readRiskText(item){return typeof item==='string'?item:(item?.detail||item?.summary||item?.title||'');}
+function readWatchpointText(item){if(typeof item==='string')return item;return [item?.horizon,item?.trigger,item?.implication||item?.detail||item?.summary].filter(Boolean).join(' | ');}
+function renderEntityCards(relatedEntities){
+  const entities=asArray(relatedEntities?.entities);
+  const pathways=asArray(relatedEntities?.pathways);
+  if(!entities.length){
+    return pathways.map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.relationType||'pathway')}</strong><div class="meta-line">${escapeHtml(item.note||'Pending connector')}</div></div>`).join('')||'<div class="theme-empty">Entity and exposure mapping will appear once connector-backed entities are available.</div>';
+  }
+  const entityHtml=entities.slice(0,6).map((item)=>{
+    const title=item.companyName||item.entityKey||item.ticker||'Entity';
+    const relation=item.relationType||'related';
+    const confidence=item.confidence!=null?fmt(item.confidence,2):'--';
+    const filings=item.filingCount!=null?fmtWhole(item.filingCount):'--';
+    const source=item.evidenceSource||'connector';
+    const subline=[item.ticker&&item.ticker!==title?item.ticker:'',item.sectorHint||'',item.horizon||''].filter(Boolean).join(' | ');
+    return `<div class="brief-item"><div class="entity-card-head"><div><div class="entity-name">${escapeHtml(title)}</div>${subline?`<div class="meta-line" style="margin-top:4px">${escapeHtml(subline)}</div>`:''}</div><span class="tag tag-neutral">${escapeHtml(relation)}</span></div><div class="delta-kpi-row"><div class="brief-stat"><div class="brief-stat-label">Confidence</div><div class="brief-stat-value">${escapeHtml(confidence)}</div></div><div class="brief-stat"><div class="brief-stat-label">Filings</div><div class="brief-stat-value">${escapeHtml(filings)}</div></div><div class="brief-stat"><div class="brief-stat-label">Latest</div><div class="brief-stat-value">${escapeHtml(fmtDate(item.latestFiledAt||item.updatedAt))}</div></div></div><div class="meta-line">${escapeHtml(source)}${item.evidenceNote?` | ${item.evidenceNote}`:''}</div>${item.recentForms?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.recentForms,'tag-neutral',5)}</div>`:''}</div>`;
+  }).join('');
+  const pathwayHtml=pathways.length?`<div class="section-note">Pathways: ${pathways.slice(0,3).map((item)=>escapeHtml(item.note||item.relationType||'pathway')).join(' | ')}</div>`:'';
+  return `<div class="brief-entity-grid">${entityHtml}</div>${pathwayHtml}`;
+}
+function renderAdjacentPathways(adjacentPathways){
+  const items=asArray(adjacentPathways?.items||adjacentPathways);
+  if(!items.length){
+    return '<div class="theme-empty">No adjacent pathways are available for this theme yet.</div>';
+  }
+  return `<div class="brief-list">${items.slice(0,6).map((item)=>{
+    const label=item?.label||item?.pathwayLabel||item?.themeLabel||item?.theme||'Adjacent pathway';
+    const relationType=item?.relationType||item?.pathwayType||'adjacent';
+    const transmissionOrder=item?.transmissionOrder?humanizeTheme(String(item.transmissionOrder).replace(/_/g,'-')):'--';
+    const transmissionPath=Array.isArray(item?.transmissionPath)?item.transmissionPath.filter(Boolean).join(' → '):String(item?.transmissionPath||item?.pathway||'').trim();
+    const confidence=item?.confidence!=null?fmt(item.confidence,2):'--';
+    const reason=item?.shortThesis||item?.thesis||item?.reason||item?.summary||item?.detail||'';
+    const topSymbols=[
+      ...asArray(item?.topSymbols).map((entry)=>typeof entry==='string'?entry:(entry?.symbol||entry?.ticker||entry?.label||'')),
+      ...asArray(item?.assets).map((entry)=>typeof entry==='string'?entry:(entry?.symbol||entry?.ticker||entry?.label||'')),
+    ].filter(Boolean).slice(0,6);
+    return `<div class="brief-item"><div class="entity-card-head"><div><div class="entity-name">${escapeHtml(label)}</div>${transmissionPath?`<div class="meta-line" style="margin-top:4px">${escapeHtml(transmissionPath)}</div>`:''}</div><span class="tag tag-neutral">${escapeHtml(relationType)}</span></div><div class="delta-kpi-row"><div class="brief-stat"><div class="brief-stat-label">Order</div><div class="brief-stat-value">${escapeHtml(transmissionOrder)}</div></div><div class="brief-stat"><div class="brief-stat-label">Confidence</div><div class="brief-stat-value">${escapeHtml(confidence)}</div></div></div>${reason?`<div class="brief-item-copy">${escapeHtml(reason)}</div>`:''}${topSymbols.length?`<div class="pill-row" style="margin-top:8px">${renderTags(topSymbols,'tag-neutral',6)}</div>`:''}</div>`;
+  }).join('')}</div>`;
+}
+function getSuggestedThemes(){
+  const ordered=[];
+  const pushTheme=(value)=>{const theme=normalizeTheme(value);if(!theme||theme==='unknown'||ordered.includes(theme)||isThemeMuted(theme))return;ordered.push(theme);};
+  pushTheme(state.currentTheme);
+  state.myThemes.forEach(pushTheme);
+  lastDigestItems.forEach((item)=>pushTheme(item.theme));
+  lastTrendRows.forEach((row)=>pushTheme(row.theme));
+  return ordered;
+}
+function pulseThemeBriefCard(){
+  const card=document.getElementById('theme-brief-card');
+  if(!card)return;
+  card.classList.remove('brief-pulse');
+  void card.offsetWidth;
+  card.classList.add('brief-pulse');
+  setTimeout(()=>card.classList.remove('brief-pulse'),1400);
+}
+function scrollThemeBriefIntoView(){
+  const target=document.getElementById('theme-brief-card')||document.getElementById('workspace-section');
+  if(!target)return;
+  target.scrollIntoView({behavior:'smooth',block:'start'});
+  pulseThemeBriefCard();
+}
+function renderWorkspaceFocus(){
+  const el=document.getElementById('workspace-focus');
+  if(!el)return;
+  const currentTheme=normalizeTheme(state.currentTheme);
+  const brief=currentTheme?themeBriefCache[currentTheme]||null:null;
+  const summary=brief?.summary||null;
+  const topChange=brief?.sections?.whatChanged?.[0]||null;
+  const delta=brief?.deltaSinceLastVisit||null;
+  const followed=currentTheme?isThemeFollowed(currentTheme):false;
+  const lastViewed=currentTheme?themeLastViewed[currentTheme]||null:null;
+  let left='';
+  if(!currentTheme){
+    left=`<div class="info-note focus-summary"><div class="focus-title">Start with one theme</div><div class="brief-copy">Choose a theme from the curated digest, lifecycle pyramid, structural alerts, or weekly briefing. The detailed analysis will load in the Theme Brief panel.</div><div class="jump-note">Tip: use Follow only for themes you want in your standing weekly workspace.</div></div>`;
+  }else{
+    left=`<div class="info-note focus-summary"><div class="focus-title">${escapeHtml(brief?.label||humanizeTheme(currentTheme))}</div><div class="brief-copy">${escapeHtml(topChange?.detail||brief?.sections?.whyItMatters?.summary||'Open the brief below to read structural changes, evidence, risks, and watchpoints for this theme.')}</div><div class="focus-actions"><span class="badge">${followed?'Followed theme':'Suggested theme'}</span><span class="badge">${escapeHtml(PERIODS[getCurrentPeriod()].label)} lens</span>${summary?.lifecycleStage?`<span class="badge">${escapeHtml(summary.lifecycleStage)}</span>`:''}</div><div class="jump-note">${lastViewed?`Last opened ${escapeHtml(fmtDateTime(lastViewed))}`:'Not viewed in this browser yet.'} ${delta?.active?`| ${escapeHtml(fmtWhole(delta.newDigestItemCount||0))} new digest items since last visit`:''}</div></div>`;
+  }
+  let right='';
+  if(!currentTheme){
+    right=`<div class="info-note"><div class="brief-section-title">How the workspace works</div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Open a full brief from any surface.</div><div class="step-item"><span class="step-index">2</span>Follow it if you want it in weekly briefing.</div><div class="step-item"><span class="step-index">3</span>Mute anything that keeps showing up but is not useful.</div></div></div>`;
+  }else{
+    right=`<div class="info-note"><div class="brief-section-title">Current theme snapshot</div><div class="focus-kpis">${summary?`<div class="brief-stat"><div class="brief-stat-label">YoY</div><div class="brief-stat-value">${escapeHtml(fmtPercent(summary.vsYearAgoPct,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Acceleration</div><div class="brief-stat-value">${escapeHtml(fmtPercent(summary.acceleration,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Source Diversity</div><div class="brief-stat-value">${escapeHtml(fmt(summary.sourceDiversity,2))}</div></div>`:`<div class="brief-stat"><div class="brief-stat-label">Status</div><div class="brief-stat-value">Loading</div></div>`}</div><div class="jump-note" style="margin-top:10px">Any <strong>Open full brief</strong> action updates the panel below. <strong>Follow</strong> adds the theme to your standing weekly workspace.</div></div>`;
+  }
+  el.innerHTML=`${left}${right}`;
+}
+function ensureCurrentTheme(){
+  if(state.currentTheme&&!isThemeMuted(state.currentTheme))return;
+  state.currentTheme=getSuggestedThemes()[0]||'';
+  persistThemeState();
+  updateShareUrl();
+}
+async function openThemeBrief(theme){
+  const normalized=normalizeTheme(theme);
+  if(!normalized||normalized==='unknown')return;
+  state.currentTheme=normalized;
+  persistThemeState();
+  updateShareUrl();
+  renderMyThemes();
+  renderWorkspaceFocus();
+  await loadThemeBrief();
+  emitEmbeddedContext();
+  scrollThemeBriefIntoView();
+}
+async function followTheme(theme){
+  const normalized=normalizeTheme(theme);
+  if(!normalized||normalized==='unknown')return;
+  state.mutedThemes=state.mutedThemes.filter((item)=>item!==normalized);
+  if(!state.myThemes.includes(normalized))state.myThemes=[normalized,...state.myThemes];
+  state.currentTheme=normalized;
+  persistThemeState();
+  updateShareUrl();
+  renderMyThemes();
+  renderWorkspaceFocus();
+  await loadFollowedThemeBriefing();
+  await loadThemeBrief();
+  emitEmbeddedContext();
+  scrollThemeBriefIntoView();
+}
+function unfollowTheme(theme){
+  const normalized=normalizeTheme(theme);
+  state.myThemes=state.myThemes.filter((item)=>item!==normalized);
+  if(state.currentTheme===normalized){state.currentTheme='';ensureCurrentTheme();}
+  persistThemeState();
+  updateShareUrl();
+  renderMyThemes();
+  renderWorkspaceFocus();
+  loadFollowedThemeBriefing();
+  loadThemeBrief();
+  emitEmbeddedContext();
+}
+function muteTheme(theme){
+  const normalized=normalizeTheme(theme);
+  if(!normalized||normalized==='unknown')return;
+  state.myThemes=state.myThemes.filter((item)=>item!==normalized);
+  if(!state.mutedThemes.includes(normalized))state.mutedThemes=[normalized,...state.mutedThemes].slice(0,20);
+  if(state.currentTheme===normalized){state.currentTheme='';ensureCurrentTheme();}
+  persistThemeState();
+  updateShareUrl();
+  renderMyThemes();
+  renderWorkspaceFocus();
+  loadFollowedThemeBriefing();
+  loadThemeBrief();
+  emitEmbeddedContext();
+}
+function unmuteTheme(theme){
+  const normalized=normalizeTheme(theme);
+  state.mutedThemes=state.mutedThemes.filter((item)=>item!==normalized);
+  persistThemeState();
+  updateShareUrl();
+  renderMyThemes();
+  renderWorkspaceFocus();
+  loadFollowedThemeBriefing();
+  emitEmbeddedContext();
+}
+function renderMyThemes(){
+  const el=document.getElementById('my-themes');
+  const badge=document.getElementById('my-themes-badge');
+  if(!el||!badge)return;
+  const suggested=getSuggestedThemes().filter((theme)=>!isThemeFollowed(theme)).slice(0,8);
+  const snapshotMeta=followedThemeBriefing?.snapshot||null;
+  badge.textContent=`${state.myThemes.length} followed`;
+  let html='<div class="brief-list">';
+  html+='<div class="brief-section"><div class="brief-section-title">Followed Themes</div>';
+  if(snapshotMeta?.snapshotDate){
+    html+=`<div class="section-note">Weekly saved snapshot ${snapshotMeta.persisted?'available':'pending'} for ${escapeHtml(fmtDate(snapshotMeta.snapshotDate))}${snapshotMeta.generatedAt?` | refreshed ${escapeHtml(fmtDateTime(snapshotMeta.generatedAt))}`:''}</div>`;
+  }
+  if(!state.myThemes.length){
+    html+='<div class="theme-empty">No followed themes yet. Follow themes from the trend surfaces to build a repeatable weekly workspace.</div>';
+  }else{
+    html+='<div class="brief-list">';
+    state.myThemes.forEach((theme)=>{
+      const active=state.currentTheme===theme?' active':'';
+      const brief=themeBriefCache[theme]||null;
+      const summary=brief?.summary||null;
+      const topChange=brief?.sections?.whatChanged?.[0]||null;
+      const lastViewed=themeLastViewed[theme]||null;
+      html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><button class="theme-chip${active}" onclick="openThemeBrief('${theme}')">${escapeHtml(brief?.label||humanizeTheme(theme))}</button><span class="badge">followed</span></div>${summary?`<div class="meta-line" style="margin-top:6px">Lifecycle ${escapeHtml(summary.lifecycleStage||'n/a')} | YoY ${fmtPercent(summary.vsYearAgoPct,0)} | acceleration ${fmtPercent(summary.acceleration,0)}</div>`:''}${topChange?`<div class="story-summary">${escapeHtml(truncate(topChange.detail||topChange.title||'',160))}</div>`:''}<div class="meta-line" style="margin-top:6px">Last opened ${escapeHtml(fmtDateTime(lastViewed))}</div><div class="theme-actions"><button class="btn" onclick="unfollowTheme('${theme}')">Unfollow</button><button class="btn" onclick="muteTheme('${theme}')">Mute</button></div></div>`;
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+  html+='<div class="brief-section"><div class="brief-section-title">Suggested Themes</div>';
+  if(!suggested.length){
+    html+='<div class="theme-empty">Suggestions will populate from the curated digest and lifecycle pyramid.</div>';
+  }else{
+    html+='<div class="brief-list">';
+    suggested.forEach((theme)=>{
+      html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><button class="theme-chip" onclick="openThemeBrief('${theme}')">${escapeHtml(humanizeTheme(theme))}</button><span class="badge">suggested</span></div><div class="theme-actions"><button class="btn" onclick="followTheme('${theme}')">Follow</button><button class="btn" onclick="muteTheme('${theme}')">Mute</button></div></div>`;
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+  if(state.mutedThemes.length){
+    html+='<div class="brief-section"><div class="brief-section-title">Muted Themes</div><div class="brief-list">';
+    state.mutedThemes.slice(0,8).forEach((theme)=>{
+      html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><button class="theme-chip muted" onclick="openThemeBrief('${theme}')">${escapeHtml(humanizeTheme(theme))}</button><span class="badge">muted</span></div><div class="theme-actions"><button class="btn" onclick="unmuteTheme('${theme}')">Unmute</button></div></div>`;
+    });
+    html+='</div></div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+  renderWorkspaceFocus();
 }
 
+function renderTabs(){
+  const tabs=document.getElementById('period-tabs');
+  if(!tabs)return;
+  tabs.innerHTML=Object.entries(PERIODS).map(([value,meta])=>{
+    const active=state.period===value?' active':'';
+    return `<button class="tab${active}" onclick="setPeriod('${value}')">${meta.label}</button>`;
+  }).join('');
+  document.getElementById('current-period-badge').textContent=PERIODS[getCurrentPeriod()].label;
+  document.getElementById('curated-period-badge').textContent=`${PERIODS[getCurrentPeriod()].label} lens`;
+  document.getElementById('period-caption').textContent=`${PERIODS[getCurrentPeriod()].label} operating view`;
+  document.getElementById('insight-period-badge').textContent=PERIODS[getCurrentPeriod()].shortLabel;
+}
+function renderEvolutionSelect(){
+  const select=document.getElementById('evolution-parent-select');
+  if(!select)return;
+  select.innerHTML=EVOLUTION_PARENTS.map((option)=>`<option value="${option.value}"${option.value===state.evolutionParent?' selected':''}>${option.label}</option>`).join('');
+  document.getElementById('theme-evolution-badge').textContent=getEvolutionParentLabel(state.evolutionParent);
+  select.onchange=(event)=>{
+    state.evolutionParent=event.target.value;
+    lsSet('evolution-parent',state.evolutionParent);
+    document.getElementById('theme-evolution-badge').textContent=getEvolutionParentLabel(state.evolutionParent);
+    renderHorizonSummary();
+    loadThemeEvolution();
+    emitEmbeddedContext();
+  };
+}
+function renderHorizonSummary(){
+  const meta=PERIODS[getCurrentPeriod()];
+  const temperatures=Array.isArray(lastStatusSnapshot?.temperatures)?lastStatusSnapshot.temperatures:[];
+  const hotCount=temperatures.filter((row)=>String(row.temperature||'').toUpperCase()==='HOT').length;
+  const strongest=temperatures.slice().sort((a,b)=>Number(b.intensity||0)-Number(a.intensity||0)).slice(0,3).map((item)=>item.theme).filter(Boolean);
+  const el=document.getElementById('horizon-summary');
+  if(!el)return;
+  el.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${meta.label}</div><div class="meta-line">Current lens</div></div>
+      <div class="kpi"><div class="kpi-value">${hotCount}</div><div class="meta-line">Hot themes now</div></div>
+      <div class="kpi"><div class="kpi-value">${getEvolutionParentLabel(state.evolutionParent)}</div><div class="meta-line">Evolution focus</div></div>
+    </div>
+    <div class="info-note" style="margin-top:10px">${meta.lens}</div>
+    <div class="meta-line" style="margin-top:8px">${strongest.length?`Strongest live themes: ${strongest.join(', ')}`:'Live status themes will appear here once the status feed loads.'}</div>
+  `;
+}
+function setPeriod(period){
+  if(!PERIODS[period]||state.period===period)return;
+  state.period=period;
+  lsSet('period',period);
+  updateShareUrl();
+  renderTabs();
+  renderHorizonSummary();
+  refreshTrendSurfaces();
+}
 async function f(url,cacheKey){
   try{
-    const r=await fetch(url);
-    const d=await r.json();
-    if(cacheKey)lsSet(cacheKey,{data:d,ts:new Date().toISOString()});
-    return{data:d,cached:false};
+    const response=await fetch(url);
+    const data=await response.json();
+    if(cacheKey)lsSet(cacheKey,{data,ts:new Date().toISOString()});
+    return{data,cached:false};
   }catch{
     if(cacheKey){
-      const c=lsGet(cacheKey);
-      if(c)return{data:c.data,cached:true,cachedAt:c.ts};
+      const cached=lsGet(cacheKey);
+      if(cached)return{data:cached.data,cached:true,cachedAt:cached.ts};
     }
     return{data:null,cached:false};
   }
 }
-
-function cachedBadge(ts){
-  if(!ts)return'<span class="badge" style="color:var(--warn)">(cached)</span>';
-  const t=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  return`<span class="badge" style="color:var(--warn)">(cached ${t})</span>`;
+async function postJson(url,body){
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);
+  return data;
 }
-
+function summarizeEvidenceClasses(items){return asArray(items).map((item)=>item?.label||item?.evidenceClass||item).filter(Boolean);}
+function splitTags(value){return String(value||'').split(',').map((item)=>item.trim()).filter(Boolean);}
+function collectThemeNotebookForm(){
+  return{
+    noteMarkdown:document.getElementById('theme-brief-note-input')?.value||'',
+    tags:splitTags(document.getElementById('theme-brief-tags-input')?.value||''),
+    pinned:Boolean(document.getElementById('theme-brief-pin-input')?.checked),
+  };
+}
+function applyNotebookStateToCachedBrief(theme,notebook){
+  const brief=themeBriefCache[theme];
+  if(!brief||!notebook)return;
+  brief.notebookState=notebook;
+  if(!brief.sections)brief.sections={};
+  if(!brief.sections.notebookHooks)brief.sections.notebookHooks={};
+  brief.sections.notebookHooks.noteMarkdown=notebook.noteMarkdown||'';
+  brief.sections.notebookHooks.savedTags=Array.isArray(notebook.tags)?notebook.tags:[];
+  brief.sections.notebookHooks.pinned=Boolean(notebook.pinned);
+  brief.sections.notebookHooks.shareToken=notebook.shareToken||null;
+  brief.sections.notebookHooks.shareUrl=notebook.shareUrl||null;
+  brief.sections.notebookHooks.sharedAt=notebook.sharedAt||null;
+  brief.sections.notebookHooks.exportCount=notebook.exportCount||0;
+  brief.sections.notebookHooks.lastExportedAt=notebook.lastExportedAt||null;
+  brief.sections.notebookHooks.updatedAt=notebook.updatedAt||null;
+}
+async function saveThemeNotebook(options={}){
+  if(!state.currentTheme)return null;
+  const notebook=await postJson(`${API}/theme-brief-notebook/${encodeURIComponent(state.currentTheme)}?period=${encodeURIComponent(getCurrentPeriod())}`,{
+    ...collectThemeNotebookForm(),
+    ...options,
+  });
+  applyNotebookStateToCachedBrief(state.currentTheme,notebook);
+  await loadThemeBrief();
+  return notebook;
+}
+async function shareThemeNotebook(){
+  const notebook=await saveThemeNotebook({shareRequested:true});
+  const shareUrl=notebook?.shareUrl?`${API.replace(/\/api$/,'')}${notebook.shareUrl}`:'';
+  if(shareUrl&&navigator.clipboard?.writeText){
+    try{await navigator.clipboard.writeText(shareUrl);}catch{}
+  }
+}
+async function unshareThemeNotebook(){
+  await saveThemeNotebook({unshareRequested:true});
+}
+async function exportThemeBrief(format='markdown'){
+  if(!state.currentTheme)return;
+  const response=await fetch(`${API}/theme-brief-export/${encodeURIComponent(state.currentTheme)}?period=${encodeURIComponent(getCurrentPeriod())}&format=${encodeURIComponent(format)}`);
+  const data=await response.json();
+  if(!response.ok)throw new Error(data?.error||`Export failed (${response.status})`);
+  applyNotebookStateToCachedBrief(state.currentTheme,data.notebook||null);
+  const blob=new Blob([data.content||''],{type:data.contentType||'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=data.filename||`${state.currentTheme}-theme-brief.${format==='json'?'json':'md'}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  await loadThemeBrief();
+}
+async function dismissStructuralAlert(alertKey){
+  if(!alertKey)return;
+  await postJson(`${API}/structural-alerts/dismiss`,{alertKey});
+  await loadStructuralAlerts();
+}
+async function applyDiscoveryTriageDecision(topicId,decision,normalizedTheme='',parentTheme='',category=''){
+  if(!topicId||!decision)return;
+  await postJson(`${API}/discovery-triage/review`,{
+    topicId,
+    decision,
+    normalizedTheme,
+    normalizedParentTheme:parentTheme,
+    normalizedCategory:category,
+    reviewer:'dashboard-ui',
+    reason:`Dashboard triage decision: ${decision}`,
+  });
+  await loadDiscoveryTriage();
+  await refreshTrendSurfaces();
+}
+async function loadStructuralAlerts(){
+  const el=document.getElementById('structural-alerts');
+  const badge=document.getElementById('structural-alerts-badge');
+  const followed=normalizeThemeList(state.myThemes);
+  const params=new URLSearchParams([['period','week'],['limit','8']]);
+  if(followed.length)params.set('themes',followed.join(','));
+  const cacheKey=`structural-alerts-${cacheToken(followed.join('-')||'all')}`;
+  const {data,cached,cachedAt}=await f(`${API}/structural-alerts?${params.toString()}`,cacheKey);
+  structuralAlertsPayload=data||{items:[]};
+  const items=asArray(data?.items);
+  badge.textContent=`${fmtWhole(items.length)} open`;
+  let html='';
+  if(cached)html+=cachedBadge(cachedAt);
+  if(!items.length){
+    el.innerHTML=`${html}<div class="theme-empty">No open structural alerts for the current weekly lens.</div>`;
+    return;
+  }
+  html+='<div class="brief-list">';
+  items.slice(0,8).forEach((item)=>{
+    const evidence=summarizeEvidenceClasses(item.evidenceClasses);
+    const topSymbols=asArray(item.metadata?.topSymbols);
+    html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><button class="theme-chip" onclick="openThemeBrief('${normalizeTheme(item.theme)}')">${escapeHtml(item.label||humanizeTheme(item.theme))}</button><span class="badge ${item.severity==='critical'||item.severity==='high'?'tag-growing':'tag-neutral'}">${escapeHtml(item.severity||'alert')}</span></div><div class="story-summary">${escapeHtml(item.headline||'Structural alert')}</div><div class="meta-line" style="margin-top:6px">${escapeHtml(item.detail||'')}</div><div class="meta-line" style="margin-top:6px">Score ${escapeHtml(fmt(item.alertScore||item.signalScore||0,2))}${item.updatedAt?` | updated ${escapeHtml(fmtDateTime(item.updatedAt))}`:''}</div>${item.alertType==='adjacent_pathway'&&item.metadata?.transmissionOrder?`<div class="meta-line" style="margin-top:6px">Adjacent pathway | ${escapeHtml(item.metadata.transmissionOrder)} | ${escapeHtml(item.metadata.relationType||'related')}</div>`:''}${topSymbols.length?`<div class="pill-row" style="margin-top:8px">${renderTags(topSymbols,'tag-neutral',4)}</div>`:''}${evidence.length?`<div class="pill-row" style="margin-top:8px">${renderTags(evidence,'tag-neutral',6)}</div>`:''}<div class="theme-actions" style="margin-top:8px"><button class="btn" onclick="openThemeBrief('${normalizeTheme(item.theme)}')">Open full brief</button><button class="btn" onclick="dismissStructuralAlert('${escapeHtml(item.alertKey||'')}')">Dismiss</button></div></div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+async function loadDiscoveryTriage(){
+  const el=document.getElementById('discovery-triage');
+  const badge=document.getElementById('discovery-triage-badge');
+  const {data,cached,cachedAt}=await f(`${API}/discovery-triage?limit=8`, 'discovery-triage-watch');
+  discoveryTriagePayload=data||{items:[],summary:{}};
+  const items=asArray(data?.items);
+  const summary=data?.summary||{};
+  badge.textContent=`${fmtWhole(summary.watch||items.length)} watch`;
+  let html='';
+  if(cached)html+=cachedBadge(cachedAt);
+  if(!items.length){
+    el.innerHTML=`${html}<div class="theme-empty">No discovery topics need triage right now.</div>`;
+    return;
+  }
+  html+='<div class="brief-list">';
+  items.slice(0,8).forEach((item)=>{
+    const normalizedTheme=normalizeTheme(item.normalizedTheme||'');
+    const briefTheme=shouldShowDiscoveryTheme(normalizedTheme)?normalizedTheme:'';
+    html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><strong>${escapeHtml(item.label||item.id)}</strong><div class="meta-line">${escapeHtml(item.category||'other')} | articles ${escapeHtml(fmtWhole(item.articleCount||0))} | momentum ${escapeHtml(fmt(item.momentum||0,2))} | score ${escapeHtml(fmt(item.structuralScore||0,2))}</div></div><span class="badge">${escapeHtml(item.promotionState||'watch')}</span></div>${item.keywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.keywords,'tag-neutral',6)}</div>`:''}${briefTheme?`<div class="meta-line" style="margin-top:6px">Suggested theme ${escapeHtml(humanizeTheme(briefTheme))}</div>`:''}${item.lastReview?.decidedAt?`<div class="meta-line" style="margin-top:6px">Last review ${escapeHtml(fmtDateTime(item.lastReview.decidedAt))} by ${escapeHtml(item.lastReview.reviewer||'unknown')}</div>`:''}<div class="theme-actions" style="margin-top:8px">${briefTheme?`<button class="btn" onclick="openThemeBrief('${briefTheme}')">Open full brief</button>`:''}<button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','canonical','${escapeHtml(normalizedTheme)}','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Canonical</button><button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','watch','${escapeHtml(normalizedTheme)}','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Watch</button><button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','suppressed','','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Suppress</button></div></div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+  function renderEvolutionChart(periods,series){
+    if(periods.length<2||series.length===0)return'<div class="meta-line">Not enough history to render evolution lines yet.</div>';
+    const periodLabels=periods.map((period,index)=>normalizePeriodLabel(period,index));
+    const selectedSeries=series.map((item)=>({
+      name:item.name,
+      points:asArray(item.values).map((value,index)=>({label:periodLabels[index]||`P${index+1}`,value:normalizeSeriesValue(value)??0})),
+    })).filter((item)=>item.points.some((point)=>point.value>0)).sort((a,b)=>(b.points[b.points.length-1]?.value||0)-(a.points[a.points.length-1]?.value||0)).slice(0,6);
+    if(selectedSeries.length===0)return'<div class="meta-line">Theme evolution series is empty.</div>';
+    const allValues=selectedSeries.flatMap((item)=>item.points.map((point)=>point.value));
+    const maxY=Math.max(...allValues,1);
+  const width=860;
+  const height=280;
+  const padLeft=48;
+  const padRight=18;
+  const padTop=18;
+  const padBottom=34;
+  const plotWidth=width-padLeft-padRight;
+  const plotHeight=height-padTop-padBottom;
+  const xDenom=Math.max(periods.length-1,1);
+  let svg=`<div class="chart-wrap"><svg width="100%" viewBox="0 0 ${width} ${height}" style="max-width:${width}px">`;
+    for(let i=0;i<=4;i++){
+      const y=padTop+(plotHeight*i/4);
+      const value=maxY-(maxY*i/4);
+      svg+=`<line x1="${padLeft}" y1="${y}" x2="${padLeft+plotWidth}" y2="${y}" stroke="#2f3d2e" stroke-width="1"/>`;
+      svg+=`<text x="${padLeft-6}" y="${y+4}" fill="#8fa286" font-size="9" text-anchor="end">${value.toFixed(0)}%</text>`;
+    }
+    periodLabels.forEach((label,index)=>{
+      const x=padLeft+(plotWidth*index/xDenom);
+      if(index<periodLabels.length-1)svg+=`<line x1="${x}" y1="${padTop}" x2="${x}" y2="${padTop+plotHeight}" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>`;
+      svg+=`<text x="${x}" y="${height-10}" fill="#8fa286" font-size="9" text-anchor="middle">${escapeHtml(String(label))}</text>`;
+    });
+  selectedSeries.forEach((row,index)=>{
+    const color=LINE_COLORS[index%LINE_COLORS.length];
+    let path='';
+    row.points.forEach((point,pointIndex)=>{
+      const x=padLeft+(plotWidth*pointIndex/xDenom);
+      const y=padTop+plotHeight-((point.value/maxY)*plotHeight);
+      path+=`${pointIndex===0?'M':'L'}${x.toFixed(1)} ${y.toFixed(1)} `;
+    });
+    svg+=`<path d="${path.trim()}" fill="none" stroke="${color}" stroke-width="2.4"/>`;
+    row.points.forEach((point,pointIndex)=>{
+      const x=padLeft+(plotWidth*pointIndex/xDenom);
+      const y=padTop+plotHeight-((point.value/maxY)*plotHeight);
+      svg+=`<circle cx="${x}" cy="${y}" r="2.2" fill="${color}" />`;
+    });
+  });
+  svg+='</svg></div><div class="legend">';
+  svg+=selectedSeries.map((item,index)=>`<span class="line-key"><span class="line-swatch" style="background:${LINE_COLORS[index%LINE_COLORS.length]}"></span>${escapeHtml(item.name)}</span>`).join('');
+  svg+='</div>';
+  return svg;
+}
+async function refreshTrendSurfaces(){
+  await Promise.all([loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage()]);
+  ensureCurrentTheme();
+  renderMyThemes();
+  await loadThemeBrief();
+  await loadFollowedThemeBriefing();
+}
 async function refreshAll(){
+  renderTabs();
+  renderEvolutionSelect();
+  renderHorizonSummary();
   document.getElementById('last-update').textContent='Updating...';
-  await Promise.all([loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadToday(),loadHeatmap(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),loadWhatif(),loadAnomalies(),loadCodex(),loadPending(),loadRegime(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline()]);
-  document.getElementById('last-update').textContent='Updated '+new Date().toLocaleTimeString();
+  await Promise.all([
+    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadCodexQuality(),
+    loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
+    loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
+    loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),
+  ]);
+  ensureCurrentTheme();
+  renderMyThemes();
+  await loadThemeBrief();
+  await loadFollowedThemeBriefing();
+  document.getElementById('last-update').textContent=`Updated ${new Date().toLocaleTimeString()}`;
 }
-
-async function loadAutomationBudget(){
-  const {data:d,cached,cachedAt}=await f(API+'/automation-budget','automation-budget');
-  const el=document.getElementById('automation-budget');
-  if(!d||!d.budget){el.innerHTML='Automation budget unavailable';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  const daily=d.budget.daily||{};
-  const approvals=Array.isArray(d.approvals)?d.approvals:[];
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  h+=`<div style="font-size:10px;color:var(--dim);margin-bottom:6px">kill switch ${d.budget.killSwitchActive?'<span class="neg">ACTIVE</span>':'<span class="pos">off</span>'} | approvals ${approvals.length}</div>`;
-  h+='<table><tr><th>Action</th><th>Used</th><th>Limit</th><th>Remain</th></tr>';
-  for(const [name,row] of Object.entries(daily)){
-    h+=`<tr><td>${escapeHtml(name)}</td><td>${Number(row.used||0)}</td><td>${Number(row.limit||0)}</td><td>${Number(row.remaining||0)}</td></tr>`;
-  }
-  h+='</table>';
-  if(approvals.length>0){
-    h+=`<div class="detail-block"><div><strong>Pending approvals</strong></div>`;
-    for(const item of approvals.slice(0,4)){
-      h+=`<div class="detail-meta">${escapeHtml(item.action_type)} | ${fmtDate(item.created_at)}</div>`;
-    }
-    h+=`</div>`;
-  }
-  el.innerHTML=h;
-}
-
-async function loadAutomationLog(){
-  const {data:d,cached,cachedAt}=await f(API+'/automation-log','automation-log');
-  const el=document.getElementById('automation-log');
-  if(!d||!Array.isArray(d.actions)){el.innerHTML='Automation log unavailable';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  if(d.actions.length===0){el.innerHTML=h+'No automation actions recorded yet.';return}
-  for(const row of d.actions.slice(0,8)){
-    const dot=row.result==='success'?'dot-green':row.result==='queued' || row.result==='dry-run' || row.result==='skipped'?'dot-yellow':'dot-red';
-    h+=`<div style="margin-bottom:6px"><span class="status-dot ${dot}"></span><strong>${escapeHtml(row.action_type||'unknown')}</strong>`;
-    h+=`<div class="detail-meta">${escapeHtml(row.result||'')} | ${fmtDate(row.executed_at)}${row.reason?` | ${escapeHtml(row.reason)}`:''}</div></div>`;
-  }
-  el.innerHTML=h;
-}
-
 async function loadStatus(){
-  const{data:d,cached,cachedAt}=await f(API+'/live-status','status');
-  if(!d){document.getElementById('system-status').innerHTML='<span class="neg">API offline · 수집 중...</span>';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=`<div style="font-size:11px">`;
-  h+=`<div>Articles today: <strong>${d.todayArticles||0}</strong> ${cb}</div>`;
-  h+=`<div>Pending: <strong>${d.pending||0}</strong></div>`;
-  h+=`<div>Signals: <strong>${(d.signals||[]).length}</strong> channels</div>`;
-  h+=`</div>`;
-  document.getElementById('system-status').innerHTML=h;
-  document.getElementById('status-badge').textContent=cached?'CACHED':d.todayArticles>0?'LIVE':'IDLE';
-
-  // Temperatures
-  let th='';
-  for(const t of(d.temperatures||[])){
-    const cls=t.status==='HOT'?'tag-hot':t.status==='WARM'?'tag-warm':'tag-cool';
-    th+=`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${t.theme}</span><span class="tag ${cls}">${t.status} ${fmt(t.temp,0)}</span></div>`;
+  const {data,cached,cachedAt}=await f(`${API}/live-status`,'status');
+  const systemEl=document.getElementById('system-status');
+  if(!data){
+    systemEl.innerHTML='<div class="neg">Live status unavailable. Dashboard is waiting for API or cached data.</div>';
+    return;
   }
-  document.getElementById('temperatures').innerHTML=th||'테마 온도 수집 중...';
-
-  // Signals
-  let sh='<table><tr><th>Signal</th><th>Value</th></tr>';
-  for(const s of(d.signals||[]).slice(0,8)){
-    sh+=`<tr><td>${s.name}</td><td>${fmt(s.value,3)}</td></tr>`;
+  lastStatusSnapshot=data;
+  const temperatures=Array.isArray(data.temperatures)?data.temperatures:[];
+  const signals=Array.isArray(data.signals)?data.signals:[];
+  const todayArticles=Number(data.todayArticles??data.articlesToday??0);
+  const pending=Number(data.pending??0);
+  const hottest=temperatures.slice().sort((a,b)=>Number(b.intensity||0)-Number(a.intensity||0)).find((item)=>Number(item.intensity||0)>=0.05)||null;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${fmtWhole(todayArticles)}</div><div class="meta-line">Articles today</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(pending)}</div><div class="meta-line">Pending</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(signals.length)}</div><div class="meta-line">Signal channels</div></div>
+    </div>
+  `;
+  if(hottest){
+    html+=`<div class="detail-block"><div><strong>Hottest live issue</strong></div><div class="meta-line">Theme: <strong>${escapeHtml(hottest.themeLabel||humanizeTheme(hottest.theme)||'unknown')}</strong></div><div class="meta-line">Temperature: <span class="tag ${stageClass(hottest.temperature)}">${escapeHtml(hottest.temperature||'n/a')}</span></div><div class="meta-line">Intensity: ${pct(hottest.intensity||0,0)}</div></div>`;
+  }else{
+    html+=`<div class="detail-block"><div><strong>Hottest live issue</strong></div><div class="meta-line">No live issue exceeded the current noise floor.</div></div>`;
   }
-  sh+='</table>';
-  document.getElementById('signals').innerHTML=sh;
+  systemEl.innerHTML=html;
+  document.getElementById('status-badge').textContent=cached?'CACHED':todayArticles>0?'LIVE':'IDLE';
+
+  let tempHtml='';
+  for(const item of temperatures){
+    tempHtml+=`<div class="interactive-row" style="cursor:default"><div style="display:flex;justify-content:space-between;gap:12px"><strong>${escapeHtml(item.theme||'unknown')}</strong><span class="tag ${stageClass(item.temperature)}">${escapeHtml(item.temperature||'n/a')}</span></div><div class="meta-line" style="margin-top:4px">Intensity ${pct(item.intensity||0,0)}</div></div>`;
+  }
+  document.getElementById('temperatures').innerHTML=tempHtml||'<div class="meta-line">No live issue temperatures available.</div>';
+
+  let signalHtml='<div class="table-wrap"><table><tr><th>Signal</th><th>Value</th></tr>';
+  for(const signal of signals.slice(0,12)){
+    signalHtml+=`<tr><td>${escapeHtml(signal.label||signal.channel||'signal')}</td><td>${fmt(signal.value,3)}</td></tr>`;
+  }
+  signalHtml+='</table></div>';
+  document.getElementById('signals').innerHTML=signals.length?signalHtml:'<div class="meta-line">No signal history available.</div>';
+  renderHorizonSummary();
 }
-
+async function loadAutomationBudget(){
+  const {data,cached,cachedAt}=await f(`${API}/automation-budget`,'automation-budget');
+  const el=document.getElementById('automation-budget');
+  if(!data?.budget){
+    el.innerHTML='<div class="meta-line">Automation budget unavailable.</div>';
+    return;
+  }
+  const approvals=Array.isArray(data.approvals)?data.approvals:[];
+  const daily=data.budget.daily||{};
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="meta-line" style="margin-bottom:8px">Kill switch ${data.budget.killSwitchActive?'<span class="neg">ACTIVE</span>':'<span class="pos">off</span>'} | approvals ${approvals.length}</div>`;
+  html+='<div class="table-wrap"><table><tr><th>Action</th><th>Used</th><th>Limit</th><th>Remain</th></tr>';
+  for(const [name,row] of Object.entries(daily)){
+    html+=`<tr><td>${escapeHtml(name)}</td><td>${fmtWhole(row.used||0)}</td><td>${fmtWhole(row.limit||0)}</td><td>${fmtWhole(row.remaining||0)}</td></tr>`;
+  }
+  html+='</table></div>';
+  if(approvals.length){
+    html+='<div class="detail-block"><div><strong>Pending approvals</strong></div>';
+    approvals.slice(0,4).forEach((item)=>{html+=`<div class="meta-line">${escapeHtml(item.action_type||'unknown')} | ${fmtDate(item.created_at)}</div>`;});
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+async function loadAutomationLog(){
+  const {data,cached,cachedAt}=await f(`${API}/automation-log`,'automation-log');
+  const el=document.getElementById('automation-log');
+  if(!Array.isArray(data?.actions)){
+    el.innerHTML='<div class="meta-line">Automation log unavailable.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(!data.actions.length){
+    el.innerHTML=`${html}<div class="meta-line">No automation actions recorded yet.</div>`;
+    return;
+  }
+  data.actions.slice(0,8).forEach((row)=>{
+    const dotClass=row.result==='success'?'dot-green':['queued','dry-run','skipped'].includes(row.result)?'dot-yellow':'dot-red';
+    html+=`<div style="margin-bottom:8px"><span class="status-dot ${dotClass}"></span><strong>${escapeHtml(row.action_type||'unknown')}</strong><div class="meta-line">${escapeHtml(row.result||'unknown')} | ${fmtDate(row.executed_at)}${row.reason?` | ${escapeHtml(row.reason)}`:''}</div></div>`;
+  });
+  el.innerHTML=html;
+}
+async function loadSystemHealth(){
+  const {data,cached,cachedAt}=await f(`${API}/health`,'health');
+  const el=document.getElementById('operator-health');
+  if(!el)return;
+  if(!data){
+    el.innerHTML='<div class="meta-line">System health unavailable.</div>';
+    return;
+  }
+  const components=data.components||{};
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="meta-line" style="margin-bottom:8px"><span class="tag ${qualityClass(data.compositeScore)}">${escapeHtml(String(data.status||'unknown').toUpperCase())}</span> Composite ${pct(data.compositeScore,0)}</div>`;
+  html+=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${escapeHtml(String(data.db||'unknown'))}</div><div class="meta-line">Database</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(data.pending||0)}</div><div class="meta-line">Pending reviews</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(data.articles||0)} / ${fmtWhole(data.signals||0)}</div><div class="meta-line">Articles / signals</div></div>
+    </div>
+  `;
+  html+=`
+    <div class="detail-block">
+      <div><strong>Freshness and API components</strong></div>
+      <div class="pill-row" style="margin-top:8px">
+        <span class="tag ${qualityClass(components.dbHealthy)}">DB ${pct(components.dbHealthy,0)}</span>
+        <span class="tag ${qualityClass(components.dataFreshness)}">Articles ${fmtAgeMs(data.articleAgeMs)}</span>
+        <span class="tag ${qualityClass(components.signalFreshness)}">Signals ${fmtAgeMs(data.signalAgeMs)}</span>
+        <span class="tag ${qualityClass(components.apiHealth)}">API ${pct(components.apiHealth,0)}</span>
+      </div>
+    </div>
+  `;
+  el.innerHTML=html;
+}
+async function loadDataQuality(){
+  const {data,cached,cachedAt}=await f(`${API}/data-quality`,'data-quality');
+  const el=document.getElementById('operator-data-quality');
+  if(!el)return;
+  if(!data){
+    el.innerHTML='<div class="meta-line">Data quality unavailable.</div>';
+    return;
+  }
+  const articles=data.articleFreshness||{};
+  const signals=data.signalFreshness||{};
+  const completeness=data.outcomeCompleteness||{};
+  const nullRate=data.nullRate||{};
+  const outlierRate=data.outlierRate||{};
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="meta-line" style="margin-bottom:8px"><span class="tag ${qualityClass(data.overall)}">Overall ${pct(data.overall,0)}</span> Integrity ${pct(data.integrityPenalty,0)}</div>`;
+  html+=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${fmtAgeMs((articles.ageHours||0)*3_600_000)}</div><div class="meta-line">Article freshness</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(completeness.labeled||0)} / ${fmtWhole(completeness.total||0)}</div><div class="meta-line">Labeled coverage</div></div>
+      <div class="kpi"><div class="kpi-value">${pct(nullRate.pct,1)} / ${pct(outlierRate.pct,1)}</div><div class="meta-line">Null / outlier rate</div></div>
+    </div>
+  `;
+  html+=`
+    <div class="detail-block">
+      <div><strong>Current checks</strong></div>
+      <div class="pill-row" style="margin-top:8px">
+        <span class="tag ${qualityClass(articles.score)}">Articles ${fmtDateTime(articles.lastAt)}</span>
+        <span class="tag ${qualityClass(signals.score)}">Signals ${fmtAgeMs((signals.ageMinutes||0)*60_000)}</span>
+        <span class="tag ${qualityClass(completeness.score)}">Matured labels ${pct(completeness.pct,0)}</span>
+      </div>
+    </div>
+  `;
+  el.innerHTML=html;
+}
+async function loadCodexQuality(){
+  const {data,cached,cachedAt}=await f(`${API}/codex-quality`,'codex-quality');
+  const el=document.getElementById('operator-codex-quality');
+  if(!el)return;
+  if(!data){
+    el.innerHTML='<div class="meta-line">Codex quality unavailable.</div>';
+    return;
+  }
+  const warnings=asArray(data.recentValidationWarnings?.length?data.recentValidationWarnings:data.lastWarnings).filter(Boolean);
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="meta-line" style="margin-bottom:8px"><span class="tag ${qualityClass(data.parseSuccessRate)}">Parse success ${pct(data.parseSuccessRate,0)}</span> Avg confidence ${pct(data.avgConfidence,0)}</div>`;
+  html+=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${fmtWhole(data.totalCalls||0)}</div><div class="meta-line">Total calls</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(data.parseSuccess||0)} / ${fmtWhole(data.parseFail||0)}</div><div class="meta-line">Success / fail</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(data.validationErrors||0)}</div><div class="meta-line">Validation errors</div></div>
+    </div>
+  `;
+  html+=`<div class="detail-block"><div><strong>Recent execution context</strong></div><div class="meta-line" style="margin-top:8px">Last call ${fmtDateTime(data.lastCallAt)} | recent audit rows ${fmtWhole(data.recentAuditEntries||0)}</div>`;
+  if(warnings.length){
+    html+='<div class="pill-row" style="margin-top:8px">';
+    warnings.slice(0,6).forEach((warning)=>{html+=`<span class="tag tag-neutral">${escapeHtml(truncate(readLabel(warning),88))}</span>`;});
+    html+='</div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+async function loadCuratedItems(){
+  const {data,cached,cachedAt}=await f(`${API}/daily-digest?period=${encodeURIComponent(getCurrentPeriod())}`,`daily-digest-${getCurrentPeriod()}`);
+  const el=document.getElementById('curated-items');
+  const items=getCuratedItems(data);
+  lastDigestItems=items.slice();
+  const headline=data?.headline||data?.digest?.headline;
+  const summary=data?.summary||data?.digest?.summary;
+  const asOf=data?.generatedAt||data?.digestDate||data?.curatedDate||data?.asOf||data?.digest?.generatedAt;
+  if(!items.length){
+    el.innerHTML='<div class="meta-line">No curated digest items available for the selected horizon yet.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(headline||summary||asOf){
+    html+='<div class="info-note" style="margin-bottom:12px">';
+    if(headline)html+=`<div style="margin-bottom:4px"><strong>${escapeHtml(headline)}</strong></div>`;
+    if(summary)html+=`<div class="meta-line" style="color:var(--text)">${escapeHtml(summary)}</div>`;
+    if(asOf)html+=`<div class="meta-line" style="margin-top:6px">As of ${fmtDate(asOf)}</div>`;
+    html+='</div>';
+  }
+  html+='<div class="story-list">';
+  items.slice(0,6).forEach((item,index)=>{
+    const rank=item.rank||index+1;
+    const title=item.oneLineSummary||item.one_line_summary||item.title||item.headline||'Untitled';
+    const why=item.whyItMatters||item.why_it_matters||item.summary||item.description||'';
+    const theme=item.theme||item.category||item.bucket||'general';
+    const relatedTopics=item.relatedTopics||item.related_topics||[];
+    const relatedSignals=item.relatedSignals||item.related_signals||[];
+    const score=item.importanceScore??item.importance_score??item.score;
+    const linkedTitle=item.url?`<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(title)}</a>`:escapeHtml(title);
+    html+=`<div class="story-card"><div class="story-rank">${rank}</div><div><div class="story-head"><div class="story-title">${linkedTitle}</div><div class="badge">${escapeHtml(theme)}</div></div>${score!=null?`<div class="meta-line">Importance ${fmt(score,2)}</div>`:''}${why?`<div class="story-summary">${escapeHtml(truncate(why,220))}</div>`:''}${relatedTopics.length?`<div class="pill-row">${renderTags(relatedTopics,'tag-emerging',6)}</div>`:''}${relatedSignals.length?`<div class="pill-row">${renderTags(relatedSignals,'tag-neutral',5)}</div>`:''}<div class="theme-actions" style="margin-top:8px"><button class="btn" onclick="openThemeBrief('${normalizeTheme(theme)}')">Open full brief</button><button class="btn" onclick="followTheme('${normalizeTheme(theme)}')">Follow</button></div></div></div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+async function loadTrendPyramid(){
+  const {data,cached,cachedAt}=await f(`${API}/trend-pyramid?period=${encodeURIComponent(getCurrentPeriod())}`,`trend-pyramid-${getCurrentPeriod()}`);
+  const el=document.getElementById('trend-pyramid');
+  const stages=[
+    {key:'mainstream',label:'Mainstream',note:'Already embedded into the broad narrative.',className:'tag-mainstream'},
+    {key:'growing',label:'Growing',note:'Scaling in breadth and repetition.',className:'tag-growing'},
+    {key:'emerging',label:'Emerging',note:'Breaking into wider attention now.',className:'tag-emerging'},
+    {key:'nascent',label:'Nascent',note:'Early signals worth watchlisting.',className:'tag-nascent'},
+  ];
+  const transitions=parseList(data,['transitions','stageTransitions','moves']);
+  if(!stages.some((stage)=>getPyramidStage(data,stage.key).length)){
+    el.innerHTML='<div class="meta-line">No lifecycle pyramid data available yet.</div>';
+    return;
+  }
+  lastTrendRows=stages.flatMap((stage)=>getPyramidStage(data,stage.key));
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+='<div class="pyramid-grid">';
+  stages.forEach((stage)=>{
+    const items=getPyramidStage(data,stage.key).slice(0,5);
+    html+=`<div class="stage-column"><div class="stage-head"><div class="stage-label ${stage.className}">${stage.label}</div><div class="stage-note">${stage.note}</div></div><div class="stage-body">`;
+    if(!items.length){
+      html+='<div class="meta-line">No items in this stage.</div>';
+    }else{
+      items.forEach((item)=>{
+        const label=item.label||item.theme||item.name||item.id||'theme';
+        const articleCount=item.articleCount??item.article_count??item.volume;
+        const yoy=item.vs_year_ago_pct??item.yoyChange??item.yoy_pct;
+        const accel=item.trend_acceleration??item.acceleration??item.momentum;
+        html+=`<div class="stage-item"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(label)}</strong>${yoy!=null?`<span class="badge ${normalizePercent(yoy)>=0?'tag-growing':'tag-declining'}">${fmtPercent(yoy,0)}</span>`:''}</div><div class="meta-line" style="margin-top:4px">Articles ${articleCount!=null?fmtWhole(articleCount):'--'}${accel!=null?` | acceleration ${fmtPercent(accel,0)}`:''}</div><div class="theme-actions" style="margin-top:8px"><button class="btn" onclick="openThemeBrief('${normalizeTheme(item.theme||label)}')">Open full brief</button><button class="btn" onclick="followTheme('${normalizeTheme(item.theme||label)}')">Follow</button></div></div>`;
+      });
+    }
+    html+='</div></div>';
+  });
+  html+='</div>';
+  if(transitions.length){
+    html+='<div class="detail-block"><div><strong>Recent transitions</strong></div><div class="pill-row">';
+    transitions.slice(0,8).forEach((item)=>{
+      const label=item.theme||item.label||item.name||'theme';
+      const from=item.from||item.previousStage||'prior';
+      const to=item.to||item.stage||'current';
+      const at=item.at||item.period||item.date;
+      html+=`<span class="tag tag-neutral">${escapeHtml(label)}: ${escapeHtml(from)} -> ${escapeHtml(to)}${at?` (${escapeHtml(String(at))})`:''}</span>`;
+    });
+    html+='</div></div>';
+  }
+  el.innerHTML=html;
+}
+async function loadThemeEvolution(){
+  const {data,cached,cachedAt}=await f(`${API}/theme-evolution/${encodeURIComponent(state.evolutionParent)}?period=${encodeURIComponent(getCurrentPeriod())}`,`theme-evolution-${state.evolutionParent}-${getCurrentPeriod()}`);
+  const el=document.getElementById('theme-evolution');
+  const periods=Array.isArray(data?.periods)?data.periods:[];
+  const rawSeries=extractEvolutionSeries(data);
+  if(!periods.length||!rawSeries.length){
+    el.innerHTML='<div class="meta-line">Theme evolution data is not available for the selected parent yet.</div>';
+    return;
+  }
+  const chart=renderEvolutionChart(periods,rawSeries);
+  const insightList=parseList(data,['insights','highlights','signals']);
+  const rankedSeries=rawSeries.map((item)=>{
+    const values=asArray(item.values).map((value)=>normalizeSeriesValue(value)??0);
+    return{name:item.name,theme:item.theme||item.name,latest:values[values.length-1]||0,delta:values.length>1?(values[values.length-1]-values[0]):0};
+  }).sort((a,b)=>b.latest-a.latest).slice(0,8);
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=chart;
+  html+='<div class="table-wrap" style="margin-top:10px"><table><tr><th>Sub-theme</th><th>Latest share</th><th>Net change</th></tr>';
+  rankedSeries.forEach((item)=>{html+=`<tr><td><button class="theme-chip" onclick="openThemeBrief('${normalizeTheme(item.theme)}')">${escapeHtml(item.name)}</button></td><td>${pct(item.latest,0)}</td><td>${item.delta>=0?`<span class="pos">+${item.delta.toFixed(1)}%</span>`:`<span class="neg">${item.delta.toFixed(1)}%</span>`}</td></tr>`;});
+  html+='</table></div>';
+  if(insightList.length){
+    html+='<div class="detail-block"><div><strong>Readouts</strong></div><div class="pill-row">';
+    insightList.slice(0,8).forEach((item)=>{
+      const text=typeof item==='string'?item:item.summary||item.text||item.label||item.theme;
+      html+=`<span class="tag tag-neutral">${escapeHtml(truncate(text,72))}</span>`;
+    });
+    html+='</div></div>';
+  }
+  el.innerHTML=html;
+}
+async function loadThemeBrief(){
+  const el=document.getElementById('theme-brief');
+  const badge=document.getElementById('theme-brief-badge');
+  if(!el||!badge)return;
+  if(!state.currentTheme){
+    badge.textContent='No theme selected';
+    el.innerHTML='<div class="theme-empty">Pick a theme from the digest, lifecycle pyramid, or evolution table to inspect structural change.</div>';
+    renderWorkspaceFocus();
+    return;
+  }
+  badge.textContent=humanizeTheme(state.currentTheme);
+  const previousViewedAt=themeLastViewed[state.currentTheme]||null;
+  const params=new URLSearchParams({period:getCurrentPeriod()});
+  if(previousViewedAt)params.set('since',previousViewedAt);
+  const cacheKey=`theme-brief-${state.currentTheme}-${getCurrentPeriod()}-${cacheToken(previousViewedAt||'first')}`;
+  const {data,cached,cachedAt}=await f(`${API}/theme-brief/${encodeURIComponent(state.currentTheme)}?${params.toString()}`,cacheKey);
+  if(!data?.sections){
+    el.innerHTML='<div class="theme-empty">Theme Brief data is not available for the selected theme yet.</div>';
+    return;
+  }
+  themeBriefCache[state.currentTheme]=data;
+  themeLastViewed[state.currentTheme]=new Date().toISOString();
+  persistThemeViews();
+  const followed=isThemeFollowed(state.currentTheme);
+  const muted=isThemeMuted(state.currentTheme);
+  const sections=data.sections||{};
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="info-note"><div class="brief-hero"><div><strong>${escapeHtml(data.label||humanizeTheme(state.currentTheme))}</strong><div class="meta-line" style="margin-top:4px">${escapeHtml(data.categoryLabel||data.category||'Theme')} | ${escapeHtml(data.parentTheme||'parent unavailable')} | ${escapeHtml(PERIODS[getCurrentPeriod()].label)} lens</div>${previousViewedAt?`<div class="meta-line" style="margin-top:4px">Previous view ${escapeHtml(fmtDateTime(previousViewedAt))}</div>`:'<div class="meta-line" style="margin-top:4px">First view in this browser workspace</div>'}</div><div class="theme-actions"><button class="btn" onclick="${followed?`unfollowTheme('${state.currentTheme}')`:`followTheme('${state.currentTheme}')`}">${followed?'Unfollow':'Follow'}</button><button class="btn" onclick="${muted?`unmuteTheme('${state.currentTheme}')`:`muteTheme('${state.currentTheme}')`}">${muted?'Unmute':'Mute'}</button></div></div>${data.summary?`<div class="brief-stats" style="margin-top:10px"><div class="brief-stat"><div class="brief-stat-label">Lifecycle</div><div class="brief-stat-value">${escapeHtml(data.summary.lifecycleStage||'n/a')}</div></div><div class="brief-stat"><div class="brief-stat-label">YoY</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.vsYearAgoPct,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Acceleration</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.acceleration,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Source Diversity</div><div class="brief-stat-value">${escapeHtml(fmt(data.summary.sourceDiversity,2))}</div></div></div>`:''}</div>`;
+  html+='<div class="brief-grid" style="margin-top:12px">';
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">What Changed</div><span class="badge">${fmtWhole((sections.whatChanged||[]).length)} claim${(sections.whatChanged||[]).length===1?'':'s'}</span></div><div class="brief-list">${(sections.whatChanged||[]).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Update')}</strong><div class="brief-item-copy">${escapeHtml(item.detail||'')}</div>${item.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',5)}</div>`:''}</div>`).join('')||'<div class="theme-empty">No structural changes recorded yet.</div>'}</div></div>`;
+  const deltaSince=data.deltaSinceLastVisit||null;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Since Last Visit</div><span class="badge">${deltaSince?.active?'updated':'stable'}</span></div>${deltaSince?.headline?`<div class="info-note" style="margin-bottom:8px">${escapeHtml(deltaSince.headline)}</div>`:''}<div class="delta-kpi-row"><div class="brief-stat"><div class="brief-stat-label">New Digest Items</div><div class="brief-stat-value">${escapeHtml(fmtWhole(deltaSince?.newDigestItemCount||0))}</div></div><div class="brief-stat"><div class="brief-stat-label">New Articles</div><div class="brief-stat-value">${escapeHtml(fmtWhole(deltaSince?.newArticleCount||0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Status</div><div class="brief-stat-value">${escapeHtml(deltaSince?.status||'n/a')}</div></div></div><div class="brief-list">${(deltaSince?.items||[]).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Delta')}</strong><div class="brief-item-copy">${escapeHtml(item.detail||'')}</div>${item.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',5)}</div>`:''}</div>`).join('')||'<div class="theme-empty">No newer digest or article evidence was detected since the previous view.</div>'}</div></div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Why It Matters</div><span class="badge">${fmtWhole(asArray(sections.whyItMatters?.statements).filter(Boolean).length||0)} reads</span></div><div class="brief-list">${[sections.whyItMatters?.summary,...asArray(sections.whyItMatters?.statements).slice(1)].filter(Boolean).map((item,index)=>`<div class="brief-item"><strong>${index===0?'Primary read':`Read ${index+1}`}</strong><div class="brief-item-copy">${escapeHtml(item)}</div></div>`).join('')||'<div class="theme-empty">Reasoning is not available yet.</div>'}</div></div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Evidence</div><span class="badge">${fmtWhole((sections.evidence?.provenance||[]).length)} refs</span></div><div class="brief-list">${(sections.evidence?.curatedItems||[]).slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Curated item')}</strong><div class="meta-line">${escapeHtml(item.source||'unknown')} | ${fmtDate(item.publishedAt)}</div>${item.whyItMatters?`<div class="story-summary">${escapeHtml(truncate(item.whyItMatters,180))}</div>`:''}</div>`).join('')}${(sections.evidence?.recentArticles||[]).slice(0,2).map((item)=>`<div class="brief-item"><strong>${item.url?`<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title||'Recent article')}</a>`:escapeHtml(item.title||'Recent article')}</strong><div class="meta-line">${escapeHtml(item.source||'unknown')} | ${fmtDate(item.publishedAt)}</div></div>`).join('')}${(sections.evidence?.researchEvidence?.works||[]).slice(0,2).map((item)=>`<div class="brief-item"><strong>${item.landingPageUrl?`<a href="${escapeHtml(item.landingPageUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.title||'Research work')}</a>`:escapeHtml(item.title||'Research work')}</strong><div class="meta-line">${escapeHtml(item.sourceDisplayName||'OpenAlex')} | ${item.publicationYear||fmtDate(item.publicationDate)} | citations ${escapeHtml(fmtWhole(item.citedByCount||0))}</div>${item.primaryTopic?`<div class="meta-line" style="margin-top:4px">Topic ${escapeHtml(item.primaryTopic)}</div>`:''}${item.abstractSummary?`<div class="story-summary">${escapeHtml(truncate(item.abstractSummary,180))}</div>`:''}${item.matchedKeywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.matchedKeywords,'tag-neutral',6)}</div>`:''}</div>`).join('')}${(sections.evidence?.githubEvidence?.repos||[]).slice(0,2).map((item)=>`<div class="brief-item"><strong>${item.htmlUrl?`<a href="${escapeHtml(item.htmlUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.fullName||item.name||'GitHub repository')}</a>`:escapeHtml(item.fullName||item.name||'GitHub repository')}</strong><div class="meta-line">GitHub | ${escapeHtml(item.language||'unknown')} | stars ${escapeHtml(fmtWhole(item.stargazersCount||0))} | pushed ${escapeHtml(fmtDate(item.pushedAt||item.updatedAt))}</div>${item.description?`<div class="story-summary">${escapeHtml(truncate(item.description,180))}</div>`:''}${item.matchedKeywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.matchedKeywords,'tag-neutral',6)}</div>`:''}</div>`).join('')}${!(sections.evidence?.curatedItems||[]).length&&!(sections.evidence?.recentArticles||[]).length&&!(sections.evidence?.researchEvidence?.works||[]).length&&!(sections.evidence?.githubEvidence?.repos||[]).length?'<div class="theme-empty">Evidence sources will appear here when digest, article, research, or code links are available.</div>':''}${sections.evidence?.researchEvidence?.summary?`<div class="section-note">Research lane: ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.workCount||0))} works | recent ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.recentCount||0))} | citations ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.totalCitations||0))}</div>`:''}${sections.evidence?.githubEvidence?.summary?`<div class="section-note">Code lane: ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.repoCount||0))} repos | recent pushes ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.recentPushedCount||0))} | stars ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.totalStars||0))}</div>`:''}${sections.evidence?.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(sections.evidence.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',8)}</div>`:''}</div></div>`;
+  const selectedMovement=sections.subtopicMovement?.selectedTheme;
+  const peers=sections.subtopicMovement?.peerThemes||[];
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Subtopic Movement</div><span class="badge">${escapeHtml(humanizeTheme(data.parentTheme||'theme'))}</span></div>${selectedMovement?`<div class="brief-item"><strong>${escapeHtml(selectedMovement.label||selectedMovement.theme)}</strong><div class="meta-line">Rank ${fmtWhole(selectedMovement.rank||0)} | share ${pct(selectedMovement.lastSharePct,0)} | delta ${fmtPercent(selectedMovement.deltaSharePct,1)}</div></div>`:''}<div class="brief-list">${peers.slice(0,5).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.theme)}</strong><div class="meta-line">Share ${pct(item.lastSharePct,0)} | delta ${fmtPercent(item.deltaSharePct,1)} | rank ${fmtWhole(item.rank||0)}</div></div>`).join('')||'<div class="theme-empty">Subtopic movement is not available yet.</div>'}</div></div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Related Entities</div><span class="badge">${fmtWhole((sections.relatedEntities?.entities||[]).length)} linked</span></div>${renderEntityCards(sections.relatedEntities)}</div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Adjacent Pathways</div><span class="badge">${fmtWhole(asArray(sections.adjacentPathways?.items||sections.adjacentPathways).length)} routes</span></div>${renderAdjacentPathways(sections.adjacentPathways)}</div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Risks</div><span class="badge">${fmtWhole((sections.risks||[]).length)} watchouts</span></div><div class="brief-list">${(sections.risks||[]).map((item)=>`<div class="brief-item"><div class="brief-item-copy">${escapeHtml(readRiskText(item))}</div></div>`).join('')||'<div class="theme-empty">No explicit risks were generated for this theme.</div>'}</div></div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Watch Next</div><span class="badge">${fmtWhole((sections.watchpoints||[]).length)} prompts</span></div><div class="brief-list">${(sections.watchpoints||[]).map((item)=>`<div class="brief-item"><div class="brief-item-copy">${escapeHtml(readWatchpointText(item))}</div></div>`).join('')||'<div class="theme-empty">No watchpoints available yet.</div>'}</div></div>`;
+  const notebookHooks=sections.notebookHooks||{};
+  const notebookTags=[...(notebookHooks.savedTags||[])];
+  const suggestedTags=(notebookHooks.suggestedTags||[]).filter((tag)=>!notebookTags.includes(tag));
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Notebook Hooks</div><span class="badge">${notebookHooks.pinned?'pinned':'workspace'}</span></div><div class="brief-list"><div class="brief-item"><strong>Saved note</strong><textarea id="theme-brief-note-input" class="note-textarea" placeholder="Add an analyst memo, thesis checkpoint, or follow-up question for this theme.">${escapeHtml(notebookHooks.noteMarkdown||'')}</textarea><div class="meta-line" style="margin-top:6px">${notebookHooks.updatedAt?`Updated ${escapeHtml(fmtDateTime(notebookHooks.updatedAt))}`:'No saved note yet.'}${notebookHooks.sharedAt?` | Shared ${escapeHtml(fmtDateTime(notebookHooks.sharedAt))}`:''}${notebookHooks.lastExportedAt?` | Exported ${escapeHtml(fmtDateTime(notebookHooks.lastExportedAt))}`:''}</div></div><div class="brief-item"><strong>Tags</strong><input id="theme-brief-tags-input" class="note-input" value="${escapeHtml(notebookTags.join(', '))}" placeholder="theme, catalyst, follow-up" /><div class="pill-row" style="margin-top:8px">${renderTags(notebookTags,'tag-growing',8)||''}${renderTags(suggestedTags,'tag-neutral',8)||'<span class="theme-empty">No tags</span>'}</div></div><div class="brief-item"><strong>Prompt seed</strong><div class="meta-line">${escapeHtml(notebookHooks.promptSeed||'No prompt seed available.')}</div><label class="meta-line" style="display:flex;align-items:center;gap:8px;margin-top:10px"><input id="theme-brief-pin-input" type="checkbox"${notebookHooks.pinned?' checked':''}/> Pin this theme in notebook workflows</label><div class="theme-actions" style="margin-top:10px"><button class="btn" onclick="saveThemeNotebook()">Save note</button><button class="btn" onclick="shareThemeNotebook()">Share link</button><button class="btn" onclick="unshareThemeNotebook()">Unshare</button><button class="btn" onclick="exportThemeBrief('markdown')">Export MD</button><button class="btn" onclick="exportThemeBrief('json')">Export JSON</button></div>${notebookHooks.shareUrl?`<div class="meta-line" style="margin-top:8px">Share URL: <a href="${escapeHtml(`${API.replace(/\/api$/,'')}${notebookHooks.shareUrl}`)}" target="_blank" rel="noreferrer">${escapeHtml(notebookHooks.shareUrl)}</a></div>`:''}${notebookHooks.exportCount?`<div class="meta-line" style="margin-top:6px">Exports ${escapeHtml(fmtWhole(notebookHooks.exportCount))}</div>`:''}</div></div></div>`;
+  html+='</div>';
+  el.innerHTML=html;
+  renderMyThemes();
+  renderWorkspaceFocus();
+}
+async function loadFollowedThemeBriefing(){
+  const el=document.getElementById('followed-theme-briefing');
+  const badge=document.getElementById('followed-briefing-badge');
+  if(!el||!badge)return;
+  if(!state.myThemes.length){
+    badge.textContent='Follow themes to activate';
+    followedThemeBriefing={periodType:'week',themeCount:0,items:[]};
+    el.innerHTML='<div class="theme-empty">Follow a handful of themes and this card will compress the weekly structural delta into a reusable briefing.</div>';
+    renderMyThemes();
+    renderWorkspaceFocus();
+    return;
+  }
+  badge.textContent=`${state.myThemes.length} theme${state.myThemes.length===1?'':'s'}`;
+  const params=new URLSearchParams({
+    period:'week',
+    limit:String(Math.min(state.myThemes.length,6)),
+    themes:state.myThemes.join(','),
+  });
+  state.myThemes.forEach((theme)=>{
+    const viewedAt=themeLastViewed[theme];
+    if(viewedAt)params.set(`since_${theme}`,viewedAt);
+  });
+  const sinceToken=cacheToken(state.myThemes.map((theme)=>`${theme}:${themeLastViewed[theme]||'none'}`).join('|'));
+  const cacheKey=`followed-theme-briefing-${cacheToken(state.myThemes.join('-')||'none')}-${sinceToken}`;
+  const {data,cached,cachedAt}=await f(`${API}/followed-theme-briefing?${params.toString()}`,cacheKey);
+  followedThemeBriefing=data&&Array.isArray(data.items)?data:{periodType:'week',themeCount:0,items:[]};
+  if(!Array.isArray(data?.items)||!data.items.length){
+    el.innerHTML='<div class="theme-empty">The weekly structural briefing is not available for the current followed-theme set yet.</div>';
+    renderMyThemes();
+    return;
+  }
+  const snapshot=data.snapshot||null;
+  badge.textContent=`${state.myThemes.length} theme${state.myThemes.length===1?'':'s'}${snapshot?.persisted&&snapshot?.snapshotDate?` | saved ${fmtDate(snapshot.snapshotDate)}`:''}`;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(data.headline||snapshot){
+    html+='<div class="info-note" style="margin-bottom:10px">';
+    if(data.headline)html+=`<div><strong>${escapeHtml(data.headline)}</strong></div>`;
+    if(snapshot?.snapshotDate||snapshot?.generatedAt)html+=`<div class="meta-line" style="margin-top:6px">Snapshot ${snapshot.persisted?'saved':'live'}${snapshot.snapshotDate?` | week of ${escapeHtml(fmtDate(snapshot.snapshotDate))}`:''}${snapshot.generatedAt?` | refreshed ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
+    html+='</div>';
+  }
+  html+='<div class="brief-list">';
+  data.items.forEach((item,index)=>{
+    const topChange=item.topChange||{};
+    const delta=item.deltaSinceLastVisit||{};
+    const adjacent=item.adjacentPathways||[];
+    const adjacentPrimary=adjacent[0]||null;
+    html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:12px"><div><button class="theme-chip" onclick="openThemeBrief('${normalizeTheme(item.theme)}')">${escapeHtml(item.label||humanizeTheme(item.theme))}</button><div class="meta-line" style="margin-top:6px">${escapeHtml(item.categoryLabel||item.category||'Theme')} | score ${fmt(item.score,1)} | YoY ${fmtPercent(item.summary?.vsYearAgoPct,0)} | acceleration ${fmtPercent(item.summary?.acceleration,0)}</div></div><span class="badge">#${index+1}</span></div>${topChange?.title?`<div class="story-summary" style="margin-top:8px"><strong>${escapeHtml(topChange.title)}</strong> ${escapeHtml(truncate(topChange.detail||'',160))}</div>`:''}${!topChange?.title&&adjacentPrimary?`<div class="story-summary" style="margin-top:8px"><strong>${escapeHtml(adjacentPrimary.label||'Adjacent pathway')}</strong> ${escapeHtml(truncate(adjacentPrimary.transmissionPath||adjacentPrimary.thesis||adjacentPrimary.reason||'',180))}</div>`:''}${item.whyItMatters?`<div class="brief-copy" style="margin-top:8px">${escapeHtml(truncate(item.whyItMatters,180))}</div>`:''}${delta?.active?`<div class="delta-kpi-row" style="margin-top:8px"><div class="brief-stat"><div class="brief-stat-label">Digest</div><div class="brief-stat-value">${escapeHtml(fmtWhole(delta.newDigestItemCount||0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Articles</div><div class="brief-stat-value">${escapeHtml(fmtWhole(delta.newArticleCount||0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Status</div><div class="brief-stat-value">${escapeHtml(delta.status||'updated')}</div></div></div>`:''}${adjacent.length?`<div class="pill-row" style="margin-top:8px">${renderTags(adjacent.map((pathway)=>`${pathway.label||'Pathway'} (${pathway.transmissionOrder||'indirect'})`),'tag-neutral',3)}</div>`:''}${item.watchpoint?`<div class="section-note">${escapeHtml(truncate(item.watchpoint,160))}</div>`:''}<div class="pill-row" style="margin-top:8px">${renderTags((item.evidenceClasses||[]).map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',6)}</div><div class="theme-actions" style="margin-top:8px"><button class="btn" onclick="openThemeBrief('${normalizeTheme(item.theme)}')">Open full brief</button></div></div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+  renderMyThemes();
+  renderWorkspaceFocus();
+}
+async function loadCategoryTrends(){
+  const {data,cached,cachedAt}=await f(`${API}/category-trends?period=${encodeURIComponent(getCurrentPeriod())}`,`category-trends-${getCurrentPeriod()}`);
+  const el=document.getElementById('category-trends');
+  let categories=[];
+  if(Array.isArray(data?.categories))categories=data.categories;
+  else if(data?.categories&&typeof data.categories==='object')categories=Object.entries(data.categories).map(([category,payload])=>({category,...payload}));
+  else if(Array.isArray(data))categories=data;
+  if(!categories.length){
+    el.innerHTML='<div class="meta-line">Category trend data is not available yet.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+='<div class="category-grid">';
+  categories.slice(0,8).forEach((item)=>{
+    const topThemes=item.topThemes||item.themes||item.leaders||[];
+    const category=item.category||item.name||item.label||'category';
+    const summary=item.summary||item.thesis||item.shiftSummary||item.description;
+    const momentum=item.momentum??item.changePct??item.vs_previous_period_pct;
+    const breadth=item.breadth??item.themeCount??item.uniqueThemes;
+    html+=`<div class="category-card"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(category)}</strong>${momentum!=null?`<span class="tag ${normalizePercent(momentum)>=0?'tag-growing':'tag-declining'}">${fmtPercent(momentum,0)}</span>`:''}</div><div class="meta-line" style="margin-top:4px">${breadth!=null?`Breadth ${fmtWhole(breadth)}`:'Breadth data unavailable'}</div>${summary?`<div class="story-summary" style="margin-top:6px">${escapeHtml(truncate(summary,120))}</div>`:''}${topThemes.length?`<div class="pill-row">${renderThemeButtons(topThemes,6)}</div>`:''}</div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+async function loadQuarterlyInsights(){
+  const {data,cached,cachedAt}=await f(`${API}/insights/quarterly?period=${encodeURIComponent(getCurrentPeriod())}`,`quarterly-insights-${getCurrentPeriod()}`);
+  const el=document.getElementById('quarterly-insights');
+  const headline=data?.headline||data?.title||data?.summary;
+  const insights=parseList(data,['insights','highlights','items']);
+  const transitions=parseList(data,['transitions','shifts','moves']);
+  const risks=parseList(data,['risks','watchouts','warnings']);
+  if(!headline&&!insights.length&&!transitions.length&&!risks.length){
+    el.innerHTML='<div class="meta-line">Insight stack not available for this horizon yet.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(headline)html+=`<div class="info-note" style="margin-bottom:12px"><strong>${escapeHtml(headline)}</strong></div>`;
+  html+='<div class="insight-list">';
+  insights.slice(0,5).forEach((item)=>{
+    const title=item.title||item.label||item.theme||'Insight';
+    const body=item.body||item.summary||item.text||item.description||'';
+    html+=`<div class="insight-card"><div><strong>${escapeHtml(title)}</strong></div>${body?`<div class="story-summary">${escapeHtml(truncate(body,180))}</div>`:''}</div>`;
+  });
+  if(transitions.length){
+    html+='<div class="insight-card"><div><strong>Transitions</strong></div><div class="pill-row" style="margin-top:8px">';
+    transitions.slice(0,8).forEach((item)=>{
+      const label=item.theme||item.label||item.name||'theme';
+      const from=item.from||item.previousStage||'prior';
+      const to=item.to||item.stage||'current';
+      html+=`<span class="tag tag-neutral">${escapeHtml(label)}: ${escapeHtml(from)} -> ${escapeHtml(to)}</span>`;
+    });
+    html+='</div></div>';
+  }
+  if(risks.length){
+    html+='<div class="insight-card"><div><strong>Watchouts</strong></div>';
+    risks.slice(0,4).forEach((item)=>{
+      const text=typeof item==='string'?item:item.summary||item.text||item.label||item.title;
+      html+=`<div class="meta-line" style="margin-top:6px">- ${escapeHtml(truncate(text,160))}</div>`;
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
 async function loadToday(){
-  const{data:d,cached,cachedAt}=await f(API+'/today','today');
-  if(!d||d.length===0){document.getElementById('today-events').innerHTML='이벤트 수집 중... 최근 7일 이벤트로 대체 예정';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:6px">${cb}</div>`:'';
-  const items=Array.isArray(d)?d:(d.events||[]);
-  for(const e of items.slice(0,10)){
-    h+=`<div class="event-row">`;
-    h+=`<div class="event-title">${e.title||'Untitled'}</div>`;
-    h+=`<div class="event-meta">${e.source||''} · ${e.theme||''} · ${String(e.date||e.publishedAt||'').slice(0,10)}</div>`;
-    h+=`<div class="event-reactions">`;
-    for(const r of(e.expectedReactions||[]).slice(0,5)){
-      const cls=Number(r.avgReturn)>=0?'pos':'neg';
-      h+=`<span class="reaction-chip"><strong>${r.symbol}</strong> <span class="${cls}">${rf(r.avgReturn)}</span> hit ${pct(r.hitRate)}</span>`;
-    }
-    h+=`</div></div>`;
+  const {data,cached,cachedAt}=await f(`${API}/today`,'today');
+  const el=document.getElementById('today-events');
+  const items=Array.isArray(data)?data:parseList(data,['events','items']);
+  if(!items.length){
+    el.innerHTML='<div class="meta-line">No recent event feed available.</div>';
+    return;
   }
-  document.getElementById('today-events').innerHTML=h||'이벤트 수집 중...';
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  items.slice(0,8).forEach((item)=>{
+    html+=`<div class="event-row"><div class="event-title">${escapeHtml(item.title||'Untitled event')}</div><div class="meta-line">${escapeHtml(item.source||'unknown')} | ${escapeHtml(item.theme||'general')} | ${fmtDate(item.date||item.publishedAt)}</div>`;
+    const reactions=Array.isArray(item.expectedReactions)?item.expectedReactions:[];
+    if(reactions.length){
+      html+='<div class="event-reactions">';
+      reactions.slice(0,5).forEach((reaction)=>{html+=`<span class="reaction-chip"><strong>${escapeHtml(reaction.symbol||'asset')}</strong> ${rf(reaction.avgReturn)} hit ${pct(reaction.hitRate)}</span>`;});
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
 }
-
 async function loadHeatmap(){
-  const{data:d,cached,cachedAt}=await f(API+'/heatmap','heatmap');
-  if(!d){document.getElementById('heatmap').innerHTML='민감도 데이터 수집 중...';return}
-  const themes=d.themes||[...new Set((d.data||[]).map(r=>r.theme))];
-  const symbols=d.symbols||[...new Set((d.data||[]).map(r=>r.symbol))];
+  const {data,cached,cachedAt}=await f(`${API}/heatmap`,'heatmap');
+  const el=document.getElementById('heatmap');
+  const cells=data?.cells||data?.data||[];
+  if(!cells.length){
+    el.innerHTML='<div class="meta-line">No sensitivity heatmap data available.</div>';
+    return;
+  }
+  const themes=data?.themes||[...new Set(cells.map((row)=>row.theme))];
+  const symbols=data?.symbols||[...new Set(cells.map((row)=>row.symbol))];
   const lookup={};
-  for(const r of(d.data||[]))lookup[r.theme+':'+r.symbol]=r;
-
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  h+='<table><tr><th></th>';
-  for(const s of symbols.slice(0,12))h+=`<th style="text-align:center;font-size:10px">${s}</th>`;
-  h+='</tr>';
-  for(const t of themes){
-    h+=`<tr><td style="font-weight:bold">${t}</td>`;
-    for(const s of symbols.slice(0,12)){
-      const r=lookup[t+':'+s];
-      if(!r){h+='<td style="text-align:center">·</td>';continue}
-      const hit=Number(r.hitRate||0.5);
-      const bg=hit>0.58?'#0a3a0a':hit>0.52?'#1a2a1a':hit<0.42?'#3a0a0a':hit<0.48?'#2a1a1a':'#1a1a1a';
-      const ret=Number(r.avgReturn||0);
-      h+=`<td style="text-align:center"><div class="heatmap-cell" style="background:${bg}" title="${t}→${s}: ${ret>=0?'+':''}${ret.toFixed(2)}% hit ${(hit*100).toFixed(0)}%">${(hit*100).toFixed(0)}</div></td>`;
-    }
-    h+='</tr>';
-  }
-  h+='</table><div style="font-size:9px;color:var(--dim);margin-top:4px">Cell = hit rate %. Green > 58%, Red < 42%</div>';
-  document.getElementById('heatmap').innerHTML=h;
+  cells.forEach((row)=>{lookup[`${row.theme}:${row.symbol}`]=row;});
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+='<div class="table-wrap"><table><tr><th></th>';
+  symbols.slice(0,12).forEach((symbol)=>{html+=`<th style="text-align:center">${escapeHtml(symbol)}</th>`;});
+  html+='</tr>';
+  themes.forEach((theme)=>{
+    html+=`<tr><td><strong>${escapeHtml(theme)}</strong></td>`;
+    symbols.slice(0,12).forEach((symbol)=>{
+      const row=lookup[`${theme}:${symbol}`];
+      if(!row){html+='<td style="text-align:center">-</td>';return;}
+      const hit=Number(row.hitRate||0.5);
+      const bg=hit>0.58?'rgba(126,224,129,0.25)':hit>0.52?'rgba(126,224,129,0.12)':hit<0.42?'rgba(255,122,107,0.26)':hit<0.48?'rgba(255,122,107,0.14)':'rgba(255,255,255,0.04)';
+      html+=`<td style="text-align:center;background:${bg}" title="${escapeHtml(theme)} / ${escapeHtml(symbol)} | return ${fmtPercent(row.avgReturn)} | hit ${pct(row.hitRate)}">${pct(hit)}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</table></div><div class="meta-line" style="margin-top:8px">Green cells indicate stronger hit rates. This surface remains available, but intentionally demoted out of the main view.</div>';
+  el.innerHTML=html;
 }
-
 async function loadTrends(){
-  const{data:d,cached,cachedAt}=await f(API+'/trends','trends');
-  if(!d){document.getElementById('trends').innerHTML='트렌드 수집 중...';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  for(const t of(d||[]).sort((a,b)=>b.momentum-a.momentum)){
-    const status=t.momentum>30?'SURGING':t.momentum>10?'GROWING':t.momentum>-10?'STABLE':'DECLINING';
-    const cls=status==='SURGING'||status==='GROWING'?'tag-pos':status==='DECLINING'?'tag-neg':'tag-neutral';
-    h+=`<div style="margin-bottom:8px">`;
-    h+=`<div style="display:flex;justify-content:space-between"><strong>${t.name}</strong><span class="tag ${cls}">${status}</span></div>`;
-    h+=`<div style="font-size:10px;color:var(--dim)">${t.total} articles · ${fmt(t.recentAvg,0)}/mo · <span class="${t.momentum>=0?'pos':'neg'}">${t.momentum>=0?'+':''}${fmt(t.momentum,0)}%</span></div>`;
-    const tl=(t.timeline||[]).slice(-18);
-    if(tl.length>0){
-      const mx=Math.max(...tl.map(p=>p.n));
-      h+=`<div class="sparkline">`;
-      for(const p of tl)h+=`<div class="sparkline-bar" style="height:${mx>0?(p.n/mx*28):0}px" title="${String(p.month).slice(0,7)}: ${p.n}"></div>`;
-      h+=`</div>`;
+  const {data,cached,cachedAt}=await f(`${API}/trends`,'trends');
+  const el=document.getElementById('trends');
+  const items=Array.isArray(data)?data:[];
+  if(!items.length){
+    el.innerHTML='<div class="meta-line">No trend summary available.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  items.slice().sort((a,b)=>Number(b.momentum||0)-Number(a.momentum||0)).slice(0,6).forEach((item)=>{
+    const status=Number(item.momentum||0)>30?'SURGING':Number(item.momentum||0)>10?'GROWING':Number(item.momentum||0)>-10?'STABLE':'DECLINING';
+    const tagClass=status==='SURGING'||status==='GROWING'?'tag-growing':status==='DECLINING'?'tag-declining':'tag-neutral';
+    const timeline=Array.isArray(item.timeline)?item.timeline.slice(-18):[];
+    html+=`<div class="interactive-row" style="cursor:default"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(item.name||'trend')}</strong><span class="tag ${tagClass}">${status}</span></div><div class="meta-line" style="margin-top:4px">${fmtWhole(item.total||0)} articles | ${fmt(item.recentAvg||0,0)}/mo | ${fmtPercent(item.momentum||0,0)}</div>`;
+    if(timeline.length){
+      const maxValue=Math.max(...timeline.map((point)=>Number(point.n||0)),1);
+      html+='<div class="sparkline">';
+      timeline.forEach((point)=>{html+=`<div class="sparkline-bar" style="height:${Math.max(3,(Number(point.n||0)/maxValue)*32)}px" title="${escapeHtml(String(point.month||'').slice(0,7))}: ${fmtWhole(point.n||0)}"></div>`;});
+      html+='</div>';
     }
-    h+=`</div>`;
-  }
-  document.getElementById('trends').innerHTML=h;
+    html+='</div>';
+  });
+  el.innerHTML=html;
 }
-
 async function loadEmergingTechTopics(){
-  const{data:d,cached,cachedAt}=await f(API+'/emerging-tech','emerging-tech');
+  const {data,cached,cachedAt}=await f(`${API}/emerging-tech`,'emerging-tech');
   const el=document.getElementById('emerging-tech-topics');
-  if(!d||!Array.isArray(d.topics)){el.innerHTML='Emerging-topic data unavailable';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  if(d.topics.length===0){el.innerHTML=(cb||'')+'No labeled discovery topics yet.';return}
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  for(const topic of d.topics.slice(0,6)){
+  const topics=Array.isArray(data?.topics)?data.topics:[];
+  if(!topics.length){
+    el.innerHTML='<div class="meta-line">No labeled discovery topics yet.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  topics.slice(0,6).forEach((topic)=>{
     const active=selectedEmergingTopicId===topic.id?' active':'';
-    h+=`<div class="interactive-row${active}" onclick="openEmergingTopicDetail('${escapeHtml(topic.id)}')">`;
-    h+=`<div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(topic.label||topic.id)}</strong><span class="tag tag-neutral">${escapeHtml(topic.stage||'watch')}</span></div>`;
-    h+=`<div style="font-size:10px;color:var(--dim)">${escapeHtml(topic.category||'other')} |articles ${topic.articleCount||0} |momentum ${fmt(topic.momentum||0,2)}</div>`;
-    h+=`<div style="font-size:10px;color:var(--dim)">research ${fmt(topic.researchMomentum||0,2)} |novelty ${fmt(topic.novelty||0,2)}</div>`;
-    h+=renderSourceQuality(topic.sourceQualityScore,topic.sourceQualityBreakdown);
-    if(topic.description){h+=`<div style="font-size:10px;margin-top:2px">${escapeHtml(topic.description)}</div>`}
-    h+=`</div>`;
-  }
-  el.innerHTML=h;
-  if(!selectedEmergingTopicId&&d.topics[0]?.id){
-    await openEmergingTopicDetail(d.topics[0].id);
-  }
+    const onclick=JSON.stringify(String(topic.id));
+    html+=`<div class="interactive-row${active}" onclick='openEmergingTopicDetail(${onclick})'><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(topic.label||topic.id)}</strong><span class="tag tag-neutral">${escapeHtml(topic.stage||'watch')}</span></div><div class="meta-line" style="margin-top:4px">${escapeHtml(topic.category||'other')} | articles ${fmtWhole(topic.articleCount||0)} | momentum ${fmt(topic.momentum||0,2)}</div><div class="meta-line">Research ${fmt(topic.researchMomentum||0,2)} | novelty ${fmt(topic.novelty||0,2)}</div>${renderSourceQuality(topic.sourceQualityScore,topic.sourceQualityBreakdown)}</div>`;
+  });
+  el.innerHTML=html;
+  if(!selectedEmergingTopicId&&topics[0]?.id)await openEmergingTopicDetail(topics[0].id);
 }
-
 async function loadEmergingTechReports(){
-  const{data:d,cached,cachedAt}=await f(API+'/reports/latest?limit=6','emerging-tech-reports');
+  const {data,cached,cachedAt}=await f(`${API}/reports/latest?limit=6`,'emerging-tech-reports');
   const el=document.getElementById('emerging-tech-reports');
-  if(!d||!Array.isArray(d.reports)){el.innerHTML='Report data unavailable';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  if(d.reports.length===0){el.innerHTML=(cb||'')+'No reports generated yet.';return}
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  for(const report of d.reports.slice(0,6)){
-    const active=selectedEmergingReportId===report.id?' active':'';
-    h+=`<div class="interactive-row${active}" onclick="openReportDetail('${escapeHtml(report.id)}')">`;
-    h+=`<div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(report.topic_label||report.topic_id)}</strong><span class="tag ${Number(report.tracking_score||0)>=60?'tag-pos':'tag-neutral'}">track ${Number(report.tracking_score||0)}</span></div>`;
-    h+=`<div style="font-size:10px;color:var(--dim)">generated ${String(report.generated_at||'').slice(0,10)} |momentum ${fmt(report.momentum||0,2)} |research ${fmt(report.research_momentum||0,2)}</div>`;
-    h+=`<div style="font-size:10px;color:var(--dim)">source quality ${fmt(report.source_quality_score||0,2)}</div>`;
-    h+=`</div>`;
+  const reports=Array.isArray(data?.reports)?data.reports:[];
+  if(!reports.length){
+    selectedEmergingReportId='';
+    el.innerHTML='<div class="meta-line">No reports generated yet.</div>';
+    return;
   }
-  el.innerHTML=h;
-  if(!selectedEmergingReportId&&d.reports[0]?.id){
-    await openReportDetail(d.reports[0].id);
-  }
+  const hasSelectedReport=reports.some((report)=>String(report.id||'')===String(selectedEmergingReportId||''));
+  if(!hasSelectedReport)selectedEmergingReportId='';
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  reports.slice(0,6).forEach((report)=>{
+    const active=String(selectedEmergingReportId||'')===String(report.id||'')?' active':'';
+    const onclick=JSON.stringify(String(report.id));
+    html+=`<div class="interactive-row${active}" onclick='openReportDetail(${onclick})'><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(report.topic_label||report.topic_id||report.id)}</strong><span class="tag ${Number(report.tracking_score||0)>=60?'tag-growing':'tag-neutral'}">track ${fmtWhole(report.tracking_score||0)}</span></div><div class="meta-line" style="margin-top:4px">Generated ${fmtDate(report.generated_at)} | momentum ${fmt(report.momentum||0,2)} | research ${fmt(report.research_momentum||0,2)}</div><div class="meta-line">Source quality ${fmt(report.source_quality_score||0,2)}</div></div>`;
+  });
+  el.innerHTML=html;
+  if(!selectedEmergingReportId&&reports[0]?.id)await openReportDetail(reports[0].id,{skipListRefresh:true,skipRecovery:true});
 }
-
 async function openEmergingTopicDetail(topicId){
   if(!topicId)return;
   selectedEmergingTopicId=topicId;
   const el=document.getElementById('emerging-tech-topic-detail');
-  const {data:d}=await f(API+'/emerging-tech/'+encodeURIComponent(topicId),'emerging-tech-topic-'+topicId);
-  if(!d||!d.topic){el.innerHTML='Topic detail unavailable';return}
-  const topic=d.topic;
-  let h=`<div><strong>${escapeHtml(topic.label||topic.id)}</strong></div>`;
-  h+=`<div class="detail-meta">${escapeHtml(topic.category||'other')} |stage ${escapeHtml(topic.stage||'watch')} |updated ${fmtDate(topic.updatedAt)}</div>`;
-  if(topic.description){h+=`<div style="margin-top:6px;font-size:11px">${escapeHtml(topic.description)}</div>`}
-  h+=renderSourceQuality(topic.sourceQualityScore,topic.sourceQualityBreakdown);
-  h+=`<div class="detail-meta">momentum ${fmt(topic.momentum||0,2)} |research ${fmt(topic.researchMomentum||0,2)} |novelty ${fmt(topic.novelty||0,2)} |cohesion ${fmt(topic.cohesion||0,2)}</div>`;
-  const keywords=Array.isArray(topic.keywords)?topic.keywords:[];
-  if(keywords.length>0){h+=`<div class="pill-row">${keywords.slice(0,10).map((item)=>`<span class="tag tag-cool">${escapeHtml(item)}</span>`).join('')}</div>`}
-  const techs=Array.isArray(topic.keyTechnologies)?topic.keyTechnologies:[];
-  if(techs.length>0){h+=`<div class="detail-block"><div><strong>Technologies</strong></div><div class="pill-row">${techs.slice(0,10).map((item)=>`<span class="tag tag-neutral">${escapeHtml(item)}</span>`).join('')}</div></div>`}
-  const companies=Array.isArray(topic.keyCompanies)?topic.keyCompanies:[];
-  if(companies.length>0){h+=`<div class="detail-block"><div><strong>Companies</strong></div><div class="pill-row">${companies.slice(0,10).map((item)=>`<span class="tag tag-neutral">${escapeHtml(item)}</span>`).join('')}</div></div>`}
-  if(Array.isArray(d.symbols)&&d.symbols.length>0){
-    h+=`<div class="detail-block"><div><strong>Linked Symbols</strong></div>`;
-    h+=`<table><tr><th>Symbol</th><th>Return</th><th>Hit</th><th>Sample</th></tr>`;
-    for(const row of d.symbols.slice(0,8)){
-      h+=`<tr><td>${escapeHtml(row.symbol)}</td><td>${rf(row.avgReturn)}</td><td>${pct(row.hitRate)}</td><td>${row.sampleSize}</td></tr>`;
-    }
-    h+=`</table></div>`;
+  const {data}=await f(`${API}/emerging-tech/${encodeURIComponent(topicId)}`,`emerging-tech-topic-${topicId}`);
+  if(!data?.topic){
+    el.innerHTML='<div class="meta-line">Topic detail unavailable.</div>';
+    return;
   }
-  if(Array.isArray(d.articles)&&d.articles.length>0){
-    h+=`<div class="detail-block"><div><strong>Recent Articles</strong></div>`;
-    for(const article of d.articles.slice(0,6)){
-      const href=article.url?`<a href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer" style="color:var(--text)">${escapeHtml(article.title)}</a>`:escapeHtml(article.title);
-      h+=`<div style="margin-top:5px"><div>${href}</div><div class="detail-meta">${escapeHtml(article.source||'unknown')} |${fmtDate(article.publishedAt)}</div></div>`;
-    }
-    h+=`</div>`;
+  const topic=data.topic;
+  let html=`<div><strong>${escapeHtml(topic.label||topic.id)}</strong></div>`;
+  html+=`<div class="meta-line" style="margin-top:4px">${escapeHtml(topic.category||'other')} | stage ${escapeHtml(topic.stage||'watch')} | updated ${fmtDate(topic.updatedAt)}</div>`;
+  if(topic.description)html+=`<div class="story-summary" style="margin-top:6px">${escapeHtml(topic.description)}</div>`;
+  html+=renderSourceQuality(topic.sourceQualityScore,topic.sourceQualityBreakdown);
+  html+=`<div class="meta-line">Momentum ${fmt(topic.momentum||0,2)} | research ${fmt(topic.researchMomentum||0,2)} | novelty ${fmt(topic.novelty||0,2)} | cohesion ${fmt(topic.cohesion||0,2)}</div>`;
+  if(Array.isArray(topic.keywords)&&topic.keywords.length)html+=`<div class="pill-row">${renderTags(topic.keywords,'tag-emerging',10)}</div>`;
+  if(Array.isArray(topic.keyTechnologies)&&topic.keyTechnologies.length)html+=`<div class="detail-block"><div><strong>Technologies</strong></div><div class="pill-row">${renderTags(topic.keyTechnologies,'tag-neutral',10)}</div></div>`;
+  if(Array.isArray(topic.keyCompanies)&&topic.keyCompanies.length)html+=`<div class="detail-block"><div><strong>Companies</strong></div><div class="pill-row">${renderTags(topic.keyCompanies,'tag-neutral',10)}</div></div>`;
+  if(Array.isArray(data.symbols)&&data.symbols.length){
+    html+='<div class="detail-block"><div><strong>Linked symbols</strong></div><div class="table-wrap"><table><tr><th>Symbol</th><th>Return</th><th>Hit</th><th>Sample</th></tr>';
+    data.symbols.slice(0,8).forEach((row)=>{html+=`<tr><td>${escapeHtml(row.symbol)}</td><td>${rf(row.avgReturn)}</td><td>${pct(row.hitRate)}</td><td>${fmtWhole(row.sampleSize)}</td></tr>`;});
+    html+='</table></div></div>';
   }
-  if(d.report?.id){
-    h+=`<div class="detail-block"><button class="refresh-btn" onclick="openReportDetail('${escapeHtml(d.report.id)}')">Open latest report</button></div>`;
+  if(Array.isArray(data.articles)&&data.articles.length){
+    html+='<div class="detail-block"><div><strong>Recent articles</strong></div>';
+    data.articles.slice(0,6).forEach((article)=>{
+      const link=article.url?`<a href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer">${escapeHtml(article.title)}</a>`:escapeHtml(article.title);
+      html+=`<div style="margin-top:8px">${link}<div class="meta-line">${escapeHtml(article.source||'unknown')} | ${fmtDate(article.publishedAt)}</div></div>`;
+    });
+    html+='</div>';
   }
-  el.innerHTML=h;
+  if(data.report?.id){
+    const onclick=JSON.stringify(String(data.report.id));
+    html+=`<div class="detail-block"><button class="btn" onclick='openReportDetail(${onclick})'>Open latest report</button></div>`;
+  }
+  el.innerHTML=html;
   await loadEmergingTechTopics();
 }
-
-async function openReportDetail(reportId){
+async function openReportDetail(reportId,options={}){
   if(!reportId)return;
-  selectedEmergingReportId=reportId;
+  selectedEmergingReportId=String(reportId);
   const el=document.getElementById('emerging-tech-report-detail');
-  const {data:d}=await f(API+'/reports/'+encodeURIComponent(reportId),'emerging-tech-report-'+reportId);
-  if(!d||!d.report){el.innerHTML='Report detail unavailable';return}
-  const report=d.report;
-  const topic=d.topic||null;
-  let h=`<div><strong>${escapeHtml(report.topic_label||topic?.label||report.topic_id||report.id)}</strong></div>`;
-  h+=`<div class="detail-meta">generated ${fmtDate(report.generated_at)} |track ${Number(report.tracking_score||0)} |next review ${fmtDate(report.next_review_at)}</div>`;
-  h+=`<div class="detail-meta">momentum ${fmt(report.momentum||0,2)} |research ${fmt(report.research_momentum||0,2)} |source quality ${fmt(report.source_quality_score||0,2)}</div>`;
-  if(report.investment_thesis){h+=`<div class="detail-block" style="font-size:11px;white-space:pre-wrap">${escapeHtml(report.investment_thesis)}</div>`}
+  const {data}=await f(`${API}/reports/${encodeURIComponent(reportId)}`,`emerging-tech-report-${reportId}`);
+  if(!data?.report){
+    selectedEmergingReportId='';
+    el.innerHTML='<div class="meta-line">Report detail unavailable. Recovering the latest valid report...</div>';
+    if(!options?.skipRecovery)await loadEmergingTechReports();
+    return;
+  }
+  const report=data.report;
+  const topic=data.topic||null;
+  let html=`<div><strong>${escapeHtml(report.topic_label||topic?.label||report.topic_id||report.id)}</strong></div>`;
+  html+=`<div class="meta-line" style="margin-top:4px">Generated ${fmtDate(report.generated_at)} | track ${fmtWhole(report.tracking_score||0)} | next review ${fmtDate(report.next_review_at)}</div>`;
+  html+=`<div class="meta-line">Momentum ${fmt(report.momentum||0,2)} | research ${fmt(report.research_momentum||0,2)} | source quality ${fmt(report.source_quality_score||0,2)}</div>`;
+  if(report.investment_thesis)html+=`<div class="detail-block" style="white-space:pre-wrap">${escapeHtml(report.investment_thesis)}</div>`;
   if(topic){
-    h+=`<div class="detail-block"><div><strong>Topic context</strong></div><div class="detail-meta">${escapeHtml(topic.category||'other')} |stage ${escapeHtml(topic.stage||'watch')}</div>${renderSourceQuality(report.source_quality_score||0,topic.sourceQualityBreakdown)}</div>`;
-    if(Array.isArray(topic.keyTechnologies)&&topic.keyTechnologies.length>0){h+=`<div class="pill-row">${topic.keyTechnologies.slice(0,8).map((item)=>`<span class="tag tag-cool">${escapeHtml(item)}</span>`).join('')}</div>`}
+    html+=`<div class="detail-block"><div><strong>Topic context</strong></div><div class="meta-line">${escapeHtml(topic.category||'other')} | stage ${escapeHtml(topic.stage||'watch')}</div>${renderSourceQuality(report.source_quality_score||0,topic.sourceQualityBreakdown)}</div>`;
+    if(Array.isArray(topic.keyTechnologies)&&topic.keyTechnologies.length)html+=`<div class="pill-row">${renderTags(topic.keyTechnologies,'tag-emerging',8)}</div>`;
   }
-  el.innerHTML=h;
-  await loadEmergingTechReports();
+  el.innerHTML=html;
+  if(!options?.skipListRefresh)await loadEmergingTechReports();
 }
-
 async function loadWeeklyDigest(){
-  const{data:d,cached,cachedAt}=await f(API+'/digest/weekly','weekly-digest');
+  const {data,cached,cachedAt}=await f(`${API}/digest/weekly`,'weekly-digest');
   const el=document.getElementById('emerging-tech-digest');
-  const digest=d&&d.digest?d.digest:null;
-  const cb=cached?cachedBadge(cachedAt):'';
-  if(!digest){el.innerHTML=(cb||'')+'No weekly digest generated yet.';return}
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  h+=`<div style="margin-bottom:6px"><strong>${digest.headline||'Weekly digest'}</strong></div>`;
-  h+=`<div style="font-size:10px;color:var(--dim);margin-bottom:6px">week ending ${digest.weekEnding||''} 쨌 ${digest.mode||'deterministic'}</div>`;
-  h+=`<div style="font-size:10px;margin-bottom:6px">${digest.summary||''}</div>`;
-  const watchlist=Array.isArray(digest.watchlist)?digest.watchlist:[];
-  if(watchlist.length>0){
-    h+=`<div style="display:flex;flex-wrap:wrap;gap:4px">`;
-    for(const item of watchlist.slice(0,8))h+=`<span class="tag tag-cool">${item}</span>`;
-    h+=`</div>`;
+  const digest=data?.digest||null;
+  if(!digest){
+    el.innerHTML='<div class="meta-line">No weekly digest generated yet.</div>';
+    return;
   }
-  el.innerHTML=h;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div><strong>${escapeHtml(digest.headline||'Weekly digest')}</strong></div><div class="meta-line" style="margin-top:4px">Week ending ${escapeHtml(digest.weekEnding||'--')} | ${escapeHtml(digest.mode||'deterministic')}</div>`;
+  if(digest.summary)html+=`<div class="story-summary">${escapeHtml(digest.summary)}</div>`;
+  if(Array.isArray(digest.watchlist)&&digest.watchlist.length)html+=`<div class="pill-row">${renderTags(digest.watchlist,'tag-emerging',8)}</div>`;
+  el.innerHTML=html;
 }
-
 async function loadWhatif(){
-  const{data:d,cached,cachedAt}=await f(API+'/whatif//','whatif');
-  if(!d){document.getElementById('whatif').innerHTML='시뮬레이션 대기 중...';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  const items=Array.isArray(d)?d:(d.strategies||[]);
-  h+='<table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th></tr>';
-  for(const r of items.slice(0,8)){
-    h+=`<tr><td>${r.theme}</td><td><strong>${r.symbol||r.name||''}</strong></td><td>${r.direction||''}</td>`;
-    h+=`<td class="${Number(r.sharpe_ratio||r.sharpe||0)>=0?'pos':'neg'}">${fmt(r.sharpe_ratio||r.sharpe)}</td>`;
-    h+=`<td>${pct(r.hit_rate)}</td></tr>`;
+  const {data,cached,cachedAt}=await f(`${API}/whatif//`,'whatif');
+  const el=document.getElementById('whatif');
+  const items=Array.isArray(data)?data:parseList(data,['strategies','items']);
+  if(!items.length){
+    el.innerHTML='<div class="meta-line">No tactical strategy data available.</div>';
+    return;
   }
-  h+='</table>';
-  document.getElementById('whatif').innerHTML=h;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+='<div class="table-wrap"><table><tr><th>Theme</th><th>Symbol</th><th>Dir</th><th>Sharpe</th><th>Hit</th></tr>';
+  items.slice(0,8).forEach((row)=>{html+=`<tr><td>${escapeHtml(row.theme||'theme')}</td><td><strong>${escapeHtml(row.symbol||row.name||'')}</strong></td><td>${escapeHtml(row.direction||'')}</td><td class="${Number(row.sharpe_ratio||row.sharpe||0)>=0?'pos':'neg'}">${fmt(row.sharpe_ratio||row.sharpe||0,2)}</td><td>${pct(row.hit_rate)}</td></tr>`;});
+  html+='</table></div><div class="meta-line" style="margin-top:8px">Kept as a reference surface only. It is intentionally not placed in the primary trend workflow.</div>';
+  el.innerHTML=html;
 }
-
 async function loadAnomalies(){
-  const{data:d,cached,cachedAt}=await f(API+'/anomalies','anomalies');
-  if(!d){document.getElementById('anomalies').innerHTML='이상치 수집 중...';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  for(const r of(d||[]).slice(0,5)){
-    h+=`<div style="margin-bottom:6px;font-size:11px">`;
-    h+=`<div><strong>${r.symbol}</strong> ${rf(r.forward_return_pct)} <span class="dim">z=${fmt(r.z_score,1)}</span></div>`;
-    h+=`<div style="font-size:10px;color:var(--dim)">${String(r.event_date).slice(0,10)} · ${r.theme}</div>`;
-    h+=`</div>`;
+  const {data,cached,cachedAt}=await f(`${API}/anomalies`,'anomalies');
+  const el=document.getElementById('anomalies');
+  const items=Array.isArray(data)?data:[];
+  if(!items.length){
+    el.innerHTML='<div class="meta-line">No anomalies detected.</div>';
+    return;
   }
-  document.getElementById('anomalies').innerHTML=h||'이상치 수집 중...';
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  items.slice(0,5).forEach((row)=>{html+=`<div style="margin-bottom:8px"><div><strong>${escapeHtml(row.symbol||'asset')}</strong> ${rf(row.forward_return_pct)} <span class="meta-line">z=${fmt(row.z_score,1)}</span></div><div class="meta-line">${fmtDate(row.event_date)} | ${escapeHtml(row.theme||'theme')}</div></div>`;});
+  el.innerHTML=html;
 }
-
 async function loadCodex(){
-  const{data:d,cached,cachedAt}=await f(API+'/codex-latest','codex');
-  if(!d){document.getElementById('codex-latest').innerHTML='Codex 수집 중...';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  if(d.proposals?.length>0){
-    for(const p of d.proposals.slice(0,4)){
-      const s=p.status||'?';
-      const dot=s==='executed'?'dot-green':s==='pending'?'dot-yellow':'dot-red';
-      h+=`<div style="margin-bottom:4px"><span class="status-dot ${dot}"></span>${p.proposal_type}: ${JSON.stringify(p.payload||{}).slice(0,60)}</div>`;
-    }
-  }else{h+='제안 수집 중...';}
-  document.getElementById('codex-latest').innerHTML=h;
+  const {data,cached,cachedAt}=await f(`${API}/codex-latest`,'codex');
+  const el=document.getElementById('codex-latest');
+  const proposals=Array.isArray(data?.proposals)?data.proposals:[];
+  if(!proposals.length){
+    el.innerHTML='<div class="meta-line">No recent Codex discoveries.</div>';
+    return;
+  }
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  proposals.slice(0,5).forEach((proposal)=>{
+    const status=proposal.status||'unknown';
+    const dotClass=status==='executed'?'dot-green':status==='pending'?'dot-yellow':'dot-red';
+    html+=`<div style="margin-bottom:8px"><span class="status-dot ${dotClass}"></span><strong>${escapeHtml(proposal.proposal_type||'proposal')}</strong><div class="meta-line">${escapeHtml(truncate(JSON.stringify(proposal.payload||{}),120))}</div></div>`;
+  });
+  el.innerHTML=html;
 }
-
+function summarizePayloadFocus(payload={},fallbackType='proposal'){
+  if(!payload||typeof payload!=='object')return fallbackType;
+  const label=payload.label||payload.theme||payload.targetTheme||payload.source||payload.query||payload.symbol||payload.url;
+  if(typeof label==='string'&&label.trim())return label.trim();
+  return fallbackType;
+}
+function summarizePayloadMeta(payload={}){
+  if(!payload||typeof payload!=='object')return[];
+  const items=[];
+  const confidence=Number(payload.confidence);
+  if(Number.isFinite(confidence)&&confidence>0)items.push(`confidence ${fmt(confidence,2)}`);
+  if(payload.targetTheme)items.push(`target ${humanizeTheme(payload.targetTheme)}`);
+  if(payload.symbol)items.push(`symbol ${payload.symbol}`);
+  if(payload.source)items.push(`source ${payload.source}`);
+  if(payload.url)items.push(truncate(String(payload.url),48));
+  return items.slice(0,4);
+}
+function snapshotLevelClass(level){
+  const key=String(level||'').toLowerCase();
+  if(key.includes('critical')||key.includes('high')||key.includes('defensive'))return'tag-declining';
+  if(key.includes('constructive')||key.includes('good')||key.includes('strong'))return'tag-growing';
+  if(key.includes('elevated')||key.includes('watch'))return'tag-nascent';
+  return'tag-neutral';
+}
+function renderSnapshotSourceMeta(meta){
+  const sources=Array.isArray(meta?.sources)?meta.sources:[];
+  if(!sources.length)return'';
+  const labels=sources.slice(0,4).map((source)=>{
+    const name=source?.name||source?.kind||'source';
+    const state=source?.available===false?'offline':source?.stale?'stale':'live';
+    return `${name} (${state})`;
+  });
+  return `<div class="meta-line" style="margin-top:8px">Sources ${escapeHtml(labels.join(' | '))}</div>`;
+}
+function renderGeoPressureSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('geo-pressure-snapshot');
+  const badge=document.getElementById('geo-pressure-badge');
+  if(!el)return;
+  if(badge)badge.textContent=`${humanizeTheme(snapshot.level||'watch')} ${fmtWhole(snapshot.score||0)}`;
+  const countries=Array.isArray(snapshot.topCountries)?snapshot.topCountries:[];
+  const hotspots=Array.isArray(snapshot.hotspots)?snapshot.hotspots:[];
+  const linkedThemes=Array.isArray(snapshot.linkedThemes)?snapshot.linkedThemes:[];
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Country and corridor pressure</strong><div class="meta-line">Countries ${fmtWhole(countries.length)} | hotspots ${fmtWhole(hotspots.length)} | linked themes ${fmtWhole(linkedThemes.length)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
+  html+=countries.length
+    ? `<div class="brief-list" style="margin-top:10px">${countries.slice(0,4).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.code||'Country')}</strong><div class="meta-line">Strength ${fmt(item.totalStrength||0,1)} | links ${fmtWhole(item.edgeCount||0)}${item.topSymbol?` | top ${escapeHtml(item.topSymbol)}`:''}</div><div class="brief-item-copy">${escapeHtml(truncate(item.strongestEdgeHeadline||'Country-linked transmission path detected.',120))}</div></div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No country-linked pressure paths were detected in the current transmission cache.</div>';
+  if(linkedThemes.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(linkedThemes.map((item)=>item.themeLabel||humanizeTheme(item.theme)),'tag-neutral',6)}</div>`;
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+function renderRiskSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('risk-snapshot');
+  const badge=document.getElementById('risk-snapshot-badge');
+  if(!el)return;
+  if(badge)badge.textContent=`${humanizeTheme(snapshot.level||'watch')} ${fmtWhole(snapshot.score||0)}`;
+  const hottest=Array.isArray(snapshot.hottestThemes)?snapshot.hottestThemes:[];
+  const highlights=Array.isArray(snapshot.highlights)?snapshot.highlights:[];
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Risk posture ${escapeHtml(String(snapshot.level||'watch').toUpperCase())}</strong><div class="meta-line">Score ${fmtWhole(snapshot.score||0)} | alerts ${fmtWhole(snapshot.summary?.alertCount||0)} | pending validation ${fmtWhole(snapshot.summary?.pendingValidation||0)} | articles 24h ${fmtWhole(snapshot.summary?.articleCount24h||0)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
+  if(hottest.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(hottest.map((item)=>`${item.themeLabel||humanizeTheme(item.theme)} ${item.temperature||''}`),'tag-neutral',6)}</div>`;
+  html+=highlights.length
+    ? `<div class="brief-list" style="margin-top:10px">${highlights.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.themeLabel||humanizeTheme(item.theme)||'Theme')}</strong><div class="meta-line">${escapeHtml(item.severity||'medium')} | ${escapeHtml(item.alertType||'signal')}</div><div class="brief-item-copy">${escapeHtml(truncate(item.headline||item.detail||'Structural pressure detected.',140))}</div></div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No structural risk highlights were generated.</div>';
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+function renderMacroSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('macro-snapshot');
+  const badge=document.getElementById('macro-snapshot-badge');
+  if(!el)return;
+  if(badge)badge.textContent=humanizeTheme(snapshot.verdict||'watch');
+  const signals=Array.isArray(snapshot.signals)?snapshot.signals:[];
+  const topThemes=Array.isArray(snapshot.topThemes)?snapshot.topThemes:[];
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(humanizeTheme(snapshot.verdict||'watch'))} macro regime</strong><div class="meta-line">Strategies ${fmtWhole(snapshot.strategyCount||0)} | signals ${fmtWhole(signals.length)}</div></div><span class="tag ${snapshotLevelClass(snapshot.verdict)}">${escapeHtml(snapshot.verdict||'watch')}</span></div>`;
+  html+=signals.length
+    ? `<div class="brief-list" style="margin-top:10px">${signals.slice(0,6).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.channel||'signal')}</strong><div class="meta-line">${escapeHtml(String(item.value??'--'))}${item.updatedAt?` | ${escapeHtml(fmtDateTime(item.updatedAt))}`:''}</div></div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No macro signals available.</div>';
+  if(topThemes.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(topThemes.map((item)=>`${humanizeTheme(item.theme)} ${fmtWhole(item.count||0)}`),'tag-neutral',6)}</div>`;
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+function renderInvestmentSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('investment-snapshot');
+  const badge=document.getElementById('investment-snapshot-badge');
+  if(!el)return;
+  if(badge)badge.textContent=`${fmtWhole(snapshot.trackedIdeaCount||0)} tracked`;
+  const strongest=Array.isArray(snapshot.strongestPairs)?snapshot.strongestPairs:[];
+  const ideas=Array.isArray(snapshot.trackedIdeas)?snapshot.trackedIdeas:[];
+  const tuning=snapshot.experimentRegistry&&typeof snapshot.experimentRegistry==='object'?snapshot.experimentRegistry:null;
+  const signalRuntime=snapshot.signalRuntime&&typeof snapshot.signalRuntime==='object'?snapshot.signalRuntime:null;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Investment workflow</strong><div class="meta-line">Strategies ${fmtWhole(snapshot.strategyCount||0)} | tracked ideas ${fmtWhole(snapshot.trackedIdeaCount||0)} | reviews ${fmtWhole(snapshot.reviewCount||0)}</div></div><span class="badge">${snapshot.conviction?.observations?`${fmtWhole(snapshot.conviction.observations)} obs`:'learning'}</span></div>`;
+  if(signalRuntime){
+    html+=`<div class="meta-line" style="margin-top:8px">Signals ${escapeHtml(signalRuntime.source||'missing')} | coverage ${fmtWhole(signalRuntime.coverage||0)}/5${signalRuntime.signalCapturedAt?` | captured ${escapeHtml(fmtDateTime(signalRuntime.signalCapturedAt))}`:''}${signalRuntime.transmissionFreshnessHours!=null?` | transmission ${signalRuntime.transmissionFresh?'fresh':'stale'} ${fmt(signalRuntime.transmissionFreshnessHours,1)}h`:''}</div>`;
+  }
+  if(tuning){
+    html+=`<div class="brief-item" style="margin-top:10px"><strong>Self-tuning ${escapeHtml(String(tuning.lastAction||'observe').toUpperCase())}</strong><div class="meta-line">Score ${fmt(tuning.lastScore||0,1)} | rollback ${tuning.rollbackArmed?'armed':'clear'}${tuning.updatedAt?` | ${escapeHtml(fmtDateTime(tuning.updatedAt))}`:''}</div><div class="meta-line">${escapeHtml(tuning.activeReason||'Learned weight profile persisted from automation.')}</div><div class="meta-line">corr ${fmt(tuning.profile?.corroboration||1,2)}x | contradiction ${fmt(tuning.profile?.contradiction||1,2)}x | reality ${fmt(tuning.profile?.reality||1,2)}x | aggression ${fmt(tuning.profile?.aggression||1,2)}x</div></div>`;
+  }
+  html+=strongest.length
+    ? `<div class="brief-list" style="margin-top:10px">${strongest.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.symbol||'asset')} | ${escapeHtml(item.themeLabel||humanizeTheme(item.theme))}</strong><div class="meta-line">Hit ${pct(item.hitRate,0)} | avg ${rf(item.avgReturn,1)} | score ${fmt(item.compositeScore||0,2)}</div></div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No investment pair scoring available.</div>';
+  if(ideas.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(ideas.map((item)=>item.label||item.symbol||item.theme||'idea'),'tag-neutral',6)}</div>`;
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+function renderValidationSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('validation-snapshot');
+  const badge=document.getElementById('validation-snapshot-badge');
+  if(!el)return;
+  if(badge)badge.textContent=`${fmtWhole(snapshot.runCount||0)} runs`;
+  const runs=Array.isArray(snapshot.recentRuns)?snapshot.recentRuns:[];
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Validation coverage</strong><div class="meta-line">Hit ${pct(snapshot.costAdjustedHitRate,0)} | avg ${rf(snapshot.avgReturnPct,1)} | coverage ${fmt(snapshot.coverageScore||0,1)} | quality ${fmt(snapshot.qualityScore||0,1)}</div></div><span class="badge">${fmt(snapshot.executionScore||0,1)}</span></div>`;
+  html+=runs.length
+    ? `<div class="brief-list" style="margin-top:10px">${runs.slice(0,3).map((run)=>`<div class="brief-item"><strong>${escapeHtml(run.label||run.id||'run')}</strong><div class="meta-line">${escapeHtml(run.mode||'replay')} | themes ${fmtWhole(run.uniqueThemeCount||0)} | symbols ${fmtWhole(run.uniqueSymbolCount||0)} | hit ${pct(run.hitRate,0)}</div></div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No replay or validation runs are available yet.</div>';
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+function renderTransmissionSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('transmission-snapshot');
+  const badge=document.getElementById('transmission-snapshot-badge');
+  if(!el)return;
+  if(badge)badge.textContent=snapshot.regimeLabel?`${snapshot.regimeLabel} ${fmtWhole(snapshot.regimeConfidence||0)}`:'Links';
+  const edges=Array.isArray(snapshot.strongestEdges)?snapshot.strongestEdges:[];
+  const relations=Array.isArray(snapshot.topRelations)?snapshot.topRelations:[];
+  const topCountries=Array.isArray(snapshot.topCountries)?snapshot.topCountries:[];
+  const topSymbols=Array.isArray(snapshot.topSymbols)?snapshot.topSymbols:[];
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(snapshot.regimeLabel||'Transmission')}</strong><div class="meta-line">Confidence ${fmtWhole(snapshot.regimeConfidence||0)} | edges ${fmtWhole(snapshot.edgeCount||0)} | countries ${fmtWhole(topCountries.length)}</div></div><span class="badge">${fmtWhole(snapshot.edgeCount||0)} links</span></div>`;
+  if(snapshot.generatedAt||snapshot.freshnessHours!=null){
+    html+=`<div class="meta-line" style="margin-top:8px">Transmission ${snapshot.fresh?'fresh':'stale'}${snapshot.freshnessHours!=null?` | age ${fmt(snapshot.freshnessHours,1)}h`:''}${snapshot.generatedAt?` | updated ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
+  }
+  html+=edges.length
+    ? `<div class="brief-list" style="margin-top:10px">${edges.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.symbol||'asset')} | ${escapeHtml(item.relationLabel||humanizeTheme(item.relationType||'link'))}</strong><div class="meta-line">${escapeHtml(item.countryLabel||item.source||'signal path')} | strength ${fmt(item.strength||0,1)}</div><div class="brief-item-copy">${escapeHtml(truncate(item.headline||'Transmission path',120))}</div></div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No transmission links are cached yet.</div>';
+  if(relations.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(relations.map((item)=>`${item.relationLabel||humanizeTheme(item.relationType)} ${fmtWhole(item.count||0)}`),'tag-neutral',6)}</div>`;
+  if(topSymbols.length)html+=`<div class="meta-line" style="margin-top:8px">Top symbols ${escapeHtml(topSymbols.slice(0,4).map((item)=>`${item.symbol} (${fmtWhole(item.count||0)})`).join(' | '))}</div>`;
+  if(Array.isArray(snapshot.notes)&&snapshot.notes.length)html+=`<div class="section-note">${escapeHtml(snapshot.notes.slice(0,2).join(' '))}</div>`;
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+function renderSourceOpsSnapshot(snapshot={},cachedAt=null,cached=false){
+  const el=document.getElementById('source-ops-snapshot');
+  const badge=document.getElementById('source-ops-snapshot-badge');
+  if(!el)return;
+  if(badge)badge.textContent=`${fmtWhole(snapshot.activeCount||0)} active`;
+  const events=Array.isArray(snapshot.recentEvents)?snapshot.recentEvents:[];
+  const categories=Array.isArray(snapshot.categoryMix)?snapshot.categoryMix:[];
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Source and dataflow operations</strong><div class="meta-line">Approved ${fmtWhole(snapshot.approvedCount||0)} | drafts ${fmtWhole(snapshot.draftCount||0)} | discovered ${fmtWhole(snapshot.discoveredCount||0)} | overrides ${fmtWhole(snapshot.overrideCount||0)}</div></div><span class="badge">${fmtWhole(snapshot.profileCount||0)} profiles</span></div>`;
+  html+=events.length
+    ? `<div class="brief-list" style="margin-top:10px">${events.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Source event')}</strong><div class="meta-line">${escapeHtml(item.action||'updated')} | ${escapeHtml(item.status||'ok')} | ${escapeHtml(item.actor||'system')}${item.createdAt?` | ${escapeHtml(fmtDateTime(item.createdAt))}`:''}</div>${item.detail?`<div class="brief-item-copy">${escapeHtml(truncate(item.detail,120))}</div>`:''}</div>`).join('')}</div>`
+    : '<div class="theme-empty" style="margin-top:10px">No recent source operations were logged.</div>';
+  if(categories.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(categories.map((item)=>`${item.category} ${fmtWhole(item.count||0)}`),'tag-neutral',6)}</div>`;
+  html+=renderSnapshotSourceMeta(snapshot.meta);
+  el.innerHTML=html;
+}
+async function loadThemeShellSnapshots(){
+  const {data,cached,cachedAt}=await f(`${API}/theme-shell-snapshots`,'theme-shell-snapshots');
+  renderGeoPressureSnapshot(data?.geoPressure||{},cachedAt,cached);
+  renderRiskSnapshot(data?.risk||{},cachedAt,cached);
+  renderMacroSnapshot(data?.macro||{},cachedAt,cached);
+  renderInvestmentSnapshot(data?.investment||{},cachedAt,cached);
+  renderValidationSnapshot(data?.validation||{},cachedAt,cached);
+  renderTransmissionSnapshot(data?.transmission||{},cachedAt,cached);
+  renderSourceOpsSnapshot(data?.sourceOps||{},cachedAt,cached);
+}
+async function reviewCodexProposal(id,decision){
+  if(!id||!decision)return;
+  await postJson(`${API}/codex-proposals/${encodeURIComponent(id)}/review`,{decision,reviewer:'theme-dashboard'});
+  await Promise.all([loadProposalInbox(),loadCodex(),loadPending(),loadThemeShellSnapshots()]);
+}
+async function reviewApprovalQueue(id,decision){
+  if(!id||!decision)return;
+  await postJson(`${API}/approval-queue/${encodeURIComponent(id)}/review`,{decision,reviewer:'theme-dashboard'});
+  await Promise.all([loadProposalInbox(),loadAutomationBudget(),loadAutomationLog(),loadThemeShellSnapshots()]);
+}
+async function loadProposalInbox(){
+  const {data,cached,cachedAt}=await f(`${API}/proposal-inbox?limit=8`,'proposal-inbox');
+  const proposalEl=document.getElementById('proposal-inbox');
+  const approvalEl=document.getElementById('approval-queue');
+  const proposalBadge=document.getElementById('proposal-inbox-badge');
+  const approvalBadge=document.getElementById('approval-queue-badge');
+  const proposals=Array.isArray(data?.proposals)?data.proposals:[];
+  const approvals=Array.isArray(data?.approvals)?data.approvals:[];
+  proposalInboxPayload={proposals,approvals};
+  if(proposalBadge)proposalBadge.textContent=`${fmtWhole(proposals.length)} pending`;
+  if(approvalBadge)approvalBadge.textContent=`${fmtWhole(approvals.length)} pending`;
+  let proposalHtml=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(!proposals.length){
+    proposalHtml+='<div class="theme-empty">No pending Codex proposals need review.</div>';
+  }else{
+    proposalHtml+='<div class="review-grid">';
+    proposals.slice(0,8).forEach((proposal)=>{
+      const payload=proposal.payload&&typeof proposal.payload==='object'?proposal.payload:{};
+      const proposalType=proposal.proposal_type||proposal.proposalType||'proposal';
+      const createdAt=proposal.created_at||proposal.createdAt||proposal.executed_at||proposal.executedAt||null;
+      const focus=summarizePayloadFocus(payload,proposalType);
+      const meta=summarizePayloadMeta(payload);
+      proposalHtml+=`<div class="interactive-row"><div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(focus)}</strong><div class="meta-line">${escapeHtml(proposalType)} | ${escapeHtml(proposal.status||'pending')} | ${escapeHtml(fmtDateTime(createdAt))}</div></div><span class="badge">${escapeHtml((proposal.source||'codex').toString())}</span></div>${proposal.reasoning?`<div class="story-summary">${escapeHtml(truncate(proposal.reasoning,180))}</div>`:''}${meta.length?`<div class="pill-row" style="margin-top:8px">${renderTags(meta,'tag-neutral',6)}</div>`:''}<div class="payload-preview">${escapeHtml(truncate(JSON.stringify(payload,null,2),320))}</div><div class="theme-actions" style="margin-top:8px"><button class="btn" onclick="reviewCodexProposal('${escapeHtml(String(proposal.id||''))}','accept')">Accept</button><button class="btn" onclick="reviewCodexProposal('${escapeHtml(String(proposal.id||''))}','reject')">Reject</button>${payload.targetTheme?`<button class="btn" onclick="openThemeBrief('${normalizeTheme(payload.targetTheme)}')">Open target brief</button>`:''}</div></div>`;
+    });
+    proposalHtml+='</div>';
+  }
+  if(proposalEl)proposalEl.innerHTML=proposalHtml;
+  let approvalHtml=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(!approvals.length){
+    approvalHtml+='<div class="theme-empty">No human approval actions are waiting.</div>';
+  }else{
+    approvalHtml+='<div class="review-grid">';
+    approvals.slice(0,8).forEach((approval)=>{
+      const payload=approval.payload&&typeof approval.payload==='object'?approval.payload:{};
+      const focus=summarizePayloadFocus(payload,approval.action_type||'approval');
+      const meta=summarizePayloadMeta(payload);
+      approvalHtml+=`<div class="interactive-row"><div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(focus)}</strong><div class="meta-line">${escapeHtml(approval.action_type||'approval')} | ${escapeHtml(approval.status||'pending')} | ${escapeHtml(fmtDateTime(approval.created_at))}</div></div><span class="badge">human review</span></div>${approval.reasoning?`<div class="story-summary">${escapeHtml(truncate(approval.reasoning,180))}</div>`:''}${meta.length?`<div class="pill-row" style="margin-top:8px">${renderTags(meta,'tag-neutral',6)}</div>`:''}<div class="payload-preview">${escapeHtml(truncate(JSON.stringify(payload,null,2),320))}</div><div class="theme-actions" style="margin-top:8px"><button class="btn" onclick="reviewApprovalQueue('${escapeHtml(String(approval.id||''))}','accept')">Accept</button><button class="btn" onclick="reviewApprovalQueue('${escapeHtml(String(approval.id||''))}','reject')">Reject</button></div></div>`;
+    });
+    approvalHtml+='</div>';
+  }
+  if(approvalEl)approvalEl.innerHTML=approvalHtml;
+}
 async function loadPending(){
-  const{data:d,cached,cachedAt}=await f(API+'/pending','pending');
-  if(!d||d.length===0){document.getElementById('pending').innerHTML='검증 대기 수집 중...';return}
-  const cb=cached?cachedBadge(cachedAt):'';
-  const items=Array.isArray(d)?d:(d.items||[]);
-  if(items.length===0){document.getElementById('pending').innerHTML=(cb||'')+'검증 대기 수집 중...';return}
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  h+='<table><tr><th>Symbol</th><th>Theme</th><th>Days</th></tr>';
-  for(const r of items.slice(0,6)){
-    h+=`<tr><td><strong>${r.symbol}</strong></td><td>${r.theme}</td><td>${r.daysRemaining}d</td></tr>`;
+  const {data,cached,cachedAt}=await f(`${API}/pending`,'pending');
+  const el=document.getElementById('pending');
+  const items=Array.isArray(data)?data:parseList(data,['items','pending']);
+  if(!items.length){
+    el.innerHTML='<div class="meta-line">No pending validation items.</div>';
+    return;
   }
-  h+='</table>';
-  document.getElementById('pending').innerHTML=h;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+='<div class="table-wrap"><table><tr><th>Symbol</th><th>Theme</th><th>Days</th></tr>';
+  items.slice(0,6).forEach((row)=>{html+=`<tr><td><strong>${escapeHtml(row.symbol||'asset')}</strong></td><td>${escapeHtml(row.theme||'theme')}</td><td>${fmtWhole(row.daysRemaining||0)}d</td></tr>`;});
+  html+='</table></div>';
+  el.innerHTML=html;
 }
-
 async function loadRegime(){
-  const{data:d,cached,cachedAt}=await f(API+'/regime//','regime');
-  if(!d||d.length===0){document.getElementById('regime').innerHTML='Regime 데이터 수집 중...';return}
-  const byTheme={};
-  for(const r of d){if(!byTheme[r.theme])byTheme[r.theme]=[];byTheme[r.theme].push(r)}
-  const cb=cached?cachedBadge(cachedAt):'';
-  let h=cb?`<div style="margin-bottom:4px">${cb}</div>`:'';
-  h+='<div class="grid3">';
-  for(const[theme,rows]of Object.entries(byTheme)){
-    h+=`<div><strong>${theme}</strong><table><tr><th>Symbol</th><th>Regime</th><th>Return</th><th>Hit</th></tr>`;
-    for(const r of rows.slice(0,8)){
-      const cls=r.regime==='risk-off'?'tag-neg':r.regime==='risk-on'?'tag-pos':'tag-neutral';
-      h+=`<tr><td>${r.symbol}</td><td><span class="tag ${cls}">${r.regime}</span></td><td>${rf(r.avg_return)}</td><td>${pct(r.hit_rate)}</td></tr>`;
-    }
-    h+='</table></div>';
+  const {data,cached,cachedAt}=await f(`${API}/regime//`,'regime');
+  const el=document.getElementById('regime');
+  const rows=Array.isArray(data)?data:[];
+  if(!rows.length){
+    el.innerHTML='<div class="meta-line">No regime-conditional data available.</div>';
+    return;
   }
-  h+='</div>';
-  document.getElementById('regime').innerHTML=h;
+  const byTheme={};
+  rows.forEach((row)=>{const key=row.theme||'theme';if(!byTheme[key])byTheme[key]=[];byTheme[key].push(row);});
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+='<div class="grid3">';
+  Object.entries(byTheme).forEach(([theme,themeRows])=>{
+    html+=`<div><strong>${escapeHtml(theme)}</strong><div class="table-wrap"><table><tr><th>Symbol</th><th>Regime</th><th>Return</th><th>Hit</th></tr>`;
+    themeRows.slice(0,8).forEach((row)=>{const tagClass=row.regime==='risk-off'?'tag-declining':row.regime==='risk-on'?'tag-growing':'tag-neutral';html+=`<tr><td>${escapeHtml(row.symbol||'asset')}</td><td><span class="tag ${tagClass}">${escapeHtml(row.regime||'balanced')}</span></td><td>${rf(row.avg_return)}</td><td>${pct(row.hit_rate)}</td></tr>`;});
+    html+='</table></div></div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
 }
-
-// ── Signal Timeline ──
 async function loadSignalTimeline(){
   const channels='vix,hy_credit_spread,dollarIndex,oilPrice';
-  const{data:d}=await f(API+'/signals/history?days=30&channels='+channels,'signal-timeline');
+  const {data}=await f(`${API}/signals/history?days=30&channels=${channels}`,'signal-timeline');
   const el=document.getElementById('signal-timeline');
-  if(!d||!d.channels||Object.keys(d.channels).length===0){el.innerHTML='시그널 타임라인 데이터 없음';return}
-  const colors={vix:'#ff5a5a',hy_credit_spread:'#ffaa33',dollarIndex:'#6a8aff',oilPrice:'#4aff8a'};
-  const allNames=Object.keys(d.channels);
-  // Normalize each channel to 0-1 range
+  if(!data?.channels||!Object.keys(data.channels).length){
+    el.innerHTML='<div class="meta-line">No signal timeline data available.</div>';
+    return;
+  }
+  const colors={vix:'#ff7a6b',hy_credit_spread:'#f3b562',dollarIndex:'#7ca9ff',oilPrice:'#7ee081'};
+  const names=Object.keys(data.channels);
   const normalized={};
-  for(const name of allNames){
-    const pts=d.channels[name]||[];
-    const vals=pts.map(p=>Number(p.value||0));
-    const mn=Math.min(...vals),mx=Math.max(...vals);
-    const range=mx-mn||1;
-    normalized[name]=pts.map(p=>({ts:p.ts,norm:(Number(p.value||0)-mn)/range}));
-  }
-  // SVG dimensions
-  const W=900,H=220,PAD=40;
-  const plotW=W-PAD*2,plotH=H-PAD*2;
-  // Gather all timestamps to determine x range
-  let allTs=[];
-  for(const name of allNames)for(const p of normalized[name])allTs.push(new Date(p.ts).getTime());
-  const minT=Math.min(...allTs),maxT=Math.max(...allTs);
-  const tRange=maxT-minT||1;
-  let svg=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">`;
-  // Grid lines
-  for(let i=0;i<=4;i++){
-    const y=PAD+plotH*(1-i/4);
-    svg+=`<line x1="${PAD}" y1="${y}" x2="${PAD+plotW}" y2="${y}" stroke="#1e2e1e" stroke-width="0.5"/>`;
-    svg+=`<text x="${PAD-4}" y="${y+3}" fill="#6a7a6a" font-size="9" text-anchor="end">${(i/4).toFixed(1)}</text>`;
-  }
-  // Draw lines for each channel
-  for(const name of allNames){
-    const pts=normalized[name];
-    if(pts.length<2)continue;
-    const col=colors[name]||'#999';
-    let pathD='';
-    for(let i=0;i<pts.length;i++){
-      const x=PAD+((new Date(pts[i].ts).getTime()-minT)/tRange)*plotW;
-      const y=PAD+plotH*(1-pts[i].norm);
-      pathD+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);
-    }
-    svg+=`<path d="${pathD}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.85"/>`;
-  }
-  svg+=`</svg>`;
-  // Legend
-  let legend='<div style="display:flex;gap:12px;margin-top:4px;font-size:10px">';
-  for(const name of allNames){
-    const col=colors[name]||'#999';
-    const label=name.replace(/_/g,' ');
-    legend+=`<span><span style="display:inline-block;width:12px;height:3px;background:${col};margin-right:3px;vertical-align:middle"></span>${label}</span>`;
-  }
-  legend+='</div>';
-  el.innerHTML=svg+legend;
+  names.forEach((name)=>{
+    const points=data.channels[name]||[];
+    const values=points.map((point)=>Number(point.value||0));
+    const minValue=Math.min(...values);
+    const maxValue=Math.max(...values);
+    const range=maxValue-minValue||1;
+    normalized[name]=points.map((point)=>({ts:point.ts,norm:(Number(point.value||0)-minValue)/range}));
+  });
+  const width=900;
+  const height=220;
+  const pad=40;
+  const plotWidth=width-pad*2;
+  const plotHeight=height-pad*2;
+  const allTs=[];
+  names.forEach((name)=>normalized[name].forEach((point)=>allTs.push(new Date(point.ts).getTime())));
+  const minTime=Math.min(...allTs);
+  const maxTime=Math.max(...allTs);
+  const rangeTime=maxTime-minTime||1;
+  let svg=`<div class="chart-wrap"><svg width="100%" viewBox="0 0 ${width} ${height}" style="max-width:${width}px">`;
+  for(let i=0;i<=4;i++){const y=pad+plotHeight*(1-i/4);svg+=`<line x1="${pad}" y1="${y}" x2="${pad+plotWidth}" y2="${y}" stroke="#2f3d2e" stroke-width="1"/>`;}
+  names.forEach((name)=>{
+    const points=normalized[name];
+    if(points.length<2)return;
+    const color=colors[name]||'#cccccc';
+    let path='';
+    points.forEach((point,index)=>{const x=pad+((new Date(point.ts).getTime()-minTime)/rangeTime)*plotWidth;const y=pad+plotHeight*(1-point.norm);path+=`${index===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)} `;});
+    svg+=`<path d="${path.trim()}" fill="none" stroke="${color}" stroke-width="2"/>`;
+  });
+  svg+='</svg></div><div class="legend">';
+  names.forEach((name)=>{svg+=`<span class="line-key"><span class="line-swatch" style="background:${colors[name]||'#cccccc'}"></span>${escapeHtml(name.replace(/_/g,' '))}</span>`;});
+  svg+='</div>';
+  el.innerHTML=svg;
 }
-
-// ── Correlation Matrix ──
 async function loadCorrelation(){
   const theme=document.getElementById('corr-theme-select')?.value||'conflict';
-  const{data:d}=await f(API+'/correlation?theme='+encodeURIComponent(theme),'corr-'+theme);
+  const {data}=await f(`${API}/correlation?theme=${encodeURIComponent(theme)}`,`corr-${theme}`);
   const el=document.getElementById('correlation-matrix');
-  if(!d||!d.correlations||d.correlations.length===0){el.innerHTML='상관 데이터 없음 (theme: '+theme+')';return}
-  // Build a table: rows = symbols, columns = signal_name
-  const rows=d.correlations;
-  const signalNames=[...new Set(rows.map(r=>r.signal_name))];
-  const symbols=[...new Set(rows.map(r=>r.symbol))];
+  const rows=Array.isArray(data?.correlations)?data.correlations:[];
+  if(!rows.length){
+    el.innerHTML=`<div class="meta-line">No correlation data available for ${escapeHtml(theme)}.</div>`;
+    return;
+  }
+  const signalNames=[...new Set(rows.map((row)=>row.signal_name))];
+  const symbols=[...new Set(rows.map((row)=>row.symbol))];
   const lookup={};
-  for(const r of rows)lookup[r.symbol+':'+r.signal_name]=r;
-  let h='<div style="overflow-x:auto"><table><tr><th>Symbol</th>';
-  for(const s of signalNames)h+=`<th style="text-align:center;font-size:9px;max-width:60px;overflow:hidden">${s}</th>`;
-  h+='</tr>';
-  for(const sym of symbols.slice(0,20)){
-    h+=`<tr><td style="font-weight:bold">${sym}</td>`;
-    for(const sig of signalNames){
-      const r=lookup[sym+':'+sig];
-      if(!r){h+='<td style="text-align:center">-</td>';continue}
-      const corr=Number(r.pearson_corr||0);
-      const absCorr=Math.abs(corr);
-      const alpha=Math.min(1,absCorr*3).toFixed(2);
-      const bg=corr>0?`rgba(74,255,138,${alpha})`:`rgba(255,90,90,${alpha})`;
-      h+=`<td style="text-align:center;background:${bg};font-size:10px" title="slope=${fmt(r.regr_slope,4)} n=${r.sample_size}">${corr.toFixed(2)}</td>`;
-    }
-    h+='</tr>';
-  }
-  h+='</table></div>';
-  h+='<div style="font-size:9px;color:var(--dim);margin-top:4px">Green = positive, Red = negative. Hover for slope/sample size.</div>';
-  el.innerHTML=h;
+  rows.forEach((row)=>{lookup[`${row.symbol}:${row.signal_name}`]=row;});
+  let html='<div class="table-wrap"><table><tr><th>Symbol</th>';
+  signalNames.forEach((signal)=>{html+=`<th style="text-align:center">${escapeHtml(signal)}</th>`;});
+  html+='</tr>';
+  symbols.slice(0,20).forEach((symbol)=>{
+    html+=`<tr><td><strong>${escapeHtml(symbol)}</strong></td>`;
+    signalNames.forEach((signal)=>{
+      const row=lookup[`${symbol}:${signal}`];
+      if(!row){html+='<td style="text-align:center">-</td>';return;}
+      const corr=Number(row.pearson_corr||0);
+      const alpha=Math.min(1,Math.abs(corr)*3).toFixed(2);
+      const bg=corr>=0?`rgba(126,224,129,${alpha})`:`rgba(255,122,107,${alpha})`;
+      html+=`<td style="text-align:center;background:${bg}" title="slope=${fmt(row.regr_slope,4)} n=${fmtWhole(row.sample_size||0)}">${corr.toFixed(2)}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</table></div><div class="meta-line" style="margin-top:8px">Green is positive, red is negative. Hover for slope and sample size.</div>';
+  el.innerHTML=html;
 }
-
-// ── Regime Timeline ──
 async function loadRegimeTimeline(){
-  const{data:d}=await f(API+'/regime-timeline?days=365','regime-timeline');
+  const {data}=await f(`${API}/regime-timeline?days=365`,'regime-timeline');
   const el=document.getElementById('regime-timeline');
-  if(!d||!d.timeline||d.timeline.length===0){el.innerHTML='레짐 타임라인 데이터 없음';return}
-  const tl=d.timeline;
-  const W=900,H=140,PAD=40;
-  const plotW=W-PAD*2,plotH=H-PAD*2;
-  const barH=20;
-  // Regime bar at top, VIX line below
-  const vixValues=tl.map(r=>Number(r.vix||0));
-  const vixMin=Math.min(...vixValues),vixMax=Math.max(...vixValues);
-  const vixRange=vixMax-vixMin||1;
-  const n=tl.length;
-  const barW=plotW/Math.max(n,1);
-  const regimeColors={'risk-off':'#ff5a5a','risk-on':'#4aff8a','balanced':'#555'};
-  let svg=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">`;
-  // Regime color blocks
-  for(let i=0;i<n;i++){
-    const x=PAD+i*barW;
-    const col=regimeColors[tl[i].regime]||'#555';
-    svg+=`<rect x="${x}" y="${PAD}" width="${Math.max(barW,1)}" height="${barH}" fill="${col}" opacity="0.6"/>`;
+  const timeline=Array.isArray(data?.timeline)?data.timeline:[];
+  if(!timeline.length){
+    el.innerHTML='<div class="meta-line">No regime timeline data available.</div>';
+    return;
   }
-  // Labels
-  svg+=`<text x="${PAD-4}" y="${PAD+barH/2+3}" fill="#6a7a6a" font-size="9" text-anchor="end">Regime</text>`;
-  svg+=`<text x="${PAD-4}" y="${PAD+barH+plotH/2}" fill="#6a7a6a" font-size="9" text-anchor="end">VIX</text>`;
-  // VIX grid lines
-  const vixLineTop=PAD+barH+4;
-  const vixLineH=plotH-barH-8;
-  for(let i=0;i<=3;i++){
-    const y=vixLineTop+vixLineH*(1-i/3);
-    const val=vixMin+(vixRange*i/3);
-    svg+=`<line x1="${PAD}" y1="${y}" x2="${PAD+plotW}" y2="${y}" stroke="#1e2e1e" stroke-width="0.5"/>`;
-    svg+=`<text x="${PAD+plotW+2}" y="${y+3}" fill="#6a7a6a" font-size="8">${val.toFixed(0)}</text>`;
-  }
-  // VIX line
-  let pathD='';
-  for(let i=0;i<n;i++){
-    const x=PAD+i*barW+barW/2;
-    const normV=(vixValues[i]-vixMin)/vixRange;
-    const y=vixLineTop+vixLineH*(1-normV);
-    pathD+=(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);
-  }
-  svg+=`<path d="${pathD}" fill="none" stroke="#ffaa33" stroke-width="1.5"/>`;
-  // Threshold lines at VIX 18 and 25
-  for(const thresh of[18,25]){
-    if(thresh>=vixMin&&thresh<=vixMax){
-      const y=vixLineTop+vixLineH*(1-(thresh-vixMin)/vixRange);
-      svg+=`<line x1="${PAD}" y1="${y}" x2="${PAD+plotW}" y2="${y}" stroke="#6a7a6a" stroke-width="0.5" stroke-dasharray="3,3"/>`;
-      svg+=`<text x="${PAD+plotW+2}" y="${y+3}" fill="#6a7a6a" font-size="8">${thresh}</text>`;
-    }
-  }
-  svg+=`</svg>`;
-  // Legend
-  let legend='<div style="display:flex;gap:12px;margin-top:4px;font-size:10px">';
-  legend+=`<span><span style="display:inline-block;width:12px;height:8px;background:#ff5a5a;margin-right:3px;vertical-align:middle;opacity:0.6"></span>risk-off (VIX&gt;25)</span>`;
-  legend+=`<span><span style="display:inline-block;width:12px;height:8px;background:#4aff8a;margin-right:3px;vertical-align:middle;opacity:0.6"></span>risk-on (VIX&lt;18)</span>`;
-  legend+=`<span><span style="display:inline-block;width:12px;height:8px;background:#555;margin-right:3px;vertical-align:middle;opacity:0.6"></span>balanced</span>`;
-  legend+=`<span><span style="display:inline-block;width:12px;height:3px;background:#ffaa33;margin-right:3px;vertical-align:middle"></span>VIX</span>`;
-  legend+='</div>';
-  el.innerHTML=svg+legend;
+  const width=900;
+  const height=140;
+  const pad=40;
+  const plotWidth=width-pad*2;
+  const plotHeight=height-pad*2;
+  const barHeight=20;
+  const vixValues=timeline.map((row)=>Number(row.vix||0));
+  const minVix=Math.min(...vixValues);
+  const maxVix=Math.max(...vixValues);
+  const range=maxVix-minVix||1;
+  const barWidth=plotWidth/Math.max(timeline.length,1);
+  const regimeColors={'risk-off':'#ff7a6b','risk-on':'#7ee081',balanced:'#4c554a'};
+  let svg=`<div class="chart-wrap"><svg width="100%" viewBox="0 0 ${width} ${height}" style="max-width:${width}px">`;
+  timeline.forEach((row,index)=>{const x=pad+index*barWidth;svg+=`<rect x="${x}" y="${pad}" width="${Math.max(1,barWidth)}" height="${barHeight}" fill="${regimeColors[row.regime]||'#4c554a'}" opacity="0.7"/>`;});
+  const lineTop=pad+barHeight+6;
+  const lineHeight=plotHeight-barHeight-8;
+  for(let i=0;i<=3;i++){const y=lineTop+lineHeight*(1-i/3);svg+=`<line x1="${pad}" y1="${y}" x2="${pad+plotWidth}" y2="${y}" stroke="#2f3d2e" stroke-width="1"/>`;}
+  let path='';
+  timeline.forEach((row,index)=>{const x=pad+index*barWidth+barWidth/2;const y=lineTop+lineHeight*(1-((Number(row.vix||0)-minVix)/range));path+=`${index===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)} `;});
+  svg+=`<path d="${path.trim()}" fill="none" stroke="#f3b562" stroke-width="2"/>`;
+  svg+='</svg></div><div class="legend"><span class="line-key"><span class="line-swatch" style="background:#ff7a6b"></span>risk-off</span><span class="line-key"><span class="line-swatch" style="background:#7ee081"></span>risk-on</span><span class="line-key"><span class="line-swatch" style="background:#4c554a"></span>balanced</span><span class="line-key"><span class="line-swatch" style="background:#f3b562"></span>VIX</span></div>';
+  el.innerHTML=svg;
 }
 
-// Auto-refresh every 60 seconds
-refreshAll();
-setInterval(refreshAll,60000);
+state.myThemes=normalizeThemeList(lsGet('my-themes'));
+state.mutedThemes=normalizeThemeList(lsGet('muted-themes'));
+state.currentTheme=state.currentTheme||normalizeTheme(lsGet('current-theme')||'');
+themeLastViewed=lsGet('theme-last-viewed')||{};
+window.addEventListener('message',(event)=>{
+  if(event.origin!==window.location.origin)return;
+  const data=event.data||{};
+  if(data.source==='map-lens'&&data.type==='wm-map-lens-ready'){
+    pushMapLensContext();
+    return;
+  }
+  if(!EMBED_MODE)return;
+  if(data.source!=='operator-shell'||data.type!=='wm-theme-workspace-context')return;
+  void applyEmbeddedContext(data.payload||{});
+});
+renderTabs();
+renderEvolutionSelect();
+renderHorizonSummary();
+renderMyThemes();
+updateShareUrl();
+postEmbedMessage('wm-theme-workspace-ready',{theme:state.currentTheme||null,period:getCurrentPeriod()});
+getMapLensFrame()?.addEventListener('load',()=>pushMapLensContext(),{once:true});
+void refreshAll().then(()=>emitEmbeddedContext());
+setInterval(()=>{void refreshAll().then(()=>emitEmbeddedContext());},60000);
 </script>
 </body>
 </html>

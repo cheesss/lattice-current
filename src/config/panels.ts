@@ -16,6 +16,79 @@ const EXTENDED_LAYER_DEFAULTS: Pick<
   intelDensity: false,
 };
 
+export const SOURCE_DRAWER_ONLY_PANEL_KEYS = [
+  'politics',
+  'intel',
+  'glint-feed',
+  'events',
+  'us',
+  'europe',
+  'middleeast',
+  'africa',
+  'latam',
+  'asia',
+  'energy',
+  'gov',
+  'thinktanks',
+  'tech',
+  'finance',
+  'ai',
+  'startups',
+  'vcblogs',
+  'regionalStartups',
+  'unicorns',
+  'accelerators',
+  'funding',
+  'producthunt',
+  'security',
+  'policy',
+  'hardware',
+  'cloud',
+  'dev',
+  'github',
+  'ipo',
+  'markets-news',
+  'commodities-news',
+  'crypto-news',
+  'economic-news',
+  'forex',
+  'bonds',
+  'centralbanks',
+  'analysis',
+  'fintech',
+  'regulation',
+  'institutional',
+  'gccNews',
+  'gold-silver',
+  'mining-news',
+  'critical-minerals',
+  'base-metals',
+  'mining-companies',
+  'commodity-news',
+  'layoffs',
+] as const;
+
+const SOURCE_DRAWER_ONLY_PANEL_KEY_SET = new Set<string>(SOURCE_DRAWER_ONLY_PANEL_KEYS);
+
+export function isSourceDrawerOnlyPanelKey(key: string): boolean {
+  return SOURCE_DRAWER_ONLY_PANEL_KEY_SET.has(key);
+}
+
+function buildSignalSurfacePanels(panels: Record<string, PanelConfig>): Record<string, PanelConfig> {
+  return Object.fromEntries(
+    Object.entries(panels).map(([key, config]) => {
+      if (!isSourceDrawerOnlyPanelKey(key)) {
+        return [key, config];
+      }
+      return [key, {
+        ...config,
+        enabled: false,
+        priority: Math.max(config.priority ?? 3, 3),
+      }];
+    }),
+  );
+}
+
 // ============================================
 // FULL VARIANT (Geopolitical)
 // ============================================
@@ -57,7 +130,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   'country-exposure-matrix': { name: 'Country Exposure Matrix', enabled: true, priority: 2 },
   'investment-workflow': { name: 'Decision Workflow', enabled: true, priority: 2 },
   'investment-ideas': { name: 'Signal Candidates', enabled: true, priority: 2 },
-  'backtest-lab': { name: 'Replay Validation', enabled: false, priority: 3 },
+  'backtest-lab': { name: 'Replay Validation', enabled: true, priority: 3 },
   'resource-profiler': { name: 'Resource Profiler', enabled: false, priority: 3 },
   'data-qa': { name: 'Data Q&A', enabled: false, priority: 3 },
   economic: { name: 'Economic Indicators', enabled: true, priority: 2 },
@@ -225,7 +298,7 @@ const TECH_PANELS: Record<string, PanelConfig> = {
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
   'investment-workflow': { name: 'Decision Workflow', enabled: true, priority: 2 },
   'investment-ideas': { name: 'Signal Candidates', enabled: true, priority: 2 },
-  'backtest-lab': { name: 'Replay Validation', enabled: false, priority: 3 },
+  'backtest-lab': { name: 'Replay Validation', enabled: true, priority: 3 },
   'resource-profiler': { name: 'Resource Profiler', enabled: false, priority: 3 },
   'data-qa': { name: 'Data Q&A', enabled: false, priority: 3 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
@@ -349,7 +422,7 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'source-ops': { name: 'Source Operations', enabled: true, priority: 1 },
   'investment-workflow': { name: 'Decision Workflow', enabled: true, priority: 2 },
   'investment-ideas': { name: 'Signal Candidates', enabled: true, priority: 2 },
-  'backtest-lab': { name: 'Replay Validation', enabled: false, priority: 3 },
+  'backtest-lab': { name: 'Replay Validation', enabled: true, priority: 3 },
   'resource-profiler': { name: 'Resource Profiler', enabled: false, priority: 3 },
   'data-qa': { name: 'Data Q&A', enabled: false, priority: 3 },
   'markets-news': { name: 'Markets News', enabled: true, priority: 2 },
@@ -594,7 +667,13 @@ const HAPPY_MOBILE_MAP_LAYERS: MapLayers = {
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
-export const DEFAULT_PANELS = SITE_VARIANT === 'happy' ? HAPPY_PANELS : SITE_VARIANT === 'tech' ? TECH_PANELS : SITE_VARIANT === 'finance' ? FINANCE_PANELS : FULL_PANELS;
+export const DEFAULT_PANELS = SITE_VARIANT === 'happy'
+  ? HAPPY_PANELS
+  : SITE_VARIANT === 'tech'
+    ? buildSignalSurfacePanels(TECH_PANELS)
+    : SITE_VARIANT === 'finance'
+      ? buildSignalSurfacePanels(FINANCE_PANELS)
+      : buildSignalSurfacePanels(FULL_PANELS);
 export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' ? HAPPY_MAP_LAYERS : SITE_VARIANT === 'tech' ? TECH_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MAP_LAYERS : FULL_MAP_LAYERS;
 export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy' ? HAPPY_MOBILE_MAP_LAYERS : SITE_VARIANT === 'tech' ? TECH_MOBILE_MAP_LAYERS : SITE_VARIANT === 'finance' ? FINANCE_MOBILE_MAP_LAYERS : FULL_MOBILE_MAP_LAYERS;
 
@@ -614,103 +693,100 @@ export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> =
 };
 
 // ============================================
-// PANEL CATEGORY MAP (variant-aware)
+// PANEL CATEGORY MAP
 // ============================================
-// Maps category keys to panel keys. Only categories with at least one
-// matching panel in the active variant's DEFAULT_PANELS are shown.
-// The `variants` field restricts a category to specific site variants;
-// omit it to show the category for all variants.
-export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: string[]; variants?: string[] }> = {
+// Settings categories follow the signal-first operator loop rather than the
+// historical variant-specific panel walls. A category is shown only when the
+// active panel set exposes at least one matching panel.
+export interface PanelCategoryDefinition {
+  label: string;
+  labelKey?: string;
+  panelKeys: string[];
+  variants?: string[];
+}
+
+export const PANEL_CATEGORY_MAP: Record<string, PanelCategoryDefinition> = {
   // All variants — essential panels
-  core: {
-    labelKey: 'header.panelCatCore',
-    panelKeys: ['map', 'live-news', 'live-webcams', 'insights', 'strategic-posture'],
+  signalLoop: {
+    label: 'Signal Loop',
+    panelKeys: [
+      'live-news',
+      'live-webcams',
+      'insights',
+      'strategic-posture',
+      'strategic-risk',
+      'cii',
+      'gdelt-intel',
+      'event-intelligence',
+      'signal-ridgeline',
+      'positive-feed',
+      'progress',
+      'counters',
+      'spotlight',
+      'renewable',
+      'giving',
+    ],
   },
 
-  // Full (geopolitical) variant
-  intelligence: {
-    labelKey: 'header.panelCatIntelligence',
-    panelKeys: ['cii', 'strategic-risk', 'intel', 'glint-feed', 'gdelt-intel', 'event-intelligence', 'cascade'],
-    variants: ['full'],
+  briefing: {
+    label: 'Briefing',
+    panelKeys: [
+      'map',
+      'cascade',
+      'satellite-fires',
+      'ucdp-events',
+      'displacement',
+      'climate',
+      'population-exposure',
+    ],
   },
-  regionalNews: {
-    labelKey: 'header.panelCatRegionalNews',
-    panelKeys: ['politics', 'us', 'europe', 'middleeast', 'africa', 'latam', 'asia'],
-    variants: ['full'],
+  marketImpact: {
+    label: 'Market Impact',
+    panelKeys: [
+      'macro-signals',
+      'transmission-sankey',
+      'markets',
+      'commodities',
+      'finance',
+      'crypto',
+      'economic',
+      'polymarket',
+      'heatmap',
+      'trade-policy',
+      'supply-chain',
+      'etf-flows',
+      'stablecoins',
+    ],
   },
-  marketsFinance: {
-    labelKey: 'header.panelCatMarketsFinance',
-      panelKeys: ['commodities', 'markets', 'cross-asset-tape', 'event-impact-screener', 'country-exposure-matrix', 'investment-workflow', 'investment-ideas', 'transmission-sankey', 'signal-ridgeline', 'economic', 'trade-policy', 'supply-chain', 'finance', 'polymarket', 'macro-signals', 'etf-flows', 'stablecoins', 'crypto', 'heatmap'],
-    variants: ['full'],
+  watchlist: {
+    label: 'Watchlist',
+    panelKeys: [
+      'monitors',
+      'investment-workflow',
+      'investment-ideas',
+    ],
   },
-  topical: {
-    labelKey: 'header.panelCatTopical',
-    panelKeys: ['energy', 'gov', 'thinktanks', 'tech', 'ai', 'layoffs'],
-    variants: ['full'],
+  validation: {
+    label: 'Validate',
+    panelKeys: [
+      'backtest-lab',
+      'cross-asset-tape',
+      'event-impact-screener',
+      'country-exposure-matrix',
+    ],
   },
-  dataTracking: {
-    labelKey: 'header.panelCatDataTracking',
-    panelKeys: ['monitors', 'satellite-fires', 'ucdp-events', 'displacement', 'climate', 'population-exposure', 'dataflow-ops', 'source-ops', 'data-qa', 'backtest-lab', 'resource-profiler'],
-    variants: ['full'],
-  },
-
-  // Tech variant
-  techAi: {
-    labelKey: 'header.panelCatTechAi',
-    panelKeys: ['ai', 'tech', 'hardware', 'cloud', 'dev', 'github', 'producthunt', 'events', 'service-status', 'tech-readiness', 'signal-ridgeline'],
-    variants: ['tech'],
-  },
-  startupsVc: {
-    labelKey: 'header.panelCatStartupsVc',
-    panelKeys: ['startups', 'vcblogs', 'regionalStartups', 'unicorns', 'accelerators', 'funding', 'ipo'],
-    variants: ['tech'],
-  },
-  securityPolicy: {
-    labelKey: 'header.panelCatSecurityPolicy',
-    panelKeys: ['security', 'policy', 'regulation'],
-    variants: ['tech'],
-  },
-  techMarkets: {
-    labelKey: 'header.panelCatMarkets',
-      panelKeys: ['markets', 'finance', 'crypto', 'economic', 'polymarket', 'macro-signals', 'event-intelligence', 'investment-workflow', 'investment-ideas', 'dataflow-ops', 'source-ops', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'signal-ridgeline', 'etf-flows', 'stablecoins', 'layoffs', 'monitors'],
-    variants: ['tech'],
-  },
-
-  // Finance variant
-  finMarkets: {
-    labelKey: 'header.panelCatMarkets',
-      panelKeys: ['markets', 'cross-asset-tape', 'event-impact-screener', 'country-exposure-matrix', 'event-intelligence', 'investment-workflow', 'investment-ideas', 'dataflow-ops', 'source-ops', 'backtest-lab', 'resource-profiler', 'transmission-sankey', 'signal-ridgeline', 'markets-news', 'heatmap', 'macro-signals', 'analysis', 'polymarket'],
-    variants: ['finance'],
-  },
-  fixedIncomeFx: {
-    labelKey: 'header.panelCatFixedIncomeFx',
-    panelKeys: ['forex', 'bonds'],
-    variants: ['finance'],
-  },
-  finCommodities: {
-    labelKey: 'header.panelCatCommodities',
-    panelKeys: ['commodities', 'commodities-news'],
-    variants: ['finance'],
-  },
-  cryptoDigital: {
-    labelKey: 'header.panelCatCryptoDigital',
-    panelKeys: ['crypto', 'crypto-news', 'etf-flows', 'stablecoins', 'fintech'],
-    variants: ['finance'],
-  },
-  centralBanksEcon: {
-    labelKey: 'header.panelCatCentralBanks',
-    panelKeys: ['centralbanks', 'economic', 'trade-policy', 'supply-chain', 'economic-news'],
-    variants: ['finance'],
-  },
-  dealsInstitutional: {
-    labelKey: 'header.panelCatDeals',
-    panelKeys: ['ipo', 'derivatives', 'institutional', 'regulation'],
-    variants: ['finance'],
-  },
-  gulfMena: {
-    labelKey: 'header.panelCatGulfMena',
-    panelKeys: ['gcc-investments', 'gccNews', 'monitors'],
-    variants: ['finance'],
+  operations: {
+    label: 'Operate',
+    panelKeys: [
+      'dataflow-ops',
+      'source-ops',
+      'data-qa',
+      'resource-profiler',
+      'runtime-config',
+      'service-status',
+      'tech-readiness',
+      'codex-ops',
+    ],
   },
 };
 

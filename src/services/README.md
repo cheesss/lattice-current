@@ -89,7 +89,9 @@ This folder contains algorithmic building blocks such as Kalman filters, HMMs, H
 
 ## Validation shortcuts
 
-- math only: `npm run test:math`
-- all data tests: `npm run test:data`
-- runtime browser test: `npm run test:e2e:runtime`
 - typecheck: `npm run typecheck`
+- signal surface guardrails: `npm exec -- node --import tsx --test tests/signal-product-surface.test.mjs tests/windows-spawn-guardrails.test.mjs`
+- math only: `npm run test:math`
+- broad data tests: `npm run test:data`
+
+Prefer these non-interactive checks before any browser-based validation.

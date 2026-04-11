@@ -2,6 +2,7 @@ import type { HistoricalBackfillOptions, HistoricalFrameLoadOptions } from './im
 import type { HistoricalReplayOptions, WalkForwardBacktestOptions } from './historical-intelligence';
 import type { ThemeDiscoveryQueueItem } from './theme-discovery';
 import { AUTOMATION_THRESHOLDS } from '@/config/automation-thresholds';
+import { STOP_WORDS, SUPPRESSED_TRENDING_TERMS } from '@/utils/analysis-constants';
 
 export type DatasetHistoricalProvider = 'fred' | 'alfred' | 'gdelt-doc' | 'coingecko' | 'acled' | 'yahoo-chart' | 'rss-feed';
 export type DatasetAutomationMode = 'manual' | 'guarded-auto' | 'full-auto';
@@ -83,6 +84,20 @@ const DEFAULT_POLICY: DatasetDiscoveryPolicy = {
   allowProviders: ['fred', 'alfred', 'gdelt-doc', 'coingecko', 'acled', 'yahoo-chart', 'rss-feed'],
 };
 
+const RSS_QUERY_BLOCKLIST = new Set([
+  ...STOP_WORDS,
+  ...SUPPRESSED_TRENDING_TERMS,
+  'technology',
+  'science',
+  'environment',
+  'society',
+  'health',
+  'hl',
+  'gl',
+  'ceid',
+  'when',
+]);
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -105,6 +120,25 @@ function dedupe<T>(items: T[]): T[] {
 
 function takeFirst<T>(items: T[], limit: number): T[] {
   return items.slice(0, Math.max(0, limit));
+}
+
+function isMeaningfulRssTerm(value: string): boolean {
+  const normalized = normalize(value);
+  if (!normalized || normalized.length < 3) return false;
+  if (/^\d+$/.test(normalized)) return false;
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return false;
+  return tokens.some((token) => token.length >= 3 && !RSS_QUERY_BLOCKLIST.has(token));
+}
+
+function sanitizeRssTerms(values: string[], limit: number): string[] {
+  return takeFirst(
+    dedupe(values
+      .map((value) => normalize(value))
+      .filter((value) => value.length >= 3)
+      .filter((value) => isMeaningfulRssTerm(value))),
+    limit,
+  );
 }
 
 function themeBlob(theme: DatasetDiscoveryThemeInput): string {
@@ -359,10 +393,11 @@ function buildRssFeedProposals(theme: DatasetDiscoveryThemeInput, priority: numb
   const proposals: DatasetProposal[] = [];
   if (terms.length === 0 && symbols.length === 0) return proposals;
 
-  const baseTerms = takeFirst(dedupe([
+  const baseTerms = sanitizeRssTerms([
     ...terms,
     ...symbols.map((symbol) => symbol.toLowerCase()),
-  ]).filter((term) => term.length >= 2), 6);
+  ], 6);
+  if (baseTerms.length === 0) return proposals;
   const broadQuery = `${baseTerms.map((term) => term.includes(' ') ? `"${term}"` : term).join(' OR ')} when:30d`;
   const broadConfidence = clamp(Math.round(priority * 0.66 + 12), 34, 90);
   proposals.push({
@@ -389,11 +424,11 @@ function buildRssFeedProposals(theme: DatasetDiscoveryThemeInput, priority: numb
     autoEnable: false,
   });
 
-  const sectorTerms = takeFirst(dedupe([
+  const sectorTerms = sanitizeRssTerms([
     ...symbols,
     ...(theme.sectors || []).map((sector) => normalize(sector)),
     ...takeFirst((theme.supportingHeadlines || []).map((headline) => normalize(headline)).filter(Boolean), 2),
-  ]).filter((term) => String(term).length >= 2), 6);
+  ], 6);
   if (sectorTerms.length >= 2) {
     const sectorQuery = `${sectorTerms.map((term) => term.includes(' ') ? `"${term}"` : term).join(' OR ')} when:30d`;
     const sourceFamily = hasTechSignal(blob) || hasFinanceSignal(blob) ? 'sector-news' : 'broad-news';
@@ -424,35 +459,37 @@ function buildRssFeedProposals(theme: DatasetDiscoveryThemeInput, priority: numb
   }
 
   if (hasPolicySignal(blob)) {
-    const policyTerms = takeFirst(dedupe([
+    const policyTerms = sanitizeRssTerms([
       ...terms,
       ...['policy', 'regulation', 'export control', 'sanction'],
-    ]), 6);
-    const policyQuery = `${policyTerms.map((term) => term.includes(' ') ? `"${term}"` : term).join(' OR ')} when:60d`;
-    const policyConfidence = clamp(Math.round(priority * 0.67 + 18), 38, 94);
-    proposals.push({
-      id: `rss-policy-${slugify(theme.label)}`,
-      label: `RSS Policy Release / ${theme.label}`,
-      provider: 'rss-feed',
-      proposedBy: 'heuristic',
-      confidence: policyConfidence,
-      proposalScore: clamp(Math.round(policyConfidence + 6), 0, 100),
-      rationale: `Policy/news-release RSS helps separate policy-driven drift from ordinary media noise for ${theme.label}.`,
-      querySummary: policyQuery,
-      sourceThemeId: theme.themeId,
-      fetchArgs: {
-        url: buildGoogleNewsRssUrl(policyQuery),
-        name: `${theme.label} policy coverage`,
-        limit: 100,
-        source_family: 'policy-release',
-        feature_family: 'policy',
-      },
-      ...buildProposalDefaults({ provider: 'rss-feed', sourceFamily: 'policy-release', featureFamily: 'policy' }),
-      pitSafety: 'high',
-      estimatedCost: 'low',
-      autoRegister: false,
-      autoEnable: false,
-    });
+    ], 6);
+    if (policyTerms.length >= 2) {
+      const policyQuery = `${policyTerms.map((term) => term.includes(' ') ? `"${term}"` : term).join(' OR ')} when:60d`;
+      const policyConfidence = clamp(Math.round(priority * 0.67 + 18), 38, 94);
+      proposals.push({
+        id: `rss-policy-${slugify(theme.label)}`,
+        label: `RSS Policy Release / ${theme.label}`,
+        provider: 'rss-feed',
+        proposedBy: 'heuristic',
+        confidence: policyConfidence,
+        proposalScore: clamp(Math.round(policyConfidence + 6), 0, 100),
+        rationale: `Policy/news-release RSS helps separate policy-driven drift from ordinary media noise for ${theme.label}.`,
+        querySummary: policyQuery,
+        sourceThemeId: theme.themeId,
+        fetchArgs: {
+          url: buildGoogleNewsRssUrl(policyQuery),
+          name: `${theme.label} policy coverage`,
+          limit: 100,
+          source_family: 'policy-release',
+          feature_family: 'policy',
+        },
+        ...buildProposalDefaults({ provider: 'rss-feed', sourceFamily: 'policy-release', featureFamily: 'policy' }),
+        pitSafety: 'high',
+        estimatedCost: 'low',
+        autoRegister: false,
+        autoEnable: false,
+      });
+    }
   }
 
   return proposals;

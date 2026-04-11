@@ -6,6 +6,12 @@ import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.m
 import { ensureEmergingTechSchema } from './_shared/schema-emerging-tech.mjs';
 import { ensureCodexProposalSchema } from './_shared/schema-proposals.mjs';
 import {
+  evaluateDiscoveryTopicPromotion,
+  listTaxonomyThemes,
+  resolveThemeTaxonomy,
+  THEME_TAXONOMY_VERSION,
+} from './_shared/theme-taxonomy.mjs';
+import {
   averageEmbedding,
   buildDocumentFrequencies,
   buildMonthlyCounts,
@@ -25,7 +31,81 @@ import {
 loadOptionalEnvFile();
 
 const { Client } = pg;
-const MAIN_THEMES = ['conflict', 'tech', 'energy', 'economy', 'politics'];
+const MAIN_THEMES = listTaxonomyThemes({ includeParents: false }).map((theme) => theme.key);
+const SOURCE_PROPOSAL_MAX_KEYWORDS = 2;
+const SOURCE_PROPOSAL_MIN_ARTICLE_COUNT = 45;
+const SOURCE_PROPOSAL_MIN_ARTICLE_COUNT_WATCH = 80;
+const SOURCE_PROPOSAL_MIN_SOURCE_QUALITY = 0.62;
+const SOURCE_PROPOSAL_MIN_SOURCE_QUALITY_WATCH = 0.8;
+const SOURCE_PROPOSAL_MIN_DIVERSITY = 3;
+const SOURCE_PROPOSAL_MIN_COHESION = 0.72;
+const SOURCE_PROPOSAL_MIN_MOMENTUM = 1.45;
+const SOURCE_PROPOSAL_MIN_MOMENTUM_WATCH = 2;
+const SOURCE_PROPOSAL_MIN_NOVELTY_WATCH = 0.35;
+const BLOCKED_SOURCE_PROPOSAL_FLAGS = new Set([
+  'sports',
+  'entertainment',
+  'celebrity',
+  'crime',
+  'weather',
+  'gaming',
+  'lottery',
+  'gossip',
+]);
+const GENERIC_SOURCE_PROPOSAL_TERMS = new Set([
+  'analysis',
+  'analyst',
+  'article',
+  'articles',
+  'business',
+  'companies',
+  'company',
+  'coverage',
+  'development',
+  'economy',
+  'feature',
+  'global',
+  'growth',
+  'industry',
+  'industries',
+  'latest',
+  'market',
+  'markets',
+  'news',
+  'outlook',
+  'people',
+  'platform',
+  'policy',
+  'report',
+  'reports',
+  'research',
+  'science',
+  'software',
+  'startup',
+  'startups',
+  'story',
+  'stories',
+  'technology',
+  'tech',
+  'theme',
+  'themes',
+  'trend',
+  'trends',
+  'update',
+  'updates',
+  'world',
+]);
+const BROAD_TAXONOMY_TERMS = new Set(
+  listTaxonomyThemes({ includeParents: true })
+    .flatMap((theme) => [
+      theme.key,
+      theme.label,
+      theme.category,
+      theme.parentTheme,
+    ])
+    .map((value) => normalizeProposalText(value))
+    .filter(Boolean),
+);
 
 export function parseArgs(argv = process.argv.slice(2)) {
   const parsed = {
@@ -66,6 +146,221 @@ export function parseArgs(argv = process.argv.slice(2)) {
     }
   }
   return parsed;
+}
+
+function normalizeProposalText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_/]+/g, ' ')
+    .replace(/[^a-z0-9+\-\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function uniqueValues(values = []) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function normalizeTopicStringArray(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+}
+
+function humanizeThemeKey(themeKey) {
+  return normalizeProposalText(String(themeKey || '').replace(/-general$/g, '').replace(/-/g, ' '));
+}
+
+function countPhraseMatchesInTitles(phrase, titles) {
+  const normalizedPhrase = normalizeProposalText(phrase);
+  if (!normalizedPhrase) return 0;
+  return titles.reduce((total, title) => (
+    normalizeProposalText(title).includes(normalizedPhrase) ? total + 1 : total
+  ), 0);
+}
+
+function buildSourceProposalContext(topic = {}) {
+  const normalization = topic.codexMetadata?.normalization && typeof topic.codexMetadata.normalization === 'object'
+    ? topic.codexMetadata.normalization
+    : {};
+  const representativeTitles = normalizeTopicStringArray(
+    topic.codexMetadata?.representativeTitles || topic.representativeTitles,
+  );
+  const promotionState = String(
+    topic.promotionState
+    || normalization.promotionState
+    || '',
+  ).trim().toLowerCase();
+  const suppressionReason = String(
+    topic.suppressionReason
+    || normalization.suppressionReason
+    || '',
+  ).trim();
+  const normalizedTheme = String(
+    topic.normalizedTheme
+    || normalization.canonicalTheme
+    || '',
+  ).trim().toLowerCase();
+  const normalizedCategory = String(
+    topic.normalizedCategory
+    || normalization.canonicalCategory
+    || '',
+  ).trim().toLowerCase();
+  const parentTheme = String(
+    topic.parentTheme
+    || normalization.canonicalParentTheme
+    || '',
+  ).trim().toLowerCase();
+  const qualityFlags = uniqueValues([
+    ...normalizeTopicStringArray(topic.qualityFlags),
+    ...normalizeTopicStringArray(normalization.qualityFlags),
+  ].map((flag) => normalizeProposalText(flag)));
+  const matchedKeywords = uniqueValues(
+    normalizeTopicStringArray(normalization.matchedKeywords).map((keyword) => normalizeProposalText(keyword)),
+  );
+  const resolvedTheme = normalizedTheme ? resolveThemeTaxonomy(normalizedTheme) : resolveThemeTaxonomy(parentTheme);
+  const normalizedThemeLabel = normalizeProposalText(
+    resolvedTheme.themeType === 'subtheme'
+      ? resolvedTheme.themeLabel || humanizeThemeKey(normalizedTheme)
+      : '',
+  );
+
+  return {
+    topicId: String(topic.id || '').trim(),
+    promotionState,
+    suppressionReason,
+    normalizedTheme,
+    normalizedThemeLabel,
+    normalizedCategory,
+    parentTheme,
+    parentThemeLabel: normalizeProposalText(resolvedTheme.parentThemeLabel || humanizeThemeKey(parentTheme)),
+    representativeTitles,
+    qualityFlags,
+    matchedKeywords,
+    articleCount: Number(topic.articleCount || 0),
+    sourceQualityScore: Number(topic.sourceQualityScore || 0),
+    diversity: Number(topic.diversity || 0),
+    cohesion: Number(topic.cohesion || 0),
+    momentum: Number(topic.momentum || 0),
+    novelty: Number(topic.novelty || 0),
+  };
+}
+
+export function assessTopicSourceProposalReadiness(topic = {}) {
+  const context = buildSourceProposalContext(topic);
+  const blockedFlag = context.qualityFlags.find((flag) => BLOCKED_SOURCE_PROPOSAL_FLAGS.has(flag));
+
+  if (context.promotionState === 'suppressed') {
+    return { ready: false, reason: 'suppressed-topic', context };
+  }
+  if (context.suppressionReason) {
+    return { ready: false, reason: 'suppression-reason', context };
+  }
+  if (blockedFlag) {
+    return { ready: false, reason: `blocked-flag:${blockedFlag}`, context };
+  }
+  if (context.articleCount < SOURCE_PROPOSAL_MIN_ARTICLE_COUNT) {
+    return { ready: false, reason: 'article-count-too-low', context };
+  }
+  if (context.sourceQualityScore < SOURCE_PROPOSAL_MIN_SOURCE_QUALITY) {
+    return { ready: false, reason: 'source-quality-too-low', context };
+  }
+  if (context.diversity < SOURCE_PROPOSAL_MIN_DIVERSITY) {
+    return { ready: false, reason: 'diversity-too-low', context };
+  }
+  if (context.cohesion < SOURCE_PROPOSAL_MIN_COHESION) {
+    return { ready: false, reason: 'cohesion-too-low', context };
+  }
+  if (context.momentum < SOURCE_PROPOSAL_MIN_MOMENTUM) {
+    return { ready: false, reason: 'momentum-too-low', context };
+  }
+  if (!context.normalizedTheme && !context.parentTheme) {
+    return { ready: false, reason: 'missing-taxonomy', context };
+  }
+
+  if (context.promotionState === 'canonical') {
+    return { ready: true, reason: 'canonical-topic', context };
+  }
+  if (
+    context.promotionState === 'watch'
+    && context.articleCount >= SOURCE_PROPOSAL_MIN_ARTICLE_COUNT_WATCH
+    && context.sourceQualityScore >= SOURCE_PROPOSAL_MIN_SOURCE_QUALITY_WATCH
+    && context.momentum >= SOURCE_PROPOSAL_MIN_MOMENTUM_WATCH
+    && context.novelty >= SOURCE_PROPOSAL_MIN_NOVELTY_WATCH
+  ) {
+    return { ready: true, reason: 'strong-watch-topic', context };
+  }
+
+  return { ready: false, reason: 'promotion-state-too-weak', context };
+}
+
+function isMeaningfulProposalKeyword(keyword, context) {
+  const normalizedKeyword = normalizeProposalText(keyword);
+  if (!normalizedKeyword || normalizedKeyword.length < 4) return false;
+  if (/^\d+$/.test(normalizedKeyword)) return false;
+  if (GENERIC_SOURCE_PROPOSAL_TERMS.has(normalizedKeyword)) return false;
+  if (
+    BROAD_TAXONOMY_TERMS.has(normalizedKeyword)
+    && normalizedKeyword !== context.normalizedThemeLabel
+  ) {
+    return false;
+  }
+  if (
+    normalizedKeyword === context.normalizedCategory
+    || normalizedKeyword === context.parentThemeLabel
+  ) {
+    return false;
+  }
+
+  const tokens = normalizedKeyword.split(' ').filter(Boolean);
+  if (tokens.every((token) => GENERIC_SOURCE_PROPOSAL_TERMS.has(token))) return false;
+
+  const titleMatches = countPhraseMatchesInTitles(normalizedKeyword, context.representativeTitles);
+  const isCanonicalThemePhrase = context.normalizedThemeLabel && normalizedKeyword === context.normalizedThemeLabel;
+  const isMatchedKeyword = context.matchedKeywords.includes(normalizedKeyword);
+
+  if (!isCanonicalThemePhrase && !isMatchedKeyword && titleMatches === 0) return false;
+  if (tokens.length === 1 && normalizedKeyword.length < 7 && !isCanonicalThemePhrase && titleMatches < 2) return false;
+  return true;
+}
+
+export function selectTopicSourceProposalKeywords(topic = {}, limit = SOURCE_PROPOSAL_MAX_KEYWORDS) {
+  const { context } = assessTopicSourceProposalReadiness(topic);
+  const rawKeywords = normalizeTopicStringArray(topic.keywords);
+  const candidateKeywords = uniqueValues([
+    context.normalizedThemeLabel,
+    ...context.matchedKeywords,
+    ...rawKeywords,
+  ].map((keyword) => normalizeProposalText(keyword)));
+
+  return candidateKeywords
+    .filter((keyword) => isMeaningfulProposalKeyword(keyword, context))
+    .map((keyword) => {
+      const titleMatches = countPhraseMatchesInTitles(keyword, context.representativeTitles);
+      const tokenCount = keyword.split(' ').filter(Boolean).length;
+      const isCanonicalThemePhrase = context.normalizedThemeLabel && keyword === context.normalizedThemeLabel;
+      const isMatchedKeyword = context.matchedKeywords.includes(keyword);
+      const score = (
+        (isCanonicalThemePhrase ? 5 : 0)
+        + (isMatchedKeyword ? 3 : 0)
+        + Math.min(4, titleMatches * 1.5)
+        + Math.min(2.5, tokenCount * 0.6)
+        + Math.min(2, keyword.length / 12)
+      );
+      return { keyword, score };
+    })
+    .sort((left, right) => right.score - left.score || left.keyword.localeCompare(right.keyword))
+    .slice(0, Math.max(1, Math.floor(limit)))
+    .map((row) => row.keyword);
+}
+
+function buildGoogleNewsSearchUrl(keyword) {
+  const normalizedKeyword = normalizeProposalText(keyword);
+  const query = normalizedKeyword.includes(' ')
+    ? `"${normalizedKeyword}"`
+    : normalizedKeyword;
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
 }
 
 async function loadThemeAnchors(client) {
@@ -155,6 +450,7 @@ function clusterToTopic(cluster, documentFrequencies, options, anchors) {
   const diversity = computeSourceDiversity(cluster.items);
   const cohesion = computeCohesion(cluster.items, centroid);
   const representativeItems = pickRepresentativeItems(cluster.items, centroid, 5);
+  const representativeTitles = representativeItems.map((item) => item.title);
 
   let parentTheme = 'emerging-tech';
   let parentThemeSimilarity = 0;
@@ -166,7 +462,23 @@ function clusterToTopic(cluster, documentFrequencies, options, anchors) {
     }
   }
 
-  const qualifies = cluster.items.length >= options.minArticleCount
+  const normalization = evaluateDiscoveryTopicPromotion({
+    id: deriveTopicId(keywords),
+    label: representativeTitles[0] || keywords.slice(0, 3).join(' '),
+    description: representativeTitles.slice(0, 3).join('; '),
+    category: parentTheme,
+    parentTheme,
+    keywords,
+    representativeTitles,
+    articleCount: cluster.items.length,
+    momentum: momentum.ratio,
+    researchMomentum: researchMomentum?.ratio,
+    novelty: Math.max(0, Math.min(1, 1 - parentThemeSimilarity)),
+    sourceQualityScore: sourceQuality.sourceQualityScore,
+  });
+
+  const qualifies = normalization.promotionState !== 'suppressed'
+    && cluster.items.length >= options.minArticleCount
     && diversity >= options.minDiversity
     && cohesion >= options.minCohesion
     && (
@@ -193,9 +505,15 @@ function clusterToTopic(cluster, documentFrequencies, options, anchors) {
     sourceQualityBreakdown: sourceQuality.breakdown,
     diversity,
     cohesion,
-    parentTheme,
+    parentTheme: normalization.canonicalParentTheme || parentTheme,
+    normalizedTheme: normalization.canonicalTheme,
+    normalizedCategory: normalization.canonicalCategory,
+    promotionState: normalization.promotionState,
+    suppressionReason: normalization.suppressionReason,
+    qualityFlags: normalization.qualityFlags,
     novelty: Math.max(0, Math.min(1, 1 - parentThemeSimilarity)),
     codexMetadata: {
+      normalization,
       representativeTitles: representativeItems.map((item) => item.title),
       parentThemeSimilarity: Number(parentThemeSimilarity.toFixed(4)),
       recentAverage: Number(momentum.recentAverage.toFixed(4)),
@@ -217,12 +535,16 @@ async function upsertTopics(client, topics) {
       INSERT INTO discovery_topics (
         id, keywords, centroid_embedding, representative_article_ids, article_count,
         first_seen, last_seen, monthly_counts, momentum, research_momentum, source_quality_score,
-        source_quality_breakdown, novelty, diversity, cohesion, parent_theme, codex_metadata, updated_at
+        source_quality_breakdown, novelty, diversity, cohesion, parent_theme,
+        normalized_theme, normalized_parent_theme, normalized_category, promotion_state,
+        suppression_reason, quality_flags, taxonomy_version, codex_metadata, updated_at
       )
       VALUES (
         $1, $2::text[], $3::double precision[], $4::integer[], $5,
         $6::date, $7::date, $8::jsonb, $9, $10, $11,
-        $12::jsonb, $13, $14, $15, $16, $17::jsonb, NOW()
+        $12::jsonb, $13, $14, $15, $16,
+        $17, $18, $19, $20,
+        $21, $22::jsonb, $23, $24::jsonb, NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         keywords = EXCLUDED.keywords,
@@ -240,6 +562,13 @@ async function upsertTopics(client, topics) {
         diversity = EXCLUDED.diversity,
         cohesion = EXCLUDED.cohesion,
         parent_theme = EXCLUDED.parent_theme,
+        normalized_theme = EXCLUDED.normalized_theme,
+        normalized_parent_theme = EXCLUDED.normalized_parent_theme,
+        normalized_category = EXCLUDED.normalized_category,
+        promotion_state = EXCLUDED.promotion_state,
+        suppression_reason = EXCLUDED.suppression_reason,
+        quality_flags = EXCLUDED.quality_flags,
+        taxonomy_version = EXCLUDED.taxonomy_version,
         codex_metadata = EXCLUDED.codex_metadata,
         updated_at = NOW()
     `, [
@@ -259,6 +588,13 @@ async function upsertTopics(client, topics) {
       topic.diversity,
       topic.cohesion,
       topic.parentTheme,
+      topic.normalizedTheme,
+      topic.parentTheme,
+      topic.normalizedCategory,
+      topic.promotionState,
+      topic.suppressionReason,
+      JSON.stringify(topic.qualityFlags || []),
+      THEME_TAXONOMY_VERSION,
       JSON.stringify(topic.codexMetadata),
     ]);
 
@@ -280,12 +616,16 @@ async function upsertTopics(client, topics) {
   }
 }
 
-async function proposeSourcesForNewTopic(client, topic) {
-  if (Number(topic.articleCount || 0) < 30) return 0;
-  const keywords = Array.isArray(topic.keywords) ? topic.keywords.slice(0, 3) : [];
+export async function proposeSourcesForNewTopic(client, topic) {
+  const readiness = assessTopicSourceProposalReadiness(topic);
+  if (!readiness.ready) return 0;
+
+  const keywords = selectTopicSourceProposalKeywords(topic, SOURCE_PROPOSAL_MAX_KEYWORDS);
+  if (keywords.length === 0) return 0;
+
   let inserted = 0;
   for (const keyword of keywords) {
-    const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=en-US&gl=US&ceid=US:en`;
+    const googleNewsUrl = buildGoogleNewsSearchUrl(keyword);
     const exists = await client.query(
       `
         SELECT 1
@@ -309,9 +649,12 @@ async function proposeSourcesForNewTopic(client, topic) {
           url: googleNewsUrl,
           name: `Google News: ${keyword}`,
           theme: topic.id,
-          reason: `auto-generated from topic ${topic.id}`,
+          normalizedTheme: readiness.context.normalizedTheme || null,
+          parentTheme: readiness.context.parentTheme || null,
+          promotionState: readiness.context.promotionState || null,
+          reason: `auto-generated from topic ${topic.id} (${readiness.reason})`,
         }),
-        `auto-generated source proposal for topic ${topic.id}`,
+        `auto-generated source proposal for topic ${topic.id} (${readiness.reason})`,
       ],
     );
     inserted += Number(result.rowCount || 0);
@@ -344,6 +687,8 @@ export async function runEmergingTechDiscovery(options = {}) {
       emergingCandidates: emergingCandidates.length,
       clusterCount: clusters.length,
       insertedTopics: topics.length,
+      canonicalTopics: topics.filter((topic) => topic.promotionState === 'canonical').length,
+      watchTopics: topics.filter((topic) => topic.promotionState === 'watch').length,
       topics: topics.slice(0, 20).map((topic) => ({
         id: topic.id,
         keywords: topic.keywords,
@@ -352,6 +697,8 @@ export async function runEmergingTechDiscovery(options = {}) {
         sourceQualityScore: topic.sourceQualityScore,
         diversity: topic.diversity,
         cohesion: topic.cohesion,
+        promotionState: topic.promotionState,
+        parentTheme: topic.parentTheme,
       })),
     };
   } finally {

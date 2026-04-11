@@ -6,7 +6,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { ensureEmergingTechSchema } from './_shared/schema-emerging-tech.mjs';
+import { ensureDailyCuratedNewsSchema } from './curate-daily-news.mjs';
 import { runCodexJsonPrompt } from './_shared/codex-json.mjs';
+import { CANONICAL_PARENT_THEME_KEYS } from './_shared/theme-taxonomy.mjs';
 
 loadOptionalEnvFile();
 
@@ -67,7 +69,25 @@ function buildDeterministicDigest(topics = [], reports = [], asOf) {
 function buildPrompt(asOf, topics, reports) {
   return [
     'Generate a weekly operator digest for emerging-technology monitoring.',
-    'Return strict JSON only with this schema:',
+    'This is a structural monitoring brief, not a news recap and not a trading note.',
+    '',
+    'Analyze in this order:',
+    '1. Which topic most clearly represents the week’s structural change?',
+    '2. Which supporting topics or reports reinforce that signal?',
+    '3. What belongs on the watchlist for the next review cycle?',
+    '',
+    'Rules:',
+    '- Headline must capture the most important structural change of the week.',
+    '- Summary must explain what changed, why it matters, and what should stay on the watchlist.',
+    '- Watchlist items must come only from the supplied topics or reports.',
+    '- Prefer clarity and specificity over hype.',
+    '',
+    'Output rules:',
+    '- Return strict JSON only.',
+    '- Do not include markdown or commentary outside JSON.',
+    '- The response must match this schema exactly.',
+    '',
+    'Schema:',
     '{',
     '  "headline": "1 sentence headline",',
     '  "summary": "2-4 sentence digest summary",',
@@ -84,13 +104,56 @@ function buildPrompt(asOf, topics, reports) {
 }
 
 async function loadDigestContext(client, config) {
-  const { rows: topicRows } = await client.query(`
-    SELECT id, label, momentum, research_momentum, novelty
-    FROM discovery_topics
-    WHERE status IN ('labeled', 'reported')
-    ORDER BY momentum DESC NULLS LAST, research_momentum DESC NULLS LAST, novelty DESC NULLS LAST
-    LIMIT $1
-  `, [config.topicLimit]);
+  await ensureDailyCuratedNewsSchema(client);
+  let topicRows = [];
+  try {
+    const curated = await client.query(`
+      WITH ranked AS (
+        SELECT
+          theme,
+          parent_theme,
+          category,
+          COALESCE(NULLIF(topic_label, ''), NULLIF(theme, ''), 'unknown') AS label,
+          COUNT(*)::int AS article_count,
+          AVG(importance_score) AS momentum,
+          AVG(novelty_score) AS novelty,
+          MAX(updated_at) AS last_updated
+        FROM daily_curated_news
+        WHERE curated_date >= ($1::date - INTERVAL '6 days')
+          AND curated_date <= $1::date
+          AND COALESCE(NULLIF(parent_theme, ''), '') = ANY($2::text[])
+          AND COALESCE(NULLIF(category, ''), 'other') <> 'other'
+        GROUP BY theme, parent_theme, category, COALESCE(NULLIF(topic_label, ''), NULLIF(theme, ''), 'unknown')
+      )
+      SELECT
+        theme AS id,
+        label,
+        momentum,
+        0::double precision AS research_momentum,
+        novelty,
+        article_count
+      FROM ranked
+      ORDER BY momentum DESC NULLS LAST, article_count DESC, label ASC
+      LIMIT $3
+    `, [config.asOf, CANONICAL_PARENT_THEME_KEYS, config.topicLimit]);
+    topicRows = curated.rows;
+  } catch {
+    topicRows = [];
+  }
+
+  if (topicRows.length === 0) {
+    const fallback = await client.query(`
+      SELECT id, label, momentum, research_momentum, novelty
+      FROM discovery_topics
+      WHERE status IN ('labeled', 'reported')
+        AND COALESCE(NULLIF(parent_theme, ''), '') = ANY($1::text[])
+        AND COALESCE(NULLIF(category, ''), 'other') <> 'other'
+        AND COALESCE((codex_metadata->'taxonomyMigration'->>'operatorVisible')::boolean, true)
+      ORDER BY momentum DESC NULLS LAST, research_momentum DESC NULLS LAST, novelty DESC NULLS LAST
+      LIMIT $2
+    `, [CANONICAL_PARENT_THEME_KEYS, config.topicLimit]);
+    topicRows = fallback.rows;
+  }
   const { rows: reportRows } = await client.query(`
     SELECT topic_id, topic_label, tracking_score, investment_thesis, generated_at
     FROM tech_reports
@@ -107,13 +170,17 @@ export async function runWeeklyDigestGeneration(options = {}) {
   await client.connect();
   try {
     await ensureEmergingTechSchema(client);
+    await ensureDailyCuratedNewsSchema(client);
     const context = await loadDigestContext(client, config);
 
     let digest = null;
     let mode = 'deterministic';
     const fallback = buildDeterministicDigest(context.topics, context.reports, config.asOf);
-    const response = await runCodexJsonPrompt(buildPrompt(config.asOf, context.topics, context.reports));
-    if (response.code === 0 && response.parsed) {
+    const response = await runCodexJsonPrompt(buildPrompt(config.asOf, context.topics, context.reports), 95_000, {
+      label: 'generate-weekly-digest',
+      asOf: config.asOf,
+    });
+    if (response.parsed) {
       const normalized = normalizeWeeklyDigestPayload(response.parsed, fallback);
       if (normalized.headline && normalized.summary) {
         digest = normalized;

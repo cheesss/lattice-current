@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { ensureEmergingTechSchema } from './_shared/schema-emerging-tech.mjs';
 import { runCodexJsonPrompt } from './_shared/codex-json.mjs';
+import { createWhereBuilder } from './_shared/query-builder.mjs';
 
 loadOptionalEnvFile();
 
@@ -53,8 +54,26 @@ export function normalizeDiscoveryTopicPayload(raw = {}) {
 
 function buildPrompt(topic, articles) {
   return [
-    'Analyze this emerging-technology article cluster.',
-    'Return strict JSON only with this schema:',
+    'You are labeling an emerging-technology article cluster for downstream theme governance.',
+    'Do not merely summarize the headlines. Decide what the cluster is, how mature it is, and whether it is coherent enough to track.',
+    '',
+    'Analyze in this order:',
+    '1. Cluster coherence: are the articles about one topic or a mixed/noisy bundle?',
+    '2. Category fit: which single category best describes the cluster?',
+    '3. Lifecycle stage: is it research, early-commercial, mature, or decline?',
+    '4. Market relevance: does the cluster have real investment relevance or is it mostly noise?',
+    '',
+    'Rules:',
+    '- If the cluster is mixed or noisy, use category "other".',
+    '- Use conservative scores when evidence is weak or conflicting.',
+    '- Keep key_companies and key_technologies grounded in the supplied articles only.',
+    '',
+    'Output rules:',
+    '- Return strict JSON only.',
+    '- Do not include markdown or commentary outside JSON.',
+    '- The response must match this schema exactly.',
+    '',
+    'Schema:',
     '{',
     '  "topic_name": "clear topic label",',
     '  "category": "semiconductor|biotech|energy|robotics|materials|quantum|security|other",',
@@ -79,17 +98,16 @@ function buildPrompt(topic, articles) {
 }
 
 async function loadPendingTopics(client, options) {
-  const params = [];
-  const conditions = [`status = 'pending'`];
+  const where = createWhereBuilder([`status = 'pending'`]);
   if (options.topicId) {
-    params.push(options.topicId);
-    conditions.push(`id = $${params.length}`);
+    where.addValue(options.topicId, (placeholder) => `id = ${placeholder}`);
   }
+  const { whereClause, params } = where.build();
   params.push(options.limit);
   const { rows } = await client.query(`
     SELECT *
     FROM discovery_topics
-    WHERE ${conditions.join(' AND ')}
+    ${whereClause}
     ORDER BY momentum DESC NULLS LAST, article_count DESC
     LIMIT $${params.length}
   `, params);
@@ -151,8 +169,11 @@ export async function runDiscoveryTopicLabeling(options = {}) {
     const labeled = [];
     for (const topic of topics) {
       const articles = await loadRepresentativeArticles(client, topic);
-      const response = await runCodexJsonPrompt(buildPrompt(topic, articles));
-      if (response.code !== 0 || !response.parsed) {
+      const response = await runCodexJsonPrompt(buildPrompt(topic, articles), 95_000, {
+        label: 'label-discovery-topics',
+        topicId: topic.id,
+      });
+      if (!response.parsed) {
         continue;
       }
       const normalized = normalizeDiscoveryTopicPayload(response.parsed);

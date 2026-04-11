@@ -859,6 +859,17 @@ export class BacktestLabPanel extends Panel {
       }
       if (action === 'focus-theme') {
         setInvestmentFocusContext({ themeId: button.dataset.themeId || null });
+        return;
+      }
+      if (action === 'open-briefing') {
+        if (!this.focus.themeId) return;
+        window.dispatchEvent(new CustomEvent('wm:focus-theme', {
+          detail: {
+            themeId: this.focus.themeId,
+            workspaceId: 'brief',
+            scrollTarget: 'theme-workspace',
+          },
+        }));
       }
     });
     this.unsubscribeFocus = subscribeInvestmentFocusContext((context) => {
@@ -1273,6 +1284,7 @@ export class BacktestLabPanel extends Panel {
             ${regionOptions.map((region) => `<option value="${escapeHtml(region)}"${region === this.focus.region ? ' selected' : ''}>${escapeHtml(region)}</option>`).join('')}
           </select>
         </label>
+        <button type="button" class="backtest-lab-btn secondary" data-action="open-briefing"${this.focus.themeId ? '' : ' disabled'}>Open briefing</button>
         <button type="button" class="backtest-lab-btn" data-action="clear-focus">Clear focus</button>
       </div>
     `;

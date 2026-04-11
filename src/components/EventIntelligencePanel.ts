@@ -80,6 +80,39 @@ function directionArrow(dir: string): string {
   return '<span style="color:#6b7280">&#9644;</span>';
 }
 
+function normalizeThemeId(value: string): string | null {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!normalized || normalized === 'unknown') return null;
+  return normalized;
+}
+
+function humanizeTheme(value: string): string {
+  return String(value || '')
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function renderThemeChip(theme: string, action: 'brief' | 'validate' = 'brief', label?: string): string {
+  const themeId = normalizeThemeId(theme);
+  const text = label || humanizeTheme(themeId || theme || 'unknown');
+  if (!themeId) {
+    return `<span class="event-intel-theme-chip disabled">${escapeHtml(text)}</span>`;
+  }
+  return `<button type="button" class="event-intel-theme-chip" data-action="${action === 'validate' ? 'open-validation' : 'open-theme'}" data-theme-id="${escapeHtml(themeId)}">${escapeHtml(text)}</button>`;
+}
+
+function renderThemeAction(theme: string, label: string, action: 'brief' | 'validate'): string {
+  const themeId = normalizeThemeId(theme);
+  if (!themeId) return '';
+  return `<button type="button" class="event-intel-action-btn${action === 'validate' ? ' secondary' : ''}" data-action="${action === 'validate' ? 'open-validation' : 'open-theme'}" data-theme-id="${escapeHtml(themeId)}">${escapeHtml(label)}</button>`;
+}
+
 export class EventIntelligencePanel extends Panel {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private lastSuccessfulData: {
@@ -92,6 +125,21 @@ export class EventIntelligencePanel extends Panel {
 
   constructor() {
     super({ id: 'event-intelligence', title: 'Event Intelligence', className: 'event-intelligence-panel' });
+    this.content.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest<HTMLButtonElement>('[data-action][data-theme-id]');
+      if (!button) return;
+      const themeId = normalizeThemeId(button.dataset.themeId || '');
+      if (!themeId) return;
+      const workspaceId = button.dataset.action === 'open-validation' ? 'validate' : 'brief';
+      window.dispatchEvent(new CustomEvent('wm:focus-theme', {
+        detail: {
+          themeId,
+          workspaceId,
+          scrollTarget: workspaceId === 'validate' ? 'validation' : 'theme-workspace',
+        },
+      }));
+    });
     void this.refresh();
   }
 
@@ -280,7 +328,12 @@ export class EventIntelligencePanel extends Panel {
     const badges = live.temperatures
       .map((t) => {
         const bg = tempBadgeColor(t.temperature);
-        return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:${bg};color:#fff;margin:2px">${escapeHtml(t.theme)}: ${escapeHtml(t.temperature.toUpperCase())}</span>`;
+        const themeId = normalizeThemeId(t.theme);
+        const label = humanizeTheme(themeId || t.theme);
+        if (!themeId) {
+          return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:${bg};color:#fff;margin:2px">${escapeHtml(label)}: ${escapeHtml(t.temperature.toUpperCase())}</span>`;
+        }
+        return `<button type="button" class="event-intel-temp-chip" data-action="open-theme" data-theme-id="${escapeHtml(themeId)}" style="--event-intel-temp-bg:${bg}">${escapeHtml(label)} <span>${escapeHtml(t.temperature.toUpperCase())}</span></button>`;
       })
       .join('');
 
@@ -316,7 +369,7 @@ export class EventIntelligencePanel extends Panel {
             return `<div style="background:${bg};border-radius:2px;min-height:18px;font-size:9px;text-align:center;line-height:18px;color:#fff" title="${escapeHtml(theme)} x ${escapeHtml(sym)}: ${(rate * 100).toFixed(0)}%">${(rate * 100).toFixed(0)}</div>`;
           })
           .join('');
-        return `<div style="font-size:9px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(theme)}">${escapeHtml(theme)}</div>${cells}`;
+        return `<div style="display:flex;align-items:center;min-width:0;overflow:hidden">${renderThemeChip(theme, 'brief', humanizeTheme(theme))}</div>${cells}`;
       })
       .join('');
 
@@ -355,9 +408,13 @@ export class EventIntelligencePanel extends Panel {
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
               <span style="font-size:9px;color:var(--text-dim)">${escapeHtml(ev.source)}</span>
-              <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,0.06);color:var(--text-dim)">${escapeHtml(ev.theme)}</span>
+              ${renderThemeChip(ev.theme)}
             </div>
             <div style="margin-top:3px">${reactions}</div>
+            <div class="event-intel-action-row">
+              ${renderThemeAction(ev.theme, 'Open brief', 'brief')}
+              ${renderThemeAction(ev.theme, 'Validate', 'validate')}
+            </div>
           </div>`;
       })
       .join('');
@@ -383,9 +440,15 @@ export class EventIntelligencePanel extends Panel {
         const rank = i + 1;
         const returnColor = s.expectedReturn >= 0 ? '#22c55e' : '#ef4444';
         return `
-          <div style="display:grid;grid-template-columns:20px 1fr 60px 60px 60px;gap:4px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px">
+          <div style="display:grid;grid-template-columns:20px minmax(0,1fr) 60px 60px 60px;gap:4px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px">
             <span style="color:var(--text-dim);font-weight:600">#${rank}</span>
-            <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+            <div style="display:grid;gap:4px;min-width:0">
+              <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+              <div class="event-intel-action-row compact">
+                ${renderThemeChip(s.theme)}
+                ${renderThemeAction(s.theme, 'Validate', 'validate')}
+              </div>
+            </div>
             <span style="text-align:right;color:var(--text)" title="Sharpe">${s.sharpe.toFixed(2)}</span>
             <span style="text-align:right;color:${returnColor}" title="Expected Return">${s.expectedReturn >= 0 ? '+' : ''}${s.expectedReturn.toFixed(1)}%</span>
             <span style="text-align:right;color:#f59e0b" title="Max Drawdown">-${Math.abs(s.maxDrawdown).toFixed(1)}%</span>

@@ -9,104 +9,31 @@
  * NAS PostgreSQL: 192.168.0.76:5433, DB: lattice
  */
 
-import pg from 'pg';
+import { createLogger } from '@/utils/logger';
+import { createManagedPgPool } from '@/utils/pg-pool';
 
-// ---------------------------------------------------------------------------
-// Pool management (lazy singleton, same pattern as article-ingestor.ts)
-// ---------------------------------------------------------------------------
-
-let pool: pg.Pool | null = null;
-let poolCacheKey = '';
-let consecutiveFailures = 0;
-let disabledUntil = 0;
-let lastPoolError = '';
 const CIRCUIT_BREAKER_FAILS = Math.max(1, Number(process.env.SIGNAL_HISTORY_POOL_CIRCUIT_FAILS || 3));
 const CIRCUIT_BREAKER_OPEN_MS = Math.max(60_000, Number(process.env.SIGNAL_HISTORY_POOL_CIRCUIT_OPEN_MS || (5 * 60 * 1000)));
-
-function resolveNasPgConfig(): pg.PoolConfig {
-  const env = (keys: string[], fallback: string): string => {
-    for (const k of keys) {
-      const v = String(process.env[k] || '').trim();
-      if (v) return v;
-    }
-    return fallback;
-  };
-
-  const host = env(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'], '192.168.0.76');
-  const portRaw = Number(env(['INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'], '5433'));
-  const port = Number.isFinite(portRaw) && portRaw > 0 ? portRaw : 5433;
-  const database = env(['INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'], 'lattice');
-  const user = env(['INTEL_PG_USER', 'NAS_PG_USER', 'PG_USER', 'PGUSER'], 'postgres');
-  const password = env(['INTEL_PG_PASSWORD', 'NAS_PG_PASSWORD', 'PG_PASSWORD', 'PGPASSWORD'], '');
-
-  return {
-    host,
-    port,
-    database,
-    user,
-    password: password || undefined,
-    max: 4,
-    idleTimeoutMillis: 30_000,
-    allowExitOnIdle: true,
-  };
-}
-
-function recordPoolFailure(error: unknown): void {
-  consecutiveFailures += 1;
-  lastPoolError = String((error as Error)?.message || error || 'pool failure');
-  if (consecutiveFailures >= CIRCUIT_BREAKER_FAILS) {
-    disabledUntil = Date.now() + CIRCUIT_BREAKER_OPEN_MS;
-    console.warn(`[signal-history-updater] pool circuit open for ${Math.round(CIRCUIT_BREAKER_OPEN_MS / 1000)}s: ${lastPoolError}`);
-    if (pool) {
-      void pool.end().catch(() => { /* ignore */ });
-      pool = null;
-      poolCacheKey = '';
-    }
-  }
-}
-
-function recordPoolSuccess(): void {
-  consecutiveFailures = 0;
-  disabledUntil = 0;
-  lastPoolError = '';
-}
-
-function getPool(): pg.Pool | null {
-  if (Date.now() < disabledUntil) return null;
-  const config = resolveNasPgConfig();
-  const key = JSON.stringify({
-    host: config.host,
-    port: config.port,
-    database: config.database,
-    user: config.user,
-  });
-
-  if (pool && poolCacheKey === key) return pool;
-
-  if (pool) {
-    void pool.end().catch(() => { /* ignore */ });
-  }
-
-  pool = new pg.Pool(config);
-  pool.on('error', (err) => recordPoolFailure(err));
-  poolCacheKey = key;
-  return pool;
-}
+const logger = createLogger('signal-history-updater');
+const poolManager = createManagedPgPool({
+  name: 'signal-history-updater',
+  max: 4,
+  idleTimeoutMillis: 30_000,
+  allowExitOnIdle: true,
+  maxFailures: CIRCUIT_BREAKER_FAILS,
+  cooldownMs: CIRCUIT_BREAKER_OPEN_MS,
+  logger,
+});
+const getPool = () => poolManager.getPool();
+const recordPoolFailure = (error: unknown) => poolManager.recordFailure(error);
+const recordPoolSuccess = () => poolManager.recordSuccess();
 
 export async function closeSignalHistoryUpdaterPool(): Promise<void> {
-  if (!pool) return;
-  const ref = pool;
-  pool = null;
-  poolCacheKey = '';
-  await ref.end().catch(() => { /* ignore */ });
+  await poolManager.close();
 }
 
 export function getSignalHistoryUpdaterCircuitState(): { consecutiveFailures: number; disabledUntil: number; lastError: string } {
-  return {
-    consecutiveFailures,
-    disabledUntil,
-    lastError: lastPoolError,
-  };
+  return poolManager.getCircuitState();
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +112,7 @@ export async function pushSignalFromMarketData(
     recordPoolSuccess();
   } catch (err: unknown) {
     recordPoolFailure(err);
-    console.error('[signal-history-updater] pushSignalFromMarketData failed:', err);
+    logger.error('pushSignalFromMarketData failed', { error: String(err) });
   }
 }
 
@@ -242,7 +169,7 @@ export async function pushGdeltStress(
     }
   } catch (err: unknown) {
     recordPoolFailure(err);
-    console.error('[signal-history-updater] pushGdeltStress failed:', err);
+    logger.error('pushGdeltStress failed', { error: String(err) });
   }
 }
 
@@ -275,7 +202,7 @@ export async function pushSignal(
     recordPoolSuccess();
   } catch (err: unknown) {
     recordPoolFailure(err);
-    console.error('[signal-history-updater] pushSignal failed:', err);
+    logger.error('pushSignal failed', { error: String(err) });
   }
 }
 
@@ -309,7 +236,7 @@ export async function getLatestSignals(): Promise<Record<string, { value: number
     }
   } catch (err: unknown) {
     recordPoolFailure(err);
-    console.error('[signal-history-updater] getLatestSignals failed:', err);
+    logger.error('getLatestSignals failed', { error: String(err) });
   }
 
   return result;

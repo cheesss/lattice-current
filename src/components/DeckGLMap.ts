@@ -112,6 +112,12 @@ type MapInteractionMode = 'flat' | '3d';
 type MapProjectionMode = 'mercator' | 'globe';
 type MapLodLevel = 'global' | 'regional' | 'local';
 
+export interface DeckGLMapOptions {
+  disableProjectionToggle?: boolean;
+  initialProjectionMode?: MapProjectionMode;
+  lockProjectionMode?: MapProjectionMode;
+}
+
 export interface CountryClickPayload {
   lat: number;
   lon: number;
@@ -541,12 +547,18 @@ export class DeckGLMap {
   private replayMaxTs = 0;
   private replayTimerId: ReturnType<typeof setInterval> | null = null;
   private replayStepMs = 60 * 60 * 1000;
+  private readonly disableProjectionToggle: boolean;
+  private readonly lockedProjectionMode: MapProjectionMode | null;
 
-  constructor(container: HTMLElement, initialState: DeckMapState) {
+  constructor(container: HTMLElement, initialState: DeckMapState, options: DeckGLMapOptions = {}) {
     this.container = container;
     this.state = initialState;
     this.hotspots = [...INTEL_HOTSPOTS];
-    this.projectionMode = this.getPreferredProjectionForView(initialState.view);
+    this.disableProjectionToggle = Boolean(options.disableProjectionToggle);
+    this.lockedProjectionMode = options.lockProjectionMode ?? null;
+    this.projectionMode = options.initialProjectionMode
+      ?? this.lockedProjectionMode
+      ?? this.getPreferredProjectionForView(initialState.view);
 
     this.debouncedRebuildLayers = debounce(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
@@ -588,6 +600,159 @@ export class DeckGLMap {
     this.createLayerToggles();
     this.createLegend();
     this.startBorderStreamRefresh();
+  }
+
+  private normalizeUiLabel(value: unknown, fallback: string): string {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) return fallback;
+    if (['undefined', 'null', 'unknown', 'n/a'].includes(normalized.toLowerCase())) {
+      return fallback;
+    }
+    return normalized;
+  }
+
+  private translateUiLabel(key: string, fallback: string, params?: Record<string, string>): string {
+    const translated = params ? t(key, params) : t(key);
+    return this.normalizeUiLabel(translated, fallback);
+  }
+
+  private humanizeUiToken(token: string, fallback = 'Unknown'): string {
+    const raw = String(token || '').trim();
+    if (!raw) return fallback;
+    const spaced = raw
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const words = spaced.split(' ').filter(Boolean).map((word) => {
+      const upper = word.toUpperCase();
+      if (upper === 'AI' || upper === 'UCDP' || upper === 'GPS' || upper === 'MENA') return upper;
+      if (upper === 'HQ') return 'HQ';
+      if (upper === 'HQS') return 'HQs';
+      if (upper === 'LATAM') return 'LatAm';
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    });
+    return words.join(' ') || fallback;
+  }
+
+  private getLayerLabel(layerKey: string): string {
+    const fallbacks: Record<string, string> = {
+      hotspots: 'Hotspots',
+      conflicts: 'Conflict Zones',
+      bases: 'Military Bases',
+      nuclear: 'Nuclear Sites',
+      irradiators: 'Gamma Irradiators',
+      spaceports: 'Spaceports',
+      cables: 'Undersea Cables',
+      pipelines: 'Pipelines',
+      datacenters: 'AI Data Centers',
+      military: 'Military Activity',
+      ais: 'Ship Traffic',
+      tradeRoutes: 'Trade Routes',
+      flights: 'Flight Delays',
+      protests: 'Protests',
+      ucdpEvents: 'UCDP Events',
+      displacement: 'Displacement Flows',
+      climate: 'Climate Anomalies',
+      weather: 'Weather Alerts',
+      outages: 'Internet Outages',
+      cyberThreats: 'Cyber Threats',
+      natural: 'Natural Events',
+      fires: 'Fires',
+      waterways: 'Strategic Waterways',
+      economic: 'Economic Centers',
+      minerals: 'Critical Minerals',
+      startupHubs: 'Startup Hubs',
+      techHQs: 'Tech HQs',
+      accelerators: 'Accelerators',
+      cloudRegions: 'Cloud Regions',
+      techEvents: 'Tech Events',
+      stockExchanges: 'Stock Exchanges',
+      financialCenters: 'Financial Centers',
+      centralBanks: 'Central Banks',
+      commodityHubs: 'Commodity Hubs',
+      gulfInvestments: 'Gulf Investments',
+      intelDensity: 'Intel Density 3D',
+      positiveEvents: 'Positive Events',
+      kindness: 'Acts of Kindness',
+      happiness: 'World Happiness',
+      speciesRecovery: 'Species Recovery',
+      renewableInstallations: 'Clean Energy',
+    };
+    const translationKeys: Record<string, string> = {
+      hotspots: 'intelHotspots',
+      conflicts: 'conflictZones',
+      bases: 'militaryBases',
+      nuclear: 'nuclearSites',
+      irradiators: 'gammaIrradiators',
+      cables: 'underseaCables',
+      datacenters: 'aiDataCenters',
+      military: 'militaryActivity',
+      ais: 'shipTraffic',
+      flights: 'flightDelays',
+      displacement: 'displacementFlows',
+      climate: 'climateAnomalies',
+      weather: 'weatherAlerts',
+      outages: 'internetOutages',
+      natural: 'naturalEvents',
+      waterways: 'strategicWaterways',
+      economic: 'economicCenters',
+      minerals: 'criticalMinerals',
+    };
+    const translationKey = translationKeys[layerKey] ?? layerKey;
+    return this.translateUiLabel(`components.deckgl.layers.${translationKey}`, fallbacks[layerKey] ?? this.humanizeUiToken(layerKey));
+  }
+
+  private getLayerHelpLabel(labelKey: string): string {
+    const fallbacks: Record<string, string> = {
+      countries: 'Countries',
+      routes: 'Routes',
+      nodes: 'Nodes',
+    };
+    return this.translateUiLabel(`components.deckgl.layerHelp.labels.${labelKey}`, fallbacks[labelKey] ?? this.humanizeUiToken(labelKey));
+  }
+
+  private getLayerHelpText(section: 'title' | 'section' | 'description' | 'note', key: string): string {
+    const translationKey = section === 'title'
+      ? 'components.deckgl.layerHelp.title'
+      : `components.deckgl.layerHelp.${section === 'section' ? 'sections' : section === 'description' ? 'descriptions' : 'notes'}.${key}`;
+    const fallbacks: Record<string, string> = {
+      title: 'Layer Guide',
+      techEcosystem: 'Tech Ecosystem',
+      infrastructure: 'Infrastructure',
+      naturalEconomic: 'Natural and Economic',
+      financeCore: 'Finance Core',
+      transmission: 'Transmission',
+      stressSignals: 'Stress Signals',
+      intelligence: 'Intelligence',
+      logistics: 'Logistics',
+      environment: 'Environment',
+      countriesOverlay: 'Country overlays remain visible for regional context.',
+    };
+    const fallbackKey = section === 'title' ? 'title' : key;
+    return this.translateUiLabel(translationKey, fallbacks[fallbackKey] ?? this.humanizeUiToken(key));
+  }
+
+  private getLegendLabel(legendKey: string): string {
+    const fallbacks: Record<string, string> = {
+      title: 'Legend',
+      startupHub: 'Startup Hub',
+      techHQ: 'Tech HQ',
+      accelerator: 'Accelerator',
+      cloudRegion: 'Cloud Region',
+      datacenter: 'Data Center',
+      stockExchange: 'Stock Exchange',
+      financialCenter: 'Financial Center',
+      centralBank: 'Central Bank',
+      commodityHub: 'Commodity Hub',
+      waterway: 'Waterway',
+      highAlert: 'High Alert',
+      elevated: 'Elevated',
+      monitoring: 'Monitoring',
+      base: 'Military Base',
+      nuclear: 'Nuclear Site',
+    };
+    return this.translateUiLabel(`components.deckgl.legend.${legendKey}`, fallbacks[legendKey] ?? this.humanizeUiToken(legendKey));
   }
 
   private setupDOM(): void {
@@ -2261,9 +2426,14 @@ export class DeckGLMap {
     const data: ConflictZoneLabelDatum[] = zones
       .map((zone) => {
         const intensity = this.getConflictZoneIntensity(zone);
+        const zoneName = typeof zone.name === 'string' && zone.name.trim().length > 0
+          ? zone.name.trim()
+          : typeof zone.location === 'string' && zone.location.trim().length > 0
+            ? zone.location.trim()
+            : 'Conflict zone';
         return {
           id: zone.id,
-          name: zone.name,
+          name: zoneName,
           lon: zone.center[0],
           lat: zone.center[1],
           intensity,
@@ -2302,9 +2472,14 @@ export class DeckGLMap {
     const data: ConflictZoneLabelDatum[] = zones
       .map((zone) => {
         const intensity = this.getConflictZoneIntensity(zone);
+        const zoneName = typeof zone.name === 'string' && zone.name.trim().length > 0
+          ? zone.name.trim()
+          : typeof zone.location === 'string' && zone.location.trim().length > 0
+            ? zone.location.trim()
+            : 'Conflict zone';
         return {
           id: zone.id,
-          name: zone.name,
+          name: zoneName,
           lon: zone.center[0],
           lat: zone.center[1],
           intensity,
@@ -3855,7 +4030,14 @@ export class DeckGLMap {
     const layerId = rawLayerId.endsWith('-ghost') ? rawLayerId.slice(0, -6) : rawLayerId;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj = info.object as any;
-    const text = (value: unknown): string => escapeHtml(String(value ?? ''));
+    const text = (value: unknown, fallback = ''): string => {
+      const normalized = String(value ?? '').trim();
+      if (!normalized) return escapeHtml(fallback);
+      if (['undefined', 'null', 'unknown', 'n/a'].includes(normalized.toLowerCase())) {
+        return escapeHtml(fallback);
+      }
+      return escapeHtml(normalized);
+    };
 
     switch (layerId) {
       case 'hotspots-layer':
@@ -4549,23 +4731,36 @@ export class DeckGLMap {
   private createControls(): void {
     const controls = document.createElement('div');
     controls.className = 'map-controls deckgl-controls';
+    const zoomInLabel = escapeHtml(this.translateUiLabel('components.deckgl.zoomIn', 'Zoom in'));
+    const zoomOutLabel = escapeHtml(this.translateUiLabel('components.deckgl.zoomOut', 'Zoom out'));
+    const resetViewLabel = escapeHtml(this.translateUiLabel('components.deckgl.resetView', 'Reset view'));
+    const viewLabels = {
+      global: escapeHtml(this.translateUiLabel('components.deckgl.views.global', 'Global')),
+      america: escapeHtml(this.translateUiLabel('components.deckgl.views.americas', 'Americas')),
+      mena: escapeHtml(this.translateUiLabel('components.deckgl.views.mena', 'MENA')),
+      eu: escapeHtml(this.translateUiLabel('components.deckgl.views.europe', 'Europe')),
+      asia: escapeHtml(this.translateUiLabel('components.deckgl.views.asia', 'Asia')),
+      latam: escapeHtml(this.translateUiLabel('components.deckgl.views.latam', 'LatAm')),
+      africa: escapeHtml(this.translateUiLabel('components.deckgl.views.africa', 'Africa')),
+      oceania: escapeHtml(this.translateUiLabel('components.deckgl.views.oceania', 'Oceania')),
+    };
     controls.innerHTML = `
       <div class="zoom-controls">
-        <button class="map-btn zoom-in" title="${t('components.deckgl.zoomIn')}">+</button>
-        <button class="map-btn zoom-out" title="${t('components.deckgl.zoomOut')}">-</button>
-        <button class="map-btn zoom-reset" title="${t('components.deckgl.resetView')}">&#8962;</button>
-        <button class="map-btn projection-toggle" title="Switch to flat map" aria-label="Switch to flat map">GL</button>
+        <button class="map-btn zoom-in" title="${zoomInLabel}">+</button>
+        <button class="map-btn zoom-out" title="${zoomOutLabel}">-</button>
+        <button class="map-btn zoom-reset" title="${resetViewLabel}">&#8962;</button>
+          ${this.disableProjectionToggle || this.lockedProjectionMode ? '' : '<button class="map-btn projection-toggle" title="Switch to flat map" aria-label="Switch to flat map">GL</button>'}
       </div>
       <div class="view-selector">
         <select class="view-select">
-          <option value="global">${t('components.deckgl.views.global')}</option>
-          <option value="america">${t('components.deckgl.views.americas')}</option>
-          <option value="mena">${t('components.deckgl.views.mena')}</option>
-          <option value="eu">${t('components.deckgl.views.europe')}</option>
-          <option value="asia">${t('components.deckgl.views.asia')}</option>
-          <option value="latam">${t('components.deckgl.views.latam')}</option>
-          <option value="africa">${t('components.deckgl.views.africa')}</option>
-          <option value="oceania">${t('components.deckgl.views.oceania')}</option>
+          <option value="global">${viewLabels.global}</option>
+          <option value="america">${viewLabels.america}</option>
+          <option value="mena">${viewLabels.mena}</option>
+          <option value="eu">${viewLabels.eu}</option>
+          <option value="asia">${viewLabels.asia}</option>
+          <option value="latam">${viewLabels.latam}</option>
+          <option value="africa">${viewLabels.africa}</option>
+          <option value="oceania">${viewLabels.oceania}</option>
         </select>
       </div>
     `;
@@ -4591,21 +4786,23 @@ export class DeckGLMap {
   }
 
   private getPreferredProjectionForView(view: DeckMapView): MapProjectionMode {
+    if (this.lockedProjectionMode) return this.lockedProjectionMode;
     return view === 'global' ? DEFAULT_MAP_PROJECTION : 'mercator';
   }
 
   private applyProjection(mode: MapProjectionMode): void {
     if (!this.maplibreMap) return;
-    if (this.projectionMode === mode) {
+    const resolvedMode = this.lockedProjectionMode ?? mode;
+    if (this.projectionMode === resolvedMode) {
       this.updateProjectionButton();
       return;
     }
     try {
-      this.maplibreMap.setProjection({ type: mode });
-      this.projectionMode = mode;
+      this.maplibreMap.setProjection({ type: resolvedMode });
+      this.projectionMode = resolvedMode;
     } catch (error) {
-      console.warn(`[DeckGLMap] Failed to set projection "${mode}"`, error);
-      if (mode !== 'mercator') {
+      console.warn(`[DeckGLMap] Failed to set projection "${resolvedMode}"`, error);
+      if (resolvedMode !== 'mercator') {
         try {
           this.maplibreMap.setProjection({ type: 'mercator' });
           this.projectionMode = 'mercator';
@@ -4620,6 +4817,7 @@ export class DeckGLMap {
   }
 
   private toggleProjectionMode(): void {
+    if (this.lockedProjectionMode || this.disableProjectionToggle) return;
     const nextMode: MapProjectionMode = this.projectionMode === 'globe' ? 'mercator' : 'globe';
     this.applyProjection(nextMode);
   }
@@ -4627,6 +4825,11 @@ export class DeckGLMap {
   private updateProjectionButton(): void {
     const button = this.container.querySelector('.projection-toggle') as HTMLButtonElement | null;
     if (!button) return;
+    if (this.disableProjectionToggle || this.lockedProjectionMode) {
+      button.hidden = true;
+      button.style.display = 'none';
+      return;
+    }
     const globe = this.projectionMode === 'globe';
     button.textContent = globe ? 'GL' : '2D';
     const label = globe ? 'Switch to flat map' : 'Switch to globe map';
@@ -4638,6 +4841,7 @@ export class DeckGLMap {
   private createTimeSlider(): void {
     const slider = document.createElement('div');
     slider.className = 'time-slider deckgl-time-slider';
+    const allLabel = escapeHtml(this.translateUiLabel('components.deckgl.timeAll', 'All'));
     slider.innerHTML = `
       <div class="time-options">
         <button class="time-btn ${this.state.timeRange === '1h' ? 'active' : ''}" data-range="1h">1h</button>
@@ -4645,7 +4849,7 @@ export class DeckGLMap {
         <button class="time-btn ${this.state.timeRange === '24h' ? 'active' : ''}" data-range="24h">24h</button>
         <button class="time-btn ${this.state.timeRange === '48h' ? 'active' : ''}" data-range="48h">48h</button>
         <button class="time-btn ${this.state.timeRange === '7d' ? 'active' : ''}" data-range="7d">7d</button>
-        <button class="time-btn ${this.state.timeRange === 'all' ? 'active' : ''}" data-range="all">${t('components.deckgl.timeAll')}</button>
+        <button class="time-btn ${this.state.timeRange === 'all' ? 'active' : ''}" data-range="all">${allLabel}</button>
       </div>
       <div class="replay-row">
         <button class="replay-toggle-btn" data-replay="toggle" aria-label="Toggle replay mode">REPLAY</button>
@@ -4830,39 +5034,41 @@ export class DeckGLMap {
   private createLayerToggles(): void {
     const toggles = document.createElement('div');
     toggles.className = 'layer-toggles deckgl-layer-toggles';
+    const layersTitle = escapeHtml(this.translateUiLabel('components.deckgl.layersTitle', 'Layers'));
+    const layerGuideTitle = escapeHtml(this.translateUiLabel('components.deckgl.layerGuide', 'Layer guide'));
 
     const layerConfig = SITE_VARIANT === 'tech'
       ? [
-        { key: 'startupHubs', label: t('components.deckgl.layers.startupHubs'), icon: '&#128640;' },
-        { key: 'techHQs', label: t('components.deckgl.layers.techHQs'), icon: '&#127970;' },
-        { key: 'accelerators', label: t('components.deckgl.layers.accelerators'), icon: '&#9889;' },
-        { key: 'cloudRegions', label: t('components.deckgl.layers.cloudRegions'), icon: '&#9729;' },
-        { key: 'datacenters', label: t('components.deckgl.layers.aiDataCenters'), icon: '&#128421;' },
-        { key: 'cables', label: t('components.deckgl.layers.underseaCables'), icon: '&#128268;' },
-        { key: 'outages', label: t('components.deckgl.layers.internetOutages'), icon: '&#128225;' },
-        { key: 'cyberThreats', label: t('components.deckgl.layers.cyberThreats'), icon: '&#128737;' },
+        { key: 'startupHubs', label: this.getLayerLabel('startupHubs'), icon: '&#128640;' },
+        { key: 'techHQs', label: this.getLayerLabel('techHQs'), icon: '&#127970;' },
+        { key: 'accelerators', label: this.getLayerLabel('accelerators'), icon: '&#9889;' },
+        { key: 'cloudRegions', label: this.getLayerLabel('cloudRegions'), icon: '&#9729;' },
+        { key: 'datacenters', label: this.getLayerLabel('datacenters'), icon: '&#128421;' },
+        { key: 'cables', label: this.getLayerLabel('cables'), icon: '&#128268;' },
+        { key: 'outages', label: this.getLayerLabel('outages'), icon: '&#128225;' },
+        { key: 'cyberThreats', label: this.getLayerLabel('cyberThreats'), icon: '&#128737;' },
         { key: 'intelDensity', label: 'Intel Density 3D', icon: '&#11014;' },
-        { key: 'techEvents', label: t('components.deckgl.layers.techEvents'), icon: '&#128197;' },
-        { key: 'natural', label: t('components.deckgl.layers.naturalEvents'), icon: '&#127755;' },
-        { key: 'fires', label: t('components.deckgl.layers.fires'), icon: '&#128293;' },
+        { key: 'techEvents', label: this.getLayerLabel('techEvents'), icon: '&#128197;' },
+        { key: 'natural', label: this.getLayerLabel('natural'), icon: '&#127755;' },
+        { key: 'fires', label: this.getLayerLabel('fires'), icon: '&#128293;' },
       ]
       : SITE_VARIANT === 'finance'
       ? [
-          { key: 'stockExchanges', label: t('components.deckgl.layers.stockExchanges'), icon: '&#127963;' },
-          { key: 'financialCenters', label: t('components.deckgl.layers.financialCenters'), icon: '&#128176;' },
-          { key: 'centralBanks', label: t('components.deckgl.layers.centralBanks'), icon: '&#127974;' },
-          { key: 'commodityHubs', label: t('components.deckgl.layers.commodityHubs'), icon: '&#128230;' },
-          { key: 'gulfInvestments', label: t('components.deckgl.layers.gulfInvestments'), icon: '&#127760;' },
-          { key: 'tradeRoutes', label: t('components.deckgl.layers.tradeRoutes'), icon: '&#128674;' },
-          { key: 'cables', label: t('components.deckgl.layers.underseaCables'), icon: '&#128268;' },
-          { key: 'pipelines', label: t('components.deckgl.layers.pipelines'), icon: '&#128738;' },
-          { key: 'outages', label: t('components.deckgl.layers.internetOutages'), icon: '&#128225;' },
-          { key: 'weather', label: t('components.deckgl.layers.weatherAlerts'), icon: '&#9928;' },
-          { key: 'economic', label: t('components.deckgl.layers.economicCenters'), icon: '&#128176;' },
+          { key: 'stockExchanges', label: this.getLayerLabel('stockExchanges'), icon: '&#127963;' },
+          { key: 'financialCenters', label: this.getLayerLabel('financialCenters'), icon: '&#128176;' },
+          { key: 'centralBanks', label: this.getLayerLabel('centralBanks'), icon: '&#127974;' },
+          { key: 'commodityHubs', label: this.getLayerLabel('commodityHubs'), icon: '&#128230;' },
+          { key: 'gulfInvestments', label: this.getLayerLabel('gulfInvestments'), icon: '&#127760;' },
+          { key: 'tradeRoutes', label: this.getLayerLabel('tradeRoutes'), icon: '&#128674;' },
+          { key: 'cables', label: this.getLayerLabel('cables'), icon: '&#128268;' },
+          { key: 'pipelines', label: this.getLayerLabel('pipelines'), icon: '&#128738;' },
+          { key: 'outages', label: this.getLayerLabel('outages'), icon: '&#128225;' },
+          { key: 'weather', label: this.getLayerLabel('weather'), icon: '&#9928;' },
+          { key: 'economic', label: this.getLayerLabel('economic'), icon: '&#128176;' },
           { key: 'intelDensity', label: 'Intel Density 3D', icon: '&#11014;' },
-          { key: 'waterways', label: t('components.deckgl.layers.strategicWaterways'), icon: '&#9875;' },
-          { key: 'natural', label: t('components.deckgl.layers.naturalEvents'), icon: '&#127755;' },
-          { key: 'cyberThreats', label: t('components.deckgl.layers.cyberThreats'), icon: '&#128737;' },
+          { key: 'waterways', label: this.getLayerLabel('waterways'), icon: '&#9875;' },
+          { key: 'natural', label: this.getLayerLabel('natural'), icon: '&#127755;' },
+          { key: 'cyberThreats', label: this.getLayerLabel('cyberThreats'), icon: '&#128737;' },
         ]
       : SITE_VARIANT === 'happy'
       ? [
@@ -4873,38 +5079,38 @@ export class DeckGLMap {
           { key: 'renewableInstallations', label: 'Clean Energy', icon: '&#9889;' },
         ]
       : [
-        { key: 'hotspots', label: t('components.deckgl.layers.intelHotspots'), icon: '&#127919;' },
-        { key: 'conflicts', label: t('components.deckgl.layers.conflictZones'), icon: '&#9876;' },
-        { key: 'bases', label: t('components.deckgl.layers.militaryBases'), icon: '&#127963;' },
-        { key: 'nuclear', label: t('components.deckgl.layers.nuclearSites'), icon: '&#9762;' },
-        { key: 'irradiators', label: t('components.deckgl.layers.gammaIrradiators'), icon: '&#9888;' },
-        { key: 'spaceports', label: t('components.deckgl.layers.spaceports'), icon: '&#128640;' },
-        { key: 'cables', label: t('components.deckgl.layers.underseaCables'), icon: '&#128268;' },
-        { key: 'pipelines', label: t('components.deckgl.layers.pipelines'), icon: '&#128738;' },
-        { key: 'datacenters', label: t('components.deckgl.layers.aiDataCenters'), icon: '&#128421;' },
-        { key: 'military', label: t('components.deckgl.layers.militaryActivity'), icon: '&#9992;' },
-        { key: 'ais', label: t('components.deckgl.layers.shipTraffic'), icon: '&#128674;' },
+        { key: 'hotspots', label: this.getLayerLabel('hotspots'), icon: '&#127919;' },
+        { key: 'conflicts', label: this.getLayerLabel('conflicts'), icon: '&#9876;' },
+        { key: 'bases', label: this.getLayerLabel('bases'), icon: '&#127963;' },
+        { key: 'nuclear', label: this.getLayerLabel('nuclear'), icon: '&#9762;' },
+        { key: 'irradiators', label: this.getLayerLabel('irradiators'), icon: '&#9888;' },
+        { key: 'spaceports', label: this.getLayerLabel('spaceports'), icon: '&#128640;' },
+        { key: 'cables', label: this.getLayerLabel('cables'), icon: '&#128268;' },
+        { key: 'pipelines', label: this.getLayerLabel('pipelines'), icon: '&#128738;' },
+        { key: 'datacenters', label: this.getLayerLabel('datacenters'), icon: '&#128421;' },
+        { key: 'military', label: this.getLayerLabel('military'), icon: '&#9992;' },
+        { key: 'ais', label: this.getLayerLabel('ais'), icon: '&#128674;' },
         { key: 'intelDensity', label: 'Intel Density 3D', icon: '&#11014;' },
-        { key: 'tradeRoutes', label: t('components.deckgl.layers.tradeRoutes'), icon: '&#9875;' },
-        { key: 'flights', label: t('components.deckgl.layers.flightDelays'), icon: '&#9992;' },
-        { key: 'protests', label: t('components.deckgl.layers.protests'), icon: '&#128226;' },
-        { key: 'ucdpEvents', label: t('components.deckgl.layers.ucdpEvents'), icon: '&#9876;' },
-        { key: 'displacement', label: t('components.deckgl.layers.displacementFlows'), icon: '&#128101;' },
-        { key: 'climate', label: t('components.deckgl.layers.climateAnomalies'), icon: '&#127787;' },
-        { key: 'weather', label: t('components.deckgl.layers.weatherAlerts'), icon: '&#9928;' },
-        { key: 'outages', label: t('components.deckgl.layers.internetOutages'), icon: '&#128225;' },
-        { key: 'cyberThreats', label: t('components.deckgl.layers.cyberThreats'), icon: '&#128737;' },
-        { key: 'natural', label: t('components.deckgl.layers.naturalEvents'), icon: '&#127755;' },
-        { key: 'fires', label: t('components.deckgl.layers.fires'), icon: '&#128293;' },
-        { key: 'waterways', label: t('components.deckgl.layers.strategicWaterways'), icon: '&#9875;' },
-        { key: 'economic', label: t('components.deckgl.layers.economicCenters'), icon: '&#128176;' },
-        { key: 'minerals', label: t('components.deckgl.layers.criticalMinerals'), icon: '&#128142;' },
+        { key: 'tradeRoutes', label: this.getLayerLabel('tradeRoutes'), icon: '&#9875;' },
+        { key: 'flights', label: this.getLayerLabel('flights'), icon: '&#9992;' },
+        { key: 'protests', label: this.getLayerLabel('protests'), icon: '&#128226;' },
+        { key: 'ucdpEvents', label: this.getLayerLabel('ucdpEvents'), icon: '&#9876;' },
+        { key: 'displacement', label: this.getLayerLabel('displacement'), icon: '&#128101;' },
+        { key: 'climate', label: this.getLayerLabel('climate'), icon: '&#127787;' },
+        { key: 'weather', label: this.getLayerLabel('weather'), icon: '&#9928;' },
+        { key: 'outages', label: this.getLayerLabel('outages'), icon: '&#128225;' },
+        { key: 'cyberThreats', label: this.getLayerLabel('cyberThreats'), icon: '&#128737;' },
+        { key: 'natural', label: this.getLayerLabel('natural'), icon: '&#127755;' },
+        { key: 'fires', label: this.getLayerLabel('fires'), icon: '&#128293;' },
+        { key: 'waterways', label: this.getLayerLabel('waterways'), icon: '&#9875;' },
+        { key: 'economic', label: this.getLayerLabel('economic'), icon: '&#128176;' },
+        { key: 'minerals', label: this.getLayerLabel('minerals'), icon: '&#128142;' },
       ];
 
     toggles.innerHTML = `
       <div class="toggle-header">
-        <span>${t('components.deckgl.layersTitle')}</span>
-        <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
+        <span>${layersTitle}</span>
+        <button class="layer-help-btn" title="${layerGuideTitle}">?</button>
         <button class="toggle-collapse">&#9660;</button>
       </div>
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
@@ -4912,7 +5118,7 @@ export class DeckGLMap {
           <label class="layer-toggle" data-layer="${key}">
             <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}>
             <span class="toggle-icon">${icon}</span>
-            <span class="toggle-label">${label}</span>
+            <span class="toggle-label">${escapeHtml(label)}</span>
           </label>
         `).join('')}
       </div>
@@ -4966,20 +5172,20 @@ export class DeckGLMap {
     const popup = document.createElement('div');
     popup.className = 'layer-help-popup';
 
-    const label = (layerKey: string): string => t(`components.deckgl.layers.${layerKey}`).toUpperCase();
-    const staticLabel = (labelKey: string): string => t(`components.deckgl.layerHelp.labels.${labelKey}`).toUpperCase();
+    const label = (layerKey: string): string => escapeHtml(this.getLayerLabel(layerKey).toUpperCase());
+    const staticLabel = (labelKey: string): string => escapeHtml(this.getLayerHelpLabel(labelKey).toUpperCase());
     const helpItem = (layerLabel: string, descriptionKey: string): string =>
-      `<div class="layer-help-item"><span>${layerLabel}</span> ${t(`components.deckgl.layerHelp.descriptions.${descriptionKey}`)}</div>`;
+      `<div class="layer-help-item"><span>${layerLabel}</span> ${escapeHtml(this.getLayerHelpText('description', descriptionKey))}</div>`;
     const helpSection = (titleKey: string, items: string[], noteKey?: string): string => `
       <div class="layer-help-section">
-        <div class="layer-help-title">${t(`components.deckgl.layerHelp.sections.${titleKey}`)}</div>
+        <div class="layer-help-title">${escapeHtml(this.getLayerHelpText('section', titleKey))}</div>
         ${items.join('')}
-        ${noteKey ? `<div class="layer-help-note">${t(`components.deckgl.layerHelp.notes.${noteKey}`)}</div>` : ''}
+        ${noteKey ? `<div class="layer-help-note">${escapeHtml(this.getLayerHelpText('note', noteKey))}</div>` : ''}
       </div>
     `;
     const helpHeader = `
       <div class="layer-help-header">
-        <span>${t('components.deckgl.layerHelp.title')}</span>
+        <span>${escapeHtml(this.getLayerHelpText('title', 'title'))}</span>
         <button class="layer-help-close">×</button>
       </div>
     `;
@@ -5127,19 +5333,19 @@ export class DeckGLMap {
     const isLight = getCurrentTheme() === 'light';
     const legendItems = SITE_VARIANT === 'tech'
       ? [
-          { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: t('components.deckgl.legend.startupHub') },
-          { shape: shapes.circle('rgb(100, 200, 255)'), label: t('components.deckgl.legend.techHQ') },
-          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: t('components.deckgl.legend.accelerator') },
-          { shape: shapes.circle('rgb(150, 100, 255)'), label: t('components.deckgl.legend.cloudRegion') },
-          { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
+          { shape: shapes.circle(isLight ? 'rgb(22, 163, 74)' : 'rgb(0, 255, 150)'), label: this.getLegendLabel('startupHub') },
+          { shape: shapes.circle('rgb(100, 200, 255)'), label: this.getLegendLabel('techHQ') },
+          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 200, 0)'), label: this.getLegendLabel('accelerator') },
+          { shape: shapes.circle('rgb(150, 100, 255)'), label: this.getLegendLabel('cloudRegion') },
+          { shape: shapes.square('rgb(136, 68, 255)'), label: this.getLegendLabel('datacenter') },
         ]
       : SITE_VARIANT === 'finance'
       ? [
-          { shape: shapes.circle('rgb(255, 215, 80)'), label: t('components.deckgl.legend.stockExchange') },
-          { shape: shapes.circle('rgb(0, 220, 150)'), label: t('components.deckgl.legend.financialCenter') },
-          { shape: shapes.hexagon('rgb(255, 210, 80)'), label: t('components.deckgl.legend.centralBank') },
-          { shape: shapes.square('rgb(255, 150, 80)'), label: t('components.deckgl.legend.commodityHub') },
-          { shape: shapes.triangle('rgb(80, 170, 255)'), label: t('components.deckgl.legend.waterway') },
+          { shape: shapes.circle('rgb(255, 215, 80)'), label: this.getLegendLabel('stockExchange') },
+          { shape: shapes.circle('rgb(0, 220, 150)'), label: this.getLegendLabel('financialCenter') },
+          { shape: shapes.hexagon('rgb(255, 210, 80)'), label: this.getLegendLabel('centralBank') },
+          { shape: shapes.square('rgb(255, 150, 80)'), label: this.getLegendLabel('commodityHub') },
+          { shape: shapes.triangle('rgb(80, 170, 255)'), label: this.getLegendLabel('waterway') },
         ]
       : SITE_VARIANT === 'happy'
       ? [
@@ -5152,17 +5358,17 @@ export class DeckGLMap {
           { shape: shapes.circle('rgb(255, 200, 50)'), label: 'Renewable Installation' },
         ]
       : [
-          { shape: shapes.circle('rgb(255, 68, 68)'), label: t('components.deckgl.legend.highAlert') },
-          { shape: shapes.circle('rgb(255, 165, 0)'), label: t('components.deckgl.legend.elevated') },
-          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 255, 0)'), label: t('components.deckgl.legend.monitoring') },
-          { shape: shapes.triangle('rgb(68, 136, 255)'), label: t('components.deckgl.legend.base') },
-          { shape: shapes.hexagon(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 220, 0)'), label: t('components.deckgl.legend.nuclear') },
-          { shape: shapes.square('rgb(136, 68, 255)'), label: t('components.deckgl.legend.datacenter') },
+          { shape: shapes.circle('rgb(255, 68, 68)'), label: this.getLegendLabel('highAlert') },
+          { shape: shapes.circle('rgb(255, 165, 0)'), label: this.getLegendLabel('elevated') },
+          { shape: shapes.circle(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 255, 0)'), label: this.getLegendLabel('monitoring') },
+          { shape: shapes.triangle('rgb(68, 136, 255)'), label: this.getLegendLabel('base') },
+          { shape: shapes.hexagon(isLight ? 'rgb(180, 120, 0)' : 'rgb(255, 220, 0)'), label: this.getLegendLabel('nuclear') },
+          { shape: shapes.square('rgb(136, 68, 255)'), label: this.getLegendLabel('datacenter') },
         ];
 
     legend.innerHTML = `
-      <span class="legend-label-title">${t('components.deckgl.legend.title')}</span>
-      ${legendItems.map(({ shape, label }) => `<span class="legend-item">${shape}<span class="legend-label">${label}</span></span>`).join('')}
+      <span class="legend-label-title">${escapeHtml(this.getLegendLabel('title'))}</span>
+      ${legendItems.map(({ shape, label }) => `<span class="legend-item">${shape}<span class="legend-label">${escapeHtml(label)}</span></span>`).join('')}
     `;
 
     this.container.appendChild(legend);

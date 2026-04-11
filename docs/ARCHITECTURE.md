@@ -4,9 +4,32 @@ This document describes the current main-branch architecture of Lattice Current.
 
 ## System identity
 
-The repository is now a signal-first decision-support workspace.
+The repository is now a theme-led signal intelligence workspace.
 
-It is not organized around a single autonomous trading engine. Replay, walk-forward evaluation, and portfolio accounting remain in the codebase, but they serve as validation and calibration layers for signal quality rather than as the primary product surface.
+It is not organized around a single autonomous trading engine or a standalone
+globe application. Replay, walk-forward evaluation, portfolio accounting,
+theme tracking, and live intake remain in the codebase, but they are arranged
+around one operator shell and one decision loop.
+
+## Operator shell
+
+The canonical root surface is now `event-dashboard.html`, and `/` redirects
+there. The old main page is retired from the user entry flow.
+
+The theme shell absorbs these operator surfaces in one place:
+
+- live signal intake and first-pass interpretation
+- evidence-backed theme briefs
+- followed themes and structural alerts
+- proposal inbox and approval execution
+- compact validation and market snapshots
+- runtime, source health, and diagnostics
+
+The map remains part of the product, but the globe is no longer the default
+identity. The active path is now a flat 2D map lens (`event-map-lens.html`
+backed by `src/theme-map-lens.ts`) that keeps legacy risk-region,
+infrastructure, and event overlays available inside the shell without reviving
+the globe-first UI.
 
 ## Major planes
 
@@ -46,6 +69,17 @@ Above the canonical event layer, the system builds:
 
 This layer is intended to support human judgment, not replace it.
 
+The embedded theme workspace is synchronized with the shell through a
+`postMessage` bridge so that selected theme, period, and workspace context stay
+aligned without URL polling or full iframe churn.
+
+The same theme shell also acts as the operator review surface for:
+
+- Codex proposals that can now be accepted or rejected in place
+- human approval queue items that can execute once accepted
+- compact risk, macro, investment, and validation snapshots served through a shared API payload
+- system health, data quality, and Codex quality diagnostics that used to live outside the main operator path
+
 ### 4. Validation layer
 
 Replay, walk-forward, historical storage, and portfolio accounting live here.
@@ -70,9 +104,13 @@ The storage model is now:
 
 The runtime model is:
 
-- web app for public and operator-facing surfaces
-- desktop app with sidecar for local services and storage-aware workflows
+- web app for operator-facing surfaces
+- desktop app with a lazy-started sidecar for local services and storage-aware workflows
 - docs site as public product and technical reference surface
+
+Hidden workspaces are expected to stay cheap. Panel refreshes should be gated
+by active workspace visibility rather than by whether a panel object has been
+constructed.
 
 ## Practical architectural rules
 
@@ -81,6 +119,8 @@ The runtime model is:
 - "Stored in NAS" does not mean "usable in replay".
 - Signal generation must be verified end to end: collect -> store -> load -> frame -> signal.
 - Replay and walk-forward are downstream validation tools, not the product identity of the branch.
+- Source bundles belong in the source drawer unless they directly support the operator loop.
+- Desktop startup should not eagerly spawn heavy background automation.
 
 ## What was removed from the main branch
 

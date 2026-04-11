@@ -5,7 +5,10 @@ import {
   buildArticleRecord,
   buildArxivQuery,
   extractArxivEntries,
+  initializeArxivState,
+  normalizeCategories,
   parseArgs,
+  shouldResetArxivResume,
 } from '../scripts/fetch-arxiv-archive.mjs';
 
 test('fetch-arxiv-archive parseArgs applies defaults and overrides', () => {
@@ -21,7 +24,12 @@ test('fetch-arxiv-archive parseArgs applies defaults and overrides', () => {
 });
 
 test('fetch-arxiv-archive builds OR query from categories', () => {
-  assert.equal(buildArxivQuery(['cs.AI', 'cs.LG']), 'cat:cs.AI+OR+cat:cs.LG');
+  assert.equal(buildArxivQuery(['cs.AI', 'cs.LG']), 'cat:cs.AI OR cat:cs.LG');
+});
+
+test('fetch-arxiv-archive normalizes categories before building query', () => {
+  assert.deepEqual(normalizeCategories(['cs.LG', 'cs.AI', 'cs.LG', '']), ['cs.AI', 'cs.LG']);
+  assert.equal(buildArxivQuery(['cs.LG', 'cs.AI', 'cs.LG']), 'cat:cs.AI OR cat:cs.LG');
 });
 
 test('fetch-arxiv-archive extracts normalized entries from arxiv atom feed', () => {
@@ -60,4 +68,41 @@ test('fetch-arxiv-archive builds normalized article records', () => {
   assert.equal(record.theme, 'emerging-tech');
   assert.match(record.summary, /New photonic model/);
   assert.match(record.summary, /categories cs\.AI, cs\.LG/);
+});
+
+test('fetch-arxiv-archive resets resume when query config changes', () => {
+  const previousState = {
+    stateVersion: 1,
+    since: '2021-01-01',
+    categories: ['cs.AI'],
+    lastProcessedOffset: 800,
+  };
+  assert.equal(shouldResetArxivResume({ since: '2021-01-01', categories: ['cs.AI'] }, previousState), true);
+
+  const nextState = initializeArxivState(
+    { since: '2021-01-01', categories: ['cs.LG', 'cs.AI'], batchSize: 100 },
+    {
+      stateVersion: 2,
+      since: '2021-01-01',
+      categories: ['cs.AI'],
+      lastProcessedOffset: 800,
+    },
+  );
+  assert.equal(nextState.resumeReset, true);
+  assert.equal(nextState.lastProcessedOffset, 0);
+});
+
+test('fetch-arxiv-archive resumes from next offset when config matches', () => {
+  const state = initializeArxivState(
+    { since: '2021-01-01', categories: ['cs.AI', 'cs.LG'], batchSize: 100 },
+    {
+      stateVersion: 2,
+      since: '2021-01-01',
+      categories: ['cs.LG', 'cs.AI'],
+      lastProcessedOffset: 900,
+    },
+  );
+  assert.equal(state.resumeReset, false);
+  assert.equal(state.resumeFromOffset, 900);
+  assert.equal(state.lastProcessedOffset, 900);
 });

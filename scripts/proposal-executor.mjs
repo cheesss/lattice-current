@@ -28,6 +28,8 @@ const RESULTS_PATH = path.resolve('data', 'executor-results.json');
 const BACKFILL_LOG_DIR = path.resolve('data', 'backfill-logs');
 const MAX_RETRIES = Math.max(1, Number(process.env.PROPOSAL_EXECUTOR_MAX_RETRIES || 2));
 
+export const FINAL_PROPOSAL_STATUSES = new Set(['executed', 'rejected', 'skipped', 'dead']);
+
 function getPgConfig() {
   return resolveNasPgConfig();
 }
@@ -115,7 +117,7 @@ async function ensureProposalTable(client) {
   await ensureCodexProposalSchema(client);
 }
 
-async function ensureExecutorSchema(client) {
+export async function ensureExecutorSchema(client) {
   await ensureProposalTable(client);
   await ensureAutomationSchema(client);
 }
@@ -195,17 +197,8 @@ async function main() {
         result: status,
         reason: result?.reason || result?.summary || '',
       });
-      const dbStatus = DRY_RUN
-        ? 'dry-run'
-        : result?.pendingApproval
-          ? 'pending-approval'
-          : result?.skipped
-            ? 'skipped'
-            : 'executed';
-      await client.query(
-        'UPDATE codex_proposals SET status = $1, result = $2, executed_at = NOW() WHERE id = $3',
-        [dbStatus, JSON.stringify(result), proposal._dbId],
-      );
+      const dbStatus = deriveProposalExecutionStatus(result, { dryRun: DRY_RUN });
+      await updateProposalExecutionState(client, proposal._dbId, dbStatus, result);
       console.log(`  OK ${result.summary || result.reason || 'Done'}`);
     } catch (error) {
       const message = String(error?.message || error || 'proposal execution failed');
@@ -220,13 +213,11 @@ async function main() {
         result: 'failed',
         reason: message,
       });
-      await client.query(
-        'UPDATE codex_proposals SET status = $1, result = $2, executed_at = NOW() WHERE id = $3',
-        [
-          failure.movedToDeadQueue ? 'dead' : 'failed',
-          JSON.stringify({ error: message, ...failure }),
-          proposal._dbId,
-        ],
+      await updateProposalExecutionState(
+        client,
+        proposal._dbId,
+        failure.movedToDeadQueue ? 'dead' : 'failed',
+        { error: message, ...failure },
       );
       console.log(`  FAIL ${message} (retry ${failure.retryCount}/${MAX_RETRIES})`);
     }
@@ -240,7 +231,121 @@ async function main() {
   await client.end();
 }
 
-async function executeProposal(client, proposal, options = {}) {
+export function deriveProposalExecutionStatus(result, { dryRun = false } = {}) {
+  if (dryRun) return 'dry-run';
+  if (result?.pendingApproval) return 'pending-approval';
+  if (result?.skipped) return 'skipped';
+  return 'executed';
+}
+
+export async function updateProposalExecutionState(client, proposalId, status, result) {
+  if (!proposalId) return;
+  await client.query(
+    'UPDATE codex_proposals SET status = $1, result = $2, executed_at = NOW() WHERE id = $3',
+    [status, JSON.stringify(result ?? null), proposalId],
+  );
+}
+
+export async function loadProposalById(client, proposalId) {
+  const normalizedId = Number(proposalId);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return null;
+  const { rows } = await client.query(
+    `
+      SELECT id, proposal_type, payload, status, result, reasoning, source, created_at, executed_at
+      FROM codex_proposals
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [normalizedId],
+  );
+  return rows[0] || null;
+}
+
+export async function reviewCodexProposalById(client, proposalId, decision, options = {}) {
+  await ensureExecutorSchema(client);
+  const row = await loadProposalById(client, proposalId);
+  if (!row) {
+    throw new Error(`Proposal ${proposalId} not found`);
+  }
+
+  const normalizedDecision = String(decision || '').trim().toLowerCase();
+  const reviewer = String(options.reviewer || 'dashboard-ui').slice(0, 120);
+  if (!['accept', 'reject'].includes(normalizedDecision)) {
+    throw new Error(`Unsupported proposal decision: ${decision}`);
+  }
+
+  const currentStatus = String(row.status || '').trim().toLowerCase();
+  if (FINAL_PROPOSAL_STATUSES.has(currentStatus)) {
+    return {
+      proposal: row,
+      status: currentStatus,
+      result: row.result || null,
+      alreadyFinal: true,
+    };
+  }
+
+  if (normalizedDecision === 'reject') {
+    const result = {
+      decision: 'reject',
+      reviewer,
+      reviewedAt: new Date().toISOString(),
+      reason: String(options.reason || 'Rejected in proposal inbox'),
+      skipped: true,
+    };
+    await updateProposalExecutionState(client, row.id, 'rejected', result);
+    return {
+      proposal: row,
+      status: 'rejected',
+      result,
+      alreadyFinal: false,
+    };
+  }
+
+  const proposal = {
+    ...(row.payload && typeof row.payload === 'object' ? row.payload : {}),
+    _dbId: row.id,
+    type: row.proposal_type,
+    human_approved: true,
+  };
+
+  try {
+    const result = await executeProposal(client, proposal, {
+      dryRun: Boolean(options.dryRun),
+      humanApproved: true,
+    });
+    const dbStatus = deriveProposalExecutionStatus(result, {
+      dryRun: Boolean(options.dryRun),
+    });
+    await updateProposalExecutionState(client, row.id, dbStatus, {
+      reviewer,
+      reviewedAt: new Date().toISOString(),
+      ...result,
+    });
+    return {
+      proposal: row,
+      status: dbStatus,
+      result,
+      alreadyFinal: false,
+    };
+  } catch (error) {
+    const message = String(error?.message || error || 'proposal execution failed');
+    const failure = onProposalFailed(proposal, message);
+    await updateProposalExecutionState(
+      client,
+      row.id,
+      failure.movedToDeadQueue ? 'dead' : 'failed',
+      {
+        reviewer,
+        reviewedAt: new Date().toISOString(),
+        error: message,
+        ...failure,
+      },
+    );
+    throw error;
+  }
+}
+
+export async function executeProposal(client, proposal, options = {}) {
   if (options.dryRun && proposal.type !== 'backfill-source') {
     return {
       dryRun: true,
@@ -252,6 +357,7 @@ async function executeProposal(client, proposal, options = {}) {
     case 'add-symbol': return handleAddSymbol(client, proposal, options);
     case 'add-rss': return handleAddRss(client, proposal, options);
     case 'add-theme': return handleAddTheme(client, proposal, options);
+    case 'attach-theme': return handleAttachTheme(client, proposal, options);
     case 'validate': return handleValidate(client, proposal, options);
     case 'remove-symbol': return handleRemoveSymbol(client, proposal, options);
     case 'add-conditional-sensitivity': return handleAddConditionalSensitivity(client, proposal, options);
@@ -609,7 +715,9 @@ async function handleAddRss(client, proposal) {
 }
 
 async function handleAddTheme(client, proposal) {
-  const { id, triggers, symbols } = proposal;
+  const { id, triggers } = proposal;
+  const symbols = Array.isArray(proposal?.symbols) ? proposal.symbols : [];
+  const assets = Array.isArray(proposal?.assets) ? proposal.assets : [];
   if (!id || !triggers?.length) throw new Error('Missing theme id or triggers');
 
   const triggerCondition = triggers.map((_, index) => `title ILIKE $${index + 1}`).join(' OR ');
@@ -625,20 +733,25 @@ async function handleAddTheme(client, proposal) {
     `, [row.id, id]);
   }
 
-  if (symbols?.length) {
-    for (const sym of symbols) {
-      const symbol = typeof sym === 'string' ? sym : sym.symbol;
+  const resolvedSymbols = [
+    ...symbols,
+    ...assets,
+  ]
+    .map((sym) => (typeof sym === 'string' ? sym : sym?.symbol))
+    .filter(Boolean);
+
+  if (resolvedSymbols.length) {
+    for (const symbol of resolvedSymbols) {
       if (!symbol) continue;
       await client.query(`
-        INSERT INTO auto_theme_symbols (theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
-        VALUES ($1, $2, 0, 0, 1.0, 'codex-theme-proposal')
-        ON CONFLICT (theme, symbol) DO NOTHING
+          INSERT INTO auto_theme_symbols (theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
+          VALUES ($1, $2, 0, 0, 1.0, 'codex-theme-proposal')
+          ON CONFLICT (theme, symbol) DO NOTHING
       `, [id, symbol]);
     }
   }
 
   // --- Backfill labeled_outcomes for every matched article × symbol × horizon ---
-  const resolvedSymbols = (symbols || []).map((sym) => typeof sym === 'string' ? sym : sym.symbol).filter(Boolean);
   let outcomeCount = 0;
 
   for (const row of matched.rows) {
@@ -701,6 +814,32 @@ async function handleAddTheme(client, proposal) {
     themeId: id,
     matchedArticles: matched.rows.length,
     outcomeCount,
+  };
+}
+
+async function handleAttachTheme(client, proposal) {
+  const targetTheme = String(proposal?.targetTheme || '').trim().toLowerCase();
+  const attachmentKey = String(proposal?.attachmentKey || '').trim().toLowerCase();
+  const label = String(proposal?.label || proposal?.name || attachmentKey || '').trim();
+  if (!targetTheme || !attachmentKey) throw new Error('Missing targetTheme or attachmentKey');
+
+  const symbols = Array.isArray(proposal?.symbols) ? proposal.symbols : [];
+  const assets = Array.isArray(proposal?.assets) ? proposal.assets : [];
+  const resolvedSymbols = [
+    ...symbols,
+    ...assets,
+  ]
+    .map((sym) => (typeof sym === 'string' ? sym : sym?.symbol))
+    .filter(Boolean);
+
+  return {
+    summary: `Attachment ${attachmentKey} recorded for ${targetTheme} with ${resolvedSymbols.length} symbol${resolvedSymbols.length === 1 ? '' : 's'}.`,
+    targetTheme,
+    attachmentKey,
+    label,
+    symbolCount: resolvedSymbols.length,
+    relationType: proposal?.relationType || null,
+    transmissionOrder: proposal?.transmissionOrder || null,
   };
 }
 

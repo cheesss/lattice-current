@@ -9,6 +9,8 @@ import { runCodexJsonPrompt } from './_shared/codex-json.mjs';
 loadOptionalEnvFile();
 
 const { Client } = pg;
+const CODEX_REPORT_TIMEOUT_MS = 35_000;
+const CODEX_REPORT_CONCURRENCY = 2;
 
 export function parseArgs(argv = process.argv.slice(2)) {
   const parsed = {
@@ -98,7 +100,26 @@ export function normalizeTechReportPayload(raw = {}, topic = {}, relatedSymbols 
 function buildPrompt(topic, articles, relatedSymbols) {
   return [
     'You are generating an operator-facing emerging-technology tracking note.',
-    'Return strict JSON only with this schema:',
+    'This is a monitoring memo, not a trading call.',
+    '',
+    'Write the thesis as a compact operator brief with this structure:',
+    '1. What changed recently',
+    '2. Why this topic matters now',
+    '3. What evidence supports continued monitoring',
+    '4. What should trigger the next review',
+    '',
+    'Rules:',
+    '- Ground the note in the supplied topic metrics, articles, and related symbols only.',
+    '- Be explicit about uncertainty when evidence is weak.',
+    '- tracking_score should reflect monitoring priority, not price upside.',
+    '- next_review_days should be shorter for fast-moving topics and longer for weak/noisy topics.',
+    '',
+    'Output rules:',
+    '- Return strict JSON only.',
+    '- Do not include markdown or commentary outside JSON.',
+    '- The response must match this schema exactly.',
+    '',
+    'Schema:',
     '{',
     '  "investment_thesis": "3-5 sentence tracking thesis focused on why the topic matters now",',
     '  "tracking_score": 0,',
@@ -239,6 +260,23 @@ async function insertTechReport(client, topic, reportPayload, context, generatio
   };
 }
 
+async function mapWithConcurrency(items, limit, iteratee) {
+  const numericLimit = Math.max(1, Math.floor(Number(limit) || 1));
+  const results = new Array(items.length);
+  let index = 0;
+
+  async function worker() {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      results[current] = await iteratee(items[current], current);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(numericLimit, items.length) }, () => worker()));
+  return results;
+}
+
 export async function runTechReportGeneration(options = {}) {
   const config = { ...parseArgs([]), ...options };
   const client = new Client(resolveNasPgConfig());
@@ -247,15 +285,26 @@ export async function runTechReportGeneration(options = {}) {
     await ensureEmergingTechSchema(client);
     const topics = await loadTopics(client, config);
     const reports = [];
-
+    const topicContexts = [];
     for (const topic of topics) {
       const context = await loadTopicContext(client, topic.id, topic.parent_theme);
+      topicContexts.push({ topic, context });
+    }
+
+    const prepared = await mapWithConcurrency(topicContexts, CODEX_REPORT_CONCURRENCY, async ({ topic, context }) => {
       let normalized = null;
       let generationMode = 'deterministic';
 
       if (!config.codexOnly || context.articles.length > 0) {
-        const response = await runCodexJsonPrompt(buildPrompt(topic, context.articles, context.relatedSymbols));
-        if (response.code === 0 && response.parsed) {
+        const response = await runCodexJsonPrompt(
+          buildPrompt(topic, context.articles, context.relatedSymbols),
+          CODEX_REPORT_TIMEOUT_MS,
+          {
+            label: 'generate-tech-report',
+            topicId: topic.id,
+          },
+        );
+        if (response.parsed) {
           const candidate = normalizeTechReportPayload(response.parsed, topic, context.relatedSymbols);
           if (candidate.investmentThesis) {
             normalized = candidate;
@@ -265,7 +314,7 @@ export async function runTechReportGeneration(options = {}) {
       }
 
       if (!normalized) {
-        if (config.codexOnly) continue;
+        if (config.codexOnly) return null;
         normalized = normalizeTechReportPayload({
           investment_thesis: buildDeterministicTechThesis(topic, context.articles, context.relatedSymbols),
           tracking_score: computeTrackingScore(topic, context.relatedSymbols),
@@ -273,7 +322,12 @@ export async function runTechReportGeneration(options = {}) {
         }, topic, context.relatedSymbols);
       }
 
-      reports.push(await insertTechReport(client, topic, normalized, context, generationMode));
+      return { topic, context, normalized, generationMode };
+    });
+
+    for (const entry of prepared) {
+      if (!entry?.normalized) continue;
+      reports.push(await insertTechReport(client, entry.topic, entry.normalized, entry.context, entry.generationMode));
     }
 
     return {

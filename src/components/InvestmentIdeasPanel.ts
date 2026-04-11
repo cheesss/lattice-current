@@ -191,7 +191,15 @@ export class InvestmentIdeasPanel extends Panel {
                   ${escapeHtml(card.title)}
                 </button>
               </h4>
-              <div class="investment-card-meta-line">${escapeHtml(card.direction.toUpperCase())} | conviction ${card.conviction} | false-positive ${card.falsePositiveRisk}</div>
+              <div class="investment-card-meta-line">
+                ${escapeHtml(card.direction.toUpperCase())} | conviction ${card.conviction} | false-positive ${card.falsePositiveRisk}
+                ${card.evidenceGrade ? ` | <span class="evidence-grade evidence-grade-${card.evidenceGrade}">${card.evidenceGrade}</span>` : ''}
+              </div>
+              <div class="investment-card-meta-line">
+                ${typeof card.alphaProb === 'number' ? `P(alpha>0): ${(card.alphaProb * 100).toFixed(0)}% | ` : ''}
+                ${typeof card.expectedAlpha === 'number' ? `E[alpha]: ${card.expectedAlpha >= 0 ? '+' : ''}${card.expectedAlpha.toFixed(2)}% | ` : ''}
+                ${typeof card.downsideRisk === 'number' ? `Downside: ${card.downsideRisk.toFixed(2)}%` : ''}
+              </div>
               <div class="investment-card-meta-line">Suggested size ${card.sizePct.toFixed(2)}% | timeframe ${escapeHtml(card.timeframe)}</div>
               ${matchingRule ? `<div class="investment-card-meta-line">Rule: ${escapeHtml(matchingRule.label)} | stop ${matchingRule.stopLossPct}% | take ${matchingRule.takeProfitPct}%</div>` : ''}
               ${trackingLine}

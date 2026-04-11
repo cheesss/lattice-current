@@ -49,6 +49,7 @@ export interface CalibrationDiagnostic {
 
 const MAX_LOG_ENTRIES = 200;
 let _log: PipelineLogEntry[] = [];
+const runtimeLogger = createLogger('pipeline');
 
 export function logPipelineEvent(
   stage: string,
@@ -68,9 +69,9 @@ export function logPipelineEvent(
 
   // Also emit to console for dev/debug
   if (level === 'error') {
-    console.error(`[pipeline:${stage}] ${message}`, meta?.context ?? '');
+    runtimeLogger.error(`${stage}: ${message}`, meta?.context);
   } else if (level === 'warn') {
-    console.warn(`[pipeline:${stage}] ${message}`, meta?.context ?? '');
+    runtimeLogger.warn(`${stage}: ${message}`, meta?.context);
   }
 }
 
@@ -134,3 +135,4 @@ export function getPipelineMetrics(): PipelineMetrics {
     stageMetrics,
   };
 }
+import { createLogger } from '@/utils/logger';

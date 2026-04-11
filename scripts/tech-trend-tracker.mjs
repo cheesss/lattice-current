@@ -19,23 +19,36 @@
 import pg from 'pg';
 import { writeFileSync } from 'fs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+import {
+  THEME_TAXONOMY_VERSION,
+  TREND_AGGREGATION_PERIODS,
+  listTrendTrackerThemes,
+} from './_shared/theme-taxonomy.mjs';
 
 loadOptionalEnvFile();
 const { Client } = pg;
 const PG_CONFIG = resolveNasPgConfig();
 
-const TECH_TOPICS = {
-  'AI/LLM': { keywords: ['AI', 'artificial intelligence', 'machine learning', 'GPT', 'ChatGPT', 'LLM', 'neural network', 'deep learning', 'OpenAI', 'generative'], symbols: ['NVDA', 'AMD', 'MSFT', 'GOOGL', 'SMH'] },
-  'Semiconductor': { keywords: ['semiconductor', 'chip', 'chipmaker', 'TSMC', 'NVIDIA', 'AMD', 'foundry', 'wafer', 'lithography', 'ASML'], symbols: ['SMH', 'SOXX', 'NVDA', 'AMD', 'AVGO'] },
-  'EV/Battery': { keywords: ['electric vehicle', 'EV', 'battery', 'lithium', 'Tesla', 'charging', 'BYD', 'solid-state battery'], symbols: ['QQQ', 'XLE'] },
-  'Nuclear/Fusion': { keywords: ['nuclear', 'fusion', 'SMR', 'modular reactor', 'uranium', 'fission', 'ITER', 'tokamak'], symbols: ['XLE', 'UNG'] },
-  'Cyber Security': { keywords: ['cyber', 'ransomware', 'hack', 'data breach', 'cybersecurity', 'zero-day', 'malware', 'phishing'], symbols: ['CIBR', 'CRWD'] },
-  'Space/Satellite': { keywords: ['SpaceX', 'satellite', 'orbit', 'space station', 'rocket', 'launch', 'NASA', 'lunar'], symbols: ['ITA'] },
-  'Biotech/Gene': { keywords: ['biotech', 'CRISPR', 'gene therapy', 'mRNA', 'vaccine', 'clinical trial', 'FDA approval', 'genomic'], symbols: ['QQQ'] },
-  'Crypto/Blockchain': { keywords: ['blockchain', 'crypto', 'bitcoin', 'ethereum', 'DeFi', 'NFT', 'Web3', 'stablecoin'], symbols: ['QQQ', 'SPY'] },
-  'Renewable Energy': { keywords: ['solar', 'wind energy', 'renewable', 'green energy', 'clean energy', 'carbon capture', 'hydrogen', 'fuel cell'], symbols: ['XLE', 'USO'] },
-  'Drone/Robotics': { keywords: ['drone', 'robot', 'autonomous', 'self-driving', 'automation', 'unmanned', 'UAV', 'lidar'], symbols: ['ITA', 'QQQ'] },
-};
+function buildTrackedTopics() {
+  return listTrendTrackerThemes()
+    .map((theme) => ({
+      key: theme.key,
+      name: theme.label,
+      aliases: [...new Set([theme.key, theme.label, ...(theme.aliases || [])])],
+      category: theme.category,
+      parentTheme: theme.parentTheme || null,
+      lifecycleHint: theme.lifecycleHint || null,
+      keywords: [...new Set(theme.keywords || [])],
+      symbols: [...new Set(theme.representativeSymbols || [])],
+    }))
+    .filter((topic) => topic.keywords.length > 0);
+}
+
+function matchesTopicFilter(topic, rawFilter) {
+  if (!rawFilter) return true;
+  const normalizedFilter = String(rawFilter).trim().toLowerCase();
+  return topic.aliases.some((alias) => String(alias).toLowerCase().includes(normalizedFilter));
+}
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -52,13 +65,27 @@ async function main() {
   const client = new Client(PG_CONFIG);
   await client.connect();
 
-  const report = { generatedAt: new Date().toISOString(), topics: [], surges: [], discovery: null };
+  const trackedTopics = buildTrackedTopics();
+  const report = {
+    generatedAt: new Date().toISOString(),
+    taxonomyVersion: THEME_TAXONOMY_VERSION,
+    supportedPeriods: TREND_AGGREGATION_PERIODS,
+    topics: [],
+    surges: [],
+    discovery: null,
+  };
 
   // ═══ 1. Topic Trend Analysis ═══
   console.log('▶ 1. 기술 주제별 트렌드 분석...\n');
 
-  for (const [topicName, config] of Object.entries(TECH_TOPICS)) {
-    if (opts.topic && !topicName.toLowerCase().includes(opts.topic.toLowerCase())) continue;
+  for (const topic of trackedTopics) {
+    if (!matchesTopicFilter(topic, opts.topic)) continue;
+
+    const topicName = topic.name;
+    const config = {
+      keywords: topic.keywords,
+      symbols: topic.symbols,
+    };
 
     const kwCondition = config.keywords.map((_, i) => `title ILIKE $${i + 1}`).join(' OR ');
     const kwParams = config.keywords.map(kw => `%${kw}%`);
@@ -117,7 +144,11 @@ async function main() {
     }
 
     const topicData = {
+      key: topic.key,
       name: topicName,
+      category: topic.category,
+      parentTheme: topic.parentTheme,
+      lifecycleHint: topic.lifecycleHint,
       totalArticles,
       avgMonthly: Number(avgMonthly.toFixed(1)),
       recentMonthlyAvg: Number(recentAvg.toFixed(1)),

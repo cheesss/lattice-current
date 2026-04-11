@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseArgs as parseAutoPipelineArgs } from '../scripts/auto-pipeline.mjs';
+import {
+  buildAutoThemeRecord,
+  parseArgs as parseAutoPipelineArgs,
+} from '../scripts/auto-pipeline.mjs';
 import { scoreThemeSymbolMappings } from '../scripts/_shared/theme-symbol-quality.mjs';
 
 test('auto-pipeline accepts repeated --step arguments', () => {
@@ -29,4 +32,21 @@ test('generic high-volatility symbols are penalized without symbol-specific hack
   assert.equal(nvdaTech.eligible, true);
   assert.ok(bdryConflict.generic_penalty > nvdaTech.generic_penalty);
   assert.ok(nvdaTech.quality_score > bdryConflict.quality_score);
+});
+
+test('auto-pipeline stores canonical taxonomy theme while preserving legacy source theme', () => {
+  const record = buildAutoThemeRecord({
+    article_id: 42,
+    title: 'IBM ships a new quantum computing system with improved error correction',
+    source: 'reuters',
+    keywords: ['quantum computing', 'qubit', 'error correction'],
+    best_theme: 'tech',
+    best_sim: 0.84,
+  });
+
+  assert.equal(record.sourceTheme, 'tech');
+  assert.equal(record.autoTheme, 'quantum-computing');
+  assert.equal(record.themeKey, 'quantum-computing');
+  assert.equal(record.parentTheme, 'technology-general');
+  assert.equal(record.themeCategory, 'technology');
 });

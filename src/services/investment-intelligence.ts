@@ -65,8 +65,10 @@ export {
 } from './investment/diagnostics';
 export {
   getInvestmentIntelligenceSnapshot,
+  hydratePersistedExperimentRegistry,
   getUniverseExpansionPolicy,
   setUniverseExpansionPolicyMode,
+  syncExperimentRegistrySnapshot,
   listCandidateExpansionReviews,
   setCandidateExpansionReviewStatus,
   getInvestmentThemeDefinition,

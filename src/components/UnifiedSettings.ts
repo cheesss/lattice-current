@@ -1,5 +1,5 @@
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
-import { PANEL_CATEGORY_MAP } from '@/config/panels';
+import { PANEL_CATEGORY_MAP, isSourceDrawerOnlyPanelKey } from '@/config/panels';
 import { SITE_VARIANT } from '@/config/variant';
 import { LANGUAGES, changeLanguage, getCurrentLanguage, t } from '@/services/i18n';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
@@ -709,9 +709,11 @@ export class UnifiedSettings {
 
     for (const [catKey, catDef] of Object.entries(PANEL_CATEGORY_MAP)) {
       if (catDef.variants && !catDef.variants.includes(variant)) continue;
-      const hasPanel = catDef.panelKeys.some(pk => panelKeys.has(pk));
+      const hasPanel = catDef.panelKeys.some((pk) =>
+        panelKeys.has(pk) && !isSourceDrawerOnlyPanelKey(pk)
+      );
       if (hasPanel) {
-        categories.push({ key: catKey, label: t(catDef.labelKey) });
+        categories.push({ key: catKey, label: catDef.label || (catDef.labelKey ? t(catDef.labelKey) : catKey) });
       }
     }
 
@@ -722,12 +724,12 @@ export class UnifiedSettings {
     const panelSettings = this.config.getPanelSettings();
     const variant = SITE_VARIANT || 'full';
     let entries = Object.entries(panelSettings)
-      .filter(([key]) => key !== 'runtime-config' || this.config.isDesktopApp);
+      .filter(([key]) => (key !== 'runtime-config' || this.config.isDesktopApp) && !isSourceDrawerOnlyPanelKey(key));
 
     if (this.activePanelCategory !== 'all') {
       const catDef = PANEL_CATEGORY_MAP[this.activePanelCategory];
       if (catDef && (!catDef.variants || catDef.variants.includes(variant))) {
-        const allowed = new Set(catDef.panelKeys);
+        const allowed = new Set(catDef.panelKeys.filter((key) => !isSourceDrawerOnlyPanelKey(key)));
         entries = entries.filter(([key]) => allowed.has(key));
       }
     }

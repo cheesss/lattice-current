@@ -16,6 +16,7 @@ const ARXIV_API_BASE = 'https://export.arxiv.org/api/query';
 const DEFAULT_SINCE = '2021-01-01';
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_STATE_PATH = 'data/arxiv-backfill-state.json';
+const ARXIV_STATE_VERSION = 2;
 const DEFAULT_CATEGORIES = [
   'cs.AI',
   'cs.LG',
@@ -69,8 +70,16 @@ function normalizeWhitespace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
+export function normalizeCategories(categories = DEFAULT_CATEGORIES) {
+  return Array.from(new Set(
+    (Array.isArray(categories) ? categories : [categories])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean),
+  )).sort();
+}
+
 export function buildArxivQuery(categories = DEFAULT_CATEGORIES) {
-  return categories.map((category) => `cat:${category}`).join('+OR+');
+  return normalizeCategories(categories).map((category) => `cat:${category}`).join(' OR ');
 }
 
 function toArray(value) {
@@ -125,6 +134,40 @@ export function buildArticleRecord(entry) {
   };
 }
 
+export function shouldResetArxivResume(config, previousState) {
+  if (!previousState) return false;
+  const previousVersion = Number(previousState.stateVersion || previousState.metadata?.stateVersion || 0);
+  if (previousVersion < ARXIV_STATE_VERSION) return true;
+  if (String(previousState.since || previousState.metadata?.since || '') !== String(config.since || '')) {
+    return true;
+  }
+  const previousCategories = normalizeCategories(previousState.categories || previousState.metadata?.categories || []);
+  const nextCategories = normalizeCategories(config.categories || []);
+  if (previousCategories.length !== nextCategories.length) return true;
+  return previousCategories.some((value, index) => value !== nextCategories[index]);
+}
+
+export function initializeArxivState(config, previousState) {
+  const resetResume = shouldResetArxivResume(config, previousState);
+  const resumeFromOffset = resetResume ? 0 : Math.max(0, Number(previousState?.lastProcessedOffset || 0));
+  return {
+    source: 'arxiv',
+    stateVersion: ARXIV_STATE_VERSION,
+    since: config.since,
+    categories: normalizeCategories(config.categories),
+    batchSize: config.batchSize,
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    errorMessage: '',
+    totalFetched: 0,
+    totalInserted: 0,
+    lastProcessedOffset: resumeFromOffset,
+    resumeFromOffset,
+    resumeReset: resetResume,
+    resumeReason: resetResume ? 'query-config-changed' : 'continue',
+  };
+}
+
 async function readState(filePath) {
   if (!existsSync(filePath)) return null;
   try {
@@ -163,9 +206,13 @@ async function upsertBackfillState(client, state) {
     state.completedAt || null,
     state.errorMessage || null,
     JSON.stringify({
+      stateVersion: state.stateVersion,
       since: state.since,
       batchSize: state.batchSize,
       categories: state.categories,
+      resumeFromOffset: state.resumeFromOffset,
+      resumeReset: Boolean(state.resumeReset),
+      resumeReason: state.resumeReason || 'continue',
     }),
   ]);
 }
@@ -208,18 +255,7 @@ export async function runArxivArchiveBackfill(options = {}) {
   }
 
   const previousState = await readState(config.statePath);
-  const state = {
-    source: 'arxiv',
-    since: config.since,
-    categories: config.categories,
-    batchSize: config.batchSize,
-    startedAt: previousState?.startedAt || new Date().toISOString(),
-    completedAt: null,
-    errorMessage: '',
-    totalFetched: Number(previousState?.totalFetched || 0),
-    totalInserted: Number(previousState?.totalInserted || 0),
-    lastProcessedOffset: Number(previousState?.lastProcessedOffset || 0),
-  };
+  const state = initializeArxivState(config, previousState);
 
   const client = new Client(resolveNasPgConfig());
   await client.connect();
@@ -235,7 +271,6 @@ export async function runArxivArchiveBackfill(options = {}) {
       const entries = await fetchArxivBatch(start, config.batchSize, config.categories);
       if (entries.length === 0) break;
       batchCount += 1;
-      state.lastProcessedOffset = start;
 
       for (const entry of entries) {
         state.totalFetched += 1;
@@ -247,6 +282,7 @@ export async function runArxivArchiveBackfill(options = {}) {
         state.totalInserted += await insertArticle(client, buildArticleRecord(entry));
       }
 
+      state.lastProcessedOffset = start + entries.length;
       await writeState(config.statePath, state);
       await upsertBackfillState(client, state);
       start += entries.length;

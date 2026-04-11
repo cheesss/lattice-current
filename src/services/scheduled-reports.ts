@@ -106,7 +106,7 @@ async function buildCodexSummary(input: ScheduledReportInput): Promise<string | 
         mode: 'deep',
         variant: input.variant,
         lang: 'ko',
-        geoContext: 'Write a concise Korean situation report covering current geopolitical, market, and technology conditions in 6-10 sentences.',
+        geoContext: 'Write a concise Korean situation report in 6-10 sentences. Explain what changed, why it matters, the largest uncertainties, and what should be watched next. Use only the supplied cues and do not invent facts.',
         headlines: [
           `REPORT_TRIGGER ${input.trigger || 'interval'}`,
           `NEWS_COUNT ${input.newsCount}`,
@@ -137,10 +137,10 @@ async function buildRoleSummary(
 ): Promise<string | null> {
   try {
     const geoContextByRole: Record<typeof role, string> = {
-      collector: 'Write a Korean intelligence collector summary from the supplied snapshot cues. Focus on facts, signals, and what changed.',
-      'red-team': 'Write a Korean red-team rebuttal. Challenge weak assumptions, propaganda risk, source weakness, and uncertainty in the supplied cues.',
-      quant: 'Write a Korean quant/market transmission note. Explain which assets, commodities, rates, or countries are exposed and why.',
-      judge: 'Write a Korean final consensus report. Integrate collector, red-team, and quant views into a concise but analytical final situation report.',
+      collector: 'Write a Korean collector summary using only the supplied cues. State the most important changes, the strongest factual signals, and what remains uncertain.',
+      'red-team': 'Write a Korean red-team rebuttal using only the supplied cues. Challenge weak assumptions, single-source claims, propaganda risk, and overconfident conclusions.',
+      quant: 'Write a Korean quant or market-transmission note using only the supplied cues. Explain which assets, commodities, rates, or countries are exposed and through what mechanism.',
+      judge: 'Write a Korean final consensus report that integrates collector, red-team, and quant views. Explain what changed, why it matters, the main risks, and what should be watched next.',
     };
     const response = await fetch('/api/local-codex-summarize', {
       method: 'POST',

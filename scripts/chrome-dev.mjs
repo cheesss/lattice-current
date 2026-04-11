@@ -2,7 +2,9 @@
 
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
@@ -10,14 +12,16 @@ import { loadEnvFile } from './_seed-utils.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
+const npmProbeExecutable = process.platform === 'win32' ? 'where.exe' : 'which';
 
 loadEnvFile(import.meta.url);
 
 const sidecarPort = Number(process.env.LOCAL_API_PORT || 46123);
 let appPort = Number(process.env.VITE_PORT || 5173);
-const shouldOpen = !process.argv.includes('--no-open');
 const smokeTest = process.argv.includes('--smoke-test');
+const shouldOpen = !process.argv.includes('--no-open') && !smokeTest;
 const localApiToken = randomBytes(24).toString('hex');
+const devStackLockPath = join(os.tmpdir(), 'lattice-current-dev-stack.lock');
 
 function buildSpawnEnv(extraEnv = {}) {
   const merged = { ...process.env, ...extraEnv };
@@ -30,15 +34,74 @@ function buildSpawnEnv(extraEnv = {}) {
   return env;
 }
 
+function readDevStackLock() {
+  try {
+    return JSON.parse(readFileSync(devStackLockPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseDevStackLock() {
+  const lock = readDevStackLock();
+  if (!lock || lock.pid !== process.pid) return;
+  try {
+    unlinkSync(devStackLockPath);
+  } catch {
+    // ignore stale cleanup failures
+  }
+}
+
+function acquireDevStackLock() {
+  const payload = JSON.stringify({
+    pid: process.pid,
+    script: 'chrome-dev.mjs',
+    createdAt: new Date().toISOString(),
+  });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      writeFileSync(devStackLockPath, payload, { flag: 'wx' });
+      return;
+    } catch (error) {
+      if (error?.code !== 'EEXIST') {
+        throw error;
+      }
+
+      const existing = readDevStackLock();
+      if (existing?.pid && isProcessAlive(existing.pid)) {
+        throw new Error(`[browser:chrome] another dev stack is already running (pid ${existing.pid}). Stop it before launching browser:chrome.`);
+      }
+
+      try {
+        unlinkSync(devStackLockPath);
+      } catch {
+        // retry once after removing a stale lock
+      }
+    }
+  }
+
+  throw new Error(`[browser:chrome] failed to acquire dev stack lock at ${devStackLockPath}`);
+}
+
 function assertViteAvailable(viteEntry) {
   if (existsSync(viteEntry)) {
     return;
   }
-  const probeCommand = process.platform === 'win32' ? 'where npm' : 'command -v npm';
-  const probe = spawnSync(probeCommand, {
-    shell: true,
+  const probe = spawnSync(npmProbeExecutable, ['npm'], {
     stdio: 'ignore',
     env: buildSpawnEnv(),
+    windowsHide: true,
   });
   if (probe.status !== 0) {
     throw new Error('[browser:chrome] Vite entrypoint missing and npm not found. Install dependencies and reopen your terminal.');
@@ -107,7 +170,10 @@ async function findAvailablePort(startPort) {
 }
 
 function spawnProcess(command, args, options = {}) {
-  const child = spawn(command, args, options);
+  const child = spawn(command, args, {
+    windowsHide: true,
+    ...options,
+  });
   child.on('error', (error) => {
     console.error(`[browser:chrome] failed to start ${command}:`, error);
   });
@@ -134,6 +200,8 @@ function openChrome(url) {
 
 const viteEntry = join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
 assertViteAvailable(viteEntry);
+acquireDevStackLock();
+process.on('exit', () => releaseDevStackLock());
 appPort = await findAvailablePort(appPort);
 
 const sidecarEnv = buildSpawnEnv({
@@ -141,6 +209,7 @@ const sidecarEnv = buildSpawnEnv({
   LOCAL_API_RESOURCE_DIR: projectRoot,
   LOCAL_API_DATA_DIR: join(projectRoot, 'data'),
   LOCAL_API_MODE: 'browser-dev',
+  LOCAL_API_BACKGROUND_AUTOMATION: 'false',
   LOCAL_API_TOKEN: localApiToken,
 });
 

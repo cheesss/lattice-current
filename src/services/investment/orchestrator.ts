@@ -56,6 +56,7 @@ import {
   InvestmentThemeDefinition,
   InvestmentWorkflowStep,
   FalsePositiveStats,
+  SignalContextSnapshot,
 } from './types';
 import { UNIVERSE_ASSET_CATALOG, POSITION_RULES } from './constants';
 import * as S from './module-state';
@@ -153,6 +154,41 @@ function buildSourceStatuses(
       : 0,
     errorMessage: null,
   }));
+}
+
+function countSignalCoverage(snapshot: SignalContextSnapshot | null): number {
+  if (!snapshot) return 0;
+  return [
+    snapshot.vix,
+    snapshot.yieldSpread,
+    snapshot.creditSpread,
+    snapshot.gdeltStress,
+    snapshot.transmissionStrength,
+  ].filter((value) => value !== null && Number.isFinite(value)).length;
+}
+
+function buildSignalRuntimeMeta(args: {
+  directSignalContext: SignalContextSnapshot | null;
+  resolvedSignalContext: SignalContextSnapshot | null;
+  transmission: EventMarketTransmissionSnapshot | null;
+}): NonNullable<IntegrationMetadata['signalRuntime']> {
+  const transmissionGeneratedAt = args.transmission?.generatedAt || null;
+  const freshnessMs = transmissionGeneratedAt ? Date.now() - Date.parse(transmissionGeneratedAt) : NaN;
+  const transmissionFreshnessHours = Number.isFinite(freshnessMs)
+    ? Math.max(0, Math.round((freshnessMs / 36e5) * 10) / 10)
+    : null;
+  return {
+    source: args.directSignalContext
+      ? 'live-signal-history'
+      : args.resolvedSignalContext
+        ? 'derived-market-transmission'
+        : 'missing',
+    coverage: countSignalCoverage(args.resolvedSignalContext),
+    signalCapturedAt: args.resolvedSignalContext?.capturedAt || null,
+    transmissionGeneratedAt,
+    transmissionFreshnessHours,
+    transmissionFresh: transmissionFreshnessHours !== null ? transmissionFreshnessHours <= 24 : false,
+  };
 }
 
 export async function recomputeInvestmentIntelligence(args: {
@@ -375,6 +411,11 @@ export async function recomputeInvestmentIntelligence(args: {
     transmission: args.transmission,
     macroOverlay,
     signalContext,
+  });
+  integration.signalRuntime = buildSignalRuntimeMeta({
+    directSignalContext: signalContext,
+    resolvedSignalContext: decisionRuntimeContext.signal.signalSnapshot,
+    transmission: args.transmission,
   });
 
   // Declare all variables produced by Stage 2 before the try block

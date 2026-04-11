@@ -8,7 +8,7 @@ Signal workspace for live risk, infrastructure, markets, and operator decision s
 
 ## What It Is
 
-Lattice Current is a public research fork of a multi-variant intelligence platform that combines:
+Lattice Current is a public research fork of a multi-variant intelligence platform now centered on a single theme-led signal shell that combines:
 
 - live global news and OSINT collection
 - AI-assisted summaries, deduction, and Q&A
@@ -23,21 +23,30 @@ The main branch has shifted away from a backtest-first product identity.
 
 The current emphasis is:
 
-- live signal intake
+- one integrated theme shell for live signal intake, theme briefs, geo context, proposal review, validation, and runtime diagnostics
 - canonical event resolution
 - evidence quality and transmission analysis
 - operator-facing decision support
 - replay and NAS-backed historical validation as secondary calibration layers
 
+## Primary entry surface
+
+The canonical product entry is now the theme shell:
+
+- `/` redirects to `/event-dashboard.html`
+- `event-dashboard.html` is the main surface for live signals, theme briefs, the 2D Geo Lens, Codex proposal review, approval handling, validation snapshots, and operator diagnostics
+- the old main page is retired from the user entry flow and kept only as legacy source material while remaining functionality is absorbed
+
 The heavy backtest-ML modules were removed from the main branch and preserved on `legacy/backtest`.
 
-## Workspace surfaces
+## Theme shell surfaces
 
-- `Live Workspace`: prioritized live signals instead of raw feed walls
-- `Briefing Desk`: decision briefs, current posture, and summary surfaces
-- `Research Desk`: graph, ontology, automation, and operator research workflow
-- `Replay Studio`: historical validation and storage sanity checks, not the primary product surface
-- `Data Flow Ops`: freshness, lag, storage, retention, and pipeline health
+- `Theme Brief`: the main evidence-backed reading surface for the selected theme or signal
+- `2D Geo Lens`: flat map surface with legacy risk-region, infrastructure, and event overlays preserved without the globe-first UI
+- `Proposal Inbox`: Codex-suggested sources, themes, and exposures with accept or reject review in place
+- `Approval Queue`: human-gated actions that execute directly from the shell once accepted
+- `Signal And Validation Snapshots`: compact risk, macro, investment, and replay surfaces kept inside the same operator loop
+- `Operator Diagnostics`: automation telemetry, system health, data quality, and Codex quality
 
 The same repository still powers multiple variants:
 
@@ -78,9 +87,12 @@ npm install
 npm run dev
 ```
 
+`npm run dev` now starts the integrated theme-shell stack: the event dashboard API plus the Vite frontend. The root path `/` redirects to the theme shell automatically.
+
 Other common commands:
 
 ```bash
+npm run dev:full
 npm run dev:tech
 npm run dev:finance
 npm run typecheck

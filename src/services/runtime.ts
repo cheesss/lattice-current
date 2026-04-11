@@ -62,7 +62,8 @@ export async function resolveLocalApiPort(): Promise<number> {
   _portPromise = (async () => {
     try {
       const { tryInvokeTauri } = await import('@/services/tauri-bridge');
-      const port = await tryInvokeTauri<number>('get_local_api_port');
+      const port = await tryInvokeTauri<number>('ensure_local_api_started')
+        ?? await tryInvokeTauri<number>('get_local_api_port');
       if (port && port > 0) {
         _resolvedPort = port;
         return port;
@@ -553,6 +554,16 @@ export function startSmartPollLoop(
 }
 
 export async function waitForSidecarReady(timeoutMs = 3000): Promise<boolean> {
+  if (isDesktopRuntime() && !CONFIGURED_LOCAL_API_BASE) {
+    try {
+      const { tryInvokeTauri } = await import('@/services/tauri-bridge');
+      await tryInvokeTauri<number>('ensure_local_api_started');
+      await resolveLocalApiPort();
+    } catch {
+      // Sidecar start can fail in constrained desktop environments.
+    }
+  }
+
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) return false;
   const pollInterval = 200;

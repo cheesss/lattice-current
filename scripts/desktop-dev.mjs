@@ -1,5 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process';
 
+const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const cargoProbeExecutable = process.platform === 'win32' ? 'where.exe' : 'which';
+
 function buildSpawnEnv(extraEnv = {}) {
   const merged = { ...process.env, ...extraEnv };
   const env = {};
@@ -13,12 +16,11 @@ function buildSpawnEnv(extraEnv = {}) {
 }
 
 function runNpm(args, extraEnv = {}) {
-  const npmCommand = ['npm', ...args].join(' ');
   return new Promise((resolve, reject) => {
-    const child = spawn(npmCommand, {
+    const child = spawn(npmExecutable, args, {
       stdio: 'inherit',
-      shell: true,
       env: buildSpawnEnv(extraEnv),
+      windowsHide: true,
     });
 
     child.on('error', reject);
@@ -30,11 +32,10 @@ function runNpm(args, extraEnv = {}) {
 }
 
 function assertCargoAvailable() {
-  const probeCommand = process.platform === 'win32' ? 'where cargo' : 'command -v cargo';
-  const probe = spawnSync(probeCommand, {
-    shell: true,
+  const probe = spawnSync(cargoProbeExecutable, ['cargo'], {
     env: buildSpawnEnv(),
     stdio: 'ignore',
+    windowsHide: true,
   });
   if (probe.status !== 0) {
     throw new Error(

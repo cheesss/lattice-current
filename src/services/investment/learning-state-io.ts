@@ -1,4 +1,5 @@
 import type { BanditArmState } from '../math-models/contextual-bandit';
+import type { ExperimentRegistrySnapshot } from '../experiment-registry';
 // FIX-3: Removed direct PersistentCache calls — all access through StateStore adapter
 // IS-4: StateStore adapter for transactional safety
 import { getStateStoreAdapter } from '../state/persistent-cache-adapter';
@@ -21,6 +22,7 @@ import type {
 } from './types';
 import {
   SNAPSHOT_KEY,
+  EXPERIMENT_REGISTRY_KEY,
   HISTORY_KEY,
   TRACKED_IDEAS_KEY,
   MARKET_HISTORY_KEY,
@@ -45,6 +47,10 @@ import {
   normalizeInvestmentSnapshot,
 } from './normalizers';
 import {
+  getExperimentRegistrySnapshot,
+  hydrateExperimentRegistry,
+} from '../experiment-registry';
+import {
   normalizeUniverseExpansionPolicy,
   normalizeCandidateReview,
   applyUniverseExpansionPolicy,
@@ -64,6 +70,10 @@ interface PersistedSnapshotStore {
 
 interface PersistedHistoryStore {
   entries: InvestmentHistoryEntry[];
+}
+
+interface PersistedExperimentRegistryStore {
+  registry: ExperimentRegistrySnapshot;
 }
 
 interface PersistedTrackedIdeasStore {
@@ -104,6 +114,27 @@ interface ThemeAssetDefinition {
   role: 'primary' | 'confirm' | 'hedge';
 }
 
+function applyExperimentRegistrySnapshot(snapshot?: Partial<ExperimentRegistrySnapshot> | null): ExperimentRegistrySnapshot {
+  const normalized = hydrateExperimentRegistry(snapshot);
+  if (S.currentSnapshot) {
+    S.setCurrentSnapshot({
+      ...S.currentSnapshot,
+      experimentRegistry: normalized,
+    });
+  }
+  return normalized;
+}
+
+async function readPersistedExperimentRegistry(): Promise<ExperimentRegistrySnapshot | null> {
+  try {
+    const cached = await getStore().get<PersistedExperimentRegistryStore>(EXPERIMENT_REGISTRY_KEY);
+    return cached?.registry ? applyExperimentRegistrySnapshot(cached.registry) : null;
+  } catch (error) {
+    console.warn('[investment-intelligence] experiment registry load failed', error);
+    return null;
+  }
+}
+
 export interface CodexCandidateExpansionProposal {
   symbol: string;
   assetName?: string;
@@ -115,6 +146,9 @@ export interface CodexCandidateExpansionProposal {
   confidence?: number;
   reason?: string;
   supportingSignals?: string[];
+  relationType?: string;
+  transmissionOrder?: 'direct' | 'second-order' | 'third-order' | 'fourth-order' | 'proxy';
+  transmissionPath?: string;
 }
 
 interface LocalCodexCandidateExpansionResponse {
@@ -133,6 +167,8 @@ export async function ensureLoaded(): Promise<void> {
   } catch (migrationError) {
     console.warn('[investment-intelligence] state migration failed (non-fatal)', migrationError);
   }
+
+  const persistedRegistry = await readPersistedExperimentRegistry();
 
   try {
     const snapshotCached = await getStore().get<PersistedSnapshotStore>(SNAPSHOT_KEY);
@@ -202,6 +238,12 @@ export async function ensureLoaded(): Promise<void> {
     console.warn('[investment-intelligence] conviction model load failed', error);
   }
 
+  if (persistedRegistry) {
+    applyExperimentRegistrySnapshot(persistedRegistry);
+  } else if (S.currentSnapshot?.experimentRegistry) {
+    applyExperimentRegistrySnapshot(S.currentSnapshot.experimentRegistry);
+  }
+
   // Load hawkes states
   try {
     const hawkesCached = await getStore().get<{ states: Record<string, HawkesCarryState> }>(HAWKES_STATES_KEY);
@@ -264,6 +306,7 @@ export async function persist(): Promise<void> {
 async function _doPersist(): Promise<void> {
   const store = getStore();
   await store.set(SNAPSHOT_KEY, { snapshot: S.currentSnapshot });
+  await store.set(EXPERIMENT_REGISTRY_KEY, { registry: getExperimentRegistrySnapshot() });
   await store.set(HISTORY_KEY, { entries: S.currentHistory.slice(0, MAX_HISTORY) });
   await store.set(TRACKED_IDEAS_KEY, { ideas: S.trackedIdeas.slice(0, MAX_TRACKED_IDEAS) });
   await store.set(MARKET_HISTORY_KEY, { points: S.marketHistory.slice(-MAX_MARKET_HISTORY_POINTS) });
@@ -318,6 +361,25 @@ async function _doPersist(): Promise<void> {
 export async function getInvestmentIntelligenceSnapshot(): Promise<InvestmentIntelligenceSnapshot | null> {
   await ensureLoaded();
   return S.currentSnapshot;
+}
+
+export async function hydratePersistedExperimentRegistry(): Promise<ExperimentRegistrySnapshot> {
+  await ensureLoaded();
+  const persisted = await readPersistedExperimentRegistry();
+  if (persisted) return persisted;
+  if (S.currentSnapshot?.experimentRegistry) {
+    return applyExperimentRegistrySnapshot(S.currentSnapshot.experimentRegistry);
+  }
+  return applyExperimentRegistrySnapshot(getExperimentRegistrySnapshot());
+}
+
+export async function syncExperimentRegistrySnapshot(
+  snapshot?: Partial<ExperimentRegistrySnapshot> | null,
+): Promise<ExperimentRegistrySnapshot> {
+  await ensureLoaded();
+  const normalized = applyExperimentRegistrySnapshot(snapshot || getExperimentRegistrySnapshot());
+  await persist();
+  return normalized;
 }
 
 export async function getUniverseExpansionPolicy(): Promise<UniverseExpansionPolicy> {
@@ -649,6 +711,7 @@ export async function resetInvestmentLearningState(seed?: Partial<InvestmentLear
   await ensureLoaded();
   S.setCurrentSnapshot(seed?.snapshot ?? null);
   S.setCurrentSnapshot(normalizeInvestmentSnapshot(S.currentSnapshot));
+  applyExperimentRegistrySnapshot(S.currentSnapshot?.experimentRegistry || getExperimentRegistrySnapshot());
   S.setUniverseExpansionPolicy(normalizeUniverseExpansionPolicy(S.currentSnapshot?.universePolicy || S.universeExpansionPolicy));
   S.setCurrentHistory((seed?.history ?? []).map((entry) => ({
     ...entry,

@@ -23,6 +23,12 @@ export const DAEMON_TASK_INTERVALS_MS = Object.freeze({
   'full-rebuild': DAY_1_MS,
   'daily-report': DAY_1_MS,
   'generate-weekly-digest': DAY_1_MS,
+  'sec-seed-universe': DAY_1_MS,
+  'openalex-theme-evidence': DAY_1_MS,
+  'github-theme-evidence': DAY_1_MS,
+  'generate-structural-alerts': DAY_1_MS,
+  'generate-codex-theme-proposals': HOUR_6_MS,
+  'generate-followed-theme-briefings': DAY_1_MS,
   'auto-curate': WEEK_1_MS,
   'coverage-gap-analysis': DAY_1_MS,
 });

@@ -2,11 +2,14 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import Database from '@duckdb/node-api';
 import pg from 'pg';
-import { resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 
 const { Client } = pg;
+
+loadOptionalEnvFile();
 
 const DEFAULT_DUCKDB_PATH = path.resolve('data', 'historical', 'intelligence-history.duckdb');
 const DEFAULT_TMP_DIR = path.resolve('.tmp', 'nas-sync');
@@ -14,8 +17,6 @@ const DEFAULT_BUCKET_HOURS = 6;
 const DEFAULT_NEWS_LOOKBACK_HOURS = 24;
 const DEFAULT_BATCH_SIZE = 1000;
 const TARGET_PROVIDERS = ['guardian', 'nyt', 'gdelt-agg'];
-
-const PG_CONFIG = resolveNasPgConfig();
 
 function parseArgs(argv) {
   const parsed = {
@@ -87,6 +88,77 @@ function toNumber(value) {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+export function parsePgJsonField(value) {
+  if (value == null || value === '') return {};
+  if (typeof value === 'object') return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+export async function resolveRawItemsColumnBindings(client) {
+  const result = await client.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'raw_items'
+    `,
+  );
+  const columns = new Set(result.rows.map((row) => String(row.column_name || '').trim().toLowerCase()));
+  return {
+    payloadColumn: columns.has('payload')
+      ? 'payload'
+      : columns.has('payload_json')
+        ? 'payload_json'
+        : null,
+    metadataColumn: columns.has('metadata')
+      ? 'metadata'
+      : columns.has('metadata_json')
+        ? 'metadata_json'
+        : null,
+  };
+}
+
+export function buildRawItemsSelectSql(columnBindings) {
+  const payloadSelect = columnBindings.payloadColumn
+    ? `${columnBindings.payloadColumn} AS payload_value`
+    : `NULL::text AS payload_value`;
+  const metadataSelect = columnBindings.metadataColumn
+    ? `${columnBindings.metadataColumn} AS metadata_value`
+    : `NULL::text AS metadata_value`;
+  return `
+    SELECT
+      id,
+      dataset_id,
+      provider,
+      source_kind,
+      source_id,
+      item_kind,
+      valid_time_start,
+      valid_time_end,
+      transaction_time,
+      knowledge_boundary,
+      headline,
+      link,
+      symbol,
+      region,
+      price,
+      ${payloadSelect},
+      ${metadataSelect}
+    FROM raw_items
+    WHERE provider = $1
+    ORDER BY dataset_id ASC, transaction_time ASC, valid_time_start ASC, id ASC
+    LIMIT $2 OFFSET $3
+  `;
 }
 
 function shouldReplaceMarketRecord(candidate, current) {
@@ -297,41 +369,16 @@ async function queryCountMapDuck(connection, providers) {
   return new Map(result.getRowObjectsJS().map((row) => [String(row.provider || ''), Number(row.count || 0)]));
 }
 
-async function fetchProviderRows(client, provider, batchSize) {
+async function fetchProviderRows(client, provider, batchSize, columnBindings) {
   const totalResult = await client.query(
     'SELECT COUNT(*)::bigint AS count FROM raw_items WHERE provider = $1',
     [provider],
   );
   const total = Number(totalResult.rows[0]?.count || 0);
   const rows = [];
+  const selectSql = buildRawItemsSelectSql(columnBindings);
   for (let offset = 0; offset < total; offset += batchSize) {
-    const result = await client.query(
-      `
-        SELECT
-          id,
-          dataset_id,
-          provider,
-          source_kind,
-          source_id,
-          item_kind,
-          valid_time_start,
-          valid_time_end,
-          transaction_time,
-          knowledge_boundary,
-          headline,
-          link,
-          symbol,
-          region,
-          price,
-          payload,
-          metadata
-        FROM raw_items
-        WHERE provider = $1
-        ORDER BY dataset_id ASC, transaction_time ASC, valid_time_start ASC, id ASC
-        LIMIT $2 OFFSET $3
-      `,
-      [provider, batchSize, offset],
-    );
+    const result = await client.query(selectSql, [provider, batchSize, offset]);
     rows.push(...result.rows.map((row) => ({
       id: String(row.id),
       datasetId: String(row.dataset_id),
@@ -348,8 +395,8 @@ async function fetchProviderRows(client, provider, batchSize) {
       symbol: row.symbol ? String(row.symbol) : null,
       region: row.region ? String(row.region) : null,
       price: toNumber(row.price),
-      payload: row.payload && typeof row.payload === 'object' ? row.payload : {},
-      metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+      payload: parsePgJsonField(row.payload_value),
+      metadata: parsePgJsonField(row.metadata_value),
     })));
     process.stderr.write(`\r[pg] ${provider}: ${Math.min(offset + batchSize, total)}/${total}`);
   }
@@ -734,10 +781,11 @@ async function main() {
   const duck = await duckDb.connect();
   await ensureDuckDbSchema(duck);
 
-  const pgClient = new Client(PG_CONFIG);
+  const pgClient = new Client(resolveNasPgConfig());
   await pgClient.connect();
 
   try {
+    const rawItemsColumnBindings = await resolveRawItemsColumnBindings(pgClient);
     const nasCounts = await queryCountMapPg(pgClient, args.providers);
     const localCounts = await queryCountMapDuck(duck, args.providers);
     console.log(JSON.stringify({
@@ -751,7 +799,7 @@ async function main() {
 
     const datasetSummaries = [];
     for (const provider of args.providers) {
-      const rows = await fetchProviderRows(pgClient, provider, args.batchSize);
+      const rows = await fetchProviderRows(pgClient, provider, args.batchSize, rawItemsColumnBindings);
       const grouped = groupByDataset(rows);
       for (const [datasetId, datasetRows] of grouped.entries()) {
         const dumpPath = await dumpDatasetEnvelope(args.tmpDir, provider, datasetId, datasetRows);
@@ -781,10 +829,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(JSON.stringify({
-    ok: false,
-    error: error instanceof Error ? error.message : String(error),
-  }, null, 2));
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(JSON.stringify({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }, null, 2));
+    process.exit(1);
+  });
+}

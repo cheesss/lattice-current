@@ -1,13 +1,11 @@
 import { SITE_VARIANT } from './variant';
 
 export type WorkspaceId =
-  | 'overview'
-  | 'intelligence'
-  | 'investing'
-  | 'builders'
-  | 'operations'
-  | 'progress'
-  | 'all';
+  | 'signals'
+  | 'brief'
+  | 'watch'
+  | 'validate'
+  | 'operate';
 
 export interface WorkspaceFlowStep {
   label: string;
@@ -33,204 +31,159 @@ export interface WorkspaceDefinition {
 export const WORKSPACE_STORAGE_KEY = 'lattice-current-workspace';
 export const LEGACY_WORKSPACE_STORAGE_KEY = 'worldmonitor-workspace';
 
+const LEGACY_WORKSPACE_ALIASES: Record<string, WorkspaceId> = {
+  overview: 'signals',
+  intelligence: 'brief',
+  investing: 'validate',
+  builders: 'signals',
+  operations: 'operate',
+  progress: 'watch',
+  all: 'signals',
+};
+
 const WORKSPACES: WorkspaceDefinition[] = [
   {
-    id: 'overview',
-    label: 'Live',
-    title: 'Live Workspace',
-    description: 'Start from prioritized headlines, the current pressure stack, and the next decision instead of raw feed overload.',
-    eyebrow: 'Daily Loop',
-    heroTitle: 'Start with the signal that matters, not every feed at once.',
-    heroSummary: 'This lens keeps prioritized signals, posture, and the next operator decision on one surface.',
+    id: 'signals',
+    label: 'Signals',
+    title: 'Signals Workspace',
+    description: 'Start from the ranked live signal, not raw category feeds or map overlays.',
+    eyebrow: 'Signal Loop',
+    heroTitle: 'See the live signal, the explanation, and the next move in one place.',
+    heroSummary: 'This surface compresses live intake, operator framing, and the current regime into a single signal-first workspace.',
     flowSteps: [
-      { label: 'Observe', summary: 'Prioritized headlines, map context, and posture shifts stay together.' },
-      { label: 'Explain', summary: 'Event intelligence, source quality, and transmission context stay attached.' },
-      { label: 'Act', summary: 'Decision support stays in the same loop, with replay kept as validation only.' },
+      { label: 'Detect', summary: 'Rank the live field by severity, confidence, and signal quality.' },
+      { label: 'Explain', summary: 'Keep the reason, sources, and linked theme attached to the signal.' },
+      { label: 'Act', summary: 'Move directly into follow, brief, or validation without opening a second product.' },
     ],
-    focusAreas: ['Priority signals', 'Briefing loop', 'Decision support'],
-    showMap: true,
+    focusAreas: ['Priority signals', 'Live explanation', 'Next action'],
+    showMap: false,
     panelKeys: [
       'live-news',
-      'politics',
-      'intel',
       'insights',
       'event-intelligence',
       'strategic-posture',
       'strategic-risk',
+      'cii',
       'macro-signals',
       'signal-ridgeline',
       'transmission-sankey',
-      'cross-asset-tape',
       'investment-workflow',
       'investment-ideas',
-      'dataflow-ops',
-      'source-ops',
       'monitors',
-      'giving',
-      'positive-feed',
-      'progress',
-      'spotlight',
-      'digest',
-      'counters',
     ],
-    featuredPanels: ['live-news', 'insights', 'event-intelligence', 'macro-signals'],
+    featuredPanels: ['live-news', 'event-intelligence', 'insights', 'macro-signals'],
   },
   {
-    id: 'intelligence',
-    label: 'Briefing',
-    title: 'Briefing Workspace',
-    description: 'Follow posture shifts, country risk, and the evidence stack behind emerging pressure.',
-    eyebrow: 'Briefing',
-    heroTitle: 'Translate noisy events into a readable pressure stack.',
-    heroSummary: 'This workspace prioritizes escalation, transmission, and source quality over raw headline volume.',
+    id: 'brief',
+    label: 'Brief',
+    title: 'Brief Workspace',
+    description: 'Open the evidence stack behind a selected signal, theme, country, or region.',
+    eyebrow: 'Signal Brief',
+    heroTitle: 'Translate live movement into a readable, evidence-backed brief.',
+    heroSummary: 'The brief surface joins event interpretation, theme context, country stress, and impact evidence.',
     flowSteps: [
-      { label: 'Filter', summary: 'Compress raw events into posture, clusters, and risk bearings.' },
-      { label: 'Trace', summary: 'Follow transmission paths, country risk, and evidence quality.' },
-      { label: 'Escalate', summary: 'Promote only the most material theaters into the operator view.' },
+      { label: 'Open', summary: 'Select a live signal, theme, or country and pull the brief into focus.' },
+      { label: 'Trace', summary: 'Walk through posture, transmission, exposure, and evidence provenance.' },
+      { label: 'Escalate', summary: 'Save the signal to watch or route it into validation when it matters.' },
     ],
-    focusAreas: ['Country risk', 'Transmission paths', 'Source quality'],
+    focusAreas: ['Theme context', 'Country lens', 'Evidence quality'],
     showMap: true,
     panelKeys: [
+      'insights',
+      'event-intelligence',
       'strategic-posture',
       'strategic-risk',
       'cii',
-      'intel',
-      'glint-feed',
-      'gdelt-intel',
-      'event-intelligence',
       'cascade',
-      'politics',
-      'us',
-      'europe',
-      'middleeast',
-      'africa',
-      'latam',
-      'asia',
-      'energy',
-      'gov',
-      'thinktanks',
+      'gdelt-intel',
       'satellite-fires',
       'ucdp-events',
       'displacement',
       'climate',
       'population-exposure',
-      'transmission-sankey',
+      'cross-asset-tape',
+      'country-exposure-matrix',
       'signal-ridgeline',
-      'source-ops',
+      'transmission-sankey',
     ],
-    featuredPanels: ['strategic-posture', 'strategic-risk', 'event-intelligence', 'gdelt-intel'],
-    variants: ['full', 'finance', 'tech'],
+    featuredPanels: ['event-intelligence', 'strategic-posture', 'strategic-risk', 'cii'],
   },
   {
-    id: 'investing',
-    label: 'Decide',
-    title: 'Decision Workspace',
-    description: 'Put macro pressure, signal candidates, and replay validation on one canvas.',
-    eyebrow: 'Decision Support',
-    heroTitle: 'Compare live regime pressure with validated signal context before taking action.',
-    heroSummary: 'The product here is the decision loop from regime read to signal candidate to validation, not raw backtest output.',
+    id: 'watch',
+    label: 'Watch',
+    title: 'Watch Workspace',
+    description: 'Track followed themes, alerts, operators notes, and saved decision context over time.',
+    eyebrow: 'Follow Through',
+    heroTitle: 'Keep durable themes and saved signals in an active watch loop.',
+    heroSummary: 'This surface is for persistent follow-up: watched themes, structural alerts, saved ideas, and operator state changes.',
     flowSteps: [
-      { label: 'Screen', summary: 'Rank current signal candidates against macro and live confirmation.' },
-      { label: 'Validate', summary: 'Use replay validation only after the live signal has been framed.' },
-      { label: 'Decide', summary: 'Translate evidence into constraints, watch states, and next actions.' },
+      { label: 'Track', summary: 'Keep saved signals, themes, and countries in one watch queue.' },
+      { label: 'Review', summary: 'Read deltas, alerts, and follow-up context without reopening the raw field.' },
+      { label: 'Promote', summary: 'Escalate watched items into validation only when they cross a clear threshold.' },
     ],
-    focusAreas: ['Macro regime', 'Signal candidates', 'Validation context'],
-    showMap: true,
+    focusAreas: ['Saved themes', 'Alerts', 'Watchpoints'],
+    showMap: false,
     panelKeys: [
-      'markets',
-      'markets-news',
-      'commodities',
-      'commodities-news',
-      'economic',
-      'economic-news',
-      'forex',
-      'bonds',
-      'centralbanks',
-      'trade-policy',
-      'supply-chain',
-      'finance',
-      'crypto',
-      'crypto-news',
-      'fintech',
-      'cross-asset-tape',
-      'event-impact-screener',
-      'country-exposure-matrix',
+      'monitors',
       'event-intelligence',
       'investment-workflow',
       'investment-ideas',
-      'macro-signals',
       'signal-ridgeline',
       'transmission-sankey',
+    ],
+    featuredPanels: ['monitors', 'investment-workflow', 'investment-ideas', 'event-intelligence'],
+  },
+  {
+    id: 'validate',
+    label: 'Validate',
+    title: 'Validate Workspace',
+    description: 'Use replay and validation only after the signal has been framed and selected.',
+    eyebrow: 'Validation',
+    heroTitle: 'Validate the signal after the brief is clear, not before.',
+    heroSummary: 'This surface keeps replay, cross-asset confirmation, and candidate review in one advanced workspace.',
+    flowSteps: [
+      { label: 'Select', summary: 'Carry a chosen signal or theme into validation without losing context.' },
+      { label: 'Verify', summary: 'Check replay behavior, exposure, and confirmation before escalating.' },
+      { label: 'Decide', summary: 'Return the result to the brief or watch loop with an explicit outcome.' },
+    ],
+    focusAreas: ['Replay', 'Exposure', 'Candidate review'],
+    showMap: false,
+    panelKeys: [
+      'backtest-lab',
+      'macro-signals',
+      'cross-asset-tape',
+      'event-impact-screener',
+      'country-exposure-matrix',
+      'investment-workflow',
+      'investment-ideas',
+      'signal-ridgeline',
+      'transmission-sankey',
+      'event-intelligence',
+      'markets',
+      'commodities',
+      'crypto',
+      'economic',
+      'heatmap',
       'etf-flows',
       'stablecoins',
-      'heatmap',
-      'analysis',
       'polymarket',
-      'gcc-investments',
-      'gccNews',
-      'dataflow-ops',
-      'source-ops',
-      'backtest-lab',
-      'resource-profiler',
     ],
-    featuredPanels: ['macro-signals', 'event-intelligence', 'investment-workflow', 'investment-ideas'],
-    variants: ['full', 'finance', 'tech'],
+    featuredPanels: ['backtest-lab', 'investment-workflow', 'investment-ideas', 'macro-signals'],
   },
   {
-    id: 'builders',
-    label: 'Build',
-    title: 'Builder Workspace',
-    description: 'Track AI, cyber, policy, and startup motion from the build side of the system.',
-    eyebrow: 'Build Radar',
-    heroTitle: 'Track product, infrastructure, security, and policy from the builder side.',
-    heroSummary: 'Instead of a global monitor, this workspace behaves like a build radar for technical operators and founders.',
-    flowSteps: [
-      { label: 'Scan', summary: 'Follow AI, infra, security, and startup motion in one field.' },
-      { label: 'Validate', summary: 'Cross-check product narratives against signals and service health.' },
-      { label: 'Ship', summary: 'Keep research and operational diagnostics close to the same workspace.' },
-    ],
-    focusAreas: ['AI stack', 'Security drift', 'Shipping velocity'],
-    showMap: true,
-    panelKeys: [
-      'tech',
-      'ai',
-      'startups',
-      'vcblogs',
-      'regionalStartups',
-      'unicorns',
-      'accelerators',
-      'funding',
-      'producthunt',
-      'github',
-      'events',
-      'security',
-      'policy',
-      'regulation',
-      'hardware',
-      'cloud',
-      'dev',
-      'service-status',
-      'tech-readiness',
-      'layoffs',
-      'ipo',
-    ],
-    featuredPanels: ['ai', 'tech', 'security', 'tech-readiness'],
-    variants: ['full', 'tech'],
-  },
-  {
-    id: 'operations',
+    id: 'operate',
     label: 'Operate',
-    title: 'Operations Workspace',
-    description: 'Work the machine itself: data freshness, automation, runtime health, source quality, and validation.',
+    title: 'Operate Workspace',
+    description: 'Run the data and service layer without mixing it into the main operator surface.',
     eyebrow: 'Operations',
-    heroTitle: 'Run the machine with clarity, not dashboard clutter.',
-    heroSummary: 'This workspace treats the service as a living pipeline: data quality, automation state, runtime health, and replay trust.',
+    heroTitle: 'Keep the machine healthy without turning the whole product into a cockpit.',
+    heroSummary: 'This workspace is reserved for data quality, automation health, runtime state, and diagnostics.',
     flowSteps: [
-      { label: 'Inspect', summary: 'Read freshness, lag, coverage, and runtime health in one pass.' },
-      { label: 'Recover', summary: 'Fix blockers before they leak into live signal and decision support.' },
-      { label: 'Sustain', summary: 'Keep automation and validation healthy without leaving the workspace.' },
+      { label: 'Inspect', summary: 'Read freshness, source quality, and runtime health in one pass.' },
+      { label: 'Recover', summary: 'Fix blockers before they degrade signals, briefs, or validation.' },
+      { label: 'Sustain', summary: 'Keep operations separate from the signal-analysis experience.' },
     ],
-    focusAreas: ['Coverage health', 'Automation loops', 'Runtime stability'],
+    focusAreas: ['Data health', 'Automation', 'Runtime'],
     showMap: false,
     panelKeys: [
       'dataflow-ops',
@@ -238,82 +191,61 @@ const WORKSPACES: WorkspaceDefinition[] = [
       'data-qa',
       'source-ops',
       'runtime-config',
-      'backtest-lab',
       'resource-profiler',
       'service-status',
       'tech-readiness',
-      'macro-signals',
-      'investment-workflow',
+      'backtest-lab',
     ],
     featuredPanels: ['dataflow-ops', 'source-ops', 'runtime-config', 'resource-profiler'],
-  },
-  {
-    id: 'progress',
-    label: 'Progress',
-    title: 'Long Horizon Workspace',
-    description: 'Surface resilience, progress, and constructive signals that compound over time.',
-    eyebrow: 'Long Horizon',
-    heroTitle: 'Watch what compounds instead of only what breaks.',
-    heroSummary: 'This lens favors resilience, durable progress, and constructive patterns that matter over longer arcs.',
-    flowSteps: [
-      { label: 'Notice', summary: 'Pull positive and resilient signals into one clean stream.' },
-      { label: 'Connect', summary: 'Link progress metrics, stories, and durable trend lines.' },
-      { label: 'Carry', summary: 'Keep a calmer operating surface for longer-horizon work.' },
-    ],
-    focusAreas: ['Resilience', 'Positive compounding', 'Long-horizon context'],
-    showMap: true,
-    panelKeys: [
-      'positive-feed',
-      'progress',
-      'counters',
-      'spotlight',
-      'breakthroughs',
-      'digest',
-      'species',
-      'renewable',
-      'giving',
-    ],
-    featuredPanels: ['positive-feed', 'progress', 'spotlight', 'renewable'],
-    variants: ['happy'],
-  },
-  {
-    id: 'all',
-    label: 'Canvas',
-    title: 'Open Canvas',
-    description: 'Expose the full lattice exactly as configured, without focus filtering.',
-    eyebrow: 'Open Canvas',
-    heroTitle: 'Move across the full lattice without workspace filtering.',
-    heroSummary: 'Use this view when you want every pane, every domain, and the entire service surface in one place.',
-    flowSteps: [
-      { label: 'Survey', summary: 'Expose the full configured surface without opinionated narrowing.' },
-      { label: 'Cross', summary: 'Jump across markets, briefing, graph, and operations fluidly.' },
-      { label: 'Compose', summary: 'Build your own working layout on top of the entire lattice.' },
-    ],
-    focusAreas: ['Free exploration', 'Cross-domain joins', 'Operator shortcuts'],
-    showMap: true,
-    panelKeys: [],
-    featuredPanels: ['live-news', 'event-intelligence', 'macro-signals', 'dataflow-ops'],
   },
 ];
 
 const FALLBACK_WORKSPACE: WorkspaceDefinition = {
-  id: 'overview',
-  label: 'Live',
-  title: 'Live Workspace',
-  description: 'Keep the live pulse, the latest brief, and the next action on one surface.',
-  eyebrow: 'Daily Loop',
+  id: 'signals',
+  label: 'Signals',
+  title: 'Signals Workspace',
+  description: 'Keep the live signal, the brief, and the next action on one surface.',
+  eyebrow: 'Signal Loop',
   heroTitle: 'Turn raw motion into a clear next move.',
-  heroSummary: 'Keep the field, the brief, and the next action on one surface.',
+  heroSummary: 'Keep the signal, the brief, and the follow-up action on one surface.',
   flowSteps: [
-    { label: 'Observe', summary: 'Track the live field.' },
+    { label: 'Detect', summary: 'Read the live field.' },
     { label: 'Explain', summary: 'Open the brief.' },
-    { label: 'Act', summary: 'Follow the next action.' },
+    { label: 'Act', summary: 'Choose the next action.' },
   ],
-  focusAreas: ['Live pulse', 'Briefing loop', 'Decision support'],
-  showMap: true,
+  focusAreas: ['Live signal', 'Brief', 'Action'],
+  showMap: false,
   panelKeys: [],
   featuredPanels: [],
 };
+
+export function isWorkspaceId(value: string | null | undefined): value is WorkspaceId {
+  return value === 'signals'
+    || value === 'brief'
+    || value === 'watch'
+    || value === 'validate'
+    || value === 'operate';
+}
+
+export function resolveWorkspaceId(
+  id?: string | null,
+  variant: string = SITE_VARIANT,
+): WorkspaceId {
+  const normalized = String(id || '').trim().toLowerCase();
+  const candidate = isWorkspaceId(normalized)
+    ? normalized
+    : LEGACY_WORKSPACE_ALIASES[normalized] ?? null;
+
+  if (candidate) {
+    const found = WORKSPACES.find((workspace) =>
+      workspace.id === candidate && (!workspace.variants || workspace.variants.includes(variant)));
+    if (found) return found.id;
+  }
+
+  const signals = WORKSPACES.find((workspace) =>
+    workspace.id === 'signals' && (!workspace.variants || workspace.variants.includes(variant)));
+  return signals?.id ?? FALLBACK_WORKSPACE.id;
+}
 
 export function getWorkspaceDefinitions(variant: string = SITE_VARIANT): WorkspaceDefinition[] {
   return WORKSPACES.filter((workspace) => !workspace.variants || workspace.variants.includes(variant));
@@ -327,10 +259,7 @@ export function getWorkspaceDefinition(
   if (definitions.length === 0) {
     return FALLBACK_WORKSPACE;
   }
-  if (id) {
-    const found = definitions.find((workspace) => workspace.id === id);
-    if (found) return found;
-  }
-  const overview = definitions.find((workspace) => workspace.id === 'overview');
-  return overview ?? definitions[0] ?? FALLBACK_WORKSPACE;
+  const resolvedId = resolveWorkspaceId(id, variant);
+  const found = definitions.find((workspace) => workspace.id === resolvedId);
+  return found ?? definitions[0] ?? FALLBACK_WORKSPACE;
 }

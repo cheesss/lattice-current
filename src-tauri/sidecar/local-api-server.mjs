@@ -2064,7 +2064,7 @@ async function importHandler(modulePath) {
   }
 }
 
-function resolveConfig(options = {}) {
+export function resolveConfig(options = {}) {
   const port = Number(options.port ?? process.env.LOCAL_API_PORT ?? 46123);
   const remoteBase = String(options.remoteBase ?? process.env.LOCAL_API_REMOTE_BASE ?? 'https://worldmonitor.app').replace(/\/$/, '');
   const resourceDir = String(options.resourceDir ?? process.env.LOCAL_API_RESOURCE_DIR ?? process.cwd());
@@ -2077,10 +2077,13 @@ function resolveConfig(options = {}) {
   const dataDir = String(options.dataDir ?? process.env.LOCAL_API_DATA_DIR ?? resourceDir);
   const mode = String(options.mode ?? process.env.LOCAL_API_MODE ?? 'desktop-sidecar');
   const cloudFallback = String(options.cloudFallback ?? process.env.LOCAL_API_CLOUD_FALLBACK ?? '') === 'true';
+  const backgroundAutomationDefault = ['tauri-sidecar', 'standalone-dev', 'browser-dev'].includes(mode)
+    ? 'false'
+    : 'true';
   const backgroundAutomationEnabled = String(
     options.backgroundAutomationEnabled
       ?? process.env.LOCAL_API_BACKGROUND_AUTOMATION
-      ?? 'true',
+      ?? backgroundAutomationDefault,
   ) !== 'false';
   const runtimeSecretsMirrorRefreshMs = Math.max(
     1_000,
@@ -5859,11 +5862,13 @@ export async function createLocalApiServer(options = {}) {
       // --- Auto-scheduler: trigger intelligence automation on a configurable interval ---
       const schedulerIntervalMs = 60 * 60 * 1000; // 1 hour
       let schedulerTimer = null;
+      let schedulerFirstRunTimer = null;
+      let accumulatorTimer = null;
 
       function startAutoScheduler() {
         if (schedulerTimer) return;
         // Run first cycle after 30 seconds (let server stabilize)
-        setTimeout(async () => {
+        schedulerFirstRunTimer = setTimeout(async () => {
           try {
             context.logger.log('[auto-scheduler] running first cycle');
             const { spawn: spawnChild } = await import('node:child_process');
@@ -5908,7 +5913,7 @@ export async function createLocalApiServer(options = {}) {
         // Start data accumulator daemon (continuous data collection + backfill)
         const accumulatorPath = path.join(context.resourceDir || process.cwd(), 'scripts', 'data-accumulator.mjs');
         if (fs.existsSync(accumulatorPath)) {
-          setTimeout(async () => {
+          accumulatorTimer = setTimeout(async () => {
             try {
               const { spawn: spawnChild } = await import('node:child_process');
               const accChild = spawnChild(process.execPath, ['--import', 'tsx', accumulatorPath], {
@@ -5932,6 +5937,18 @@ export async function createLocalApiServer(options = {}) {
       return { port: boundPort };
     },
     async close() {
+      if (schedulerFirstRunTimer) {
+        clearTimeout(schedulerFirstRunTimer);
+        schedulerFirstRunTimer = null;
+      }
+      if (schedulerTimer) {
+        clearInterval(schedulerTimer);
+        schedulerTimer = null;
+      }
+      if (accumulatorTimer) {
+        clearTimeout(accumulatorTimer);
+        accumulatorTimer = null;
+      }
       await new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
       });

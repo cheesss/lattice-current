@@ -99,6 +99,32 @@ export function deriveSignalContextFromLatestSignals(
     : null;
 }
 
+export function deriveSignalContextFallback(args: {
+  macroIndicators?: MacroIndicatorSnapshot | null;
+  transmissionProxy?: TransmissionProxy | null;
+  transmission?: EventMarketTransmissionSnapshot | null;
+}): SignalContextSnapshot | null {
+  const macroIndicators = args.macroIndicators ?? null;
+  const transmissionProxy = args.transmissionProxy ?? null;
+  const transmission = args.transmission ?? null;
+  const capturedAt = transmission?.generatedAt
+    ? new Date(transmission.generatedAt).toISOString()
+    : null;
+
+  const snapshot: SignalContextSnapshot = {
+    vix: finiteOrNull(macroIndicators?.vix),
+    yieldSpread: finiteOrNull(macroIndicators?.yieldSpread),
+    creditSpread: null,
+    gdeltStress: finiteOrNull(transmissionProxy?.marketStress),
+    transmissionStrength: finiteOrNull(transmissionProxy?.transmissionStrength),
+    capturedAt,
+  };
+
+  return Object.values(snapshot).some((value) => value !== null)
+    ? snapshot
+    : null;
+}
+
 type LatestSignalsProvider = () => Promise<Record<string, { value: number; ts: string }>>;
 
 async function defaultLatestSignalsProvider(): Promise<Record<string, { value: number; ts: string }>> {
@@ -219,6 +245,11 @@ export function buildIdeaGenerationRuntimeContext(args?: {
     transmission: args?.transmission ?? null,
     macroOverlay: args?.macroOverlay ?? null,
   });
+  const signalSnapshot = args?.signalContext ?? deriveSignalContextFallback({
+    macroIndicators,
+    transmissionProxy,
+    transmission: args?.transmission ?? null,
+  });
 
   return {
     rag: {
@@ -236,7 +267,7 @@ export function buildIdeaGenerationRuntimeContext(args?: {
     signal: {
       transmissionProxy,
       macroIndicators,
-      signalSnapshot: args?.signalContext ?? null,
+      signalSnapshot,
     },
   };
 }

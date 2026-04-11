@@ -54,23 +54,40 @@ type CountryStockSnapshot = {
 export class CountryIntelManager implements AppModule {
   private ctx: AppContext;
   private briefRequestToken = 0;
+  private countryIntelReady = false;
+  private boundMapMountedHandler: (() => void) | null = null;
 
   constructor(ctx: AppContext) {
     this.ctx = ctx;
   }
 
   init(): void {
-    this.setupCountryIntel();
+    if (!this.setupCountryIntel() && !this.boundMapMountedHandler) {
+      this.boundMapMountedHandler = () => {
+        this.setupCountryIntel();
+      };
+      window.addEventListener('wm:map-mounted', this.boundMapMountedHandler, { once: true });
+    }
   }
 
   destroy(): void {
+    if (this.boundMapMountedHandler) {
+      window.removeEventListener('wm:map-mounted', this.boundMapMountedHandler);
+      this.boundMapMountedHandler = null;
+    }
+    this.countryIntelReady = false;
     this.ctx.countryTimeline?.destroy();
     this.ctx.countryTimeline = null;
     this.ctx.countryBriefPage = null;
   }
 
-  private setupCountryIntel(): void {
-    if (!this.ctx.map) return;
+  private setupCountryIntel(): boolean {
+    if (this.countryIntelReady) return true;
+    if (!this.ctx.map) return false;
+    if (this.boundMapMountedHandler) {
+      window.removeEventListener('wm:map-mounted', this.boundMapMountedHandler);
+      this.boundMapMountedHandler = null;
+    }
     this.ctx.countryBriefPage = new CountryDeepDivePanel(this.ctx.map);
     this.ctx.countryBriefPage.setShareStoryHandler((code, name) => {
       this.ctx.countryBriefPage?.hide();
@@ -116,6 +133,8 @@ export class CountryIntelManager implements AppModule {
       this.ctx.countryTimeline?.destroy();
       this.ctx.countryTimeline = null;
     });
+    this.countryIntelReady = true;
+    return true;
   }
 
   async openCountryBrief(lat: number, lon: number): Promise<void> {

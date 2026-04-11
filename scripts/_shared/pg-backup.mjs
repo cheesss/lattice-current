@@ -52,36 +52,78 @@ export async function runBackup(config, options = {}) {
   ensureDir(backupDir);
 
   const filePath = buildBackupFilePath(backupDir);
-  const output = createWriteStream(filePath);
-  const gzip = createGzip({ level: 6 });
-  const pgDump = spawn(resolvePgDumpCommand(), [
-    '--host', String(config.host),
-    '--port', String(config.port),
-    '--username', String(config.user),
-    '--dbname', String(config.database),
-    '--format', 'plain',
-    '--no-owner',
-    '--no-privileges',
-  ], {
-    env: {
-      ...process.env,
-      PGPASSWORD: String(config.password || ''),
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
+  const command = resolvePgDumpCommand();
+
+  // Spawn pg_dump with immediate error handler attached BEFORE any other operation
+  // (spawn 'error' fires asynchronously; if not handled it becomes uncaughtException
+  //  and crashes the daemon — common case is ENOENT when pg_dump is not installed).
+  let pgDump;
+  try {
+    pgDump = spawn(command, [
+      '--host', String(config.host),
+      '--port', String(config.port),
+      '--username', String(config.user),
+      '--dbname', String(config.database),
+      '--format', 'plain',
+      '--no-owner',
+      '--no-privileges',
+    ], {
+      env: {
+        ...process.env,
+        PGPASSWORD: String(config.password || ''),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+  } catch (spawnError) {
+    return {
+      ok: false,
+      skipped: true,
+      filePath: '',
+      sizeBytes: 0,
+      durationMs: Date.now() - startedAt,
+      prunedFiles: 0,
+      error: `pg_dump unavailable: ${String(spawnError?.message || spawnError)}`,
+    };
+  }
+
+  // CRITICAL: attach error handler before any awaits to prevent uncaughtException
+  let spawnErrorMessage = null;
+  pgDump.on('error', (err) => {
+    spawnErrorMessage = String(err?.message || err);
   });
 
   let stderr = '';
-  pgDump.stderr.on('data', (chunk) => {
+  pgDump.stderr?.on('data', (chunk) => {
     stderr += String(chunk);
   });
 
+  const output = createWriteStream(filePath);
+  const gzip = createGzip({ level: 6 });
+
   try {
+    // If spawn failed asynchronously (ENOENT), spawnErrorMessage will be set on next tick
+    // Wait one tick to let the error event fire
+    await new Promise((resolve) => setImmediate(resolve));
+    if (spawnErrorMessage) {
+      const isMissing = /ENOENT|not found|cannot find/i.test(spawnErrorMessage);
+      throw new Error(
+        isMissing
+          ? `pg_dump command not available on this system (${spawnErrorMessage})`
+          : spawnErrorMessage
+      );
+    }
+
     await pipeline(pgDump.stdout, gzip, output);
-    const exitCode = await new Promise((resolve, reject) => {
-      pgDump.once('error', reject);
+    const exitCode = await new Promise((resolve) => {
       pgDump.once('close', resolve);
     });
+
+    // Check if error occurred during pipeline
+    if (spawnErrorMessage) {
+      throw new Error(spawnErrorMessage);
+    }
+
     if (Number(exitCode) !== 0) {
       throw new Error(stderr.trim() || `pg_dump exited with code ${exitCode}`);
     }
@@ -107,13 +149,16 @@ export async function runBackup(config, options = {}) {
     } catch {
       // ignore
     }
+    const errorMessage = String(error?.message || error || 'backup failed');
+    const skipped = /ENOENT|not available|not found|cannot find/i.test(errorMessage);
     return {
       ok: false,
+      skipped,
       filePath: '',
       sizeBytes: 0,
       durationMs: Date.now() - startedAt,
       prunedFiles: 0,
-      error: String(error?.message || error || 'backup failed'),
+      error: errorMessage,
     };
   }
 }

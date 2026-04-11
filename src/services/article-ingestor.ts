@@ -8,7 +8,9 @@
  * NAS PostgreSQL: 192.168.0.76:5433, DB: lattice
  */
 
-import pg from 'pg';
+import type { PoolClient } from 'pg';
+import { createLogger } from '@/utils/logger';
+import { createManagedPgPool } from '@/utils/pg-pool';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,38 +53,6 @@ interface SensitivityTarget {
   horizon: string;
 }
 
-// ---------------------------------------------------------------------------
-// Configuration helpers
-// ---------------------------------------------------------------------------
-
-function resolveNasPgConfig(): pg.PoolConfig {
-  const env = (keys: string[], fallback: string): string => {
-    for (const k of keys) {
-      const v = String(process.env[k] || '').trim();
-      if (v) return v;
-    }
-    return fallback;
-  };
-
-  const host = env(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'], '192.168.0.76');
-  const portRaw = Number(env(['INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'], '5433'));
-  const port = Number.isFinite(portRaw) && portRaw > 0 ? portRaw : 5433;
-  const database = env(['INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'], 'lattice');
-  const user = env(['INTEL_PG_USER', 'NAS_PG_USER', 'PG_USER', 'PGUSER'], 'postgres');
-  const password = env(['INTEL_PG_PASSWORD', 'NAS_PG_PASSWORD', 'PG_PASSWORD', 'PGPASSWORD'], '');
-
-  return {
-    host,
-    port,
-    database,
-    user,
-    password: password || undefined,
-    max: 4,
-    idleTimeoutMillis: 30_000,
-    allowExitOnIdle: true,
-  };
-}
-
 function resolveOllamaEmbedEndpoint(): string | null {
   const base = String(process.env.OLLAMA_API_URL || process.env.OLLAMA_BASE_URL || '').trim();
   if (!base) return null;
@@ -93,74 +63,28 @@ function resolveOllamaModel(): string {
   return String(process.env.OLLAMA_MODEL || 'nomic-embed-text').trim();
 }
 
-// ---------------------------------------------------------------------------
-// Pool management
-// ---------------------------------------------------------------------------
-
-let pool: pg.Pool | null = null;
-let poolCacheKey = '';
-let consecutiveFailures = 0;
-let disabledUntil = 0;
-let lastPoolError = '';
 const CIRCUIT_BREAKER_FAILS = Math.max(1, Number(process.env.ARTICLE_INGESTOR_POOL_CIRCUIT_FAILS || 3));
 const CIRCUIT_BREAKER_OPEN_MS = Math.max(60_000, Number(process.env.ARTICLE_INGESTOR_POOL_CIRCUIT_OPEN_MS || (5 * 60 * 1000)));
-
-function recordPoolFailure(error: unknown): void {
-  consecutiveFailures += 1;
-  lastPoolError = String((error as Error)?.message || error || 'pool failure');
-  if (consecutiveFailures >= CIRCUIT_BREAKER_FAILS) {
-    disabledUntil = Date.now() + CIRCUIT_BREAKER_OPEN_MS;
-    console.warn(`[article-ingestor] pool circuit open for ${Math.round(CIRCUIT_BREAKER_OPEN_MS / 1000)}s: ${lastPoolError}`);
-    if (pool) {
-      void pool.end().catch(() => { /* ignore */ });
-      pool = null;
-      poolCacheKey = '';
-    }
-  }
-}
-
-function recordPoolSuccess(): void {
-  consecutiveFailures = 0;
-  disabledUntil = 0;
-  lastPoolError = '';
-}
-
-function getPool(): pg.Pool | null {
-  if (Date.now() < disabledUntil) return null;
-  const config = resolveNasPgConfig();
-  const key = JSON.stringify({
-    host: config.host,
-    port: config.port,
-    database: config.database,
-    user: config.user,
-  });
-
-  if (pool && poolCacheKey === key) return pool;
-
-  if (pool) {
-    void pool.end().catch(() => { /* ignore */ });
-  }
-
-  pool = new pg.Pool(config);
-  pool.on('error', (err) => recordPoolFailure(err));
-  poolCacheKey = key;
-  return pool;
-}
+const logger = createLogger('article-ingestor');
+const poolManager = createManagedPgPool({
+  name: 'article-ingestor',
+  max: 4,
+  idleTimeoutMillis: 30_000,
+  allowExitOnIdle: true,
+  maxFailures: CIRCUIT_BREAKER_FAILS,
+  cooldownMs: CIRCUIT_BREAKER_OPEN_MS,
+  logger,
+});
+const getPool = () => poolManager.getPool();
+const recordPoolFailure = (error: unknown) => poolManager.recordFailure(error);
+const recordPoolSuccess = () => poolManager.recordSuccess();
 
 export async function closeIngestorPool(): Promise<void> {
-  if (!pool) return;
-  const ref = pool;
-  pool = null;
-  poolCacheKey = '';
-  await ref.end().catch(() => { /* ignore */ });
+  await poolManager.close();
 }
 
 export function getArticleIngestorCircuitState(): { consecutiveFailures: number; disabledUntil: number; lastError: string } {
-  return {
-    consecutiveFailures,
-    disabledUntil,
-    lastError: lastPoolError,
-  };
+  return poolManager.getCircuitState();
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +93,7 @@ export function getArticleIngestorCircuitState(): { consecutiveFailures: number;
 
 let schemaReady = false;
 
-async function ensureSchema(client: pg.PoolClient): Promise<void> {
+async function ensureSchema(client: PoolClient): Promise<void> {
   if (schemaReady) return;
 
   await client.query(`
@@ -237,7 +161,7 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
 // ---------------------------------------------------------------------------
 
 async function autoClassifyTheme(
-  client: pg.PoolClient,
+  client: PoolClient,
   articleId: number,
 ): Promise<string> {
   const result = await client.query<{ theme: string; sim: number }>(`
@@ -259,7 +183,7 @@ async function autoClassifyTheme(
 // ---------------------------------------------------------------------------
 
 async function createPendingOutcomes(
-  client: pg.PoolClient,
+  client: PoolClient,
   articleId: number,
   theme: string,
   publishedAt: string,
@@ -316,7 +240,7 @@ async function createPendingOutcomes(
 }
 
 async function refreshSensitivityMatrixForTargets(
-  client: pg.PoolClient,
+  client: PoolClient,
   targets: SensitivityTarget[],
 ): Promise<void> {
   const uniqueTargets = Array.from(new Map(
@@ -703,7 +627,7 @@ export async function checkPendingOutcomes(): Promise<CheckPendingResult> {
       try {
         await refreshSensitivityMatrixForTargets(client, refreshedTargets);
       } catch (error) {
-        console.error('[article-ingestor] refreshSensitivityMatrixForTargets failed:', error);
+        logger.error('refreshSensitivityMatrixForTargets failed', { error: String(error) });
       }
     }
 

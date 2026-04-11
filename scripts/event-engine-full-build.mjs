@@ -191,6 +191,8 @@ export async function main() {
   console.log('▶ 1. HMM Regime 분리 — 시장 상태별 종목 반응...');
 
   await client.query(REGIME_TABLE_SQL);
+  // Ensure anomaly_rate column exists (for legacy tables created before this column was added)
+  await client.query(`ALTER TABLE regime_conditional_impact ADD COLUMN IF NOT EXISTS anomaly_rate DOUBLE PRECISION DEFAULT 0`);
 
   // Use Yahoo VIX + yield spread to classify regime
   // VIX > 25 = risk-off, VIX < 18 = risk-on, else balanced

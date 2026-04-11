@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Theme Map Lens</title>
+  <style>
+    :root{
+      color-scheme: dark;
+      --lens-bg:#081018;
+      --lens-panel:rgba(7,14,22,.78);
+      --lens-border:rgba(255,255,255,.08);
+      --lens-text:#edf2f7;
+      --lens-muted:#9cb0c3;
+      --lens-accent:#7ee081;
+      --lens-alert:#ff7a6b;
+      --lens-shadow:0 24px 60px rgba(0,0,0,.38);
+    }
+    html,body{margin:0;height:100%;background:var(--lens-bg);color:var(--lens-text);font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden}
+    #lens-root{position:relative;height:100%;width:100%;background:
+      radial-gradient(circle at top left, rgba(126,224,129,.08), transparent 32%),
+      radial-gradient(circle at bottom right, rgba(124,169,255,.08), transparent 30%),
+      linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0))}
+    #lens-map{position:absolute;inset:0}
+    .lens-overlay{
+      position:absolute;top:16px;left:16px;right:16px;display:grid;gap:12px;
+      grid-template-columns:minmax(260px,340px) minmax(220px,280px);
+      align-items:start;pointer-events:none
+    }
+    .lens-card{
+      pointer-events:auto;
+      background:var(--lens-panel);
+      border:1px solid var(--lens-border);
+      border-radius:18px;
+      box-shadow:var(--lens-shadow);
+      backdrop-filter:blur(18px);
+      padding:14px 16px;
+    }
+    .lens-kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--lens-muted);margin-bottom:8px}
+    .lens-title{font-size:22px;font-weight:700;line-height:1.15;margin:0}
+    .lens-copy{margin-top:8px;color:var(--lens-muted);font-size:13px;line-height:1.45}
+    .lens-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+    .lens-stat{padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.05)}
+    .lens-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--lens-muted)}
+    .lens-stat-value{margin-top:6px;font-size:14px;font-weight:600}
+    .lens-row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .lens-badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px}
+    .lens-badge.live::before,.lens-badge.offline::before,.lens-badge.stale::before{content:'';width:8px;height:8px;border-radius:999px;display:inline-block}
+    .lens-badge.live::before{background:var(--lens-accent)}
+    .lens-badge.offline::before{background:var(--lens-alert)}
+    .lens-badge.stale::before{background:#f3b562}
+    .lens-list{display:grid;gap:8px;margin-top:12px}
+    .lens-pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .lens-pill{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);font-size:12px}
+    .lens-empty{color:var(--lens-muted);font-size:12px}
+    .lens-sources{max-height:220px;overflow:auto;padding-right:6px}
+    .lens-sources::-webkit-scrollbar{width:8px}
+    .lens-sources::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:999px}
+    .lens-footer{position:absolute;left:16px;right:16px;bottom:16px;display:flex;justify-content:space-between;gap:12px;align-items:end;pointer-events:none}
+    .lens-footer .lens-card{pointer-events:auto;max-width:520px}
+    .lens-theme-stack{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .lens-theme-chip{padding:6px 10px;border-radius:999px;background:rgba(126,224,129,.1);border:1px solid rgba(126,224,129,.2);font-size:12px;color:#d8ffe0}
+    @media (max-width: 920px){
+      .lens-overlay{grid-template-columns:1fr}
+      .lens-footer{flex-direction:column;align-items:stretch}
+    }
+  </style>
+</head>
+<body>
+  <div id="lens-root">
+    <div id="lens-map" aria-label="Theme map lens"></div>
+    <div class="lens-overlay">
+      <section class="lens-card">
+        <div class="lens-kicker">2D Geo Lens</div>
+        <div class="lens-row">
+          <h1 id="lens-title" class="lens-title">Global signal lens</h1>
+          <span id="lens-health" class="lens-badge stale">Waiting</span>
+        </div>
+        <div id="lens-copy" class="lens-copy">Legacy risk regions, infrastructure links, event overlays, and country pressure layers stay available here in flat-map mode.</div>
+        <div class="lens-meta">
+          <div class="lens-stat"><div class="lens-stat-label">Theme</div><div id="lens-theme" class="lens-stat-value">Global</div></div>
+          <div class="lens-stat"><div class="lens-stat-label">Period</div><div id="lens-period" class="lens-stat-value">Quarter</div></div>
+          <div class="lens-stat"><div class="lens-stat-label">Preset</div><div id="lens-preset" class="lens-stat-value">Cross-domain</div></div>
+          <div class="lens-stat"><div class="lens-stat-label">Layers</div><div id="lens-layer-count" class="lens-stat-value">0 active</div></div>
+        </div>
+        <div class="lens-pill-row" id="lens-active-layers"></div>
+      </section>
+      <section class="lens-card">
+        <div class="lens-kicker">Context</div>
+        <div id="lens-context-copy" class="lens-copy">The lens changes layer presets by theme while keeping manual map toggles available.</div>
+        <div class="lens-theme-stack" id="lens-followed-themes"></div>
+        <div class="lens-kicker" style="margin-top:14px">Dynamic Sources</div>
+        <div id="lens-sources" class="lens-list lens-sources"></div>
+      </section>
+    </div>
+    <div class="lens-footer">
+      <section class="lens-card">
+        <div class="lens-kicker">Live Spatial Coverage</div>
+        <div id="lens-status-line" class="lens-copy">Loading live overlays and strategic layers.</div>
+      </section>
+      <section class="lens-card">
+        <div class="lens-kicker">Operator Notes</div>
+        <div id="lens-notes" class="lens-copy">The 3D globe is intentionally removed here. Manual layer toggles still work inside the map chrome so existing risk-region and relationship views stay usable.</div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="/src/theme-map-lens.ts"></script>
+</body>
+</html>
