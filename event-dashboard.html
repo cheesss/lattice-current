@@ -137,6 +137,41 @@ th{color:var(--muted);font-weight:normal}
 .surface-drawer[open]>summary::after{content:"-"}
 @media (max-width:1320px){.hero,.section-heading{flex-direction:column;align-items:flex-start}.hero-actions{min-width:0;align-items:flex-start}.hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.snapshot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3,.mini-grid,.pyramid-grid,.category-grid,.grid2,.reference-grid,.primary-grid,.kpi-grid,.map-grid{grid-template-columns:1fr}.span-5,.span-7,.span-2{grid-column:span 1}}
 @media (max-width:760px){.container{padding:12px}.hero{padding:16px}h1{font-size:22px}.hero-grid,.snapshot-grid{grid-template-columns:1fr}.story-card{grid-template-columns:1fr}.story-rank{width:34px;height:34px}.embed-frame{height:clamp(420px,58vh,560px)}}
+/* KPI Strip */
+.kpi-strip{display:flex;gap:12px;padding:12px 0;overflow-x:auto;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
+.kpi-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
+.kpi-chip-label{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.kpi-chip-value{font-size:14px;font-weight:700;color:var(--text)}
+.kpi-chip-value.kpi-accent{color:var(--accent)}
+.kpi-chip-value.kpi-negative{color:var(--red)}
+.kpi-chip-value.kpi-positive{color:var(--accent2)}
+.kpi-regime-badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.08em}
+.kpi-regime-badge.crisis{background:rgba(255,122,107,.2);color:var(--red)}
+.kpi-regime-badge.risk-off{background:rgba(243,181,98,.2);color:var(--amber)}
+.kpi-regime-badge.balanced{background:rgba(124,169,255,.2);color:var(--blue)}
+.kpi-regime-badge.risk-on{background:rgba(126,224,129,.2);color:var(--accent2)}
+.kpi-gauge-bar{width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.kpi-gauge-fill{height:100%;border-radius:3px;transition:width .5s}
+/* Evidence bars */
+.ev-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.ev-bar-label{width:22px;font-weight:700;font-size:11px}
+.ev-bar-track{flex:1;height:16px;background:var(--border);border-radius:3px;overflow:hidden}
+.ev-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.ev-bar-count{width:70px;text-align:right;font-size:10px;color:var(--muted)}
+.ev-bar-uplift{width:55px;text-align:right;font-size:10px}
+/* Correlation grid */
+.corr-grid{display:grid;gap:1px;font-size:9px}
+.corr-cell{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:2px;font-weight:600}
+.corr-label{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:8px;text-transform:uppercase}
+/* Regime timeline */
+.regime-bar{display:flex;height:24px;border-radius:4px;overflow:hidden;margin-bottom:4px}
+.regime-segment{height:100%;transition:width .3s}
+/* Source credibility */
+.src-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:10px}
+.src-name{width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.src-bar-fill{height:100%;border-radius:2px}
+.src-score{width:28px;text-align:right;font-weight:600}
 </style>
 </head>
 <body>
@@ -156,6 +191,17 @@ th{color:var(--muted);font-weight:normal}
       </div>
     </div>
   </header>
+
+  <!-- KPI Summary Bar -->
+  <div class="kpi-strip" id="kpi-strip">
+    <div class="kpi-chip"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
+    <div class="kpi-chip"><span class="kpi-chip-label">Risk</span><span class="kpi-chip-value" id="kpi-risk">--</span><div class="kpi-gauge-bar"><div class="kpi-gauge-fill" id="kpi-risk-fill"></div></div></div>
+    <div class="kpi-chip"><span class="kpi-chip-label">Regime</span><span class="kpi-regime-badge" id="kpi-regime">--</span></div>
+    <div class="kpi-chip"><span class="kpi-chip-label">Spread</span><span class="kpi-chip-value" id="kpi-spread">--</span></div>
+    <div class="kpi-chip"><span class="kpi-chip-label">Oil</span><span class="kpi-chip-value" id="kpi-oil">--</span></div>
+    <div class="kpi-chip"><span class="kpi-chip-label">Dollar</span><span class="kpi-chip-value" id="kpi-dollar">--</span></div>
+    <div class="kpi-chip"><span class="kpi-chip-label">E2 Signals</span><span class="kpi-chip-value kpi-accent" id="kpi-e2">0</span></div>
+  </div>
 
   <div class="hero-grid hero-grid-summary">
     <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div id="system-status" class="loading">Loading system state...</div></div>
@@ -349,6 +395,27 @@ th{color:var(--muted);font-weight:normal}
       <div class="card span-2"><div class="card-title">Regime-Conditional Impact</div><div id="regime" class="loading">Loading regime data...</div></div>
     </div>
   </details>
+
+  <!-- Analytics & Visualization Section -->
+  <section class="section-block" id="analytics-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Analytics</div><div class="section-title">Event Decision Engine Visualizations</div></div>
+      <div class="section-meta">Counterfactual alpha, evidence grading, regime analysis, and model calibration.</div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="card-title">Evidence Grade Distribution <span class="badge" id="evidence-badge">--</span></div><div id="evidence-chart"></div></div>
+      <div class="card"><div class="card-title">Alpha Decay by Theme <span class="badge">Horizon</span></div><div id="alpha-decay-chart"></div></div>
+    </div>
+    <div class="grid3" style="margin-top:12px">
+      <div class="card"><div class="card-title">Event Intensity Heatmap <span class="badge">6mo</span></div><div id="hawkes-chart" style="min-height:200px"></div></div>
+      <div class="card"><div class="card-title">Signal Correlation <span class="badge">90d</span></div><div id="correlation-chart" style="min-height:200px"></div></div>
+      <div class="card"><div class="card-title">Regime Timeline <span class="badge">VIX</span></div><div id="regime-timeline-chart" style="min-height:120px"></div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card"><div class="card-title">Conviction vs Realized Alpha <span class="badge">Calibration</span></div><canvas id="calibration-canvas" style="width:100%;height:220px"></canvas></div>
+      <div class="card"><div class="card-title">Source Credibility <span class="badge" id="source-count-badge">--</span></div><div id="source-credibility-chart"></div></div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -2067,6 +2134,237 @@ postEmbedMessage('wm-theme-workspace-ready',{theme:state.currentTheme||null,peri
 getMapLensFrame()?.addEventListener('load',()=>pushMapLensContext(),{once:true});
 void refreshAll().then(()=>emitEmbeddedContext());
 setInterval(()=>{void refreshAll().then(()=>emitEmbeddedContext());},60000);
+
+// ═══════════════════════════════════════════════════════════════
+// Analytics Section: KPI + Charts (Event Decision Engine)
+// ═══════════════════════════════════════════════════════════════
+const NAS_API = 'http://localhost:46200/api';
+
+async function refreshKPI() {
+  try {
+    const r = await fetch(NAS_API + '/../api/kpi-summary').then(r => r.ok ? r.json() : null).catch(() => null);
+    // Fallback: try signals from event-dashboard API
+    const signals = r || await fetch(API + '/signals').then(r => r.ok ? r.json() : null).catch(() => null);
+    if (!signals) return;
+
+    const vix = signals.vix ?? signals.rows?.find?.(r => r.signal_name === 'vix')?.value;
+    const spread = signals.yieldSpread ?? signals.rows?.find?.(r => r.signal_name === 'yieldSpread')?.value;
+    const oil = signals.oilPrice ?? signals.rows?.find?.(r => r.signal_name === 'oilPrice')?.value;
+    const dollar = signals.dollarIndex ?? signals.rows?.find?.(r => r.signal_name === 'dollarIndex')?.value;
+    const riskGauge = signals.riskGauge ?? (vix ? Math.min(100, Math.max(4, 45 + (vix - 20) * 2)) : null);
+    const regime = signals.riskState ?? (vix > 25 ? 'risk-off' : vix < 18 ? 'risk-on' : 'balanced');
+
+    const el = (id) => document.getElementById(id);
+    if (vix != null) el('kpi-vix').textContent = Number(vix).toFixed(1);
+    if (riskGauge != null) {
+      el('kpi-risk').textContent = Math.round(riskGauge);
+      const fill = el('kpi-risk-fill');
+      fill.style.width = Math.min(100, riskGauge) + '%';
+      fill.style.background = riskGauge >= 82 ? 'var(--red)' : riskGauge >= 66 ? 'var(--amber)' : riskGauge >= 28 ? 'var(--blue)' : 'var(--accent2)';
+    }
+    const regimeEl = el('kpi-regime');
+    regimeEl.textContent = regime.toUpperCase();
+    regimeEl.className = 'kpi-regime-badge ' + regime.replace(/[^a-z-]/g, '');
+    if (spread != null) el('kpi-spread').textContent = Number(spread).toFixed(2);
+    if (oil != null) el('kpi-oil').textContent = Number(oil).toFixed(1);
+    if (dollar != null) el('kpi-dollar').textContent = Number(dollar).toFixed(1);
+
+    // VIX sparkline
+    const history = signals.vixHistory || [];
+    if (history.length > 2) {
+      const svg = el('kpi-vix-spark');
+      const w = 50, h = 16;
+      const mn = Math.min(...history), mx = Math.max(...history), rng = mx - mn || 1;
+      const pts = history.map((v, i) => `${(i/(history.length-1)*w).toFixed(1)},${(h-((v-mn)/rng)*(h-2)-1).toFixed(1)}`).join(' ');
+      svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="${history[history.length-1]>=history[0]?'var(--red)':'var(--accent2)'}" stroke-width="1.2" stroke-linecap="round"/>`;
+    }
+  } catch (e) { console.warn('KPI refresh failed', e); }
+}
+
+async function refreshEvidenceChart() {
+  try {
+    const r = await fetch(API + '/event-uplift-grades').catch(() => null);
+    if (!r?.ok) return;
+    const rows = await r.json();
+    // Aggregate from detailed rows
+    const gradeMap = {};
+    for (const row of rows) {
+      const g = row.evidence_grade || 'E0';
+      if (!gradeMap[g]) gradeMap[g] = { count: 0, totalUplift: 0 };
+      gradeMap[g].count++;
+      gradeMap[g].totalUplift += Number(row.uplift) || 0;
+    }
+    // Also add E0 count estimate
+    const total = Object.values(gradeMap).reduce((s, g) => s + g.count, 0);
+    const el = document.getElementById('evidence-chart');
+    const badge = document.getElementById('evidence-badge');
+    if (badge) badge.textContent = total + ' events';
+
+    const grades = ['E0', 'E1', 'E2', 'E3', 'E4'].filter(g => gradeMap[g]);
+    const maxCount = Math.max(...grades.map(g => gradeMap[g]?.count || 0), 1);
+    const colors = { E0: '#3d3d3d', E1: '#2d5a2d', E2: '#2d3a5d', E3: '#5d5a2d', E4: '#5d2d2d' };
+    const textColors = { E0: '#999', E1: '#7cc87c', E2: '#7cb8ff', E3: '#ffd75e', E4: '#ff9e7c' };
+
+    el.innerHTML = grades.map(g => {
+      const d = gradeMap[g];
+      const pct = (d.count / total * 100).toFixed(1);
+      const avg = d.count > 0 ? d.totalUplift / d.count : 0;
+      return `<div class="ev-bar-row">
+        <span class="ev-bar-label" style="color:${textColors[g]}">${g}</span>
+        <div class="ev-bar-track"><div class="ev-bar-fill" style="width:${d.count/maxCount*100}%;background:${colors[g]}"></div></div>
+        <span class="ev-bar-count">${d.count.toLocaleString()} (${pct}%)</span>
+        <span class="ev-bar-uplift" style="color:${avg>=0?'var(--accent2)':'var(--red)'}">${avg>=0?'+':''}${avg.toFixed(2)}%</span>
+      </div>`;
+    }).join('');
+  } catch (e) { console.warn('Evidence chart failed', e); }
+}
+
+async function refreshAlphaDecay() {
+  try {
+    const r = await fetch(API + '/alpha-decay').catch(() => null);
+    if (!r?.ok) return;
+    const curves = await r.json();
+    const el = document.getElementById('alpha-decay-chart');
+    const top = curves.sort((a, b) => Math.max(...b.points.map(p => Math.abs(p.alpha))) - Math.max(...a.points.map(p => Math.abs(p.alpha)))).slice(0, 6);
+    const colors = ['var(--accent)', 'var(--blue)', 'var(--amber)', 'var(--teal)', 'var(--red)', 'var(--muted)'];
+    el.innerHTML = top.map((c, i) => {
+      const pts = c.points.sort((a, b) => { const o = {['1w']:1,['2w']:2,['1m']:3}; return (o[a.horizon]||0) - (o[b.horizon]||0); });
+      const bars = pts.map(p => `<span style="display:inline-block;width:${Math.max(4,Math.abs(p.alpha)*8)}px;height:12px;background:${p.alpha>=0?colors[i]:'var(--red)'};border-radius:2px;margin-right:4px" title="${p.horizon}: ${p.alpha>=0?'+':''}${p.alpha.toFixed(2)}%"></span>`).join('');
+      return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:10px"><span style="width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${colors[i]}">${c.theme}</span>${bars}<span style="color:var(--muted)">${pts.map(p=>`${p.horizon}:${p.alpha>=0?'+':''}${p.alpha.toFixed(1)}%`).join(' ')}</span></div>`;
+    }).join('');
+  } catch (e) { console.warn('Alpha decay failed', e); }
+}
+
+async function refreshCorrelation() {
+  try {
+    const r = await fetch(API + '/signal-correlation').catch(() => null);
+    if (!r?.ok) return;
+    const data = await r.json();
+    const signals = [...new Set(data.map(d => d.signal_a))].sort();
+    const n = signals.length;
+    const el = document.getElementById('correlation-chart');
+    const lookup = {};
+    for (const d of data) lookup[d.signal_a + '::' + d.signal_b] = Number(d.correlation);
+
+    const shortName = s => s.replace('_', ' ').replace('credit spread', 'credit').slice(0, 8);
+    let html = `<div class="corr-grid" style="grid-template-columns:auto repeat(${n},1fr)">`;
+    html += `<div></div>${signals.map(s => `<div class="corr-label">${shortName(s)}</div>`).join('')}`;
+    for (const row of signals) {
+      html += `<div class="corr-label">${shortName(row)}</div>`;
+      for (const col of signals) {
+        const v = lookup[row + '::' + col] ?? lookup[col + '::' + row] ?? (row === col ? 1 : 0);
+        const abs = Math.abs(v);
+        const bg = v > 0 ? `rgba(124,200,124,${abs*0.6})` : `rgba(255,107,107,${abs*0.6})`;
+        html += `<div class="corr-cell" style="background:${bg}" title="${row} x ${col}: ${Number(v).toFixed(3)}">${Number(v).toFixed(1)}</div>`;
+      }
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch (e) { console.warn('Correlation failed', e); }
+}
+
+async function refreshRegimeTimeline() {
+  try {
+    const r = await fetch(API + '/regime-timeline').catch(() => null);
+    if (!r?.ok) return;
+    const segments = await r.json();
+    if (!segments.length) return;
+    const el = document.getElementById('regime-timeline-chart');
+    const colors = { crisis: 'var(--red)', 'risk-off': 'var(--amber)', balanced: 'var(--blue)', 'risk-on': 'var(--accent2)' };
+    const minDate = new Date(segments[0].start).getTime();
+    const maxDate = new Date(segments[segments.length - 1].end).getTime();
+    const range = maxDate - minDate || 1;
+
+    el.innerHTML = `<div class="regime-bar">${segments.map(s => {
+      const w = (new Date(s.end) - new Date(s.start)) / range * 100;
+      return `<div class="regime-segment" style="width:${Math.max(0.5, w)}%;background:${colors[s.regime]||'var(--border)'}" title="${s.regime}: ${s.start} to ${s.end}"></div>`;
+    }).join('')}</div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)">
+      <span>${segments[0].start}</span>
+      ${Object.entries(colors).map(([k, c]) => `<span style="color:${c}">${k}</span>`).join(' ')}
+      <span>${segments[segments.length - 1].end}</span>
+    </div>`;
+  } catch (e) { console.warn('Regime timeline failed', e); }
+}
+
+async function refreshHawkesHeatmap() {
+  try {
+    const r = await fetch(API + '/hawkes-heatmap').catch(() => null);
+    if (!r?.ok) return;
+    const rows = await r.json();
+    if (!rows.length) return;
+    const el = document.getElementById('hawkes-chart');
+    // Aggregate by theme x month
+    const agg = {};
+    for (const row of rows) {
+      const month = (row.event_date || '').slice(0, 7);
+      const key = row.theme + '::' + month;
+      if (!agg[key]) agg[key] = { sum: 0, count: 0 };
+      agg[key].sum += Number(row.hawkes_intensity) || 0;
+      agg[key].count++;
+    }
+    const themes = [...new Set(rows.map(r => r.theme))].slice(0, 8);
+    const months = [...new Set(rows.map(r => (r.event_date || '').slice(0, 7)))].sort();
+    const maxVal = Math.max(...Object.values(agg).map(a => a.sum / a.count), 0.01);
+
+    let html = `<div style="display:grid;grid-template-columns:80px repeat(${months.length},1fr);gap:1px;font-size:9px">`;
+    html += `<div></div>${months.map(m => `<div style="text-align:center;color:var(--muted)">${m.slice(5)}</div>`).join('')}`;
+    for (const theme of themes) {
+      html += `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">${theme.slice(0,12)}</div>`;
+      for (const month of months) {
+        const a = agg[theme + '::' + month];
+        const v = a ? a.sum / a.count : 0;
+        const intensity = v / maxVal;
+        const r = Math.round(intensity * 200 + 40);
+        const g = Math.round((1 - intensity) * 80 + 20);
+        const b = Math.round((1 - intensity) * 60 + 20);
+        html += `<div style="aspect-ratio:1.8;background:rgb(${r},${g},${b});border-radius:2px" title="${theme} ${month}: ${v.toFixed(2)}"></div>`;
+      }
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch (e) { console.warn('Hawkes heatmap failed', e); }
+}
+
+async function refreshSourceCredibility() {
+  try {
+    // Use articles table to approximate source credibility
+    const r = await fetch(API + '/live-status').catch(() => null);
+    if (!r?.ok) return;
+    const data = await r.json();
+    const sources = data.sourceFreshness || data.sources || [];
+    if (!sources.length) return;
+    const el = document.getElementById('source-credibility-chart');
+    const badge = document.getElementById('source-count-badge');
+    if (badge) badge.textContent = sources.length + ' sources';
+
+    const sorted = sources.sort((a, b) => (b.articleCount || b.count || 0) - (a.articleCount || a.count || 0)).slice(0, 12);
+    el.innerHTML = sorted.map(s => {
+      const score = Math.min(100, Math.max(0, (s.freshness || s.score || 50)));
+      const color = score >= 70 ? 'var(--accent2)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+      return `<div class="src-row">
+        <span class="src-name">${s.name || s.source || '?'}</span>
+        <div class="src-bar"><div class="src-bar-fill" style="width:${score}%;background:${color}"></div></div>
+        <span class="src-score" style="color:${color}">${Math.round(score)}</span>
+      </div>`;
+    }).join('');
+  } catch (e) { console.warn('Source credibility failed', e); }
+}
+
+// Run analytics refresh
+async function refreshAnalytics() {
+  await Promise.allSettled([
+    refreshKPI(),
+    refreshEvidenceChart(),
+    refreshAlphaDecay(),
+    refreshCorrelation(),
+    refreshRegimeTimeline(),
+    refreshHawkesHeatmap(),
+    refreshSourceCredibility(),
+  ]);
+}
+refreshAnalytics();
+setInterval(refreshAnalytics, 180000); // Refresh every 3 min
 </script>
 </body>
 </html>
