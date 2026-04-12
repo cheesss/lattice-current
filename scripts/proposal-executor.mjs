@@ -233,7 +233,12 @@ async function main() {
     console.log('\nTriggering incremental event engine...');
     try {
       const { execSync } = await import('child_process');
-      execSync('node scripts/incremental-event-engine-fast.mjs', { stdio: 'inherit', timeout: 300000 });
+      const py = process.env.LATTICE_PYTHON || (process.env.USERPROFILE ? `${process.env.USERPROFILE}/miniconda3/python.exe` : 'python');
+      try {
+        execSync(`${py} scripts/incremental_event_engine.py`, { stdio: 'inherit', timeout: 300000 });
+      } catch {
+        execSync('node scripts/incremental-event-engine-fast.mjs', { stdio: 'inherit', timeout: 300000 });
+      }
     } catch (err) {
       console.warn(`Event engine trigger failed (non-fatal): ${err?.message || err}`);
     }

@@ -236,7 +236,14 @@ async function runPipeline() {
   // ═══ STEP 3: 분석 테이블 전체 갱신 (regime, hawkes, whatif) ═══
   if (shouldRunStep(3)) {
     console.log('▶ STEP 3: 분석 테이블 갱신...');
-    run('node --import tsx scripts/event-engine-full-build.mjs', 300000);
+    // Python 우선, 실패 시 JS fallback
+    try {
+      const py = process.env.LATTICE_PYTHON || (process.env.USERPROFILE ? `${process.env.USERPROFILE}/miniconda3/python.exe` : 'python');
+      run(`${py} scripts/event_engine_full_build.py`, 600000);
+    } catch {
+      console.warn('  Python event engine failed, falling back to JS');
+      run('node --import tsx scripts/event-engine-full-build.mjs', 300000);
+    }
     run('node --import tsx scripts/event-analysis-ml-upgrade.mjs build', 300000);
     results.steps.push({ step: 3, status: 'ok' });
     console.log('');
@@ -264,7 +271,30 @@ async function runPipeline() {
     console.log('▶ STEP 6: Event Decision Engine (incremental)...');
     try {
       const { execSync } = await import('child_process');
-      execSync('node scripts/incremental-event-engine-fast.mjs', { stdio: 'inherit', timeout: 600000 });
+      // Python 우선, 실패 시 JS fallback
+      try {
+        const pythonCandidates = [
+          process.env.LATTICE_PYTHON,
+          process.env.PYTHON,
+          process.env.USERPROFILE ? `${process.env.USERPROFILE}/miniconda3/python.exe` : null,
+          'python',
+        ].filter(Boolean);
+        let ran = false;
+        for (const py of pythonCandidates) {
+          try {
+            execSync(`${py} scripts/incremental_event_engine.py`, { stdio: 'inherit', timeout: 600000 });
+            ran = true;
+            break;
+          } catch (e) {
+            if (e.status !== null) throw e; // Python ran but failed
+            continue; // Python not found, try next
+          }
+        }
+        if (!ran) throw new Error('No Python interpreter found');
+      } catch (pyErr) {
+        console.warn(`  Python engine failed, falling back to JS: ${pyErr?.message || pyErr}`);
+        execSync('node scripts/incremental-event-engine-fast.mjs', { stdio: 'inherit', timeout: 600000 });
+      }
       results.steps.push({ step: 6, status: 'ok', detail: 'incremental event engine updated' });
     } catch (err) {
       console.warn(`  Event engine failed (non-fatal): ${err?.message || err}`);
