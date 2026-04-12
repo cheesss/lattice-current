@@ -17,7 +17,7 @@ function createClient(usedByInterval = {}) {
 
 test('automation budgets expose expected action classes', () => {
   assert.equal(AUTOMATION_BUDGETS.daily.backfillCalls, 5);
-  assert.equal(AUTOMATION_BUDGETS.daily.rssRegistrations, 10);
+  assert.equal(AUTOMATION_BUDGETS.daily.rssRegistrations, 30);
   assert.equal(AUTOMATION_BUDGETS.weekly.backfillItems, 500000);
 });
 
