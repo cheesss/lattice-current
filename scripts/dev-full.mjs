@@ -120,7 +120,32 @@ function acquireDevStackLock() {
 acquireDevStackLock();
 process.on('exit', () => releaseDevStackLock());
 
-console.log(`${GREEN}[dev]${RESET} Starting sidecar + Vite dev server...`);
+// --- Meta-model GPU inference server ---
+const MAGENTA = '\x1b[35m';
+const metaModelScript = path.join(projectRoot, 'scripts', 'meta-model-server.py');
+const pythonCandidates = [
+  process.env.LATTICE_PYTHON,
+  process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'miniconda3', 'python.exe') : null,
+  process.env.HOME ? path.join(process.env.HOME, 'miniconda3', 'bin', 'python') : null,
+  'python3',
+  'python',
+].filter(Boolean);
+
+function findPython() {
+  for (const py of pythonCandidates) {
+    try {
+      const result = spawn(py, ['--version'], { stdio: 'pipe', windowsHide: true, timeout: 3000 });
+      // If spawn doesn't throw, python exists
+      result.kill();
+      return py;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+console.log(`${GREEN}[dev]${RESET} Starting sidecar + Vite + meta-model server...`);
 console.log(`${GREEN}[dev]${RESET} Press Ctrl+C to stop all services.\n`);
 
 const sidecar = spawnHidden(process.execPath, [sidecarScript], {
@@ -129,9 +154,26 @@ const sidecar = spawnHidden(process.execPath, [sidecarScript], {
 });
 wireLogging(sidecar, CYAN, 'sidecar');
 
+// Start meta-model server (non-fatal if Python not available)
+let metaModel = null;
+const pythonBin = findPython();
+if (pythonBin && fs.existsSync(metaModelScript)) {
+  metaModel = spawnHidden(pythonBin, [metaModelScript], { PYTHONIOENCODING: 'utf-8' });
+  wireLogging(metaModel, MAGENTA, 'meta-model');
+  metaModel.on('close', (code) => {
+    if (code !== null && code !== 0) {
+      console.error(`${MAGENTA}[meta-model]${RESET} exited with code ${code} (inference will be unavailable)`);
+    }
+  });
+  console.log(`${MAGENTA}[meta-model]${RESET} GPU inference server starting (${pythonBin})`);
+} else {
+  console.log(`${MAGENTA}[meta-model]${RESET} Python not found or meta-model-server.py missing — skipping GPU inference`);
+}
+
 const cleanup = (vite) => {
   vite?.kill();
   sidecar.kill();
+  metaModel?.kill();
 };
 
 setTimeout(async () => {
