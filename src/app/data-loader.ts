@@ -430,6 +430,7 @@ export class DataLoaderManager implements AppModule {
     }
 
     this.refreshAdvancedVisualizationPanels();
+    this.refreshChartPanels();
     (this.ctx.panels['data-qa'] as DataQAPanel | undefined)?.refreshSnapshot();
     this.ctx.analysisHubPage?.refresh();
     void this.ctx.codexHubPage?.refresh();
@@ -1223,6 +1224,74 @@ export class DataLoaderManager implements AppModule {
 
     const backtestLabPanel = this.ctx.panels['backtest-lab'] as BacktestLabPanel | undefined;
     void backtestLabPanel?.refreshData();
+  }
+
+  private refreshChartPanels(): void {
+    // KPI Bar
+    const kpiBar = (this.ctx as unknown as Record<string, unknown>).kpiBar as import('@/components/KPIBar').KPIBar | undefined;
+    if (kpiBar) {
+      const vixMarket = this.ctx.latestMarkets.find(m => m.symbol === '^VIX' || m.symbol === 'VIX');
+      kpiBar.update({
+        vix: vixMarket?.price ?? null,
+        vixHistory: this.ctx.latestMarkets.filter(m => m.symbol === '^VIX').map(m => m.price ?? 0),
+        vixChange: vixMarket?.change ?? null,
+      });
+    }
+
+    // Fetch chart data from APIs (non-blocking)
+    this.fetchChartData().catch(() => {});
+  }
+
+  private async fetchChartData(): Promise<void> {
+    const fetches = [
+      { url: '/api/kpi-summary', handler: (data: Record<string, unknown>) => {
+        const kpiBar = (this.ctx as unknown as Record<string, unknown>).kpiBar as import('@/components/KPIBar').KPIBar | undefined;
+        kpiBar?.update(data as unknown as import('@/components/KPIBar').KPIData);
+      }},
+      { url: '/api/hawkes-heatmap', handler: (data: unknown[]) => {
+        const panel = this.ctx.panels['hawkes-heatmap'] as import('@/components/HawkesHeatmapPanel').HawkesHeatmapPanel | undefined;
+        panel?.setData(data as Array<{ theme: string; event_date: string; hawkes_intensity: number }>);
+      }},
+      { url: '/api/signal-correlation', handler: (data: unknown[]) => {
+        const panel = this.ctx.panels['correlation-matrix'] as import('@/components/CorrelationMatrixPanel').CorrelationMatrixPanel | undefined;
+        panel?.setData(data as Array<{ signal_a: string; signal_b: string; correlation: number }>);
+      }},
+      { url: '/api/regime-timeline', handler: (data: unknown[]) => {
+        const panel = this.ctx.panels['regime-timeline'] as import('@/components/RegimeTimelinePanel').RegimeTimelinePanel | undefined;
+        panel?.setData(data as Array<{ regime: string; start: string; end: string }>);
+      }},
+      { url: '/api/alpha-decay', handler: (data: unknown[]) => {
+        const panel = this.ctx.panels['alpha-decay'] as import('@/components/AlphaDecayPanel').AlphaDecayPanel | undefined;
+        panel?.setData(data as Array<{ theme: string; points: Array<{ horizon: string; alpha: number }> }>);
+      }},
+      { url: '/api/event-uplift-grades', handler: (data: unknown[]) => {
+        // Evidence distribution
+        const gradeMap = new Map<string, { count: number; totalUplift: number }>();
+        for (const row of data as Array<{ evidence_grade: string; uplift?: number }>) {
+          const g = row.evidence_grade || 'E0';
+          const existing = gradeMap.get(g) || { count: 0, totalUplift: 0 };
+          existing.count++;
+          existing.totalUplift += Number(row.uplift) || 0;
+          gradeMap.set(g, existing);
+        }
+        const grades = Array.from(gradeMap.entries()).map(([grade, { count, totalUplift }]) => ({
+          grade, count, avgUplift: count > 0 ? totalUplift / count : 0,
+        })).sort((a, b) => a.grade.localeCompare(b.grade));
+        const panel = this.ctx.panels['evidence-distribution'] as import('@/components/EvidenceDistributionPanel').EvidenceDistributionPanel | undefined;
+        panel?.setData(grades);
+      }},
+    ];
+
+    await Promise.allSettled(fetches.map(async ({ url, handler }) => {
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        handler(data);
+      } catch {
+        // Non-fatal: chart panels are optional
+      }
+    }));
   }
 
   private async refreshScheduledReports(force = false): Promise<void> {

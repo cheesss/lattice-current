@@ -2330,29 +2330,112 @@ canvas,
 .main-content {
   flex: 1 1 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  display: grid;
+  grid-template-columns: minmax(320px, 42%) 1fr;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
   background: var(--bg);
   width: 100%;
 }
 
+/* KPI bar spans full width above map+panels */
+.kpi-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-height: 48px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.kpi-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+}
+
+.kpi-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.kpi-value {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  color: var(--text);
+}
+
+.kpi-value.positive { color: var(--green); }
+.kpi-value.negative { color: var(--red); }
+
+.kpi-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.kpi-badge.crisis { background: #4d1a1a; color: #ff6b6b; }
+.kpi-badge.risk-off { background: #4d3a1a; color: #ffb347; }
+.kpi-badge.balanced { background: #1a3a4d; color: #7cb8ff; }
+.kpi-badge.risk-on { background: #1a4d2d; color: #7cc87c; }
+
+.kpi-gauge {
+  width: 100px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.kpi-gauge-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.kpi-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
 .map-section {
-  height: 44vh;
+  grid-row: 2;
+  grid-column: 1;
+  height: 100%;
   min-height: 320px;
-  max-height: 82vh;
-  /* Allow resize up to 90% of viewport */
-  border: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .map-section.hidden {
   display: none;
+}
+
+/* When map is hidden, panels take full width */
+.map-section.hidden ~ .panels-grid,
+.main-content:has(.map-section.hidden) .panels-grid {
+  grid-column: 1 / -1;
+}
+
+/* When map hidden, switch to single-column layout */
+.main-content:has(.map-section.hidden) {
+  grid-template-columns: 1fr;
 }
 
 .map-section .panel-header {
@@ -2438,15 +2521,18 @@ canvas,
 }
 
 .panels-grid {
+  grid-row: 2;
+  grid-column: 2;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   grid-auto-flow: row dense;
-  grid-auto-rows: minmax(200px, 380px);
-  gap: 6px;
-  padding: 6px;
+  grid-auto-rows: minmax(200px, 420px);
+  gap: 8px;
+  padding: 8px;
   align-content: start;
   align-items: stretch;
   min-height: 0;
+  overflow-y: auto;
   position: relative;
   z-index: 1;
   /* This ensures panels scroll UNDER the pinned map (z-index: 100) */

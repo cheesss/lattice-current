@@ -58,6 +58,15 @@ import { GoodThingsDigestPanel } from '@/components/GoodThingsDigestPanel';
 import { SpeciesComebackPanel } from '@/components/SpeciesComebackPanel';
 import { RenewableEnergyPanel } from '@/components/RenewableEnergyPanel';
 import { GivingPanel } from '@/components';
+import { HawkesHeatmapPanel } from '@/components/HawkesHeatmapPanel';
+import { CorrelationMatrixPanel } from '@/components/CorrelationMatrixPanel';
+import { EventFlowSankeyPanel } from '@/components/EventFlowSankeyPanel';
+import { RegimeTimelinePanel } from '@/components/RegimeTimelinePanel';
+import { AlphaDecayPanel } from '@/components/AlphaDecayPanel';
+import { EvidenceDistributionPanel } from '@/components/EvidenceDistributionPanel';
+import { CalibrationScatterPanel } from '@/components/CalibrationScatterPanel';
+import { SourceCredibilityPanel } from '@/components/SourceCredibilityPanel';
+import { KPIBar } from '@/components/KPIBar';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
 import { buildDataQASnapshot } from '@/services/data-qa';
 import { getFabricBackedRuntimeView } from '@/services/intelligence-fabric';
@@ -453,6 +462,7 @@ export class PanelLayoutManager implements AppModule {
       ${themeWorkspaceShell}
       ${sourceDrawer}
       <div class="main-content">
+        <div class="kpi-bar" id="kpiBar"></div>
         <div class="map-section" id="mapSection">
           <div class="panel-header">
             <div class="panel-header-left">
@@ -474,6 +484,14 @@ export class PanelLayoutManager implements AppModule {
     `;
 
     this.createPanels();
+
+    // Initialize KPI bar
+    const kpiBarEl = this.ctx.container.querySelector('#kpiBar');
+    if (kpiBarEl) {
+      const kpiBar = new KPIBar();
+      kpiBarEl.replaceWith(kpiBar.getElement());
+      (this.ctx as unknown as Record<string, unknown>).kpiBar = kpiBar;
+    }
   }
 
   private renderWorkspaceStrip(): string {
@@ -883,6 +901,16 @@ export class PanelLayoutManager implements AppModule {
       this.ctx.panels['investment-ideas'] = new InvestmentIdeasPanel();
       this.ctx.panels['backtest-lab'] = new BacktestLabPanel();
       this.ctx.panels['resource-profiler'] = new ResourceProfilerPanel();
+
+      // --- Visualization panels (chart-based) ---
+      this.ctx.panels['hawkes-heatmap'] = new HawkesHeatmapPanel();
+      this.ctx.panels['correlation-matrix'] = new CorrelationMatrixPanel();
+      this.ctx.panels['event-flow-sankey'] = new EventFlowSankeyPanel();
+      this.ctx.panels['regime-timeline'] = new RegimeTimelinePanel();
+      this.ctx.panels['alpha-decay'] = new AlphaDecayPanel();
+      this.ctx.panels['evidence-distribution'] = new EvidenceDistributionPanel();
+      this.ctx.panels['calibration-scatter'] = new CalibrationScatterPanel();
+      this.ctx.panels['source-credibility'] = new SourceCredibilityPanel();
 
       if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'tech') {
         this.ctx.panels['cross-asset-tape'] = new CrossAssetTapePanel();

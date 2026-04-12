@@ -151,6 +151,14 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   displacement: { name: 'UNHCR Displacement', enabled: true, priority: 2 },
   climate: { name: 'Climate Anomalies', enabled: true, priority: 2 },
   'population-exposure': { name: 'Population Exposure', enabled: true, priority: 2 },
+  'hawkes-heatmap': { name: 'Event Intensity Heatmap', enabled: true, priority: 1 },
+  'correlation-matrix': { name: 'Signal Correlation', enabled: true, priority: 2 },
+  'event-flow-sankey': { name: 'Event Flow', enabled: true, priority: 2 },
+  'regime-timeline': { name: 'Regime Timeline', enabled: true, priority: 2 },
+  'alpha-decay': { name: 'Alpha Decay', enabled: true, priority: 2 },
+  'evidence-distribution': { name: 'Evidence Grades', enabled: true, priority: 1 },
+  'calibration-scatter': { name: 'Model Calibration', enabled: true, priority: 3 },
+  'source-credibility': { name: 'Source Credibility', enabled: true, priority: 2 },
 };
 
 const FULL_MAP_LAYERS: MapLayers = {
