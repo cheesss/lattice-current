@@ -228,6 +228,17 @@ async function main() {
   console.log(`\nExecution Summary: total=${results.length} success=${success} failed=${failed}`);
   writeFileSync(RESULTS_PATH, JSON.stringify({ timestamp: new Date().toISOString(), results }, null, 2));
 
+  // Trigger incremental event engine if any proposals were successfully executed
+  if (success > 0 && !DRY_RUN) {
+    console.log('\nTriggering incremental event engine...');
+    try {
+      const { execSync } = await import('child_process');
+      execSync('node scripts/incremental-event-engine-fast.mjs', { stdio: 'inherit', timeout: 300000 });
+    } catch (err) {
+      console.warn(`Event engine trigger failed (non-fatal): ${err?.message || err}`);
+    }
+  }
+
   await client.end();
 }
 

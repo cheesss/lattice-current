@@ -263,6 +263,33 @@ def main():
         bar = "#" * (imp // 5)
         print(f"  {fname:<25} {imp:>5} {bar}")
 
+    # Save results to NAS
+    print("\n=== Saving results to model_eval ===")
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        from datetime import datetime as dt
+        for name in ["logistic", "lgbm", "mlp"]:
+            if not results[name]:
+                continue
+            avg = {k: float(np.mean([r[k] for r in results[name]])) for k in results[name][0]}
+            cur.execute("""
+                INSERT INTO model_eval (model_version, eval_date, split_type,
+                    brier_score, ece, top20_precision, alpha_hit_rate, n_samples)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (model_version, eval_date, split_type) DO UPDATE SET
+                    brier_score = EXCLUDED.brier_score, ece = EXCLUDED.ece,
+                    top20_precision = EXCLUDED.top20_precision
+            """, (f"baseline-{name}", dt.now().date(), "purged_wf_avg",
+                  avg["brier"], avg["ece"], avg["top20_precision"], avg["accuracy"],
+                  int(np.mean([r.get("test_size", len(y)) for r in results[name]]))))
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("  Saved to model_eval")
+    except Exception as e:
+        print(f"  Save failed: {e}")
+
 
 if __name__ == "__main__":
     main()

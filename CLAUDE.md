@@ -23,6 +23,10 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 | `scripts/event-engine-full-build.mjs` | regime/hawkes/whatif 구축 |
 | `scripts/tech-trend-tracker.mjs` | 기술 트렌드 추적 |
 | `scripts/codex-from-analysis.mjs` | 분석→Codex 제안 (Anthropic API로 전환 예정) |
+| `scripts/incremental-event-engine.mjs` | 증분 이벤트 엔진 (클러스터링+alpha+controls 한번에) |
+| `scripts/meta-model-server.py` | FastAPI GPU 추론 서버 (port 8100) |
+| `scripts/train-meta-model.py` | Multi-Task 메타모델 학습 (PyTorch) |
+| `scripts/compare-models.py` | MLP vs LightGBM vs Logistic 비교 |
 
 ## NAS 테이블 구조
 
@@ -41,6 +45,13 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 | `signal_history` | 12채널 시계열 시그널 |
 | `codex_proposals` | 제안 + 실행 상태 추적 |
 | `pending_outcomes` | 새 기사 → 2주 후 확인 대기 |
+| `canonical_events` | 기사→이벤트 클러스터 (53k) |
+| `article_event_map` | 기사-이벤트 매핑 |
+| `event_features` | 이벤트별 17+ 피처 (meta-model 입력) |
+| `event_uplift` | 대조군 대비 uplift + evidence grade (E0~E4) |
+| `matched_controls` | 이벤트-비이벤트 날짜 매칭 |
+| `model_predictions` | meta-model 예측 결과 |
+| `model_eval` | 모델 검증 결과 (Brier, ECE 등) |
 
 ## 코드 수정 원칙
 
@@ -48,6 +59,20 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 2. `noUncheckedIndexedAccess: true` — 배열 접근 시 `?? 0` 또는 `!` 사용
 3. 요청된 변경사항만 수정 — 불필요한 리팩토링 금지
 4. 환경변수 하드코딩 금지 — .env.local에서 로드
+5. 기존 데이터 삭제 금지 — 증분(incremental) 방식으로 새 데이터만 추가/병합. DELETE 후 재생성하지 않음
+6. Python 계산 스크립트는 결과를 NAS에 저장하고, TS는 읽어서 표시하는 구조 유지
+
+## 커밋 규칙
+
+큰 카테고리의 작업을 완료하면 반드시 커밋한다. 커밋 단위 예시:
+- 새 파이프라인 단계 추가 완료 시
+- 모델 학습/검증 완료 시
+- UI 변경 완료 시
+- 파이프라인 연결/통합 완료 시
+- 버그 수정 완료 시
+- Python 전환 완료 시
+
+커밋하지 않고 다음 큰 작업으로 넘어가지 않는다. 커밋 메시지는 변경 내용을 구체적으로 서술한다.
 
 ## 병렬 구현 에이전트 규칙
 

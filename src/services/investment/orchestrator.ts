@@ -97,6 +97,8 @@ import { buildWorkflow } from './diagnostics';
 import { logPipelineEvent } from './pipeline-logger';
 import { scanLeadLagCorrelations, buildFingerprint, registerFingerprint } from '../pattern-discovery';
 import { measureResourceOperation } from '../resource-telemetry';
+import { enrichIdeaCardsWithMetaModel } from '../event-decision-bridge';
+import type { EventDecisionContext } from '../event-decision-bridge';
 
 // --- Phase module singletons ---
 const snapshotStore = new SnapshotStore();
@@ -960,6 +962,33 @@ export async function recomputeInvestmentIntelligence(args: {
       integration.pipelineErrors!.push({ stage: 'alertEvaluation', error: msg, degraded: true });
       // Safe default: empty alerts
       integration.alertsFired = [];
+    } finally {
+      stageTimer.stop();
+    }
+  }
+
+  // --- Event Decision Engine: enrich idea cards with meta-model predictions ---
+  {
+    const stageTimer = _time('metaModelEnrichment');
+    try {
+      const edContext: EventDecisionContext = {
+        vixValue: macroOverlay.riskGauge ?? null,
+        vixZscore: null,
+        vixMomentum: null,
+        yieldSpread: null,
+        oilPrice: null,
+        dollarIndex: null,
+        creditSpreadHy: null,
+        marketStress: null,
+        transmissionStrength: null,
+        eventIntensity: null,
+        macroOverlay,
+      };
+      ideaCards = await enrichIdeaCardsWithMetaModel(ideaCards, edContext);
+    } catch (stageError) {
+      const msg = stageError instanceof Error ? stageError.message : String(stageError);
+      logPipelineEvent('metaModelEnrichment', 'error', msg, { context: { degraded: true } });
+      // Non-fatal: keep original idea cards without meta-model predictions
     } finally {
       stageTimer.stop();
     }

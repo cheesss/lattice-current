@@ -903,9 +903,9 @@ async function step5RefreshSensitivity(client) {
         symbol,
         horizon,
         COUNT(*) AS n,
-        AVG(forward_return_pct::numeric) AS avg_return,
-        STDDEV(forward_return_pct::numeric) AS return_vol,
-        AVG(hit::int::numeric) AS hit_rate
+        AVG(COALESCE(abnormal_return, forward_return_pct)::numeric) AS avg_return,
+        STDDEV(COALESCE(abnormal_return, forward_return_pct)::numeric) AS return_vol,
+        AVG(CASE WHEN COALESCE(abnormal_return, forward_return_pct) > 0 THEN 1.0 ELSE 0.0 END::numeric) AS hit_rate
       FROM labeled_outcomes
       GROUP BY theme, symbol, horizon
     ) tr

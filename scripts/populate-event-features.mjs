@@ -268,6 +268,74 @@ async function main() {
     summary.rows.forEach(r => console.log(`  ${r.regime_label}: ${r.cnt} events, avg VIX=${r.avg_vix}, risk=${r.avg_risk}`));
   }
 
+  // ---------------------------------------------------------------------------
+  // Step 4: Fill NULL proxy features (graph, nmi, narrative, truth, legacy)
+  // ---------------------------------------------------------------------------
+  if (!DRY_RUN) {
+    console.log('\n▶ Step 4: Filling NULL proxy features...');
+
+    // graph_signal_score: approximate from source_count + source_diversity
+    await client.query(`
+      UPDATE event_features SET graph_signal_score = LEAST(100,
+        source_count * 12 + source_diversity * 40 + COALESCE(hawkes_intensity, 0) * 20
+      ) WHERE graph_signal_score IS NULL
+    `);
+
+    // nmi_score: approximate from transmission_strength correlation
+    await client.query(`
+      UPDATE event_features SET nmi_score = LEAST(1.0,
+        GREATEST(0, COALESCE(transmission_strength, 0) * 0.6 + COALESCE(market_stress, 0) * 0.4)
+      ) WHERE nmi_score IS NULL
+    `);
+
+    // narrative_alignment: approximate from source_count and hawkes
+    await client.query(`
+      UPDATE event_features SET narrative_alignment = LEAST(100,
+        40 + COALESCE(source_count, 1) * 8 + COALESCE(hawkes_momentum, 0) * 15
+      ) WHERE narrative_alignment IS NULL
+    `);
+
+    // truth_discovery_score: approximate from source_diversity
+    await client.query(`
+      UPDATE event_features SET truth_discovery_score = LEAST(1.0,
+        GREATEST(0.3, COALESCE(source_diversity, 0.5) * 0.7 + 0.3)
+      ) WHERE truth_discovery_score IS NULL
+    `);
+
+    // legacy_conviction: approximate from existing features
+    await client.query(`
+      UPDATE event_features SET legacy_conviction = LEAST(98, GREATEST(20,
+        ROUND(24 + COALESCE(source_count, 1) * 7
+          + COALESCE(event_intensity, 0) * 14
+          + COALESCE(transmission_strength, 0) * 16
+          + COALESCE(market_stress, 0) * 10
+          + COALESCE(hawkes_intensity, 0) * 12)
+      )::int) WHERE legacy_conviction IS NULL
+    `);
+
+    // legacy_fpr: inverse of conviction proxy
+    await client.query(`
+      UPDATE event_features SET legacy_fpr = LEAST(78, GREATEST(6,
+        ROUND(82 - COALESCE(source_count, 1) * 6
+          - COALESCE(event_intensity, 0) * 12
+          - COALESCE(transmission_strength, 0) * 12
+          - COALESCE(market_stress, 0) * 8)
+      )::int) WHERE legacy_fpr IS NULL
+    `);
+
+    const nullCheck = await client.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE graph_signal_score IS NULL) as null_graph,
+        COUNT(*) FILTER (WHERE nmi_score IS NULL) as null_nmi,
+        COUNT(*) FILTER (WHERE narrative_alignment IS NULL) as null_narrative,
+        COUNT(*) FILTER (WHERE truth_discovery_score IS NULL) as null_truth,
+        COUNT(*) FILTER (WHERE legacy_conviction IS NULL) as null_conviction,
+        COUNT(*) FILTER (WHERE legacy_fpr IS NULL) as null_fpr
+      FROM event_features
+    `);
+    console.log('  Remaining NULLs:', JSON.stringify(nullCheck.rows[0]));
+  }
+
   console.log('\n✅ populate-event-features complete');
   await client.end();
 }

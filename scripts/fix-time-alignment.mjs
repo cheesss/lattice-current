@@ -172,9 +172,50 @@ async function main() {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Step 5: 장후/주말 기사의 entry_price 보정
+  // ---------------------------------------------------------------------------
+  if (!DRY_RUN) {
+    console.log('\n▶ Step 5: 장후/주말 entry_price 보정...');
+
+    // 장후/주말 기사: entry를 다음 거래일 가격으로 보정
+    // aligned_entry_price = 발행일 다음 거래일의 price (Yahoo close)
+    const aligned = await client.query(`
+      UPDATE labeled_outcomes lo
+      SET aligned_entry_price = next_day.price,
+          alignment_method = CASE
+            WHEN lo.market_session IN ('after_hours', 'weekend') THEN 'next_trading_day'
+            ELSE 'same_day'
+          END
+      FROM (
+        SELECT DISTINCT ON (lo2.id) lo2.id as outcome_id, hip.price
+        FROM labeled_outcomes lo2
+        JOIN articles a ON a.id = lo2.article_id
+        JOIN worldmonitor_intel.historical_raw_items hip
+          ON hip.provider = 'yahoo-chart'
+          AND hip.symbol = lo2.symbol
+          AND hip.valid_time_start > a.published_at
+          AND hip.valid_time_start <= a.published_at + INTERVAL '5 days'
+        WHERE lo2.market_session IN ('after_hours', 'weekend')
+          AND lo2.aligned_entry_price IS NULL
+        ORDER BY lo2.id, hip.valid_time_start ASC
+      ) next_day
+      WHERE lo.id = next_day.outcome_id
+    `);
+    console.log(`  Aligned ${aligned.rowCount} after-hours/weekend entries to next trading day`);
+
+    // 장전/장중 기사: 기존 entry_price 유지
+    const sameDay = await client.query(`
+      UPDATE labeled_outcomes
+      SET aligned_entry_price = entry_price,
+          alignment_method = 'same_day'
+      WHERE market_session IN ('pre_market', 'market_hours')
+        AND aligned_entry_price IS NULL
+    `);
+    console.log(`  Kept ${sameDay.rowCount} market-hours entries as same_day`);
+  }
+
   console.log('\n✅ fix-time-alignment complete');
-  console.log('Note: aligned_entry_price 보정은 Yahoo open price 데이터 확보 후 적용합니다.');
-  console.log('현재는 market_session 태깅 + 편향 분석까지 완료.');
 
   await client.end();
 }

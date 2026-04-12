@@ -259,8 +259,22 @@ async function runPipeline() {
     console.log('');
   }
 
-  // ═══ STEP 6: 리포트 ═══
+  // ═══ STEP 6: Event Decision Engine (증분 — 새 데이터만 처리, 기존 데이터 보존) ═══
   if (shouldRunStep(6)) {
+    console.log('▶ STEP 6: Event Decision Engine (incremental)...');
+    try {
+      const { execSync } = await import('child_process');
+      execSync('node scripts/incremental-event-engine-fast.mjs', { stdio: 'inherit', timeout: 600000 });
+      results.steps.push({ step: 6, status: 'ok', detail: 'incremental event engine updated' });
+    } catch (err) {
+      console.warn(`  Event engine failed (non-fatal): ${err?.message || err}`);
+      results.steps.push({ step: 6, status: 'warn', detail: String(err?.message || err) });
+    }
+    console.log('');
+  }
+
+  // ═══ STEP 7: 리포트 ═══
+  if (shouldRunStep(7)) {
     console.log('▶ STEP 6: 최종 리포트...');
 
     const stats = {};
@@ -289,7 +303,7 @@ async function runPipeline() {
     console.log(`  proposals:`);
     for (const p of stats.proposals) console.log(`    ${p.status.padEnd(12)} ${p.n}건`);
 
-    results.steps.push({ step: 6, status: 'ok', stats });
+    results.steps.push({ step: 7, status: 'ok', stats });
     results.elapsedSeconds = elapsed;
 
     writeFileSync('data/pipeline-report.json', JSON.stringify(results, null, 2));
