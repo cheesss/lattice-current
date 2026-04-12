@@ -557,7 +557,20 @@ def main():
         # Save predictions
         save_predictions(conn, model, data, model_version)
 
-    print(f"\n✅ Training complete. Model version: {model_version}")
+    # Save retrain state for incremental engine trigger
+    avg_brier = np.mean([r["brier_score"] for r in wf_results]) if wf_results else None
+    try:
+        from incremental_event_engine import save_retrain_state
+        cur2 = conn.cursor()
+        cur2.execute("SELECT COUNT(*) FROM canonical_events")
+        event_count = cur2.fetchone()[0]
+        cur2.close()
+        save_retrain_state(event_count, model_version, avg_brier)
+        print(f"  Retrain state saved: {event_count} events, Brier={avg_brier}")
+    except Exception as e:
+        print(f"  Retrain state save skipped: {e}")
+
+    print(f"\n Training complete. Model version: {model_version}")
     conn.close()
 
 

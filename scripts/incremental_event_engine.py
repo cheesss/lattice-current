@@ -569,6 +569,91 @@ def main():
     print(f"  Events: {s[0]} | Mappings: {s[1]} | Alpha: {s[2]}")
     print(f"  Features: {s[3]} | Uplift: {s[4]} | Unmapped: {s[5]}")
 
+    # Retrain check
+    check_retrain_trigger(s[0])
+
+
+# ===========================================================================
+# Retrain trigger check
+# ===========================================================================
+RETRAIN_EVENT_THRESHOLD = 5000  # 새 이벤트 5,000개 이상이면 트리거
+RETRAIN_STATE_FILE = "data/retrain-state.json"
+
+def check_retrain_trigger(current_event_count):
+    """마지막 학습 시점 대비 새 이벤트가 threshold 이상이면 재학습 권고"""
+    import json
+    from pathlib import Path
+
+    state_path = Path(RETRAIN_STATE_FILE)
+    last_count = 0
+    last_version = "none"
+    last_brier = None
+
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text())
+            last_count = state.get("event_count_at_last_train", 0)
+            last_version = state.get("model_version", "none")
+            last_brier = state.get("brier_at_last_train")
+        except Exception:
+            pass
+
+    new_events = current_event_count - last_count
+    should_retrain = new_events >= RETRAIN_EVENT_THRESHOLD
+
+    # Check current prediction performance from model_eval
+    current_brier = None
+    try:
+        conn = psycopg2.connect(**PG_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT AVG(brier_score) FROM model_eval
+            WHERE model_version = (SELECT model_version FROM model_eval ORDER BY eval_date DESC LIMIT 1)
+        """)
+        row = cur.fetchone()
+        if row and row[0]:
+            current_brier = float(row[0])
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+
+    brier_degraded = current_brier is not None and current_brier > 0.25
+
+    print(f"\n== RETRAIN CHECK ==")
+    print(f"  Last train: {last_version} at {last_count} events (Brier: {last_brier})")
+    print(f"  Current: {current_event_count} events (+{new_events} new)")
+    if current_brier:
+        print(f"  Current Brier: {current_brier:.4f} {'(DEGRADED)' if brier_degraded else '(OK)'}")
+
+    if should_retrain or brier_degraded:
+        reason = []
+        if should_retrain:
+            reason.append(f"+{new_events} new events (threshold: {RETRAIN_EVENT_THRESHOLD})")
+        if brier_degraded:
+            reason.append(f"Brier {current_brier:.4f} > 0.25")
+
+        print(f"  ** RETRAIN RECOMMENDED: {', '.join(reason)}")
+        print(f"  Run: python scripts/train-meta-model.py --epochs 50")
+        print(f"  Then verify: python scripts/compute-validation-metrics.py")
+        print(f"  If Brier improved, update retrain state:")
+        print(f"    python -c \"import json; json.dump({{'event_count_at_last_train': {current_event_count}, 'model_version': 'NEW_VERSION', 'brier_at_last_train': NEW_BRIER}}, open('{RETRAIN_STATE_FILE}', 'w'))\"")
+    else:
+        print(f"  No retrain needed (next at +{RETRAIN_EVENT_THRESHOLD - new_events} events)")
+
+
+def save_retrain_state(event_count, model_version, brier):
+    """재학습 후 호출: 현재 상태 저장"""
+    import json
+    from pathlib import Path
+    Path(RETRAIN_STATE_FILE).parent.mkdir(exist_ok=True)
+    Path(RETRAIN_STATE_FILE).write_text(json.dumps({
+        "event_count_at_last_train": event_count,
+        "model_version": model_version,
+        "brier_at_last_train": brier,
+        "trained_at": datetime.now().isoformat(),
+    }, indent=2))
+
 
 if __name__ == "__main__":
     main()
