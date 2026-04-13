@@ -398,3 +398,30 @@ python scripts/compare-models.py
 - `data-loader.ts` (4,039줄)와 `DeckGLMap.ts` (6,796줄)는 god module — 분리 필요하지만 아직 안 함
 - v2 모델은 과적합으로 보류 상태 — 데이터 더 쌓이기 전까지 사용하지 말 것
 - event_features의 graph/nmi/narrative/truth/conviction/fpr은 proxy 값 — 실제 런타임 계산값이 아님
+
+---
+
+## 12. 추가 세션 작업 (2026-04-14)
+
+### NAS IP 변경
+- 192.168.0.76 → 192.168.0.2 (NAS 재부팅 후 IP 변경됨)
+- .env.local + 모든 스크립트/API 파일의 하드코딩 IP 전부 교체
+
+### pg 브라우저 번들 버그 수정
+- pg-pool.ts가 Node.js 전용 pg를 import → 브라우저 번들에 포함 → "Buffer is not defined" 에러
+- 수정: vite.config.ts에서 pg를 빈 shim(src/shims/pg.ts)으로 alias
+
+### 시각화 적용 (event-dashboard.html)
+- KPI 스트립: VIX, 리스크 게이지, 레짐, 스프레드, 유가, 달러, E2 시그널
+- Analytics 섹션: Evidence 분포, Alpha 감쇠, Hawkes 히트맵, 상관행렬, 레짐 타임라인, 소스 신뢰도
+- EN/KO 언어 토글 (localStorage 저장)
+
+### 프로덕션 UI 구조
+- 현재 프로덕션: event-dashboard.html (standalone 2,000줄 HTML)
+- index.html → event-dashboard.html 리다이렉트
+- src/App.ts 기반 앱은 레거시 (코드는 있지만 사용 안 됨)
+- 시각화 변경은 event-dashboard.html에 직접 적용
+
+### 다음 세션 작업: 지도 리디자인
+- 상세 계획: docs/MAP_REDESIGN_PLAN.md
+- 우선순위: 크기 확대 → 성능 최적화 → 데이터 레이어 → 테마/기간 필터
