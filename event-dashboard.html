@@ -172,9 +172,21 @@ th{color:var(--muted);font-weight:normal}
 .src-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
 .src-bar-fill{height:100%;border-radius:2px}
 .src-score{width:28px;text-align:right;font-weight:600}
+/* Descriptions */
+.desc-text{font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:6px;border-left:2px solid var(--border)}
+/* Language toggle */
+.lang-toggle{position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:0;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:var(--surface)}
+.lang-toggle button{padding:4px 10px;font-size:10px;font-weight:600;background:transparent;color:var(--muted);border:none;cursor:pointer;letter-spacing:.05em}
+.lang-toggle button.active{background:var(--accent);color:var(--bg)}
 </style>
 </head>
 <body>
+<!-- Language Toggle -->
+<div class="lang-toggle" id="lang-toggle">
+  <button class="active" data-lang="en">EN</button>
+  <button data-lang="ko">KO</button>
+</div>
+
 <div class="container">
   <header class="hero">
     <div>
@@ -194,18 +206,19 @@ th{color:var(--muted);font-weight:normal}
 
   <!-- KPI Summary Bar -->
   <div class="kpi-strip" id="kpi-strip">
-    <div class="kpi-chip"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
-    <div class="kpi-chip"><span class="kpi-chip-label">Risk</span><span class="kpi-chip-value" id="kpi-risk">--</span><div class="kpi-gauge-bar"><div class="kpi-gauge-fill" id="kpi-risk-fill"></div></div></div>
-    <div class="kpi-chip"><span class="kpi-chip-label">Regime</span><span class="kpi-regime-badge" id="kpi-regime">--</span></div>
-    <div class="kpi-chip"><span class="kpi-chip-label">Spread</span><span class="kpi-chip-value" id="kpi-spread">--</span></div>
-    <div class="kpi-chip"><span class="kpi-chip-label">Oil</span><span class="kpi-chip-value" id="kpi-oil">--</span></div>
-    <div class="kpi-chip"><span class="kpi-chip-label">Dollar</span><span class="kpi-chip-value" id="kpi-dollar">--</span></div>
-    <div class="kpi-chip"><span class="kpi-chip-label">E2 Signals</span><span class="kpi-chip-value kpi-accent" id="kpi-e2">0</span></div>
+    <div class="kpi-chip" title="CBOE Volatility Index"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
+    <div class="kpi-chip" title="Composite risk gauge (4-100)"><span class="kpi-chip-label">Risk</span><span class="kpi-chip-value" id="kpi-risk">--</span><div class="kpi-gauge-bar"><div class="kpi-gauge-fill" id="kpi-risk-fill"></div></div></div>
+    <div class="kpi-chip" title="Current market regime classification"><span class="kpi-chip-label">Regime</span><span class="kpi-regime-badge" id="kpi-regime">--</span></div>
+    <div class="kpi-chip" title="10Y-2Y Treasury yield spread"><span class="kpi-chip-label">Spread</span><span class="kpi-chip-value" id="kpi-spread">--</span></div>
+    <div class="kpi-chip" title="WTI Crude Oil price (USD)"><span class="kpi-chip-label">Oil</span><span class="kpi-chip-value" id="kpi-oil">--</span></div>
+    <div class="kpi-chip" title="US Dollar Index"><span class="kpi-chip-label">Dollar</span><span class="kpi-chip-value" id="kpi-dollar">--</span></div>
+    <div class="kpi-chip" title="Statistically significant event-asset signals"><span class="kpi-chip-label">E2 Signals</span><span class="kpi-chip-value kpi-accent" id="kpi-e2">0</span></div>
   </div>
+  <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals (E2 = matched-control uplift with t &gt; 1.96).</div>
 
   <div class="hero-grid hero-grid-summary">
-    <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div id="system-status" class="loading">Loading system state...</div></div>
-    <div class="card"><div class="card-title">Horizon Focus <span class="badge" id="current-period-badge">Quarterly</span></div><div id="horizon-summary" class="loading">Preparing horizon focus...</div></div>
+    <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div class="desc-text" data-i18n="status-desc">System health: API connections, data pipeline status, and collection freshness. Green = all systems operational.</div><div id="system-status" class="loading">Loading system state...</div></div>
+    <div class="card"><div class="card-title">Horizon Focus <span class="badge" id="current-period-badge">Quarterly</span></div><div class="desc-text" data-i18n="horizon-desc">Current analysis time window. Weekly = fast-moving signals. Monthly = confirmed trends. Quarterly = structural shifts.</div><div id="horizon-summary" class="loading">Preparing horizon focus...</div></div>
     <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Pick a theme from <strong>Curated Items</strong>, <strong>Trend Pyramid</strong>, or <strong>Structural Alerts</strong>.</div><div class="step-item"><span class="step-index">2</span>Use <strong>Open full brief</strong>. The detailed analysis loads in the <strong>Theme Brief</strong> workspace below.</div><div class="step-item"><span class="step-index">3</span><strong>Follow</strong> themes you care about. That builds a reusable weekly briefing and narrows the workspace around your themes.</div></div></div>
   </div>
 
@@ -403,17 +416,45 @@ th{color:var(--muted);font-weight:normal}
       <div class="section-meta">Counterfactual alpha, evidence grading, regime analysis, and model calibration.</div>
     </div>
     <div class="grid2">
-      <div class="card"><div class="card-title">Evidence Grade Distribution <span class="badge" id="evidence-badge">--</span></div><div id="evidence-chart"></div></div>
-      <div class="card"><div class="card-title">Alpha Decay by Theme <span class="badge">Horizon</span></div><div id="alpha-decay-chart"></div></div>
+      <div class="card">
+        <div class="card-title">Evidence Grade Distribution <span class="badge" id="evidence-badge">--</span></div>
+        <div class="desc-text" data-i18n="evidence-desc">Classifies all event-asset pairs by statistical strength. E0 = noise (no excess return vs market). E1 = positive alpha. E2 = statistically significant uplift vs matched control days (t &gt; 1.96). More E2 = more genuine signals.</div>
+        <div id="evidence-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Alpha Decay by Theme <span class="badge">Horizon</span></div>
+        <div class="desc-text" data-i18n="alpha-decay-desc">Shows how excess return (alpha) diminishes over time for each news theme. Short bars that shrink = fast-fading signal. Bars that persist = durable edge. Measured at 1-week, 2-week, and 1-month horizons.</div>
+        <div id="alpha-decay-chart"></div>
+      </div>
     </div>
     <div class="grid3" style="margin-top:12px">
-      <div class="card"><div class="card-title">Event Intensity Heatmap <span class="badge">6mo</span></div><div id="hawkes-chart" style="min-height:200px"></div></div>
-      <div class="card"><div class="card-title">Signal Correlation <span class="badge">90d</span></div><div id="correlation-chart" style="min-height:200px"></div></div>
-      <div class="card"><div class="card-title">Regime Timeline <span class="badge">VIX</span></div><div id="regime-timeline-chart" style="min-height:120px"></div></div>
+      <div class="card">
+        <div class="card-title">Event Intensity Heatmap <span class="badge">6mo</span></div>
+        <div class="desc-text" data-i18n="hawkes-desc">Hawkes process intensity by theme and month. Bright/red = cascading event cluster (news feeding more news). Dark = quiet period. Identifies when a theme is in "surge mode" with self-exciting event chains.</div>
+        <div id="hawkes-chart" style="min-height:200px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Signal Correlation <span class="badge">90d</span></div>
+        <div class="desc-text" data-i18n="corr-desc">90-day rolling correlation between market signals. Green = move together. Red = move opposite. High correlation means less diversification benefit. Key pairs: VIX vs credit spreads, oil vs dollar.</div>
+        <div id="correlation-chart" style="min-height:200px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Regime Timeline <span class="badge">VIX</span></div>
+        <div class="desc-text" data-i18n="regime-desc">Historical market regime based on VIX levels. Red = crisis (VIX &gt; 25 + credit stress). Orange = risk-off. Blue = balanced. Green = risk-on (VIX &lt; 18). Shows when defensive vs aggressive positioning was appropriate.</div>
+        <div id="regime-timeline-chart" style="min-height:120px"></div>
+      </div>
     </div>
     <div class="grid2" style="margin-top:12px">
-      <div class="card"><div class="card-title">Conviction vs Realized Alpha <span class="badge">Calibration</span></div><canvas id="calibration-canvas" style="width:100%;height:220px"></canvas></div>
-      <div class="card"><div class="card-title">Source Credibility <span class="badge" id="source-count-badge">--</span></div><div id="source-credibility-chart"></div></div>
+      <div class="card">
+        <div class="card-title">Conviction vs Realized Alpha <span class="badge">Calibration</span></div>
+        <div class="desc-text" data-i18n="calib-desc">Scatter plot of model conviction score (x-axis) vs actual realized excess return (y-axis). Points near the diagonal = well-calibrated model. Cluster above = model is conservative. Below = model overestimates.</div>
+        <canvas id="calibration-canvas" style="width:100%;height:220px"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title">Source Credibility <span class="badge" id="source-count-badge">--</span></div>
+        <div class="desc-text" data-i18n="source-desc">Trust score per news source based on how well their articles predict actual asset reactions. High score = articles from this source align with real price moves. Low score = noisy or unreliable source.</div>
+        <div id="source-credibility-chart"></div>
+      </div>
     </div>
   </section>
 </div>
@@ -2350,6 +2391,76 @@ async function refreshSourceCredibility() {
     }).join('');
   } catch (e) { console.warn('Source credibility failed', e); }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Language Toggle (EN/KO)
+// ═══════════════════════════════════════════════════════════════
+const I18N = {
+  'kpi-desc': {
+    en: 'Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals (E2 = matched-control uplift with t > 1.96).',
+    ko: '시장 스냅샷: VIX(공포 지수), 종합 리스크 점수, 현재 레짐, 금리차, 유가, 달러 강세, 통계적으로 검증된 시그널 수 (E2 = 대조군 대비 t > 1.96인 초과수익).',
+  },
+  'status-desc': {
+    en: 'System health: API connections, data pipeline status, and collection freshness. Green = all systems operational.',
+    ko: '시스템 상태: API 연결, 데이터 파이프라인, 수집 최신성. 녹색 = 정상 작동.',
+  },
+  'horizon-desc': {
+    en: 'Current analysis time window. Weekly = fast-moving signals. Monthly = confirmed trends. Quarterly = structural shifts.',
+    ko: '현재 분석 기간. 주간 = 빠른 시그널. 월간 = 확인된 트렌드. 분기 = 구조적 변화.',
+  },
+  'evidence-desc': {
+    en: 'Classifies all event-asset pairs by statistical strength. E0 = noise (no excess return vs market). E1 = positive alpha. E2 = statistically significant uplift vs matched control days (t > 1.96). More E2 = more genuine signals.',
+    ko: '모든 이벤트-종목 조합을 통계적 강도로 분류. E0 = 노이즈 (시장 대비 초과수익 없음). E1 = 양의 alpha. E2 = 대조군 대비 통계적으로 유의한 초과수익 (t > 1.96). E2가 많을수록 진짜 시그널.',
+  },
+  'alpha-decay-desc': {
+    en: 'Shows how excess return (alpha) diminishes over time for each news theme. Short bars that shrink = fast-fading signal. Bars that persist = durable edge. Measured at 1-week, 2-week, and 1-month horizons.',
+    ko: '테마별 초과수익(alpha)이 시간에 따라 얼마나 감소하는지 표시. 줄어드는 바 = 빠르게 사라지는 시그널. 유지되는 바 = 지속적인 우위. 1주/2주/1개월 기준 측정.',
+  },
+  'hawkes-desc': {
+    en: 'Hawkes process intensity by theme and month. Bright/red = cascading event cluster (news feeding more news). Dark = quiet period. Identifies when a theme is in "surge mode" with self-exciting event chains.',
+    ko: '테마×월별 Hawkes 이벤트 강도. 밝은색/빨강 = 뉴스가 뉴스를 부르는 연쇄 폭발. 어두운색 = 조용한 시기. 테마가 "폭발 모드"에 진입하는 시점을 식별.',
+  },
+  'corr-desc': {
+    en: '90-day rolling correlation between market signals. Green = move together. Red = move opposite. High correlation means less diversification benefit. Key pairs: VIX vs credit spreads, oil vs dollar.',
+    ko: '시장 시그널 간 90일 롤링 상관관계. 초록 = 같이 움직임. 빨강 = 반대로 움직임. 상관관계가 높으면 분산 효과 감소. 주요 쌍: VIX vs 크레딧 스프레드, 유가 vs 달러.',
+  },
+  'regime-desc': {
+    en: 'Historical market regime based on VIX levels. Red = crisis (VIX > 25 + credit stress). Orange = risk-off. Blue = balanced. Green = risk-on (VIX < 18). Shows when defensive vs aggressive positioning was appropriate.',
+    ko: 'VIX 기반 시장 레짐 히스토리. 빨강 = 위기 (VIX > 25 + 신용 스트레스). 주황 = 위험 회피. 파랑 = 균형. 초록 = 위험 추구 (VIX < 18). 방어적/공격적 포지션이 적절했던 시기 표시.',
+  },
+  'calib-desc': {
+    en: 'Scatter plot of model conviction score (x-axis) vs actual realized excess return (y-axis). Points near the diagonal = well-calibrated model. Cluster above = model is conservative. Below = model overestimates.',
+    ko: '모델 확신도(x축) vs 실현 초과수익(y축) 산점도. 대각선 근처 = 잘 보정된 모델. 위쪽 치우침 = 보수적 모델. 아래쪽 치우침 = 과신하는 모델.',
+  },
+  'source-desc': {
+    en: 'Trust score per news source based on how well their articles predict actual asset reactions. High score = articles from this source align with real price moves. Low score = noisy or unreliable source.',
+    ko: '뉴스 소스별 신뢰도 점수. 해당 소스의 기사가 실제 주가 반응을 얼마나 잘 예측하는지 기반. 높은 점수 = 실제 가격 변동과 일치. 낮은 점수 = 노이즈가 많은 소스.',
+  },
+};
+
+let currentLang = localStorage.getItem('lattice-lang') || 'en';
+
+function applyLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('lattice-lang', lang);
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N[key] && I18N[key][lang]) {
+      el.textContent = I18N[key][lang];
+    }
+  });
+  document.querySelectorAll('.lang-toggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+  });
+}
+
+document.getElementById('lang-toggle').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-lang]');
+  if (btn) applyLanguage(btn.getAttribute('data-lang'));
+});
+
+// Apply saved language on load
+applyLanguage(currentLang);
 
 // Run analytics refresh
 async function refreshAnalytics() {
