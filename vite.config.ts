@@ -741,6 +741,7 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
       child_process: resolve(__dirname, 'src/shims/child-process.ts'),
       'node:child_process': resolve(__dirname, 'src/shims/child-process.ts'),
+      'pg': resolve(__dirname, 'src/shims/pg.ts'),
       '@loaders.gl/worker-utils/dist/lib/process-utils/child-process-proxy.js': resolve(
         __dirname,
         'src/shims/child-process-proxy.ts'
