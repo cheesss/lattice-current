@@ -1,6 +1,6 @@
 # Lattice Current
 
-Signal workspace for live risk, infrastructure, markets, and operator decision support.
+Theme-led signal intelligence workspace for live monitoring, canonical event resolution, operator review, and validation.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -8,25 +8,28 @@ Signal workspace for live risk, infrastructure, markets, and operator decision s
 
 ## What It Is
 
-Lattice Current is a public research fork of a multi-variant intelligence platform now centered on a single theme-led signal shell that combines:
+Lattice Current is a public research fork of a multi-variant intelligence platform centered on one operator shell that combines:
 
 - live global news and OSINT collection
 - AI-assisted summaries, deduction, and Q&A
 - map-based geopolitical, infrastructure, and market visualization
 - ontology and graph-based relation analysis
-- event and transmission analysis
+- canonical event resolution before downstream interpretation
 - replay and historical validation surfaces used to calibrate signal quality
+- batch compute pipelines that write reusable outputs back to PostgreSQL
 
-## Current direction
+## Current design center
 
 The main branch has shifted away from a backtest-first product identity.
 
 The current emphasis is:
 
 - one integrated theme shell for live signal intake, theme briefs, geo context, proposal review, validation, and runtime diagnostics
-- canonical event resolution
+- canonical event resolution between ingestion and candidate generation
 - evidence quality and transmission analysis
 - operator-facing decision support
+- TypeScript for product surfaces, APIs, and orchestration
+- Python for CPU-bound batch compute such as canonical-event clustering and abnormal-return analytics
 - replay and NAS-backed historical validation as secondary calibration layers
 
 ## Primary entry surface
@@ -57,7 +60,9 @@ The same repository still powers multiple variants:
 ## Highlights
 
 - Real-time monitoring across curated feeds, strategic assets, and market data
-- AI and statistical analysis layers for summaries, trend detection, and evidence handling
+- AI and statistical analysis layers for summaries, trend detection, evidence handling, and operator briefs
+- Canonical event resolution that sits between raw article rows and usable signal objects
+- Python compute lane for heavy batch analytics while TypeScript remains the orchestration layer
 - Ontology graph, transmission graph, and historical validation tooling
 - Desktop runtime with Tauri sidecar, local services, and offline-capable workflows
 - Single codebase with variant-aware data, panels, and build targets
@@ -65,11 +70,21 @@ The same repository still powers multiple variants:
 ## Capability areas
 
 - Signal intake: live feeds, OSINT, macro, market, and conflict-oriented datasets
-- Evidence handling: event resolution, source quality, and data quality operations
+- Evidence handling: event resolution, source quality, corroboration handling, and data quality operations
 - Research workflow: Codex-assisted expansion, automation governance, ontology and graph views
-- Validation workflow: historical fetch/import, replay, and loader/storage verification
+- Validation workflow: historical fetch/import, replay, abnormal-return computation, and loader/storage verification
 - Decision support: operator briefs, transmission interpretation, and guarded recommendations
 - Operations: scheduler loops, pipeline heartbeats, retention, and blocker visibility
+
+## Execution boundary
+
+The repository now follows a workload split instead of forcing all compute through one language:
+
+- TypeScript: browser UI, API handlers, schedulers, ingestion, desktop shell
+- Python: canonical-event clustering, abnormal-return analytics, model training, and future heavy batch analytics
+- Rust: Tauri runtime only, with optional future hot-loop acceleration
+
+Batch compute should write results to NAS PostgreSQL so frontend and API code can consume stable outputs without importing Python directly.
 
 ## Repository structure
 
@@ -78,7 +93,7 @@ The same repository still powers multiple variants:
 - `src-tauri/`: desktop runtime and local sidecar
 - `docs/`: technical reference and deep-dive docs
 - `site/`: GitHub Pages documentation site
-- `scripts/`: build, packaging, and historical data tooling
+- `scripts/`: build, packaging, historical data tooling, and Python-first batch compute entrypoints
 
 ## Getting started
 
@@ -88,6 +103,12 @@ npm run dev
 ```
 
 `npm run dev` now starts the integrated theme-shell stack: the event dashboard API plus the Vite frontend. The root path `/` redirects to the theme shell automatically.
+
+Optional Python compute setup:
+
+```bash
+python -m pip install -r scripts/requirements-compute.txt
+```
 
 Other common commands:
 
@@ -99,6 +120,8 @@ npm run typecheck
 npm run build
 npm run docs:dev
 npm run docs:build
+npm run canonical:build -- --dry-run
+npm run returns:abnormal -- --dry-run
 npm run public:sync:dry
 npm run public:sync
 ```

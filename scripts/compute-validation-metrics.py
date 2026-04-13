@@ -24,7 +24,7 @@ except ImportError:
     sys.exit(1)
 
 PG_CONFIG = {
-    "host": "192.168.0.76",
+    "host": "192.168.0.2",
     "port": 5433,
     "dbname": "lattice",
     "user": "postgres",

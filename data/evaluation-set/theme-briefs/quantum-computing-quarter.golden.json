@@ -1,0 +1,82 @@
+{
+  "theme": "quantum-computing",
+  "periodType": "quarter",
+  "periodLabel": "rolling-quarter",
+  "reviewStatus": "gold",
+  "reviewedBy": "product-review",
+  "reviewedAt": "2026-04-08",
+  "sections": {
+    "whatChanged": [
+      {
+        "title": "Quarterly share strengthened",
+        "detail": "Quantum moved from a peripheral child theme toward a clearer rising theme inside technology-general.",
+        "importance": "medium"
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Quantum is structurally interesting only when research, policy, and commercialization references keep reappearing across windows.",
+      "statements": [
+        "A single quarter can be noisy, so this brief should emphasize persistence and corroboration."
+      ]
+    },
+    "evidence": {
+      "requiredSourceClasses": [
+        "news",
+        "research",
+        "policy"
+      ],
+      "requiredClaims": [
+        "Lifecycle should not be declining.",
+        "Quarterly share inside technology-general should be non-zero and directionally stronger."
+      ],
+      "provenanceExpectations": [
+        "Aggregate metrics should anchor the brief before prose."
+      ],
+      "notes": [
+        "Use this file as a compact rolling-quarter reference."
+      ]
+    },
+    "subtopicMovement": [
+      {
+        "subtheme": "quantum hardware",
+        "direction": "up",
+        "rationale": "Hardware roadmap visibility remains the dominant subtopic."
+      }
+    ],
+    "relatedEntities": {
+      "pathways": [
+        {
+          "entity": "IBM",
+          "symbol": "IBM",
+          "relationType": "platform-operator",
+          "note": "Large-platform evidence is required to avoid treating the theme as a micro-cap echo chamber."
+        }
+      ]
+    },
+    "risks": [
+      {
+        "title": "Low-base distortion",
+        "detail": "Small changes in coverage can appear large if the base is tiny."
+      }
+    ],
+    "watchpoints": [
+      {
+        "horizon": "90d",
+        "trigger": "Additional non-news evidence arrives",
+        "implication": "The brief can be upgraded from exploratory to stronger monitoring."
+      }
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "quantum-computing",
+        "rolling-quarter"
+      ],
+      "prompts": [
+        "Which evidence class is still missing for a stronger quantum brief?"
+      ]
+    }
+  },
+  "notes": [
+    "This file is intentionally compact but should still satisfy the full section contract."
+  ]
+}

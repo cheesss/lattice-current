@@ -1914,7 +1914,7 @@ export async function loadHistoricalReplayFramesFromPostgres(
   }
 
   const client = new Client({
-    host: options.pgConfig?.host || process.env.PG_HOST || process.env.INTEL_PG_HOST || '192.168.0.76',
+    host: options.pgConfig?.host || process.env.PG_HOST || process.env.INTEL_PG_HOST || '192.168.0.2',
     port: Number(options.pgConfig?.port || process.env.PG_PORT || 5433),
     database: options.pgConfig?.database || process.env.PG_DATABASE || process.env.PGDATABASE || 'lattice',
     user: options.pgConfig?.user || process.env.PG_USER || process.env.PGUSER || 'postgres',

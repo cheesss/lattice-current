@@ -38,7 +38,7 @@ const SYSTEM_CONTEXT = `You are an autonomous event-impact research agent with d
 
 ### Direct SQL (via psql or node)
 - PostgreSQL proxy at localhost:15433 (forwards to NAS), database: lattice
-- IMPORTANT: Use host=localhost port=15433 (NOT 192.168.0.76 — external IP is blocked in sandbox)
+- IMPORTANT: Use host=localhost port=15433 (NOT 192.168.0.2 — external IP is blocked in sandbox)
 - Tables: articles (60k), labeled_outcomes (618k), stock_sensitivity_matrix, auto_theme_symbols,
   regime_conditional_impact, event_hawkes_intensity, whatif_simulations, conditional_sensitivity, event_anomalies
 - You can run SQL queries to explore data patterns

@@ -1,0 +1,3306 @@
+{
+  "theme": "ai-ml",
+  "label": "emerging-tech",
+  "category": "technology",
+  "categoryLabel": "Technology",
+  "parentTheme": "technology-general",
+  "periodType": "quarter",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 105,
+    "lifecycleStage": "growing",
+    "vsPreviousPct": 100,
+    "vsYearAgoPct": 100,
+    "acceleration": 100,
+    "sourceDiversity": 0.0747,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "emerging-tech summary baseline",
+        "articleCount": 105,
+        "lifecycleStage": "growing",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 10
+      },
+      {
+        "key": "curated_digest",
+        "label": "Curated digest",
+        "description": "Ranked curated items linked to the theme.",
+        "sourceType": "digest",
+        "count": 4
+      },
+      {
+        "key": "openalex_research",
+        "label": "OpenAlex research",
+        "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+        "sourceType": "research",
+        "count": 8
+      },
+      {
+        "key": "github_code",
+        "label": "GitHub code",
+        "description": "Repositories linked to the theme through GitHub search and ranking.",
+        "sourceType": "code",
+        "count": 8
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "sec_filings",
+        "label": "SEC-backed entities",
+        "description": "Theme-to-entity links backed by SEC connector data.",
+        "sourceType": "filing",
+        "count": 8
+      },
+      {
+        "key": "codex_attachment",
+        "label": "Adjacent pathway",
+        "description": "Codex-attached adjacent or indirect pathway under an existing theme.",
+        "sourceType": "analysis",
+        "count": 0
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "emerging-tech quarter aggregate",
+        "articleCount": 105,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Ai Ml share movement inside Technology General",
+        "sharePct": 67.5,
+        "deltaSharePct": 34.17
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "Taste in the age of AI and LLMs",
+        "articleId": 79748,
+        "source": "hackernews",
+        "publishedAt": "2026-04-07T15:54:16.000Z"
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+        "articleId": 78953,
+        "source": "Google News: military",
+        "publishedAt": "2026-04-07T09:57:38.000Z"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "emerging-tech aggregate context",
+        "lifecycleStage": "growing",
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "emerging-tech relative-share context",
+        "parentTheme": "technology-general",
+        "deltaSharePct": 34.17
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+        "workId": "https://openalex.org/W4378473491",
+        "publishedAt": "2023-05-25T15:00:00.000Z",
+        "citedByCount": 494,
+        "researchSignalScore": 0,
+        "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+        "workId": "https://openalex.org/W4318671267",
+        "publishedAt": "2023-01-30T15:00:00.000Z",
+        "citedByCount": 378,
+        "researchSignalScore": 0,
+        "source": "JAMA"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+        "workId": "https://openalex.org/W4361866031",
+        "publishedAt": "2023-03-29T15:00:00.000Z",
+        "citedByCount": 264,
+        "researchSignalScore": 0,
+        "source": "arXiv (Cornell University)"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "Lightning-AI/pytorch-lightning",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+        "stars": 31009,
+        "forks": 3702,
+        "pushedAt": "2026-04-07T08:06:44.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/Lightning-AI/pytorch-lightning"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "ultralytics/yolov5",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+        "stars": 57167,
+        "forks": 17450,
+        "pushedAt": "2026-04-02T14:13:02.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/ultralytics/yolov5"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "sorrycc/awesome-javascript",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+        "stars": 34932,
+        "forks": 4528,
+        "pushedAt": "2026-04-02T13:21:16.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/sorrycc/awesome-javascript"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "emerging-tech aggregate",
+        "articleCount": 105,
+        "lifecycleStage": "growing"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Taste in the age of AI and LLMs",
+        "articleId": 79748,
+        "source": "hackernews",
+        "publishedAt": "2026-04-07T15:54:16.000Z",
+        "url": "https://rajnandan.com/posts/taste-in-the-age-of-ai-and-llms/"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+        "articleId": 78953,
+        "source": "Google News: military",
+        "publishedAt": "2026-04-07T09:57:38.000Z",
+        "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxOcEZ1QzRRT0U5dmxxQzctY1BEWkRtaXNpaWlkSWNCYzhOY29vRXYyaWNFYjh6TnR4QU1yeWdzWG1jR0hid2tPYmZUcFBwWDl0dS04SzNsTk9hUFp6WE5BQjJHcTBRZGJjRk9PZ1hwclFQc0dSTk1pN3BJbXpwQU9nVWZ2akx3RVBKc3EzUnBVaDF3alJVZGowWHlCSWktQXd0aVBLcVNQMWZ0d0hWMnJORkhtNzhqZTlpaFdmbXNoZ1dfSVYzSGpYVGN3WG1ETUpJTGt5UGV3UGRUM2s?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Agentic Federated Learning: The Future of Distributed Training Orchestration",
+        "articleId": 79794,
+        "source": "arxiv",
+        "publishedAt": "2026-04-06T17:43:30.000Z",
+        "url": "https://arxiv.org/abs/2604.04895v1"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Synthetic Sandbox for Training Machine Learning Engineering Agents",
+        "articleId": 79821,
+        "source": "arxiv",
+        "publishedAt": "2026-04-06T17:19:29.000Z",
+        "url": "https://arxiv.org/abs/2604.04872v1"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "FairLogue: A Toolkit for Intersectional Fairness Analysis in Clinical Machine Learning Models",
+        "articleId": 79835,
+        "source": "arxiv",
+        "publishedAt": "2026-04-06T17:03:03.000Z",
+        "url": "https://arxiv.org/abs/2604.04858v1"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "AMD",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:06.351Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "GOOGL",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:04.723Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "NVDA",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:01.257Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "MSFT",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:03.037Z"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Unraveling the Ethical Enigma: Artificial Intelligence in Healthcare",
+        "workId": "https://openalex.org/W4385724150",
+        "publishedAt": "2023-08-09T15:00:00.000Z",
+        "citedByCount": 228,
+        "researchSignalScore": 0,
+        "source": "Cureus"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Application of Large Language Models to Software Engineering Tasks: Opportunities, Risks, and Implications",
+        "workId": "https://openalex.org/W4367059011",
+        "publishedAt": "2023-04-25T15:00:00.000Z",
+        "citedByCount": 173,
+        "researchSignalScore": 0,
+        "source": "IEEE Software"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "ChatMOF: an artificial intelligence system for predicting and generating metal-organic frameworks using large language models",
+        "workId": "https://openalex.org/W4399290669",
+        "publishedAt": "2024-06-02T15:00:00.000Z",
+        "citedByCount": 167,
+        "researchSignalScore": 0,
+        "source": "Nature Communications"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "A Primer on Generative Artificial Intelligence",
+        "workId": "https://openalex.org/W4391615642",
+        "publishedAt": "2024-02-06T15:00:00.000Z",
+        "citedByCount": 127,
+        "researchSignalScore": 0,
+        "source": "Education Sciences"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "GPT versus Resident Physicians — A Benchmark Based on Official Board Scores",
+        "workId": "https://openalex.org/W4394767601",
+        "publishedAt": "2024-04-11T15:00:00.000Z",
+        "citedByCount": 121,
+        "researchSignalScore": 0,
+        "source": "NEJM AI"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "dipakkr/A-to-Z-Resources-for-Students",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkxNDkxMTM1MTQ=",
+        "stars": 21596,
+        "forks": 4815,
+        "pushedAt": "2026-02-27T09:14:51.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/dipakkr/A-to-Z-Resources-for-Students"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "thangchung/awesome-dotnet-core",
+        "repoKey": "MDEwOlJlcG9zaXRvcnk1NDA4Njk2OQ==",
+        "stars": 21156,
+        "forks": 2953,
+        "pushedAt": "2026-02-27T03:26:22.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/thangchung/awesome-dotnet-core"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "zhaoolee/ChromeAppHeroes",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkxNjk1Mjk1Njc=",
+        "stars": 25424,
+        "forks": 2618,
+        "pushedAt": "2026-02-11T03:18:26.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/zhaoolee/ChromeAppHeroes"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "datawhalechina/llm-cookbook",
+        "repoKey": "R_kgDOJckNQg",
+        "stars": 23718,
+        "forks": 2875,
+        "pushedAt": "2025-06-12T14:48:07.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/datawhalechina/llm-cookbook"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "karpathy/llama2.c",
+        "repoKey": "R_kgDOJ-qZHA",
+        "stars": 19366,
+        "forks": 2491,
+        "pushedAt": "2024-08-06T09:44:40.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/karpathy/llama2.c"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Ai Ml relative share",
+        "parentTheme": "technology-general",
+        "sharePct": 67.5,
+        "deltaSharePct": 34.17
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "emerging-tech risk baseline",
+        "articleCount": 105,
+        "lifecycleStage": "growing",
+        "sourceDiversity": 0.0747,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Ai Ml share baseline",
+        "parentTheme": "technology-general",
+        "sharePct": 67.5,
+        "deltaSharePct": 34.17
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "emerging-tech watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "emerging-tech changed lifecycle stage",
+        "detail": "emerging-tech moved from nascent to growing in the current quarter lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech quarter aggregate",
+            "articleCount": 105,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "emerging-tech logged 105 items, +100% versus the prior quarter and +100% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech quarter aggregate",
+            "articleCount": 105,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "emerging-tech is showing positive acceleration of 100 in the current quarter comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech quarter aggregate",
+            "articleCount": 105,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Ai Ml now represents 67.5% of Technology General coverage, a +34.17 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Ai Ml share movement inside Technology General",
+            "sharePct": 67.5,
+            "deltaSharePct": 34.17
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "2 curated items mapped to emerging-tech in the recent digest window.",
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Taste in the age of AI and LLMs",
+            "articleId": 79748,
+            "source": "hackernews",
+            "publishedAt": "2026-04-07T15:54:16.000Z"
+          },
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+            "articleId": 78953,
+            "source": "Google News: military",
+            "publishedAt": "2026-04-07T09:57:38.000Z"
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "emerging-tech matters because it is growing with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "openalex_research",
+            "label": "OpenAlex research",
+            "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+            "sourceType": "research",
+            "count": 0
+          },
+          {
+            "key": "github_code",
+            "label": "GitHub code",
+            "description": "Repositories linked to the theme through GitHub search and ranking.",
+            "sourceType": "code",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech aggregate context",
+            "lifecycleStage": "growing",
+            "vsYearAgoPct": 100,
+            "acceleration": 100
+          },
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "emerging-tech relative-share context",
+            "parentTheme": "technology-general",
+            "deltaSharePct": 34.17
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+            "workId": "https://openalex.org/W4378473491",
+            "publishedAt": "2023-05-25T15:00:00.000Z",
+            "citedByCount": 494,
+            "researchSignalScore": 0,
+            "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+            "workId": "https://openalex.org/W4318671267",
+            "publishedAt": "2023-01-30T15:00:00.000Z",
+            "citedByCount": 378,
+            "researchSignalScore": 0,
+            "source": "JAMA"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+            "workId": "https://openalex.org/W4361866031",
+            "publishedAt": "2023-03-29T15:00:00.000Z",
+            "citedByCount": 264,
+            "researchSignalScore": 0,
+            "source": "arXiv (Cornell University)"
+          },
+          {
+            "type": "github_code",
+            "evidenceClass": "github_code",
+            "sourceType": "code",
+            "label": "Lightning-AI/pytorch-lightning",
+            "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+            "stars": 31009,
+            "forks": 3702,
+            "pushedAt": "2026-04-07T08:06:44.000Z",
+            "source": "GitHub",
+            "url": "https://github.com/Lightning-AI/pytorch-lightning"
+          },
+          {
+            "type": "github_code",
+            "evidenceClass": "github_code",
+            "sourceType": "code",
+            "label": "ultralytics/yolov5",
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+            "stars": 57167,
+            "forks": 17450,
+            "pushedAt": "2026-04-02T14:13:02.000Z",
+            "source": "GitHub",
+            "url": "https://github.com/ultralytics/yolov5"
+          },
+          {
+            "type": "github_code",
+            "evidenceClass": "github_code",
+            "sourceType": "code",
+            "label": "sorrycc/awesome-javascript",
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+            "stars": 34932,
+            "forks": 4528,
+            "pushedAt": "2026-04-02T13:21:16.000Z",
+            "source": "GitHub",
+            "url": "https://github.com/sorrycc/awesome-javascript"
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Ai Ml share movement",
+        "detail": "Ai Ml is ranked #1 inside Technology General with 67.5% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 8
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Ai Ml relative share",
+            "parentTheme": "technology-general",
+            "sharePct": 67.5,
+            "deltaSharePct": 34.17
+          }
+        ]
+      },
+      {
+        "section": "relatedEntities",
+        "claimType": "entity_exposure",
+        "title": "Theme-to-entity linkage",
+        "detail": "4 entity links are attached to this theme.",
+        "evidenceClasses": [
+          {
+            "key": "sec_filings",
+            "label": "SEC-backed entities",
+            "description": "Theme-to-entity links backed by SEC connector data.",
+            "sourceType": "filing",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "sec_connector",
+            "entityKey": "AMD",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:06.351Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "GOOGL",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:04.723Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "NVDA",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:01.257Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "MSFT",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:03.037Z"
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "emerging-tech changed lifecycle stage",
+        "detail": "emerging-tech moved from nascent to growing in the current quarter lens.",
+        "metric": {
+          "from": "nascent",
+          "to": "growing"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech quarter aggregate",
+            "articleCount": 105,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "emerging-tech logged 105 items, +100% versus the prior quarter and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 105,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech quarter aggregate",
+            "articleCount": 105,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "emerging-tech is showing positive acceleration of 100 in the current quarter comparison.",
+        "metric": {
+          "acceleration": 100,
+          "sourceDiversity": 0.0747
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "emerging-tech quarter aggregate",
+            "articleCount": 105,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Ai Ml now represents 67.5% of Technology General coverage, a +34.17 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 67.5,
+          "deltaSharePct": 34.17
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Ai Ml share movement inside Technology General",
+            "sharePct": 67.5,
+            "deltaSharePct": 34.17
+          }
+        ]
+      },
+      {
+        "type": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "2 curated items mapped to emerging-tech in the recent digest window.",
+        "metric": {
+          "curatedItems": 2
+        },
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Taste in the age of AI and LLMs",
+            "articleId": 79748,
+            "source": "hackernews",
+            "publishedAt": "2026-04-07T15:54:16.000Z"
+          },
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+            "articleId": 78953,
+            "source": "Google News: military",
+            "publishedAt": "2026-04-07T09:57:38.000Z"
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "emerging-tech matters because it is growing with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "emerging-tech matters because it is growing with positive year-on-year movement and still building acceleration.",
+        "emerging-tech is not just moving in isolation. It is shifting relative share inside Technology General, which makes it a structural signal rather than a single headline burst.",
+        "emerging-tech is also reinforced by 8 OpenAlex-linked research works, including 8 from the last three publication years, which suggests the theme has live research momentum and not just media attention.",
+        "The research lane clusters around Engineering management, Business, Process management, which sharpens the evidence base behind the theme beyond general news coverage.",
+        "emerging-tech is also supported by 8 GitHub repositories with 6 active pushes in the last 90 days, which points to live builder traction instead of media-only narrative strength.",
+        "Code activity clusters around Python, C#, JavaScript, which helps frame where the implementation layer is concentrating."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech aggregate context",
+          "lifecycleStage": "growing",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "emerging-tech relative-share context",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 34.17
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+          "workId": "https://openalex.org/W4378473491",
+          "publishedAt": "2023-05-25T15:00:00.000Z",
+          "citedByCount": 494,
+          "researchSignalScore": 0,
+          "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+          "workId": "https://openalex.org/W4318671267",
+          "publishedAt": "2023-01-30T15:00:00.000Z",
+          "citedByCount": 378,
+          "researchSignalScore": 0,
+          "source": "JAMA"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+          "workId": "https://openalex.org/W4361866031",
+          "publishedAt": "2023-03-29T15:00:00.000Z",
+          "citedByCount": 264,
+          "researchSignalScore": 0,
+          "source": "arXiv (Cornell University)"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Lightning-AI/pytorch-lightning",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+          "stars": 31009,
+          "forks": 3702,
+          "pushedAt": "2026-04-07T08:06:44.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Lightning-AI/pytorch-lightning"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ultralytics/yolov5",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+          "stars": 57167,
+          "forks": 17450,
+          "pushedAt": "2026-04-02T14:13:02.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ultralytics/yolov5"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sorrycc/awesome-javascript",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+          "stars": 34932,
+          "forks": 4528,
+          "pushedAt": "2026-04-02T13:21:16.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sorrycc/awesome-javascript"
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 105,
+        "lifecycleStage": "growing",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "acceleration": 100,
+        "sourceDiversity": 0.0747,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [
+        {
+          "title": "Taste in the age of AI and LLMs",
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z",
+          "whyItMatters": "Ai Ml is cooling 96.61% versus the prior week.",
+          "oneLineSummary": "Hacker News score 173 | comments 159 | author speckx | hn_id 47677241",
+          "relatedTopics": []
+        },
+        {
+          "title": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z",
+          "whyItMatters": "Ai Ml is cooling 96.61% versus the prior week.",
+          "oneLineSummary": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "relatedTopics": []
+        }
+      ],
+      "recentArticles": [
+        {
+          "articleId": 79748,
+          "title": "Taste in the age of AI and LLMs",
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z",
+          "url": "https://rajnandan.com/posts/taste-in-the-age-of-ai-and-llms/"
+        },
+        {
+          "articleId": 78953,
+          "title": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z",
+          "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxOcEZ1QzRRT0U5dmxxQzctY1BEWkRtaXNpaWlkSWNCYzhOY29vRXYyaWNFYjh6TnR4QU1yeWdzWG1jR0hid2tPYmZUcFBwWDl0dS04SzNsTk9hUFp6WE5BQjJHcTBRZGJjRk9PZ1hwclFQc0dSTk1pN3BJbXpwQU9nVWZ2akx3RVBKc3EzUnBVaDF3alJVZGowWHlCSWktQXd0aVBLcVNQMWZ0d0hWMnJORkhtNzhqZTlpaFdmbXNoZ1dfSVYzSGpYVGN3WG1ETUpJTGt5UGV3UGRUM2s?oc=5"
+        },
+        {
+          "articleId": 79794,
+          "title": "Agentic Federated Learning: The Future of Distributed Training Orchestration",
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:43:30.000Z",
+          "url": "https://arxiv.org/abs/2604.04895v1"
+        },
+        {
+          "articleId": 79821,
+          "title": "Synthetic Sandbox for Training Machine Learning Engineering Agents",
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:19:29.000Z",
+          "url": "https://arxiv.org/abs/2604.04872v1"
+        },
+        {
+          "articleId": 79835,
+          "title": "FairLogue: A Toolkit for Intersectional Fairness Analysis in Clinical Machine Learning Models",
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:03:03.000Z",
+          "url": "https://arxiv.org/abs/2604.04858v1"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connected",
+        "summary": {
+          "workCount": 8,
+          "recentCount": 8,
+          "totalCitations": 1952,
+          "avgResearchSignalScore": 0,
+          "topConcepts": [
+            "Engineering management",
+            "Business",
+            "Process management",
+            "Engineering",
+            "Medicine"
+          ]
+        },
+        "works": [
+          {
+            "workId": "https://openalex.org/W4378473491",
+            "title": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+            "publicationYear": 2023,
+            "publicationDate": "2023-05-25T15:00:00.000Z",
+            "citedByCount": 494,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "machine learning",
+              "llm",
+              "gpt"
+            ],
+            "sourceDisplayName": "BenchCouncil Transactions on Benchmarks Standards and Evaluations",
+            "primaryTopic": "Artificial Intelligence in Healthcare and Education",
+            "landingPageUrl": "https://doi.org/10.1016/j.tbench.2023.100115",
+            "abstractSummary": "Artificial Intelligence (AI)-based ChatGPT developed by OpenAI is now widely accepted in several fields, including education. Students can learn about ideas and theories by using this technology while generating content with it. ChatGPT is built on State of the Art (SOA), like Deep Learning (DL), Natural Language Proc…",
+            "concepts": [
+              {
+                "displayName": "Engineering management",
+                "score": 0
+              },
+              {
+                "displayName": "Business",
+                "score": 0
+              },
+              {
+                "displayName": "Process management",
+                "score": 0
+              },
+              {
+                "displayName": "Engineering",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Mohd Javaid",
+              "Abid Haleem",
+              "Ravi Pratap Singh",
+              "Shahbaz Khan"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4318671267",
+            "title": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+            "publicationYear": 2023,
+            "publicationDate": "2023-01-30T15:00:00.000Z",
+            "citedByCount": 378,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence"
+            ],
+            "sourceDisplayName": "JAMA",
+            "primaryTopic": "Genetics, Bioinformatics, and Biomedical Research",
+            "landingPageUrl": "https://doi.org/10.1001/jama.2023.1344",
+            "abstractSummary": "Artificial intelligence (AI) technologies to help authors improve the preparation and quality of their manuscripts and published articles are rapidly increasing in number and sophistication.These include tools to assist with writing, grammar, language, references, statistical analysis, and reporting standards.Editors…",
+            "concepts": [
+              {
+                "displayName": "Medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Scientific integrity",
+                "score": 0
+              },
+              {
+                "displayName": "Research integrity",
+                "score": 0
+              },
+              {
+                "displayName": "Engineering ethics",
+                "score": 0
+              },
+              {
+                "displayName": "MEDLINE",
+                "score": 0
+              },
+              {
+                "displayName": "Personal Integrity",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Annette Flanagin",
+              "Kirsten Bibbins‐Domingo",
+              "Michael Berkwits",
+              "Stacy Christiansen"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4361866031",
+            "title": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+            "publicationYear": 2023,
+            "publicationDate": "2023-03-29T15:00:00.000Z",
+            "citedByCount": 264,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "llm",
+              "gpt"
+            ],
+            "sourceDisplayName": "arXiv (Cornell University)",
+            "primaryTopic": "Topic Modeling",
+            "landingPageUrl": "http://arxiv.org/abs/2303.17580",
+            "abstractSummary": "Solving complicated AI tasks with different domains and modalities is a key step toward artificial general intelligence. While there are numerous AI models available for various domains and modalities, they cannot handle complicated AI tasks autonomously. Considering large language models (LLMs) have exhibited excepti…",
+            "concepts": [
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Modalities",
+                "score": 0
+              },
+              {
+                "displayName": "Face (sociological concept)",
+                "score": 0
+              },
+              {
+                "displayName": "Task (project management)",
+                "score": 0
+              },
+              {
+                "displayName": "Artificial intelligence",
+                "score": 0
+              },
+              {
+                "displayName": "Human–computer interaction",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Yongliang Shen",
+              "Kaitao Song",
+              "Xu Tan",
+              "Dongsheng Li"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4385724150",
+            "title": "Unraveling the Ethical Enigma: Artificial Intelligence in Healthcare",
+            "publicationYear": 2023,
+            "publicationDate": "2023-08-09T15:00:00.000Z",
+            "citedByCount": 228,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "machine learning",
+              "llm",
+              "gpt"
+            ],
+            "sourceDisplayName": "Cureus",
+            "primaryTopic": "Artificial Intelligence in Healthcare and Education",
+            "landingPageUrl": "https://doi.org/10.7759/cureus.43262",
+            "abstractSummary": "The integration of artificial intelligence (AI) into healthcare promises groundbreaking advancements in patient care, revolutionizing clinical diagnosis, predictive medicine, and decision-making. This transformative technology uses machine learning, natural language processing, and large language models (LLMs) to proc…",
+            "concepts": [
+              {
+                "displayName": "Health care",
+                "score": 0
+              },
+              {
+                "displayName": "Transparency (behavior)",
+                "score": 0
+              },
+              {
+                "displayName": "Accountability",
+                "score": 0
+              },
+              {
+                "displayName": "Transformative learning",
+                "score": 0
+              },
+              {
+                "displayName": "Big data",
+                "score": 0
+              },
+              {
+                "displayName": "Confidentiality",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Madhan Jeyaraman",
+              "Sangeetha Balaji",
+              "Naveen Jeyaraman",
+              "Sankalp Yadav"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4367059011",
+            "title": "Application of Large Language Models to Software Engineering Tasks: Opportunities, Risks, and Implications",
+            "publicationYear": 2023,
+            "publicationDate": "2023-04-25T15:00:00.000Z",
+            "citedByCount": 173,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "machine learning",
+              "llm"
+            ],
+            "sourceDisplayName": "IEEE Software",
+            "primaryTopic": "Artificial Intelligence in Healthcare and Education",
+            "landingPageUrl": "https://doi.org/10.1109/ms.2023.3248401",
+            "abstractSummary": "Has the day we all have been waiting for really arrived? Have advances in deep learning and machine learning (ML) finally reached a turning point and have started to produce “accurate enough” assistants to help us in a variety of tasks, including software development? Are large language models (LLM) going to turn us a…",
+            "concepts": [
+              {
+                "displayName": "Misinformation",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Variety (cybernetics)",
+                "score": 0
+              },
+              {
+                "displayName": "Point (geometry)",
+                "score": 0
+              },
+              {
+                "displayName": "Software",
+                "score": 0
+              },
+              {
+                "displayName": "Software development",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "İpek Özkaya"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4399290669",
+            "title": "ChatMOF: an artificial intelligence system for predicting and generating metal-organic frameworks using large language models",
+            "publicationYear": 2024,
+            "publicationDate": "2024-06-02T15:00:00.000Z",
+            "citedByCount": 167,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "machine learning",
+              "gpt"
+            ],
+            "sourceDisplayName": "Nature Communications",
+            "primaryTopic": "Machine Learning in Materials Science",
+            "landingPageUrl": "https://doi.org/10.1038/s41467-024-48998-4",
+            "abstractSummary": "ChatMOF is an artificial intelligence (AI) system that is built to predict and generate metal-organic frameworks (MOFs). By leveraging a large-scale language model (GPT-4, GPT-3.5-turbo, and GPT-3.5-turbo-16k), ChatMOF extracts key details from textual inputs and delivers appropriate responses, thus eliminating the ne…",
+            "concepts": [
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Variety (cybernetics)",
+                "score": 0
+              },
+              {
+                "displayName": "Pipeline (software)",
+                "score": 0
+              },
+              {
+                "displayName": "Key (lock)",
+                "score": 0
+              },
+              {
+                "displayName": "Artificial intelligence",
+                "score": 0
+              },
+              {
+                "displayName": "Property (philosophy)",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Yeonghun Kang",
+              "Jihan Kim"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4391615642",
+            "title": "A Primer on Generative Artificial Intelligence",
+            "publicationYear": 2024,
+            "publicationDate": "2024-02-06T15:00:00.000Z",
+            "citedByCount": 127,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "machine learning",
+              "llm"
+            ],
+            "sourceDisplayName": "Education Sciences",
+            "primaryTopic": "Explainable Artificial Intelligence (XAI)",
+            "landingPageUrl": "https://doi.org/10.3390/educsci14020172",
+            "abstractSummary": "Many educators and professionals in different industries may need to become more familiar with the basic concepts of artificial intelligence (AI) and generative artificial intelligence (Gen-AI). Therefore, this paper aims to introduce some of the basic concepts of AI and Gen-AI. The approach of this explanatory paper…",
+            "concepts": [
+              {
+                "displayName": "Artificial intelligence",
+                "score": 0
+              },
+              {
+                "displayName": "Primer (cosmetics)",
+                "score": 0
+              },
+              {
+                "displayName": "Generative grammar",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Machine learning",
+                "score": 0
+              },
+              {
+                "displayName": "Mathematics education",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Faisal Kalota"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4394767601",
+            "title": "GPT versus Resident Physicians — A Benchmark Based on Official Board Scores",
+            "publicationYear": 2024,
+            "publicationDate": "2024-04-11T15:00:00.000Z",
+            "citedByCount": 121,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "ai",
+              "artificial intelligence",
+              "llm",
+              "gpt"
+            ],
+            "sourceDisplayName": "NEJM AI",
+            "primaryTopic": "Artificial Intelligence in Healthcare and Education",
+            "landingPageUrl": "https://doi.org/10.1056/aidbp2300192",
+            "abstractSummary": "BACKGROUND Artificial intelligence (AI) is a burgeoning technological advancement, with considerable promise for influencing the field of medicine. As a preliminary step toward integrating AI into medical practice, it is imperative to ascertain whether model performance is comparable with that of physicians. We presen…",
+            "concepts": [
+              {
+                "displayName": "Benchmark (surveying)",
+                "score": 0
+              },
+              {
+                "displayName": "Medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Psychology",
+                "score": 0
+              },
+              {
+                "displayName": "Family medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Medical education",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Uriel Katz",
+              "Eran Cohen",
+              "Eliya Shachar",
+              "Jonathan Somer"
+            ]
+          }
+        ]
+      },
+      "githubEvidence": {
+        "status": "connected",
+        "summary": {
+          "repoCount": 8,
+          "totalStars": 234368,
+          "recentPushedCount": 6,
+          "avgGithubSignalScore": 4.31,
+          "topLanguages": [
+            "Python",
+            "C#",
+            "JavaScript",
+            "Jupyter Notebook"
+          ]
+        },
+        "repos": [
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+            "fullName": "Lightning-AI/pytorch-lightning",
+            "name": "pytorch-lightning",
+            "htmlUrl": "https://github.com/Lightning-AI/pytorch-lightning",
+            "homepageUrl": "https://lightning.ai/pytorch-lightning/?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme",
+            "description": "Pretrain, finetune ANY AI model of ANY size on 1 or 10,000+ GPUs with zero code changes.",
+            "language": "Python",
+            "topics": [
+              "ai",
+              "artificial-intelligence",
+              "data-science",
+              "deep-learning",
+              "machine-learning",
+              "python"
+            ],
+            "stargazersCount": 31009,
+            "forksCount": 3702,
+            "watchersCount": 31009,
+            "openIssuesCount": 985,
+            "defaultBranch": "master",
+            "licenseName": "Apache-2.0",
+            "pushedAt": "2026-04-07T08:06:44.000Z",
+            "updatedAt": "2026-04-07T21:21:03.549Z",
+            "githubSignalScore": 5.33,
+            "matchedKeywords": [
+              "ai"
+            ],
+            "ownerLogin": "Lightning-AI"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+            "fullName": "ultralytics/yolov5",
+            "name": "yolov5",
+            "htmlUrl": "https://github.com/ultralytics/yolov5",
+            "homepageUrl": "https://docs.ultralytics.com",
+            "description": "YOLOv5 🚀 in PyTorch > ONNX > CoreML > TFLite",
+            "language": "Python",
+            "topics": [
+              "coreml",
+              "deep-learning",
+              "ios",
+              "machine-learning",
+              "ml",
+              "object-detection"
+            ],
+            "stargazersCount": 57167,
+            "forksCount": 17450,
+            "watchersCount": 57167,
+            "openIssuesCount": 41,
+            "defaultBranch": "master",
+            "licenseName": "AGPL-3.0",
+            "pushedAt": "2026-04-02T14:13:02.000Z",
+            "updatedAt": "2026-04-07T21:21:04.061Z",
+            "githubSignalScore": 5,
+            "matchedKeywords": [],
+            "ownerLogin": "ultralytics"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+            "fullName": "sorrycc/awesome-javascript",
+            "name": "awesome-javascript",
+            "htmlUrl": "https://github.com/sorrycc/awesome-javascript",
+            "homepageUrl": "",
+            "description": "🐢 A collection of awesome browser-side  JavaScript libraries, resources and shiny things.",
+            "language": "",
+            "topics": [],
+            "stargazersCount": 34932,
+            "forksCount": 4528,
+            "watchersCount": 34932,
+            "openIssuesCount": 36,
+            "defaultBranch": "master",
+            "licenseName": "",
+            "pushedAt": "2026-04-02T13:21:16.000Z",
+            "updatedAt": "2026-04-07T21:21:04.101Z",
+            "githubSignalScore": 4.83,
+            "matchedKeywords": [],
+            "ownerLogin": "sorrycc"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkxNDkxMTM1MTQ=",
+            "fullName": "dipakkr/A-to-Z-Resources-for-Students",
+            "name": "A-to-Z-Resources-for-Students",
+            "htmlUrl": "https://github.com/dipakkr/A-to-Z-Resources-for-Students",
+            "homepageUrl": "",
+            "description": "✅  Curated list of resources for developers",
+            "language": "",
+            "topics": [
+              "android",
+              "awesome",
+              "awesome-list",
+              "conferences",
+              "hackathon",
+              "react"
+            ],
+            "stargazersCount": 21596,
+            "forksCount": 4815,
+            "watchersCount": 21596,
+            "openIssuesCount": 11,
+            "defaultBranch": "master",
+            "licenseName": "MIT",
+            "pushedAt": "2026-02-27T09:14:51.000Z",
+            "updatedAt": "2026-04-07T21:21:04.390Z",
+            "githubSignalScore": 4.52,
+            "matchedKeywords": [],
+            "ownerLogin": "dipakkr"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnk1NDA4Njk2OQ==",
+            "fullName": "thangchung/awesome-dotnet-core",
+            "name": "awesome-dotnet-core",
+            "htmlUrl": "https://github.com/thangchung/awesome-dotnet-core",
+            "homepageUrl": "",
+            "description": ":honeybee: A collection of awesome .NET core libraries, tools, frameworks and software",
+            "language": "C#",
+            "topics": [
+              "awesome",
+              "awesome-list",
+              "csharp",
+              "dotnet-core",
+              "list",
+              "microsoft"
+            ],
+            "stargazersCount": 21156,
+            "forksCount": 2953,
+            "watchersCount": 21156,
+            "openIssuesCount": 193,
+            "defaultBranch": "master",
+            "licenseName": "",
+            "pushedAt": "2026-02-27T03:26:22.000Z",
+            "updatedAt": "2026-04-07T21:21:04.422Z",
+            "githubSignalScore": 4.48,
+            "matchedKeywords": [],
+            "ownerLogin": "thangchung"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkxNjk1Mjk1Njc=",
+            "fullName": "zhaoolee/ChromeAppHeroes",
+            "name": "ChromeAppHeroes",
+            "htmlUrl": "https://github.com/zhaoolee/ChromeAppHeroes",
+            "homepageUrl": "https://zhaoolee.com/ChromeAppHeroes/",
+            "description": "🌈谷粒-Chrome插件英雄榜, 为优秀的Chrome插件写一本中文说明书, 让Chrome插件英雄们造福人类~  ChromePluginHeroes, Write a Chinese manual for the excellent Chrome plugin, let the Chrome plugin heroes benefit the human~ 公众号「0加1」同步更新",
+            "language": "JavaScript",
+            "topics": [],
+            "stargazersCount": 25424,
+            "forksCount": 2618,
+            "watchersCount": 25424,
+            "openIssuesCount": 40,
+            "defaultBranch": "master",
+            "licenseName": "GPL-3.0",
+            "pushedAt": "2026-02-11T03:18:26.000Z",
+            "updatedAt": "2026-04-07T21:21:04.714Z",
+            "githubSignalScore": 4.39,
+            "matchedKeywords": [],
+            "ownerLogin": "zhaoolee"
+          },
+          {
+            "repoKey": "R_kgDOJckNQg",
+            "fullName": "datawhalechina/llm-cookbook",
+            "name": "llm-cookbook",
+            "htmlUrl": "https://github.com/datawhalechina/llm-cookbook",
+            "homepageUrl": "https://datawhalechina.github.io/llm-cookbook/",
+            "description": "面向开发者的 LLM 入门教程，吴恩达大模型系列课程中文版",
+            "language": "Jupyter Notebook",
+            "topics": [
+              "cookbook",
+              "llm"
+            ],
+            "stargazersCount": 23718,
+            "forksCount": 2875,
+            "watchersCount": 23718,
+            "openIssuesCount": 9,
+            "defaultBranch": "main",
+            "licenseName": "",
+            "pushedAt": "2025-06-12T14:48:07.000Z",
+            "updatedAt": "2026-04-07T21:21:04.753Z",
+            "githubSignalScore": 3.22,
+            "matchedKeywords": [
+              "llm"
+            ],
+            "ownerLogin": "datawhalechina"
+          },
+          {
+            "repoKey": "R_kgDOJ-qZHA",
+            "fullName": "karpathy/llama2.c",
+            "name": "llama2.c",
+            "htmlUrl": "https://github.com/karpathy/llama2.c",
+            "homepageUrl": "",
+            "description": "Inference Llama 2 in one file of pure C",
+            "language": "C",
+            "topics": [],
+            "stargazersCount": 19366,
+            "forksCount": 2491,
+            "watchersCount": 19366,
+            "openIssuesCount": 187,
+            "defaultBranch": "master",
+            "licenseName": "MIT",
+            "pushedAt": "2024-08-06T09:44:40.000Z",
+            "updatedAt": "2026-04-07T21:21:05.002Z",
+            "githubSignalScore": 2.72,
+            "matchedKeywords": [
+              "inference"
+            ],
+            "ownerLogin": "karpathy"
+          }
+        ]
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "github",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 0,
+          "codeCount": 8,
+          "totalCount": 8,
+          "evidenceClasses": [
+            "github_code"
+          ],
+          "latestPublishedAt": "2026-04-07T08:06:44.000Z"
+        },
+        {
+          "source": "arxiv",
+          "sourceQuality": 0.92,
+          "curatedItemCount": 0,
+          "recentArticleCount": 3,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 3,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-06T17:43:30.000Z"
+        },
+        {
+          "source": "hackernews",
+          "sourceQuality": 0.78,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-07T15:54:16.000Z"
+        },
+        {
+          "source": "google news: military",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-07T09:57:38.000Z"
+        },
+        {
+          "source": "benchcouncil transactions on benchmarks standards and evaluations",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-05-25T15:00:00.000Z"
+        },
+        {
+          "source": "jama",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-01-30T15:00:00.000Z"
+        },
+        {
+          "source": "arxiv (cornell university)",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-03-29T15:00:00.000Z"
+        },
+        {
+          "source": "cureus",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-08-09T15:00:00.000Z"
+        },
+        {
+          "source": "ieee software",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-04-25T15:00:00.000Z"
+        },
+        {
+          "source": "nature communications",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2024-06-02T15:00:00.000Z"
+        },
+        {
+          "source": "education sciences",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2024-02-06T15:00:00.000Z"
+        },
+        {
+          "source": "nejm ai",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2024-04-11T15:00:00.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 8
+        }
+      ],
+      "sourceClasses": [
+        "github",
+        "arxiv",
+        "hackernews",
+        "google news: military",
+        "benchcouncil transactions on benchmarks standards and evaluations",
+        "jama",
+        "arxiv (cornell university)",
+        "cureus",
+        "ieee software",
+        "nature communications",
+        "education sciences",
+        "nejm ai"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech aggregate",
+          "articleCount": 105,
+          "lifecycleStage": "growing"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taste in the age of AI and LLMs",
+          "articleId": 79748,
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "articleId": 78953,
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Taste in the age of AI and LLMs",
+          "articleId": 79748,
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z",
+          "url": "https://rajnandan.com/posts/taste-in-the-age-of-ai-and-llms/"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "articleId": 78953,
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z",
+          "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxOcEZ1QzRRT0U5dmxxQzctY1BEWkRtaXNpaWlkSWNCYzhOY29vRXYyaWNFYjh6TnR4QU1yeWdzWG1jR0hid2tPYmZUcFBwWDl0dS04SzNsTk9hUFp6WE5BQjJHcTBRZGJjRk9PZ1hwclFQc0dSTk1pN3BJbXpwQU9nVWZ2akx3RVBKc3EzUnBVaDF3alJVZGowWHlCSWktQXd0aVBLcVNQMWZ0d0hWMnJORkhtNzhqZTlpaFdmbXNoZ1dfSVYzSGpYVGN3WG1ETUpJTGt5UGV3UGRUM2s?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Agentic Federated Learning: The Future of Distributed Training Orchestration",
+          "articleId": 79794,
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:43:30.000Z",
+          "url": "https://arxiv.org/abs/2604.04895v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Synthetic Sandbox for Training Machine Learning Engineering Agents",
+          "articleId": 79821,
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:19:29.000Z",
+          "url": "https://arxiv.org/abs/2604.04872v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "FairLogue: A Toolkit for Intersectional Fairness Analysis in Clinical Machine Learning Models",
+          "articleId": 79835,
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:03:03.000Z",
+          "url": "https://arxiv.org/abs/2604.04858v1"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "AMD",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:06.351Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "GOOGL",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:04.723Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NVDA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:01.257Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MSFT",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:03.037Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+          "workId": "https://openalex.org/W4378473491",
+          "publishedAt": "2023-05-25T15:00:00.000Z",
+          "citedByCount": 494,
+          "researchSignalScore": 0,
+          "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+          "workId": "https://openalex.org/W4318671267",
+          "publishedAt": "2023-01-30T15:00:00.000Z",
+          "citedByCount": 378,
+          "researchSignalScore": 0,
+          "source": "JAMA"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+          "workId": "https://openalex.org/W4361866031",
+          "publishedAt": "2023-03-29T15:00:00.000Z",
+          "citedByCount": 264,
+          "researchSignalScore": 0,
+          "source": "arXiv (Cornell University)"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Unraveling the Ethical Enigma: Artificial Intelligence in Healthcare",
+          "workId": "https://openalex.org/W4385724150",
+          "publishedAt": "2023-08-09T15:00:00.000Z",
+          "citedByCount": 228,
+          "researchSignalScore": 0,
+          "source": "Cureus"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Application of Large Language Models to Software Engineering Tasks: Opportunities, Risks, and Implications",
+          "workId": "https://openalex.org/W4367059011",
+          "publishedAt": "2023-04-25T15:00:00.000Z",
+          "citedByCount": 173,
+          "researchSignalScore": 0,
+          "source": "IEEE Software"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "ChatMOF: an artificial intelligence system for predicting and generating metal-organic frameworks using large language models",
+          "workId": "https://openalex.org/W4399290669",
+          "publishedAt": "2024-06-02T15:00:00.000Z",
+          "citedByCount": 167,
+          "researchSignalScore": 0,
+          "source": "Nature Communications"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A Primer on Generative Artificial Intelligence",
+          "workId": "https://openalex.org/W4391615642",
+          "publishedAt": "2024-02-06T15:00:00.000Z",
+          "citedByCount": 127,
+          "researchSignalScore": 0,
+          "source": "Education Sciences"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "GPT versus Resident Physicians — A Benchmark Based on Official Board Scores",
+          "workId": "https://openalex.org/W4394767601",
+          "publishedAt": "2024-04-11T15:00:00.000Z",
+          "citedByCount": 121,
+          "researchSignalScore": 0,
+          "source": "NEJM AI"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Lightning-AI/pytorch-lightning",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+          "stars": 31009,
+          "forks": 3702,
+          "pushedAt": "2026-04-07T08:06:44.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Lightning-AI/pytorch-lightning"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ultralytics/yolov5",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+          "stars": 57167,
+          "forks": 17450,
+          "pushedAt": "2026-04-02T14:13:02.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ultralytics/yolov5"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sorrycc/awesome-javascript",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+          "stars": 34932,
+          "forks": 4528,
+          "pushedAt": "2026-04-02T13:21:16.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sorrycc/awesome-javascript"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "dipakkr/A-to-Z-Resources-for-Students",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNDkxMTM1MTQ=",
+          "stars": 21596,
+          "forks": 4815,
+          "pushedAt": "2026-02-27T09:14:51.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/dipakkr/A-to-Z-Resources-for-Students"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "thangchung/awesome-dotnet-core",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk1NDA4Njk2OQ==",
+          "stars": 21156,
+          "forks": 2953,
+          "pushedAt": "2026-02-27T03:26:22.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/thangchung/awesome-dotnet-core"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "zhaoolee/ChromeAppHeroes",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNjk1Mjk1Njc=",
+          "stars": 25424,
+          "forks": 2618,
+          "pushedAt": "2026-02-11T03:18:26.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/zhaoolee/ChromeAppHeroes"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "datawhalechina/llm-cookbook",
+          "repoKey": "R_kgDOJckNQg",
+          "stars": 23718,
+          "forks": 2875,
+          "pushedAt": "2025-06-12T14:48:07.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/datawhalechina/llm-cookbook"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "karpathy/llama2.c",
+          "repoKey": "R_kgDOJ-qZHA",
+          "stars": 19366,
+          "forks": 2491,
+          "pushedAt": "2024-08-06T09:44:40.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/karpathy/llama2.c"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "technology-general",
+      "selectedTheme": {
+        "theme": "ai-ml",
+        "label": "Ai Ml",
+        "lastSharePct": 67.5,
+        "deltaSharePct": 34.17,
+        "averageSharePct": 27.67,
+        "rank": 1
+      },
+      "peerThemes": [
+        {
+          "theme": "ai-ml",
+          "label": "Ai Ml",
+          "lastSharePct": 67.5,
+          "deltaSharePct": 34.17,
+          "rank": 1
+        },
+        {
+          "theme": "cloud-infrastructure",
+          "label": "Cloud Infrastructure",
+          "lastSharePct": 12.5,
+          "deltaSharePct": 12.5,
+          "rank": 2
+        },
+        {
+          "theme": "robotics-automation",
+          "label": "Robotics Automation",
+          "lastSharePct": 7.5,
+          "deltaSharePct": 7.5,
+          "rank": 3
+        },
+        {
+          "theme": "quantum-computing",
+          "label": "Quantum Computing",
+          "lastSharePct": 7.5,
+          "deltaSharePct": -25.83,
+          "rank": 4
+        },
+        {
+          "theme": "autonomous-mobility",
+          "label": "Autonomous Mobility",
+          "lastSharePct": 2.5,
+          "deltaSharePct": 2.5,
+          "rank": 5
+        },
+        {
+          "theme": "space",
+          "label": "Space",
+          "lastSharePct": 2.5,
+          "deltaSharePct": 2.5,
+          "rank": 6
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Ai Ml relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 67.5,
+          "deltaSharePct": 34.17
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connected",
+      "entities": [
+        {
+          "entityType": "company",
+          "entityKey": "AMD",
+          "ticker": "AMD",
+          "companyName": "ADVANCED MICRO DEVICES, INC.",
+          "cik": "0000002488",
+          "sectorHint": "Semiconductors & Related Devices",
+          "relationType": "supplier",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for AMD.",
+          "filingCount": 19,
+          "latestFiledAt": "2026-02-23T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:06.351Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "GOOGL",
+          "ticker": "GOOGL",
+          "companyName": "ALPHABET INC.",
+          "cik": "0001652044",
+          "sectorHint": "Services-Computer Programming, Data Processing, Etc.",
+          "relationType": "adopter",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for GOOGL.",
+          "filingCount": 19,
+          "latestFiledAt": "2026-04-01T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:04.723Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "NVDA",
+          "ticker": "NVDA",
+          "companyName": "NVIDIA CORP",
+          "cik": "0001045810",
+          "sectorHint": "Semiconductors & Related Devices",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for NVDA.",
+          "filingCount": 13,
+          "latestFiledAt": "2026-03-05T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:01.257Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "MSFT",
+          "ticker": "MSFT",
+          "companyName": "MICROSOFT CORPORATION",
+          "cik": "0000789019",
+          "sectorHint": "Services-Prepackaged Software",
+          "relationType": "adopter",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for MSFT.",
+          "filingCount": 11,
+          "latestFiledAt": "2026-01-27T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:03.037Z"
+        }
+      ],
+      "pathways": [
+        {
+          "relationType": "supplier",
+          "status": "positive",
+          "note": "ADVANCED MICRO DEVICES, INC. is linked as supplier with confidence 0.82 and 19 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "adopter",
+          "status": "positive",
+          "note": "ALPHABET INC. is linked as adopter with confidence 0.82 and 19 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "NVIDIA CORP is linked as beneficiary with confidence 0.82 and 13 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "adopter",
+          "status": "positive",
+          "note": "MICROSOFT CORPORATION is linked as adopter with confidence 0.82 and 11 filing-backed touchpoint(s)."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "AMD",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:06.351Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "GOOGL",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:04.723Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NVDA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:01.257Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MSFT",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:03.037Z"
+        }
+      ]
+    },
+    "adjacentPathways": {
+      "status": "no-attachments",
+      "items": [],
+      "evidenceClasses": [
+        {
+          "key": "codex_attachment",
+          "label": "Adjacent pathway",
+          "description": "Codex-attached adjacent or indirect pathway under an existing theme.",
+          "sourceType": "analysis",
+          "count": 0
+        }
+      ],
+      "provenance": [],
+      "summary": null
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set."
+    ],
+    "watchpoints": [
+      "Monitor whether emerging-tech keeps positive acceleration over the next quarter window.",
+      "Check if source diversity expands beyond 0.0747 and whether geographic spread broadens from 0.",
+      "Track whether Ai Ml holds or expands its 67.5% share inside Technology General.",
+      "Watch whether research coverage for this theme stays above 8 tracked OpenAlex works and whether new papers broaden beyond Engineering management / Business."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "ai-ml",
+        "technology-general",
+        "technology"
+      ],
+      "exportTitle": "emerging-tech Quarter Theme Brief",
+      "promptSeed": "What changed in emerging-tech, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech quarter aggregate",
+          "articleCount": 105,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Ai Ml share movement inside Technology General",
+          "sharePct": 67.5,
+          "deltaSharePct": 34.17
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taste in the age of AI and LLMs",
+          "articleId": 79748,
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "articleId": 78953,
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z"
+        }
+      ],
+      "claimCount": 5
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech aggregate context",
+          "lifecycleStage": "growing",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "emerging-tech relative-share context",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 34.17
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+          "workId": "https://openalex.org/W4378473491",
+          "publishedAt": "2023-05-25T15:00:00.000Z",
+          "citedByCount": 494,
+          "researchSignalScore": 0,
+          "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+          "workId": "https://openalex.org/W4318671267",
+          "publishedAt": "2023-01-30T15:00:00.000Z",
+          "citedByCount": 378,
+          "researchSignalScore": 0,
+          "source": "JAMA"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+          "workId": "https://openalex.org/W4361866031",
+          "publishedAt": "2023-03-29T15:00:00.000Z",
+          "citedByCount": 264,
+          "researchSignalScore": 0,
+          "source": "arXiv (Cornell University)"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Lightning-AI/pytorch-lightning",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+          "stars": 31009,
+          "forks": 3702,
+          "pushedAt": "2026-04-07T08:06:44.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Lightning-AI/pytorch-lightning"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ultralytics/yolov5",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+          "stars": 57167,
+          "forks": 17450,
+          "pushedAt": "2026-04-02T14:13:02.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ultralytics/yolov5"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sorrycc/awesome-javascript",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+          "stars": 34932,
+          "forks": 4528,
+          "pushedAt": "2026-04-02T13:21:16.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sorrycc/awesome-javascript"
+        }
+      ],
+      "claimCount": 6
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech aggregate",
+          "articleCount": 105,
+          "lifecycleStage": "growing"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taste in the age of AI and LLMs",
+          "articleId": 79748,
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "articleId": 78953,
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Taste in the age of AI and LLMs",
+          "articleId": 79748,
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z",
+          "url": "https://rajnandan.com/posts/taste-in-the-age-of-ai-and-llms/"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "articleId": 78953,
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z",
+          "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxOcEZ1QzRRT0U5dmxxQzctY1BEWkRtaXNpaWlkSWNCYzhOY29vRXYyaWNFYjh6TnR4QU1yeWdzWG1jR0hid2tPYmZUcFBwWDl0dS04SzNsTk9hUFp6WE5BQjJHcTBRZGJjRk9PZ1hwclFQc0dSTk1pN3BJbXpwQU9nVWZ2akx3RVBKc3EzUnBVaDF3alJVZGowWHlCSWktQXd0aVBLcVNQMWZ0d0hWMnJORkhtNzhqZTlpaFdmbXNoZ1dfSVYzSGpYVGN3WG1ETUpJTGt5UGV3UGRUM2s?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Agentic Federated Learning: The Future of Distributed Training Orchestration",
+          "articleId": 79794,
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:43:30.000Z",
+          "url": "https://arxiv.org/abs/2604.04895v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Synthetic Sandbox for Training Machine Learning Engineering Agents",
+          "articleId": 79821,
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:19:29.000Z",
+          "url": "https://arxiv.org/abs/2604.04872v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "FairLogue: A Toolkit for Intersectional Fairness Analysis in Clinical Machine Learning Models",
+          "articleId": 79835,
+          "source": "arxiv",
+          "publishedAt": "2026-04-06T17:03:03.000Z",
+          "url": "https://arxiv.org/abs/2604.04858v1"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "AMD",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:06.351Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "GOOGL",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:04.723Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NVDA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:01.257Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MSFT",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:03.037Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+          "workId": "https://openalex.org/W4378473491",
+          "publishedAt": "2023-05-25T15:00:00.000Z",
+          "citedByCount": 494,
+          "researchSignalScore": 0,
+          "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+          "workId": "https://openalex.org/W4318671267",
+          "publishedAt": "2023-01-30T15:00:00.000Z",
+          "citedByCount": 378,
+          "researchSignalScore": 0,
+          "source": "JAMA"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+          "workId": "https://openalex.org/W4361866031",
+          "publishedAt": "2023-03-29T15:00:00.000Z",
+          "citedByCount": 264,
+          "researchSignalScore": 0,
+          "source": "arXiv (Cornell University)"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Unraveling the Ethical Enigma: Artificial Intelligence in Healthcare",
+          "workId": "https://openalex.org/W4385724150",
+          "publishedAt": "2023-08-09T15:00:00.000Z",
+          "citedByCount": 228,
+          "researchSignalScore": 0,
+          "source": "Cureus"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Application of Large Language Models to Software Engineering Tasks: Opportunities, Risks, and Implications",
+          "workId": "https://openalex.org/W4367059011",
+          "publishedAt": "2023-04-25T15:00:00.000Z",
+          "citedByCount": 173,
+          "researchSignalScore": 0,
+          "source": "IEEE Software"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "ChatMOF: an artificial intelligence system for predicting and generating metal-organic frameworks using large language models",
+          "workId": "https://openalex.org/W4399290669",
+          "publishedAt": "2024-06-02T15:00:00.000Z",
+          "citedByCount": 167,
+          "researchSignalScore": 0,
+          "source": "Nature Communications"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A Primer on Generative Artificial Intelligence",
+          "workId": "https://openalex.org/W4391615642",
+          "publishedAt": "2024-02-06T15:00:00.000Z",
+          "citedByCount": 127,
+          "researchSignalScore": 0,
+          "source": "Education Sciences"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "GPT versus Resident Physicians — A Benchmark Based on Official Board Scores",
+          "workId": "https://openalex.org/W4394767601",
+          "publishedAt": "2024-04-11T15:00:00.000Z",
+          "citedByCount": 121,
+          "researchSignalScore": 0,
+          "source": "NEJM AI"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Lightning-AI/pytorch-lightning",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+          "stars": 31009,
+          "forks": 3702,
+          "pushedAt": "2026-04-07T08:06:44.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Lightning-AI/pytorch-lightning"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ultralytics/yolov5",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+          "stars": 57167,
+          "forks": 17450,
+          "pushedAt": "2026-04-02T14:13:02.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ultralytics/yolov5"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sorrycc/awesome-javascript",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+          "stars": 34932,
+          "forks": 4528,
+          "pushedAt": "2026-04-02T13:21:16.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sorrycc/awesome-javascript"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "dipakkr/A-to-Z-Resources-for-Students",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNDkxMTM1MTQ=",
+          "stars": 21596,
+          "forks": 4815,
+          "pushedAt": "2026-02-27T09:14:51.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/dipakkr/A-to-Z-Resources-for-Students"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "thangchung/awesome-dotnet-core",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk1NDA4Njk2OQ==",
+          "stars": 21156,
+          "forks": 2953,
+          "pushedAt": "2026-02-27T03:26:22.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/thangchung/awesome-dotnet-core"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "zhaoolee/ChromeAppHeroes",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNjk1Mjk1Njc=",
+          "stars": 25424,
+          "forks": 2618,
+          "pushedAt": "2026-02-11T03:18:26.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/zhaoolee/ChromeAppHeroes"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "datawhalechina/llm-cookbook",
+          "repoKey": "R_kgDOJckNQg",
+          "stars": 23718,
+          "forks": 2875,
+          "pushedAt": "2025-06-12T14:48:07.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/datawhalechina/llm-cookbook"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "karpathy/llama2.c",
+          "repoKey": "R_kgDOJ-qZHA",
+          "stars": 19366,
+          "forks": 2491,
+          "pushedAt": "2024-08-06T09:44:40.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/karpathy/llama2.c"
+        }
+      ],
+      "sourceCount": 12
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Ai Ml relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 67.5,
+          "deltaSharePct": 34.17
+        }
+      ],
+      "peerThemeCount": 6
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "AMD",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:06.351Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "GOOGL",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:04.723Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NVDA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:01.257Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MSFT",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:03.037Z"
+        }
+      ],
+      "entityCount": 4
+    },
+    "adjacentPathways": {
+      "section": "adjacentPathways",
+      "evidenceClasses": [
+        {
+          "key": "codex_attachment",
+          "label": "Adjacent pathway",
+          "description": "Codex-attached adjacent or indirect pathway under an existing theme.",
+          "sourceType": "analysis",
+          "count": 0
+        }
+      ],
+      "provenance": [],
+      "pathwayCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech risk baseline",
+          "articleCount": 105,
+          "lifecycleStage": "growing",
+          "sourceDiversity": 0.0747,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Ai Ml share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 67.5,
+          "deltaSharePct": 34.17
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taste in the age of AI and LLMs",
+          "articleId": 79748,
+          "source": "hackernews",
+          "publishedAt": "2026-04-07T15:54:16.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "articleId": 78953,
+          "source": "Google News: military",
+          "publishedAt": "2026-04-07T09:57:38.000Z"
+        }
+      ],
+      "claimCount": 1
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "emerging-tech risk baseline",
+          "articleCount": 105,
+          "lifecycleStage": "growing",
+          "sourceDiversity": 0.0747,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Ai Ml share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 67.5,
+          "deltaSharePct": 34.17
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "emerging-tech watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "ai-ml::quarter",
+    "theme": "ai-ml",
+    "periodType": "quarter",
+    "label": "Ai Ml",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-09T19:17:50.799Z",
+    "stale": false
+  }
+}

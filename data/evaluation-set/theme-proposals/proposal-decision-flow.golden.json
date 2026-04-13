@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "evaluation-set-v0",
+  "reviewStatus": "gold",
+  "datasetType": "theme-proposal-decision-flow",
+  "reviewedAt": "2026-04-08",
+  "items": [
+    {
+      "topicLabel": "grid-orchestrated humanoid fleet software platforms",
+      "expectedDecision": "propose",
+      "rationale": "The topic is distinct from generic robotics coverage, has repeatable commercialization depth, and should only pass when the proposal names a reusable theme object with multiple liquid market expressions.",
+      "expectedThemeId": "humanoid-fleet-software",
+      "minAssetCount": 2,
+      "requiredFields": [
+        "id",
+        "label",
+        "thesis",
+        "assets",
+        "transmissionChannels"
+      ],
+      "promptMustCover": [
+        "distinctness",
+        "durability",
+        "proposal.assets",
+        "2-8 valid liquid symbols"
+      ]
+    },
+    {
+      "topicLabel": "robotics software stack consolidation for humanoid fleets",
+      "expectedDecision": "attach",
+      "rationale": "This is strong enough to keep, but it belongs as an adjacent pathway under an existing parent theme rather than as a new canonical theme.",
+      "expectedTargetTheme": "robotics-automation",
+      "expectedRelationType": "infrastructure",
+      "minAssetCount": 1,
+      "promptMustCover": [
+        "attach",
+        "targetTheme",
+        "transmissionPath",
+        "attachment.assets"
+      ]
+    },
+    {
+      "topicLabel": "enterprise AI procurement buzz inside quarterly earnings chatter",
+      "expectedDecision": "reject",
+      "rationale": "The signal overlaps heavily with existing AI and software themes and should be rejected rather than promoted or attached as a faux-new concept.",
+      "rejectionReasonCategory": "overlap",
+      "mustNullPaths": [
+        "proposal",
+        "attachment"
+      ],
+      "promptMustCover": [
+        "Return \"reject\" if the topic mostly overlaps an existing theme.",
+        "proposal and attachment must both be null"
+      ]
+    },
+    {
+      "topicLabel": "march tournament bracket chatter as a workplace productivity risk",
+      "expectedDecision": "reject",
+      "rationale": "This is media noise without durable or investable transmission and should be suppressed by the theme proposal flow.",
+      "rejectionReasonCategory": "noise",
+      "mustNullPaths": [
+        "proposal",
+        "attachment"
+      ],
+      "promptMustCover": [
+        "Return \"reject\" if the topic is noisy, hype-driven, or too event-specific.",
+        "do not include any explanation outside JSON"
+      ]
+    }
+  ]
+}
+

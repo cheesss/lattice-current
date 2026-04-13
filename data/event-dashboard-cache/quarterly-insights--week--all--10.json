@@ -1,0 +1,512 @@
+{
+  "periodType": "week",
+  "periodStart": "2026-04-05",
+  "periodEnd": "2026-04-07",
+  "periodLabel": "2026-W14",
+  "requestedCategory": null,
+  "source": "theme_trend_aggregates",
+  "overview": {
+    "trackedThemes": 34,
+    "acceleratingThemes": 13,
+    "coolingThemes": 6,
+    "transitions": 21
+  },
+  "highlights": {
+    "rising": [
+      {
+        "theme": "ai-ml",
+        "label": "emerging-tech",
+        "themeLabel": "emerging-tech",
+        "parentTheme": "technology-general",
+        "category": "technology",
+        "categoryLabel": "Technology",
+        "articleCount": 27,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 80,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 100,
+        "acceleration": -1320,
+        "lifecycleStage": "growing",
+        "previousLifecycleStage": "growing",
+        "transition": null,
+        "sourceDiversity": 0.2099,
+        "sourceDiversityRaw": 0.2099,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.1503
+      },
+      {
+        "theme": "fiscal-policy",
+        "label": "Fiscal Policy",
+        "themeLabel": "Fiscal Policy",
+        "parentTheme": "macroeconomics",
+        "category": "macro",
+        "categoryLabel": "Macro",
+        "articleCount": 12,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 100,
+        "acceleration": 100,
+        "lifecycleStage": "growing",
+        "previousLifecycleStage": "nascent",
+        "transition": {
+          "from": "nascent",
+          "to": "growing"
+        },
+        "sourceDiversity": 0.6852,
+        "sourceDiversityRaw": 0.6852,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.4827
+      },
+      {
+        "theme": "cloud-infrastructure",
+        "label": "Cloud Infrastructure",
+        "themeLabel": "Cloud Infrastructure",
+        "parentTheme": "technology-general",
+        "category": "technology",
+        "categoryLabel": "Technology",
+        "articleCount": 5,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 150,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 100,
+        "acceleration": 150,
+        "lifecycleStage": "growing",
+        "previousLifecycleStage": "emerging",
+        "transition": {
+          "from": "emerging",
+          "to": "growing"
+        },
+        "sourceDiversity": 1,
+        "sourceDiversityRaw": 1,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.5408
+      },
+      {
+        "theme": "climate-change",
+        "label": "Climate Change",
+        "themeLabel": "Climate Change",
+        "parentTheme": "environment-general",
+        "category": "environment",
+        "categoryLabel": "Environment",
+        "articleCount": 3,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 200,
+        "acceleration": 100,
+        "lifecycleStage": "emerging",
+        "previousLifecycleStage": "growing",
+        "transition": {
+          "from": "growing",
+          "to": "emerging"
+        },
+        "sourceDiversity": 0,
+        "sourceDiversityRaw": 0,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.3202
+      }
+    ],
+    "accelerating": [
+      {
+        "theme": "supply-chain-security",
+        "label": "Supply Chain Security",
+        "themeLabel": "Supply Chain Security",
+        "parentTheme": "geopolitics",
+        "category": "geopolitics",
+        "categoryLabel": "Geopolitics",
+        "articleCount": 1,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 100,
+        "acceleration": 200,
+        "lifecycleStage": "emerging",
+        "previousLifecycleStage": "emerging",
+        "transition": null,
+        "sourceDiversity": 0,
+        "sourceDiversityRaw": 0,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.3851
+      },
+      {
+        "theme": "cloud-infrastructure",
+        "label": "Cloud Infrastructure",
+        "themeLabel": "Cloud Infrastructure",
+        "parentTheme": "technology-general",
+        "category": "technology",
+        "categoryLabel": "Technology",
+        "articleCount": 5,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 150,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 100,
+        "acceleration": 150,
+        "lifecycleStage": "growing",
+        "previousLifecycleStage": "emerging",
+        "transition": {
+          "from": "emerging",
+          "to": "growing"
+        },
+        "sourceDiversity": 1,
+        "sourceDiversityRaw": 1,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.5408
+      },
+      {
+        "theme": "fiscal-policy",
+        "label": "Fiscal Policy",
+        "themeLabel": "Fiscal Policy",
+        "parentTheme": "macroeconomics",
+        "category": "macro",
+        "categoryLabel": "Macro",
+        "articleCount": 12,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 100,
+        "acceleration": 100,
+        "lifecycleStage": "growing",
+        "previousLifecycleStage": "nascent",
+        "transition": {
+          "from": "nascent",
+          "to": "growing"
+        },
+        "sourceDiversity": 0.6852,
+        "sourceDiversityRaw": 0.6852,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.4827
+      },
+      {
+        "theme": "climate-change",
+        "label": "Climate Change",
+        "themeLabel": "Climate Change",
+        "parentTheme": "environment-general",
+        "category": "environment",
+        "categoryLabel": "Environment",
+        "articleCount": 3,
+        "previousCount": 0,
+        "yearAgoCount": 0,
+        "threeYearAgoCount": 0,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "vs3YearAgoPct": 200,
+        "acceleration": 100,
+        "lifecycleStage": "emerging",
+        "previousLifecycleStage": "growing",
+        "transition": {
+          "from": "growing",
+          "to": "emerging"
+        },
+        "sourceDiversity": 0,
+        "sourceDiversityRaw": 0,
+        "geographicSpread": 0,
+        "periodType": "week",
+        "periodStart": "2026-04-05",
+        "periodEnd": "2026-04-07",
+        "latestArticleAt": null,
+        "score": 0.3202
+      }
+    ],
+    "transitions": [
+      {
+        "theme": "cloud-infrastructure",
+        "label": "Cloud Infrastructure",
+        "category": "technology",
+        "from": "emerging",
+        "to": "growing",
+        "articleCount": 5,
+        "vsYearAgoPct": 100,
+        "acceleration": 150
+      },
+      {
+        "theme": "fiscal-policy",
+        "label": "Fiscal Policy",
+        "category": "macro",
+        "from": "nascent",
+        "to": "growing",
+        "articleCount": 12,
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      },
+      {
+        "theme": "climate-change",
+        "label": "Climate Change",
+        "category": "environment",
+        "from": "growing",
+        "to": "emerging",
+        "articleCount": 3,
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      },
+      {
+        "theme": "inequality",
+        "label": "Inequality",
+        "category": "society",
+        "from": "nascent",
+        "to": "emerging",
+        "articleCount": 1,
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      }
+    ],
+    "emergingTopics": [
+      {
+        "id": "dt-4536ea1f6989",
+        "label": "Military drone warfare in the Russia-Ukraine conflict",
+        "category": "geopolitics",
+        "parentTheme": "geopolitics",
+        "articleCount": 808,
+        "momentum": 1.4326,
+        "researchMomentum": 0,
+        "sourceQualityScore": 0.5719,
+        "stage": "early-commercial",
+        "promotionState": "canonical",
+        "updatedAt": "2026-04-08T07:36:45.072Z"
+      },
+      {
+        "id": "dt-f84a250cd10b",
+        "label": "Battlefield Drone Warfare and Air Defense Escalation",
+        "category": "geopolitics",
+        "parentTheme": "geopolitics",
+        "articleCount": 1062,
+        "momentum": 1.4112,
+        "researchMomentum": 0,
+        "sourceQualityScore": 0.5745,
+        "stage": "mature",
+        "promotionState": "watch",
+        "updatedAt": "2026-04-08T12:59:04.574Z"
+      },
+      {
+        "id": "dt-6cfaba39920c",
+        "label": "Military Drone Warfare in the Russia-Ukraine Conflict",
+        "category": "geopolitics",
+        "parentTheme": "geopolitics",
+        "articleCount": 841,
+        "momentum": 1.3841,
+        "researchMomentum": 0,
+        "sourceQualityScore": 0.5719,
+        "stage": "early-commercial",
+        "promotionState": "watch",
+        "updatedAt": "2026-04-08T06:21:01.366Z"
+      },
+      {
+        "id": "dt-e0650ff76da7",
+        "label": "Corporate M&A and strategic investment activity",
+        "category": "environment",
+        "parentTheme": "environment-general",
+        "articleCount": 596,
+        "momentum": 1.274,
+        "researchMomentum": 0,
+        "sourceQualityScore": 0.5634,
+        "stage": "mature",
+        "promotionState": "watch",
+        "updatedAt": "2026-04-07T21:11:19.973Z"
+      }
+    ]
+  },
+  "insights": [
+    {
+      "type": "rising_theme",
+      "theme": "ai-ml",
+      "label": "emerging-tech",
+      "category": "technology",
+      "title": "emerging-tech is one of the strongest year-on-year risers",
+      "summary": "emerging-tech logged 27 items this week, 100% versus a year ago and -1320 acceleration versus the previous week.",
+      "metrics": {
+        "articleCount": 27,
+        "vsYearAgoPct": 100,
+        "acceleration": -1320,
+        "lifecycleStage": "growing"
+      }
+    },
+    {
+      "type": "rising_theme",
+      "theme": "fiscal-policy",
+      "label": "Fiscal Policy",
+      "category": "macro",
+      "title": "Fiscal Policy is one of the strongest year-on-year risers",
+      "summary": "Fiscal Policy logged 12 items this week, 100% versus a year ago and +100 acceleration versus the previous week.",
+      "metrics": {
+        "articleCount": 12,
+        "vsYearAgoPct": 100,
+        "acceleration": 100,
+        "lifecycleStage": "growing"
+      }
+    },
+    {
+      "type": "rising_theme",
+      "theme": "cloud-infrastructure",
+      "label": "Cloud Infrastructure",
+      "category": "technology",
+      "title": "Cloud Infrastructure is one of the strongest year-on-year risers",
+      "summary": "Cloud Infrastructure logged 5 items this week, 100% versus a year ago and +150 acceleration versus the previous week.",
+      "metrics": {
+        "articleCount": 5,
+        "vsYearAgoPct": 100,
+        "acceleration": 150,
+        "lifecycleStage": "growing"
+      }
+    },
+    {
+      "type": "rising_theme",
+      "theme": "climate-change",
+      "label": "Climate Change",
+      "category": "environment",
+      "title": "Climate Change is one of the strongest year-on-year risers",
+      "summary": "Climate Change logged 3 items this week, 100% versus a year ago and +100 acceleration versus the previous week.",
+      "metrics": {
+        "articleCount": 3,
+        "vsYearAgoPct": 100,
+        "acceleration": 100,
+        "lifecycleStage": "emerging"
+      }
+    },
+    {
+      "type": "acceleration",
+      "theme": "supply-chain-security",
+      "label": "Supply Chain Security",
+      "category": "geopolitics",
+      "title": "Supply Chain Security is accelerating faster than the prior week",
+      "summary": "Supply Chain Security logged 1 items this week, 100% versus a year ago and +200 acceleration versus the previous week.",
+      "metrics": {
+        "articleCount": 1,
+        "vsPreviousPct": 100,
+        "acceleration": 200,
+        "lifecycleStage": "emerging"
+      }
+    },
+    {
+      "type": "stage_transition",
+      "theme": "cloud-infrastructure",
+      "label": "Cloud Infrastructure",
+      "category": "technology",
+      "title": "Cloud Infrastructure changed lifecycle stage",
+      "summary": "Cloud Infrastructure moved from emerging to growing with 5 items and 100% year-on-year growth.",
+      "metrics": {
+        "theme": "cloud-infrastructure",
+        "label": "Cloud Infrastructure",
+        "category": "technology",
+        "from": "emerging",
+        "to": "growing",
+        "articleCount": 5,
+        "vsYearAgoPct": 100,
+        "acceleration": 150
+      }
+    },
+    {
+      "type": "stage_transition",
+      "theme": "fiscal-policy",
+      "label": "Fiscal Policy",
+      "category": "macro",
+      "title": "Fiscal Policy changed lifecycle stage",
+      "summary": "Fiscal Policy moved from nascent to growing with 12 items and 100% year-on-year growth.",
+      "metrics": {
+        "theme": "fiscal-policy",
+        "label": "Fiscal Policy",
+        "category": "macro",
+        "from": "nascent",
+        "to": "growing",
+        "articleCount": 12,
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      }
+    },
+    {
+      "type": "stage_transition",
+      "theme": "climate-change",
+      "label": "Climate Change",
+      "category": "environment",
+      "title": "Climate Change changed lifecycle stage",
+      "summary": "Climate Change moved from growing to emerging with 3 items and 100% year-on-year growth.",
+      "metrics": {
+        "theme": "climate-change",
+        "label": "Climate Change",
+        "category": "environment",
+        "from": "growing",
+        "to": "emerging",
+        "articleCount": 3,
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      }
+    },
+    {
+      "type": "stage_transition",
+      "theme": "inequality",
+      "label": "Inequality",
+      "category": "society",
+      "title": "Inequality changed lifecycle stage",
+      "summary": "Inequality moved from nascent to emerging with 1 items and 100% year-on-year growth.",
+      "metrics": {
+        "theme": "inequality",
+        "label": "Inequality",
+        "category": "society",
+        "from": "nascent",
+        "to": "emerging",
+        "articleCount": 1,
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      }
+    },
+    {
+      "type": "emerging_topic",
+      "theme": "dt-4536ea1f6989",
+      "label": "Military drone warfare in the Russia-Ukraine conflict",
+      "category": "geopolitics",
+      "title": "Military drone warfare in the Russia-Ukraine conflict is a discovery topic worth monitoring",
+      "summary": "Military drone warfare in the Russia-Ukraine conflict carries 808 linked articles, momentum 1.4326, and source quality 0.5719.",
+      "metrics": {
+        "articleCount": 808,
+        "momentum": 1.4326,
+        "researchMomentum": 0,
+        "sourceQualityScore": 0.5719
+      }
+    }
+  ],
+  "meta": {
+    "updatedAt": "2026-04-08T17:53:17.311Z",
+    "stale": false
+  }
+}

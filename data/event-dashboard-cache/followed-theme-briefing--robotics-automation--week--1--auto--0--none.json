@@ -1,0 +1,597 @@
+{
+  "periodType": "week",
+  "generatedAt": "2026-04-08T03:08:14.603Z",
+  "themeCount": 1,
+  "themes": [
+    "robotics-automation"
+  ],
+  "headline": "Weekly structural briefing for 1 followed theme.",
+  "items": [
+    {
+      "theme": "robotics-automation",
+      "label": "Robotics / Automation",
+      "category": "technology",
+      "categoryLabel": "Technology",
+      "parentTheme": "technology-general",
+      "summary": {
+        "articleCount": 2,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "acceleration": 0,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Robotics / Automation summary baseline",
+            "articleCount": 2,
+            "lifecycleStage": "emerging",
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      "headline": "Coverage changed versus prior comparison windows",
+      "detail": "Robotics / Automation logged 2 items, +100% versus the prior week and +100% versus a year ago.",
+      "whyItMatters": "Robotics / Automation matters because it is emerging with positive year-on-year movement and still building acceleration.",
+      "topChange": {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Robotics / Automation logged 2 items, +100% versus the prior week and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 2,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Robotics / Automation week aggregate",
+            "articleCount": 2,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      "watchpoint": "",
+      "watchpoints": [
+        "Monitor whether Robotics / Automation keeps positive acceleration over the next week window.",
+        "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0."
+      ],
+      "risks": [
+        "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+        "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+      ],
+      "whatChanged": [
+        {
+          "type": "coverage_shift",
+          "title": "Coverage changed versus prior comparison windows",
+          "detail": "Robotics / Automation logged 2 items, +100% versus the prior week and +100% versus a year ago.",
+          "metric": {
+            "articleCount": 2,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          },
+          "evidenceClasses": [
+            {
+              "key": "trend_snapshot",
+              "label": "Trend aggregate",
+              "description": "Current period aggregate row for the canonical theme.",
+              "sourceType": "aggregate",
+              "count": 1
+            }
+          ],
+          "provenance": [
+            {
+              "type": "trend_snapshot",
+              "evidenceClass": "trend_snapshot",
+              "sourceType": "aggregate",
+              "label": "Robotics / Automation week aggregate",
+              "articleCount": 2,
+              "vsPreviousPct": 100,
+              "vsYearAgoPct": 100
+            }
+          ]
+        },
+        {
+          "type": "acceleration",
+          "title": "Acceleration remains positive",
+          "detail": "Robotics / Automation is showing positive acceleration of 0 in the current week comparison.",
+          "metric": {
+            "acceleration": 0,
+            "sourceDiversity": 0
+          },
+          "evidenceClasses": [
+            {
+              "key": "trend_snapshot",
+              "label": "Trend aggregate",
+              "description": "Current period aggregate row for the canonical theme.",
+              "sourceType": "aggregate",
+              "count": 1
+            }
+          ],
+          "provenance": [
+            {
+              "type": "trend_snapshot",
+              "evidenceClass": "trend_snapshot",
+              "sourceType": "aggregate",
+              "label": "Robotics / Automation week aggregate",
+              "articleCount": 2,
+              "vsPreviousPct": 100,
+              "vsYearAgoPct": 100
+            }
+          ]
+        },
+        {
+          "type": "subtopic_share",
+          "title": "Share inside the parent theme moved",
+          "detail": "Robotics Automation now represents 18.18% of Technology General coverage, a +18.18 point move across the selected range.",
+          "metric": {
+            "lastSharePct": 18.18,
+            "deltaSharePct": 18.18
+          },
+          "evidenceClasses": [
+            {
+              "key": "theme_evolution",
+              "label": "Theme evolution",
+              "description": "Relative share movement inside the parent theme.",
+              "sourceType": "aggregate",
+              "count": 1
+            }
+          ],
+          "provenance": [
+            {
+              "type": "theme_evolution",
+              "evidenceClass": "theme_evolution",
+              "sourceType": "aggregate",
+              "label": "Robotics Automation share movement inside Technology General",
+              "sharePct": 18.18,
+              "deltaSharePct": 18.18
+            }
+          ]
+        }
+      ],
+      "deltaSinceLastVisit": null,
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 8
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 4
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 8
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Robotics / Automation week aggregate",
+          "articleCount": 2,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Robotics Automation share movement inside Technology General",
+          "sharePct": 18.18,
+          "deltaSharePct": 18.18
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Robots Need Some Education: On the complexity of learning in evolutionary robotics",
+          "articleId": 80511,
+          "source": "arxiv",
+          "publishedAt": "2026-04-05T17:34:40.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Dynamic Whole-Body Dancing with Humanoid Robots -- A Model-Based Control Approach",
+          "articleId": 80683,
+          "source": "arxiv",
+          "publishedAt": "2026-04-05T07:17:33.000Z"
+        },
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Robotics / Automation aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Robotics / Automation relative-share context",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 18.18
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The role of the human-robot interaction in consumers’ acceptance of humanoid retail service robots",
+          "workId": "https://openalex.org/W4226345293",
+          "publishedAt": "2022-04-04T15:00:00.000Z",
+          "citedByCount": 293,
+          "researchSignalScore": 0,
+          "source": "Journal of Business Research"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Understanding and Improving Consumer Reactions to Service Bots",
+          "workId": "https://openalex.org/W4362590534",
+          "publishedAt": "2023-04-02T15:00:00.000Z",
+          "citedByCount": 148,
+          "researchSignalScore": 0,
+          "source": "Journal of Consumer Research"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Progress and Development Trend of Space Intelligent Robot Technology",
+          "workId": "https://openalex.org/W4210252053",
+          "publishedAt": "2021-12-31T15:00:00.000Z",
+          "citedByCount": 86,
+          "researchSignalScore": 0,
+          "source": "Space Science & Technology"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "openclaw/openclaw",
+          "repoKey": "R_kgDOQb6kRw",
+          "stars": 351162,
+          "forks": 70606,
+          "pushedAt": "2026-04-07T21:11:13.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/openclaw/openclaw"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sindresorhus/awesome",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+          "stars": 452904,
+          "forks": 34016,
+          "pushedAt": "2026-04-02T16:30:33.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sindresorhus/awesome"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "vinta/awesome-python",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+          "stars": 291200,
+          "forks": 27602,
+          "pushedAt": "2026-04-07T03:34:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/vinta/awesome-python"
+        },
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Robotics / Automation aggregate",
+          "articleCount": 2,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "America's largest shipbuilder teams up with robotics firm to target 15% throughput increase in 2026 - Splash247",
+          "articleId": 77801,
+          "source": "Google News: firm",
+          "publishedAt": "2026-04-07T05:38:09.000Z",
+          "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxOVnVaVHNfeDRibEkzeHlSV2I4ZFAyOUJrTHZza19Pd0R0VUxJUkpQbUpqS0JPU0tZUlJHNE9WMkV6Wmx1X1NlcEZzSVJBNm1waUJCNjNxY1JKdzN1eVRBYVZJMkNCMnFfMEpocUhsS1p2YW9BYS1KbEJabjFaZl9uMUdHNFBhVE53ZDNQaEtqSWpDalBON09pRDRXNVJNbTB3SEZqa29iNFlxYkw3N0tnQTZiZXhMcDVReGNfeA?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Posco invests W7b in robotics firm Brils - The Korea Herald",
+          "articleId": 77805,
+          "source": "Google News: firm",
+          "publishedAt": "2026-04-07T01:55:06.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiV0FVX3lxTE43ekhNOVgtdUlpVGVhWWgwTlNVQk1tZmhIa0JSd1FkRGpFejVyMnlUSV94U2VrWWNmeW9STUllS013TVBEQTJ1VWpjNU8tbVdiNTVQMmFxTQ?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Robots Need Some Education: On the complexity of learning in evolutionary robotics",
+          "articleId": 80511,
+          "source": "arxiv",
+          "publishedAt": "2026-04-05T17:34:40.000Z",
+          "url": "https://arxiv.org/abs/2604.04196v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Humanoid robots inspire a new generation to build machines",
+          "articleId": 77138,
+          "source": "EuroNews",
+          "publishedAt": "2026-04-05T13:11:04.000Z",
+          "url": "http://www.euronews.com/next/2026/04/05/humanoid-robots-inspire-a-new-generation-to-build-machines"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "TSLA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:18.740Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ROK",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:16.160Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ISRG",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:14.375Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ABB",
+          "evidenceSource": "theme_entity_seed",
+          "updatedAt": "2026-04-07T21:20:17.253Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "More Than a Feeling—Interrelation of Trust Layers in Human-Robot Interaction and the Role of User Dispositions and State Anxiety",
+          "workId": "https://openalex.org/W3154998360",
+          "publishedAt": "2021-04-11T15:00:00.000Z",
+          "citedByCount": 84,
+          "researchSignalScore": 0,
+          "source": "Frontiers in Psychology"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Multiaxis Force/Torque Sensor Technologies: Design Principles and Robotic Force Control Applications: A Review",
+          "workId": "https://openalex.org/W4404410816",
+          "publishedAt": "2024-11-14T15:00:00.000Z",
+          "citedByCount": 23,
+          "researchSignalScore": 0,
+          "source": "IEEE Sensors Journal"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Intelligent Humanoid Robots in Manufacturing",
+          "workId": "https://openalex.org/W4392652665",
+          "publishedAt": "2024-03-09T15:00:00.000Z",
+          "citedByCount": 17,
+          "researchSignalScore": 0,
+          "source": "OpenAlex"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Humanoid Robots like Tesla Optimus and the Future of Supply Chains: Enhancing Efficiency, Sustainability, and Workforce Dynamics",
+          "workId": "https://openalex.org/W4407780269",
+          "publishedAt": "2025-02-19T15:00:00.000Z",
+          "citedByCount": 15,
+          "researchSignalScore": 0,
+          "source": "Automation"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Advancements in Agricultural Automation: A Comprehensive Review of Artificial Intelligence and Humanoid Robotics in Farming",
+          "workId": "https://openalex.org/W4385782136",
+          "publishedAt": "2023-08-11T15:00:00.000Z",
+          "citedByCount": 6,
+          "researchSignalScore": 0,
+          "source": "International Journal of Humanoid Robotics"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "public-apis/public-apis",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk1NDM0Njc5OQ==",
+          "stars": 419963,
+          "forks": 45691,
+          "pushedAt": "2026-03-18T16:28:22.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/public-apis/public-apis"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Significant-Gravitas/AutoGPT",
+          "repoKey": "R_kgDOJKSTjA",
+          "stars": 183220,
+          "forks": 46213,
+          "pushedAt": "2026-04-07T19:47:58.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Significant-Gravitas/AutoGPT"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "awesome-selfhosted/awesome-selfhosted",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkzNjYzMzM3MA==",
+          "stars": 284703,
+          "forks": 13104,
+          "pushedAt": "2026-04-05T10:45:12.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/awesome-selfhosted/awesome-selfhosted"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ossu/computer-science",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxOTQxNTA2NA==",
+          "stars": 203052,
+          "forks": 25243,
+          "pushedAt": "2026-03-27T18:00:43.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ossu/computer-science"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "trimstray/the-book-of-secret-knowledge",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxMzgzOTMxMzk=",
+          "stars": 213836,
+          "forks": 12786,
+          "pushedAt": "2024-11-19T14:00:38.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/trimstray/the-book-of-secret-knowledge"
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Robotics Automation relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 18.18,
+          "deltaSharePct": 18.18
+        },
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Robotics / Automation risk baseline",
+          "articleCount": 2,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Robotics Automation share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 18.18,
+          "deltaSharePct": 18.18
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Robotics / Automation watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "lastEvidenceAt": "2026-04-07T21:20:18.740Z",
+      "score": 48
+    }
+  ],
+  "snapshot": {
+    "snapshotKey": "7f56c2f60349c781a840c7e5df147e6642dac48b::week::2026-04-06",
+    "themeSetKey": "7f56c2f60349c781a840c7e5df147e6642dac48b",
+    "snapshotDate": "2026-04-06",
+    "generatedAt": "2026-04-08T03:08:15.092Z",
+    "source": "followed-theme-briefing-generator",
+    "persisted": true
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T03:08:15.093Z",
+    "stale": false
+  }
+}

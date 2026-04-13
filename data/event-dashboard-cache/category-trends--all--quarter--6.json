@@ -1,0 +1,677 @@
+{
+  "periodType": "quarter",
+  "periodStart": "2026-03-31",
+  "periodEnd": "2026-04-07",
+  "periodLabel": "2026Q1",
+  "category": null,
+  "categoryLabel": null,
+  "availableCategories": [
+    "environment",
+    "geopolitics",
+    "health",
+    "macro",
+    "science",
+    "society",
+    "technology"
+  ],
+  "source": "theme_trend_aggregates",
+  "summary": null,
+  "categories": [
+    {
+      "category": "technology",
+      "label": "Technology",
+      "themeCount": 10,
+      "totalArticleCount": 186,
+      "avgVsYearAgoPct": 74.69,
+      "acceleratingThemes": 9,
+      "topThemes": [
+        {
+          "theme": "technology-general",
+          "label": "Technology",
+          "articleCount": 47,
+          "vsYearAgoPct": 46.88,
+          "lifecycleStage": "growing"
+        },
+        {
+          "theme": "cloud-infrastructure",
+          "label": "Cloud Infrastructure",
+          "articleCount": 10,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "theme": "ai-ml",
+          "label": "emerging-tech",
+          "articleCount": 105,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "growing"
+        }
+      ]
+    },
+    {
+      "category": "geopolitics",
+      "label": "Geopolitics",
+      "themeCount": 5,
+      "totalArticleCount": 82,
+      "avgVsYearAgoPct": 38.14,
+      "acceleratingThemes": 5,
+      "topThemes": [
+        {
+          "theme": "supply-chain-security",
+          "label": "Supply Chain Security",
+          "articleCount": 5,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "theme": "diplomacy",
+          "label": "Diplomacy",
+          "articleCount": 2,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "theme": "defense-industrial",
+          "label": "Defense Industrial",
+          "articleCount": 10,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        }
+      ]
+    },
+    {
+      "category": "environment",
+      "label": "Environment",
+      "themeCount": 4,
+      "totalArticleCount": 68,
+      "avgVsYearAgoPct": 733.66,
+      "acceleratingThemes": 3,
+      "topThemes": [
+        {
+          "theme": "climate-change",
+          "label": "Climate Change",
+          "articleCount": 30,
+          "vsYearAgoPct": 2900,
+          "lifecycleStage": "growing"
+        },
+        {
+          "theme": "resource-scarcity",
+          "label": "Resource Scarcity",
+          "articleCount": 2,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "theme": "clean-energy",
+          "label": "Clean Energy",
+          "articleCount": 36,
+          "vsYearAgoPct": -65.38,
+          "lifecycleStage": "growing"
+        }
+      ]
+    },
+    {
+      "category": "macro",
+      "label": "Macro",
+      "themeCount": 5,
+      "totalArticleCount": 48,
+      "avgVsYearAgoPct": -3.59,
+      "acceleratingThemes": 3,
+      "topThemes": [
+        {
+          "theme": "fiscal-policy",
+          "label": "Fiscal Policy",
+          "articleCount": 12,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "growing"
+        },
+        {
+          "theme": "macroeconomics",
+          "label": "Macroeconomics",
+          "articleCount": 33,
+          "vsYearAgoPct": -67.96,
+          "lifecycleStage": "growing"
+        },
+        {
+          "theme": "monetary-policy",
+          "label": "Monetary Policy",
+          "articleCount": 3,
+          "vsYearAgoPct": 50,
+          "lifecycleStage": "emerging"
+        }
+      ]
+    },
+    {
+      "category": "science",
+      "label": "Science",
+      "themeCount": 3,
+      "totalArticleCount": 5,
+      "avgVsYearAgoPct": 100,
+      "acceleratingThemes": 3,
+      "topThemes": [
+        {
+          "theme": "biotech",
+          "label": "emerging-tech",
+          "articleCount": 3,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "theme": "fusion-energy",
+          "label": "emerging-tech",
+          "articleCount": 1,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "theme": "materials-science",
+          "label": "Materials Science",
+          "articleCount": 1,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "nascent"
+        }
+      ]
+    },
+    {
+      "category": "health",
+      "label": "Health",
+      "themeCount": 2,
+      "totalArticleCount": 3,
+      "avgVsYearAgoPct": 100,
+      "acceleratingThemes": 2,
+      "topThemes": [
+        {
+          "theme": "public-health",
+          "label": "emerging-tech",
+          "articleCount": 2,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "theme": "mental-health",
+          "label": "Mental Health",
+          "articleCount": 1,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "nascent"
+        }
+      ]
+    },
+    {
+      "category": "society",
+      "label": "Society",
+      "themeCount": 5,
+      "totalArticleCount": 2,
+      "avgVsYearAgoPct": 40,
+      "acceleratingThemes": 2,
+      "topThemes": [
+        {
+          "theme": "inequality",
+          "label": "Inequality",
+          "articleCount": 1,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "theme": "migration",
+          "label": "Migration",
+          "articleCount": 1,
+          "vsYearAgoPct": 100,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "theme": "demographics",
+          "label": "Demographics",
+          "articleCount": 0,
+          "vsYearAgoPct": 0,
+          "lifecycleStage": "nascent"
+        }
+      ]
+    }
+  ],
+  "themes": [
+    {
+      "theme": "climate-change",
+      "label": "Climate Change",
+      "themeLabel": "Climate Change",
+      "parentTheme": "environment-general",
+      "category": "environment",
+      "categoryLabel": "Environment",
+      "articleCount": 30,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 2900,
+      "vs3YearAgoPct": 2900,
+      "acceleration": 200,
+      "lifecycleStage": "growing",
+      "previousLifecycleStage": "declining",
+      "transition": {
+        "from": "declining",
+        "to": "growing"
+      },
+      "sourceDiversity": 0.8889,
+      "sourceDiversityRaw": 0.8889,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.8073
+    },
+    {
+      "theme": "technology-general",
+      "label": "Technology",
+      "themeLabel": "Technology",
+      "parentTheme": "technology-general",
+      "category": "technology",
+      "categoryLabel": "Technology",
+      "articleCount": 47,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 46.88,
+      "vs3YearAgoPct": 95.83,
+      "acceleration": 200,
+      "lifecycleStage": "growing",
+      "previousLifecycleStage": "declining",
+      "transition": {
+        "from": "declining",
+        "to": "growing"
+      },
+      "sourceDiversity": 0.9806,
+      "sourceDiversityRaw": 0.9806,
+      "geographicSpread": 7,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.6135
+    },
+    {
+      "theme": "supply-chain-security",
+      "label": "Supply Chain Security",
+      "themeLabel": "Supply Chain Security",
+      "parentTheme": "geopolitics",
+      "category": "geopolitics",
+      "categoryLabel": "Geopolitics",
+      "articleCount": 5,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 100,
+      "acceleration": 200,
+      "lifecycleStage": "emerging",
+      "previousLifecycleStage": "nascent",
+      "transition": {
+        "from": "nascent",
+        "to": "emerging"
+      },
+      "sourceDiversity": 0.96,
+      "sourceDiversityRaw": 0.96,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.5848
+    },
+    {
+      "theme": "diplomacy",
+      "label": "Diplomacy",
+      "themeLabel": "Diplomacy",
+      "parentTheme": "geopolitics",
+      "category": "geopolitics",
+      "categoryLabel": "Geopolitics",
+      "articleCount": 2,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 0,
+      "acceleration": 200,
+      "lifecycleStage": "emerging",
+      "previousLifecycleStage": "declining",
+      "transition": {
+        "from": "declining",
+        "to": "emerging"
+      },
+      "sourceDiversity": 1,
+      "sourceDiversityRaw": 1,
+      "geographicSpread": 3,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.5557
+    },
+    {
+      "theme": "defense-industrial",
+      "label": "Defense Industrial",
+      "themeLabel": "Defense Industrial",
+      "parentTheme": "geopolitics",
+      "category": "geopolitics",
+      "categoryLabel": "Geopolitics",
+      "articleCount": 10,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 400,
+      "acceleration": 100,
+      "lifecycleStage": "emerging",
+      "previousLifecycleStage": "declining",
+      "transition": {
+        "from": "declining",
+        "to": "emerging"
+      },
+      "sourceDiversity": 0.99,
+      "sourceDiversityRaw": 0.99,
+      "geographicSpread": 1,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.52
+    },
+    {
+      "theme": "geopolitics",
+      "label": "Geopolitics",
+      "themeLabel": "Geopolitics",
+      "parentTheme": "geopolitics",
+      "category": "geopolitics",
+      "categoryLabel": "Geopolitics",
+      "articleCount": 63,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": -31.52,
+      "vs3YearAgoPct": -35.05,
+      "acceleration": 200,
+      "lifecycleStage": "growing",
+      "previousLifecycleStage": "declining",
+      "transition": {
+        "from": "declining",
+        "to": "growing"
+      },
+      "sourceDiversity": 0.9933,
+      "sourceDiversityRaw": 0.9933,
+      "geographicSpread": 6,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.5124
+    },
+    {
+      "theme": "cloud-infrastructure",
+      "label": "Cloud Infrastructure",
+      "themeLabel": "Cloud Infrastructure",
+      "parentTheme": "technology-general",
+      "category": "technology",
+      "categoryLabel": "Technology",
+      "articleCount": 10,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 100,
+      "acceleration": 100,
+      "lifecycleStage": "emerging",
+      "previousLifecycleStage": "nascent",
+      "transition": {
+        "from": "nascent",
+        "to": "emerging"
+      },
+      "sourceDiversity": 0.912,
+      "sourceDiversityRaw": 0.912,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.5083
+    },
+    {
+      "theme": "ai-ml",
+      "label": "emerging-tech",
+      "themeLabel": "emerging-tech",
+      "parentTheme": "technology-general",
+      "category": "technology",
+      "categoryLabel": "Technology",
+      "articleCount": 105,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 10400,
+      "acceleration": 100,
+      "lifecycleStage": "growing",
+      "previousLifecycleStage": "nascent",
+      "transition": {
+        "from": "nascent",
+        "to": "growing"
+      },
+      "sourceDiversity": 0.0747,
+      "sourceDiversityRaw": 0.0747,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.4975
+    },
+    {
+      "theme": "quantum-computing",
+      "label": "Quantum Computing",
+      "themeLabel": "Quantum Computing",
+      "parentTheme": "technology-general",
+      "category": "technology",
+      "categoryLabel": "Technology",
+      "articleCount": 12,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 100,
+      "acceleration": 100,
+      "lifecycleStage": "growing",
+      "previousLifecycleStage": "declining",
+      "transition": {
+        "from": "declining",
+        "to": "growing"
+      },
+      "sourceDiversity": 0.7292,
+      "sourceDiversityRaw": 0.7292,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.4893
+    },
+    {
+      "theme": "robotics-automation",
+      "label": "Robotics / Automation",
+      "themeLabel": "Robotics / Automation",
+      "parentTheme": "technology-general",
+      "category": "technology",
+      "categoryLabel": "Technology",
+      "articleCount": 7,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 100,
+      "acceleration": 100,
+      "lifecycleStage": "emerging",
+      "previousLifecycleStage": "nascent",
+      "transition": {
+        "from": "nascent",
+        "to": "emerging"
+      },
+      "sourceDiversity": 0.8571,
+      "sourceDiversityRaw": 0.8571,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.4839
+    },
+    {
+      "theme": "fiscal-policy",
+      "label": "Fiscal Policy",
+      "themeLabel": "Fiscal Policy",
+      "parentTheme": "macroeconomics",
+      "category": "macro",
+      "categoryLabel": "Macro",
+      "articleCount": 12,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 100,
+      "acceleration": 100,
+      "lifecycleStage": "growing",
+      "previousLifecycleStage": "nascent",
+      "transition": {
+        "from": "nascent",
+        "to": "growing"
+      },
+      "sourceDiversity": 0.6852,
+      "sourceDiversityRaw": 0.6852,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.4827
+    },
+    {
+      "theme": "public-health",
+      "label": "emerging-tech",
+      "themeLabel": "emerging-tech",
+      "parentTheme": "health-general",
+      "category": "health",
+      "categoryLabel": "Health",
+      "articleCount": 2,
+      "previousCount": 0,
+      "yearAgoCount": 0,
+      "threeYearAgoCount": 0,
+      "vsPreviousPct": 100,
+      "vsYearAgoPct": 100,
+      "vs3YearAgoPct": 100,
+      "acceleration": 100,
+      "lifecycleStage": "emerging",
+      "previousLifecycleStage": "nascent",
+      "transition": {
+        "from": "nascent",
+        "to": "emerging"
+      },
+      "sourceDiversity": 1,
+      "sourceDiversityRaw": 1,
+      "geographicSpread": 0,
+      "periodType": "quarter",
+      "periodStart": "2026-03-31",
+      "periodEnd": "2026-04-07",
+      "latestArticleAt": null,
+      "score": 0.4557
+    }
+  ],
+  "topTopics": [
+    {
+      "id": "dt-4536ea1f6989",
+      "label": "Military drone warfare in the Russia-Ukraine conflict",
+      "category": "geopolitics",
+      "parentTheme": "geopolitics",
+      "articleCount": 808,
+      "momentum": 1.4326,
+      "researchMomentum": 0,
+      "sourceQualityScore": 0.5719,
+      "stage": "early-commercial",
+      "promotionState": "canonical",
+      "updatedAt": "2026-04-09T15:24:55.778Z"
+    },
+    {
+      "id": "dt-f84a250cd10b",
+      "label": "Battlefield Drone Warfare and Air Defense Escalation",
+      "category": "geopolitics",
+      "parentTheme": "geopolitics",
+      "articleCount": 1062,
+      "momentum": 1.4112,
+      "researchMomentum": 0,
+      "sourceQualityScore": 0.5745,
+      "stage": "mature",
+      "promotionState": "watch",
+      "updatedAt": "2026-04-09T15:24:55.778Z"
+    },
+    {
+      "id": "dt-6cfaba39920c",
+      "label": "Military Drone Warfare in the Russia-Ukraine Conflict",
+      "category": "geopolitics",
+      "parentTheme": "geopolitics",
+      "articleCount": 841,
+      "momentum": 1.3841,
+      "researchMomentum": 0,
+      "sourceQualityScore": 0.5719,
+      "stage": "early-commercial",
+      "promotionState": "watch",
+      "updatedAt": "2026-04-09T15:24:55.778Z"
+    },
+    {
+      "id": "dt-e0650ff76da7",
+      "label": "Corporate M&A and strategic investment activity",
+      "category": "environment",
+      "parentTheme": "environment-general",
+      "articleCount": 596,
+      "momentum": 1.274,
+      "researchMomentum": 0,
+      "sourceQualityScore": 0.5634,
+      "stage": "mature",
+      "promotionState": "watch",
+      "updatedAt": "2026-04-09T15:24:55.778Z"
+    },
+    {
+      "id": "dt-1cd6ca37ca5b",
+      "label": "State-Backed Cybersecurity Threats and Defensive Infrastructure",
+      "category": "technology",
+      "parentTheme": "technology-general",
+      "articleCount": 948,
+      "momentum": 1.2727,
+      "researchMomentum": 0,
+      "sourceQualityScore": 0.5634,
+      "stage": "mature",
+      "promotionState": "watch",
+      "updatedAt": "2026-04-09T15:24:55.778Z"
+    },
+    {
+      "id": "dt-d3652b2c33e6",
+      "label": "UK tax and public spending policy debate",
+      "category": "environment",
+      "parentTheme": "environment-general",
+      "articleCount": 625,
+      "momentum": 1.2548,
+      "researchMomentum": 0,
+      "sourceQualityScore": 0.5636,
+      "stage": "mature",
+      "promotionState": "watch",
+      "updatedAt": "2026-04-09T15:24:55.778Z"
+    }
+  ],
+  "meta": {
+    "updatedAt": "2026-04-13T19:39:38.454Z",
+    "stale": false
+  }
+}

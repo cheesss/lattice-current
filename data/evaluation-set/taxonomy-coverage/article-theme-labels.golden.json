@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "evaluation-set-v0",
+  "reviewStatus": "gold",
+  "targetSampleSize": 200,
+  "curatedSampleSize": 12,
+  "reviewedAt": "2026-04-08",
+  "items": [
+    {
+      "articleId": 100124,
+      "title": "IBM extends its roadmap for fault-tolerant quantum systems",
+      "source": "Reuters",
+      "publishedAt": "2026-03-19",
+      "expectedTheme": "quantum-computing",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "The center of gravity is quantum hardware progress and error-correction milestones, not generic enterprise IT."
+    },
+    {
+      "articleId": 100215,
+      "title": "TSMC expands CoWoS capacity as AI accelerator packaging demand keeps rising",
+      "source": "Financial Times",
+      "publishedAt": "2026-03-21",
+      "expectedTheme": "semiconductor",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "This is a chip supply-chain and advanced packaging story, even though AI demand is the demand driver."
+    },
+    {
+      "articleId": 100332,
+      "title": "BMW broadens humanoid robot pilot from warehouse tasks to line-side operations",
+      "source": "The Information",
+      "publishedAt": "2026-03-24",
+      "expectedTheme": "robotics-automation",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "The durable signal is industrial automation deployment rather than auto sector news."
+    },
+    {
+      "articleId": 100418,
+      "title": "NASA and SpaceX finalize the next lunar cargo mission schedule",
+      "source": "Associated Press",
+      "publishedAt": "2026-03-25",
+      "expectedTheme": "space",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "The article reinforces launch cadence and space infrastructure activity, which belong in the space economy theme."
+    },
+    {
+      "articleId": 100577,
+      "title": "Utilities accelerate transmission buildout after federal grid resilience awards",
+      "source": "Bloomberg",
+      "publishedAt": "2026-03-27",
+      "expectedTheme": "clean-energy",
+      "expectedParentTheme": "environment-general",
+      "expectedCategory": "environment",
+      "rationale": "The core change is grid and energy-transition infrastructure, not generic industrial policy."
+    },
+    {
+      "articleId": 100621,
+      "title": "Insurers reprice coastal commercial assets after another severe climate loss season",
+      "source": "Wall Street Journal",
+      "publishedAt": "2026-03-28",
+      "expectedTheme": "climate-change",
+      "expectedParentTheme": "environment-general",
+      "expectedCategory": "environment",
+      "rationale": "The article is about climate risk transmission into finance and insurance, not only weather reporting."
+    },
+    {
+      "articleId": 100734,
+      "title": "Federal Reserve minutes show caution on premature rate cuts",
+      "source": "CNBC",
+      "publishedAt": "2026-03-29",
+      "expectedTheme": "monetary-policy",
+      "expectedParentTheme": "macroeconomics",
+      "expectedCategory": "macro",
+      "rationale": "The signal is direct central-bank posture and rate path interpretation."
+    },
+    {
+      "articleId": 100812,
+      "title": "Washington tightens export controls on advanced AI chips and tooling to China",
+      "source": "Nikkei Asia",
+      "publishedAt": "2026-03-30",
+      "expectedTheme": "trade-globalization",
+      "expectedParentTheme": "macroeconomics",
+      "expectedCategory": "macro",
+      "rationale": "This is a structural trade and supply-chain restriction story, not a pure geopolitics headline."
+    },
+    {
+      "articleId": 100905,
+      "title": "Novo Nordisk expands late-stage obesity trial footprint with new combination study",
+      "source": "STAT",
+      "publishedAt": "2026-04-01",
+      "expectedTheme": "biotech",
+      "expectedParentTheme": "science-general",
+      "expectedCategory": "science",
+      "rationale": "The article is anchored in drug-development and clinical pipeline progress."
+    },
+    {
+      "articleId": 101024,
+      "title": "Perovskite solar cells reach new durability milestone in industrial pilot lines",
+      "source": "Nature News",
+      "publishedAt": "2026-04-02",
+      "expectedTheme": "materials-science",
+      "expectedParentTheme": "science-general",
+      "expectedCategory": "science",
+      "rationale": "The novelty is materials progress with downstream energy implications, not clean-energy deployment itself."
+    },
+    {
+      "articleId": 101118,
+      "title": "WHO widens wastewater surveillance guidance after regional outbreak clusters",
+      "source": "WHO",
+      "publishedAt": "2026-04-03",
+      "expectedTheme": "public-health",
+      "expectedParentTheme": "health-general",
+      "expectedCategory": "health",
+      "rationale": "The article is a public-health surveillance and preparedness signal rather than general medicine coverage."
+    },
+    {
+      "articleId": 101207,
+      "title": "Defense ministries scale satellite and drone procurement for multi-domain operations",
+      "source": "Defense News",
+      "publishedAt": "2026-04-04",
+      "expectedTheme": "defense-industrial",
+      "expectedParentTheme": "geopolitics",
+      "expectedCategory": "geopolitics",
+      "rationale": "This is sustained defense industrial capacity and procurement activity, not an isolated conflict incident."
+    }
+  ]
+}

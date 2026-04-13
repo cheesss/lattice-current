@@ -1,0 +1,95 @@
+{
+  "theme": "semiconductor",
+  "periodType": "quarter",
+  "periodLabel": "rolling-quarter",
+  "reviewStatus": "gold",
+  "reviewedBy": "product-review",
+  "reviewedAt": "2026-04-08",
+  "sections": {
+    "whatChanged": [
+      {
+        "title": "Advanced packaging and memory bottlenecks gained visibility",
+        "detail": "The quarter emphasized supply-chain constraints and capacity additions rather than generic chip cycle commentary.",
+        "importance": "high"
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Semiconductors stay structurally central when the bottleneck shifts from demand narrative to supply-chain reality, packaging, and manufacturing constraints.",
+      "statements": [
+        "A good brief should separate broad AI enthusiasm from semiconductor-specific constraints.",
+        "Packaging, foundry capacity, and HBM references are stronger structural signals than headline AI demand alone."
+      ]
+    },
+    "evidence": {
+      "requiredSourceClasses": [
+        "news",
+        "company",
+        "supply-chain"
+      ],
+      "requiredClaims": [
+        "The brief should mention at least one bottleneck or capacity lane specific to semiconductors.",
+        "Relative share inside technology-general should remain high or strengthen."
+      ],
+      "provenanceExpectations": [
+        "Use company commentary and supply-chain reporting to ground bottleneck claims."
+      ],
+      "notes": [
+        "Do not let broad AI language replace chip-specific evidence."
+      ]
+    },
+    "subtopicMovement": [
+      {
+        "subtheme": "advanced packaging",
+        "direction": "up",
+        "rationale": "Packaging and integration constraints are increasingly central to the narrative."
+      },
+      {
+        "subtheme": "memory and HBM",
+        "direction": "up",
+        "rationale": "Memory bandwidth and HBM allocation remain key bottleneck signals."
+      }
+    ],
+    "relatedEntities": {
+      "pathways": [
+        {
+          "entity": "TSMC",
+          "symbol": "TSM",
+          "relationType": "foundry",
+          "note": "Foundry capacity and packaging expansion are strong anchor evidence."
+        },
+        {
+          "entity": "ASML",
+          "symbol": "ASML",
+          "relationType": "equipment-supplier",
+          "note": "Equipment constraint and node transition evidence can validate long-horizon importance."
+        }
+      ]
+    },
+    "risks": [
+      {
+        "title": "AI spillover contamination",
+        "detail": "Chip coverage can look strong simply because AI is strong, even when semiconductor-specific constraints did not change."
+      }
+    ],
+    "watchpoints": [
+      {
+        "horizon": "30d",
+        "trigger": "Capacity expansion stories repeat across foundry, memory, and packaging lanes",
+        "implication": "The theme is supported by real supply-chain stress rather than single-firm commentary."
+      }
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "semiconductor",
+        "technology-general",
+        "supply-chain"
+      ],
+      "prompts": [
+        "Which semiconductor bottleneck now best explains the quarter's change in share?"
+      ]
+    }
+  },
+  "notes": [
+    "This file is designed to catch brief generations that describe semiconductors only as an AI beneficiary theme."
+  ]
+}

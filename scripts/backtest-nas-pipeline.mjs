@@ -643,7 +643,7 @@ async function main() {
       '  --coverage-from 2021-04-01 --coverage-to 2026-04-01 --tolerance-days 45',
       '  --gdelt-windows 8',
       '  --gdelt-mode global',
-      '  --pg-host 192.168.0.76 --pg-port 5433 --pg-user postgres --pg-password <set-env-or-flag> --pg-database lattice',
+      '  --pg-host 192.168.0.2 --pg-port 5433 --pg-user postgres --pg-password <set-env-or-flag> --pg-database lattice',
       '  --snapshot-root \\\\NAS\\lattice-current\\backtest-snapshots',
       '  --force true',
     ].join('\n'));

@@ -245,7 +245,7 @@ const ja: LocaleLabels = {
 
 export default defineConfig({
   title: 'Lattice Current',
-  description: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.',
+  description: 'Theme-led signal shell with canonical events, operator workflows, replay, and Python-backed batch compute.',
   lang: 'en-US',
   base: '/lattice-current/',
   cleanUrls: true,
@@ -253,7 +253,7 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: '/lattice-current/favicon.svg' }],
     ['meta', { property: 'og:title', content: 'Lattice Current' }],
-    ['meta', { property: 'og:description', content: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.' }],
+    ['meta', { property: 'og:description', content: 'Theme-led signal shell with canonical events, operator workflows, replay, and Python-backed batch compute.' }],
     ['meta', { property: 'og:image', content: 'https://cheesss.github.io/lattice-current/images/hero/lattice-current-social-preview.png' }]
   ],
   locales: {
@@ -261,7 +261,7 @@ export default defineConfig({
       label: 'English',
       lang: 'en-US',
       title: 'Lattice Current',
-      description: 'Real-time global intelligence, AI-assisted analysis, historical replay, and backtesting.',
+      description: 'Theme-led signal shell with canonical events, operator workflows, replay, and Python-backed batch compute.',
       themeConfig: createThemeConfig('', en)
     },
     ko: {
@@ -269,7 +269,7 @@ export default defineConfig({
       lang: 'ko-KR',
       link: '/ko/',
       title: 'Lattice Current',
-      description: '실시간 글로벌 인텔리전스, AI 보조 분석, 히스토리컬 리플레이, 백테스트 문서.',
+      description: 'operator shell, canonical event 계층, Python 배치 계산 경계를 설명하는 문서.',
       themeConfig: createThemeConfig('ko', ko)
     },
     ja: {
@@ -277,7 +277,7 @@ export default defineConfig({
       lang: 'ja-JP',
       link: '/ja/',
       title: 'Lattice Current',
-      description: 'リアルタイム・インテリジェンス、AI 補助分析、ヒストリカル・リプレイ、バックテストのドキュメント。',
+      description: 'オペレーターシェル、canonical event レイヤー、Python バッチ計算を説明するドキュメント。',
       themeConfig: createThemeConfig('ja', ja)
     }
   }

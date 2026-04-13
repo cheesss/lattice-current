@@ -1,0 +1,1412 @@
+{
+  "theme": "climate-change",
+  "label": "Climate Change",
+  "category": "environment",
+  "categoryLabel": "Environment",
+  "parentTheme": "environment-general",
+  "periodType": "quarter",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 30,
+    "lifecycleStage": "growing",
+    "vsPreviousPct": 100,
+    "vsYearAgoPct": 2900,
+    "acceleration": 200,
+    "sourceDiversity": 0.8889,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Climate Change summary baseline",
+        "articleCount": 30,
+        "lifecycleStage": "growing",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 2900
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 6
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "sec_filings",
+        "label": "SEC-backed entities",
+        "description": "Theme-to-entity links backed by SEC connector data.",
+        "sourceType": "filing",
+        "count": 6
+      },
+      {
+        "key": "codex_attachment",
+        "label": "Adjacent pathway",
+        "description": "Codex-attached adjacent or indirect pathway under an existing theme.",
+        "sourceType": "analysis",
+        "count": 0
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Climate Change quarter aggregate",
+        "articleCount": 30,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 2900
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Climate Change share movement inside Environment General",
+        "sharePct": 60,
+        "deltaSharePct": 55.68
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Climate Change aggregate context",
+        "lifecycleStage": "growing",
+        "vsYearAgoPct": 2900,
+        "acceleration": 200
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Climate Change relative-share context",
+        "parentTheme": "environment-general",
+        "deltaSharePct": 55.68
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Climate Change aggregate",
+        "articleCount": 30,
+        "lifecycleStage": "growing"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "SHEIN Teams Up with DHL to Cut Air Cargo Emissions with Sustainable Fuel - CarbonCredits.com",
+        "articleId": 79452,
+        "source": "Google News: emissions",
+        "publishedAt": "2026-04-07T17:21:00.000Z",
+        "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxPbXJ2T08wdnpPblpjb3RaMGxwdHFQZEs1UlhUQXF5NVFOZWI0UldkZFRPRDhvakdyYWRBdzNhZENOTmV5Vkppb3NWVE9hOTR0WjNVNmxfSHdEcHdqM3lPVG4tMFJIdVZJNUVCYXc2S2lnS0FBOUxFY3N5eEs0U3hEQVM0TjNPSXZEM005YUNXZVBlekJjR2tnbmQ0OXJseHFG?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Reducing cost, waste, and carbon emissions in cataract surgery through reusable devices - EyeWorld",
+        "articleId": 79448,
+        "source": "Google News: emissions",
+        "publishedAt": "2026-04-07T11:01:32.000Z",
+        "url": "https://news.google.com/rss/articles/CBMitwFBVV95cUxNdDJRQi03c1lfd05SbmFhUXQ3d0hMLWdZSzdXZm1SZWJTUTQyWGxyZDZRbDl0ZVlrZndjcU9MVlZ0R241dG1FdlVJNlhnakx4NzNRRGxxaVVpeUxFd1hmS1dZS1VnTmEzcVBFU0hMYmhqYmV3eENnUXdOUWpxSXVCSDVwR1pmXzZqNkJrcWZyYkhId3VaX3N3VTdGYjR6dTU1ZWhDeWJ3Z2RLMmpLck0wRHc2d0Q1WFE?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Economic growth and carbon emissions: The link is beginning to weaken - The Himalayan Times",
+        "articleId": 79509,
+        "source": "Google News: emissions",
+        "publishedAt": "2026-04-07T01:02:47.000Z",
+        "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOLWhsN0dwYXZ0YUJEUXlIdzRnQnVDLVg1VUJwVlc1dVBoc2p3SEtYWkxsZV9zRHJTTlpheG9OaUxXcmgwQzVEMkdwVlNkSWZwZmFLVFVqLWc4TEhrN3YxbWpTZEJvLVJ6WjVwTWNaTHg3R240bVFuWmVTOEYwb0IzVWFKbE96eURFWUVzR1F6SHZybG9GYWw5cjQxZnhBTDk2M3ZZNFJwM3RaZ9IBXEFVX3lxTFBzYjhDV25kb3h2MGVsbVZPWEkxblkzR0s4LURndlk3SWVBVXdrT3JOUUFCQUgzS09TRnRyNV9kNDhVcXV1UmZFaXZnc19Zb0xwSHo5OGt6cXBOVlBw?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Climate Change Is a Significant Driver of More Dangerous Wildfire Seasons - The Equation - Union of Concerned Scientists",
+        "articleId": 78250,
+        "source": "Google News: climate",
+        "publishedAt": "2026-04-06T22:16:38.000Z",
+        "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOLTRYeUxwUnZONVhRWVpHWEFmd0FLZkk4OWRuVTNpZFNYcHQ2d05sdDctcXRkM0hEQzl6ZTYxLVQ2djBBSWw1OXY3SlVNNHNtd3hVZzJhU0pTbHRsdFptVV9OOEZBa0RNLVhra3ZxUUVQekM2UE9XQjB2Ymp3MERaODJ0MktGY0FMZmFyY0FTdFlGLXFidWZBNGpxbFhnamJUd0V5bGEyd09nVnNsQkdZ?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Climate change fuels longer allergy seasons across the US - WWLP",
+        "articleId": 78257,
+        "source": "Google News: climate",
+        "publishedAt": "2026-04-06T21:40:58.000Z",
+        "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxPU1lyNG41SjZYaHJIYm5xak5wTWVTOW5hMHJPNzdLYTZZdnY5LUg5RXMzZVA0YWVZLWcwZkJlQjg1WFVEajk2RDJZYXdTTTJNREYtSXJMeE94b2wycy0wQnJjc2l0UUpKaVFtQWszcVpGRW5pcF9OT05KWHB3Z3g0VHV3M1F1NGs5MFBTTU9xV192elRQVFNkTWx4UmN2RFZSSXfSAacBQVVfeXFMUDJ1M1NWWXpPdzI4NVRlV1V3V2pPb0poWGZ1Z3Fpd2tFZU13Z1BCSjdOQkUzODVZdFRpS21vZ0UxTldlZWdQWU81MkpHMjBJMW5LRE1EMDlsZ3hKMFBDYkFHbDRncEZ0RC1JV2c0eF93MFhZVUp1SmEyYlJzOWFfMEhhUVBSeXZCczlETkUyS0hXSWRNckJIa0pHVkpoc1RyS3RSVThodFU?oc=5"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "NEE",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:30.885Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "WM",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:37.721Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "LIN",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:36.070Z"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Climate Change relative share",
+        "parentTheme": "environment-general",
+        "sharePct": 60,
+        "deltaSharePct": 55.68
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Climate Change risk baseline",
+        "articleCount": 30,
+        "lifecycleStage": "growing",
+        "sourceDiversity": 0.8889,
+        "acceleration": 200
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Climate Change share baseline",
+        "parentTheme": "environment-general",
+        "sharePct": 60,
+        "deltaSharePct": 55.68
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Climate Change watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Climate Change changed lifecycle stage",
+        "detail": "Climate Change moved from declining to growing in the current quarter lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change quarter aggregate",
+            "articleCount": 30,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 2900
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Climate Change logged 30 items, +100% versus the prior quarter and +2900% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change quarter aggregate",
+            "articleCount": 30,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 2900
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Climate Change is showing positive acceleration of 200 in the current quarter comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change quarter aggregate",
+            "articleCount": 30,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 2900
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Climate Change now represents 60% of Environment General coverage, a +55.68 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Climate Change share movement inside Environment General",
+            "sharePct": 60,
+            "deltaSharePct": 55.68
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Climate Change matters because it is growing with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change aggregate context",
+            "lifecycleStage": "growing",
+            "vsYearAgoPct": 2900,
+            "acceleration": 200
+          },
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Climate Change relative-share context",
+            "parentTheme": "environment-general",
+            "deltaSharePct": 55.68
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Climate Change share movement",
+        "detail": "Climate Change is ranked #1 inside Environment General with 60% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Climate Change relative share",
+            "parentTheme": "environment-general",
+            "sharePct": 60,
+            "deltaSharePct": 55.68
+          }
+        ]
+      },
+      {
+        "section": "relatedEntities",
+        "claimType": "entity_exposure",
+        "title": "Theme-to-entity linkage",
+        "detail": "3 entity links are attached to this theme.",
+        "evidenceClasses": [
+          {
+            "key": "sec_filings",
+            "label": "SEC-backed entities",
+            "description": "Theme-to-entity links backed by SEC connector data.",
+            "sourceType": "filing",
+            "count": 3
+          }
+        ],
+        "provenance": [
+          {
+            "type": "sec_connector",
+            "entityKey": "NEE",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:30.885Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "WM",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:37.721Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "LIN",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:36.070Z"
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Climate Change changed lifecycle stage",
+        "detail": "Climate Change moved from declining to growing in the current quarter lens.",
+        "metric": {
+          "from": "declining",
+          "to": "growing"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change quarter aggregate",
+            "articleCount": 30,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 2900
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Climate Change logged 30 items, +100% versus the prior quarter and +2900% versus a year ago.",
+        "metric": {
+          "articleCount": 30,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 2900
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change quarter aggregate",
+            "articleCount": 30,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 2900
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Climate Change is showing positive acceleration of 200 in the current quarter comparison.",
+        "metric": {
+          "acceleration": 200,
+          "sourceDiversity": 0.8889
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Climate Change quarter aggregate",
+            "articleCount": 30,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 2900
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Climate Change now represents 60% of Environment General coverage, a +55.68 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 60,
+          "deltaSharePct": 55.68
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Climate Change share movement inside Environment General",
+            "sharePct": 60,
+            "deltaSharePct": 55.68
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Climate Change matters because it is growing with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Climate Change matters because it is growing with positive year-on-year movement and still building acceleration.",
+        "Climate Change is not just moving in isolation. It is shifting relative share inside Environment General, which makes it a structural signal rather than a single headline burst."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change aggregate context",
+          "lifecycleStage": "growing",
+          "vsYearAgoPct": 2900,
+          "acceleration": 200
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change relative-share context",
+          "parentTheme": "environment-general",
+          "deltaSharePct": 55.68
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 30,
+        "lifecycleStage": "growing",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 2900,
+        "acceleration": 200,
+        "sourceDiversity": 0.8889,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [],
+      "recentArticles": [
+        {
+          "articleId": 79452,
+          "title": "SHEIN Teams Up with DHL to Cut Air Cargo Emissions with Sustainable Fuel - CarbonCredits.com",
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T17:21:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxPbXJ2T08wdnpPblpjb3RaMGxwdHFQZEs1UlhUQXF5NVFOZWI0UldkZFRPRDhvakdyYWRBdzNhZENOTmV5Vkppb3NWVE9hOTR0WjNVNmxfSHdEcHdqM3lPVG4tMFJIdVZJNUVCYXc2S2lnS0FBOUxFY3N5eEs0U3hEQVM0TjNPSXZEM005YUNXZVBlekJjR2tnbmQ0OXJseHFG?oc=5"
+        },
+        {
+          "articleId": 79448,
+          "title": "Reducing cost, waste, and carbon emissions in cataract surgery through reusable devices - EyeWorld",
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T11:01:32.000Z",
+          "url": "https://news.google.com/rss/articles/CBMitwFBVV95cUxNdDJRQi03c1lfd05SbmFhUXQ3d0hMLWdZSzdXZm1SZWJTUTQyWGxyZDZRbDl0ZVlrZndjcU9MVlZ0R241dG1FdlVJNlhnakx4NzNRRGxxaVVpeUxFd1hmS1dZS1VnTmEzcVBFU0hMYmhqYmV3eENnUXdOUWpxSXVCSDVwR1pmXzZqNkJrcWZyYkhId3VaX3N3VTdGYjR6dTU1ZWhDeWJ3Z2RLMmpLck0wRHc2d0Q1WFE?oc=5"
+        },
+        {
+          "articleId": 79509,
+          "title": "Economic growth and carbon emissions: The link is beginning to weaken - The Himalayan Times",
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T01:02:47.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOLWhsN0dwYXZ0YUJEUXlIdzRnQnVDLVg1VUJwVlc1dVBoc2p3SEtYWkxsZV9zRHJTTlpheG9OaUxXcmgwQzVEMkdwVlNkSWZwZmFLVFVqLWc4TEhrN3YxbWpTZEJvLVJ6WjVwTWNaTHg3R240bVFuWmVTOEYwb0IzVWFKbE96eURFWUVzR1F6SHZybG9GYWw5cjQxZnhBTDk2M3ZZNFJwM3RaZ9IBXEFVX3lxTFBzYjhDV25kb3h2MGVsbVZPWEkxblkzR0s4LURndlk3SWVBVXdrT3JOUUFCQUgzS09TRnRyNV9kNDhVcXV1UmZFaXZnc19Zb0xwSHo5OGt6cXBOVlBw?oc=5"
+        },
+        {
+          "articleId": 78250,
+          "title": "Climate Change Is a Significant Driver of More Dangerous Wildfire Seasons - The Equation - Union of Concerned Scientists",
+          "source": "Google News: climate",
+          "publishedAt": "2026-04-06T22:16:38.000Z",
+          "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOLTRYeUxwUnZONVhRWVpHWEFmd0FLZkk4OWRuVTNpZFNYcHQ2d05sdDctcXRkM0hEQzl6ZTYxLVQ2djBBSWw1OXY3SlVNNHNtd3hVZzJhU0pTbHRsdFptVV9OOEZBa0RNLVhra3ZxUUVQekM2UE9XQjB2Ymp3MERaODJ0MktGY0FMZmFyY0FTdFlGLXFidWZBNGpxbFhnamJUd0V5bGEyd09nVnNsQkdZ?oc=5"
+        },
+        {
+          "articleId": 78257,
+          "title": "Climate change fuels longer allergy seasons across the US - WWLP",
+          "source": "Google News: climate",
+          "publishedAt": "2026-04-06T21:40:58.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxPU1lyNG41SjZYaHJIYm5xak5wTWVTOW5hMHJPNzdLYTZZdnY5LUg5RXMzZVA0YWVZLWcwZkJlQjg1WFVEajk2RDJZYXdTTTJNREYtSXJMeE94b2wycy0wQnJjc2l0UUpKaVFtQWszcVpGRW5pcF9OT05KWHB3Z3g0VHV3M1F1NGs5MFBTTU9xV192elRQVFNkTWx4UmN2RFZSSXfSAacBQVVfeXFMUDJ1M1NWWXpPdzI4NVRlV1V3V2pPb0poWGZ1Z3Fpd2tFZU13Z1BCSjdOQkUzODVZdFRpS21vZ0UxTldlZWdQWU81MkpHMjBJMW5LRE1EMDlsZ3hKMFBDYkFHbDRncEZ0RC1JV2c0eF93MFhZVUp1SmEyYlJzOWFfMEhhUVBSeXZCczlETkUyS0hXSWRNckJIa0pHVkpoc1RyS3RSVThodFU?oc=5"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "works": []
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "google news: emissions",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 3,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 3,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-07T17:21:00.000Z"
+        },
+        {
+          "source": "google news: climate",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 2,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-06T22:16:38.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        }
+      ],
+      "sourceClasses": [
+        "google news: emissions",
+        "google news: climate"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change aggregate",
+          "articleCount": 30,
+          "lifecycleStage": "growing"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "SHEIN Teams Up with DHL to Cut Air Cargo Emissions with Sustainable Fuel - CarbonCredits.com",
+          "articleId": 79452,
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T17:21:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxPbXJ2T08wdnpPblpjb3RaMGxwdHFQZEs1UlhUQXF5NVFOZWI0UldkZFRPRDhvakdyYWRBdzNhZENOTmV5Vkppb3NWVE9hOTR0WjNVNmxfSHdEcHdqM3lPVG4tMFJIdVZJNUVCYXc2S2lnS0FBOUxFY3N5eEs0U3hEQVM0TjNPSXZEM005YUNXZVBlekJjR2tnbmQ0OXJseHFG?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Reducing cost, waste, and carbon emissions in cataract surgery through reusable devices - EyeWorld",
+          "articleId": 79448,
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T11:01:32.000Z",
+          "url": "https://news.google.com/rss/articles/CBMitwFBVV95cUxNdDJRQi03c1lfd05SbmFhUXQ3d0hMLWdZSzdXZm1SZWJTUTQyWGxyZDZRbDl0ZVlrZndjcU9MVlZ0R241dG1FdlVJNlhnakx4NzNRRGxxaVVpeUxFd1hmS1dZS1VnTmEzcVBFU0hMYmhqYmV3eENnUXdOUWpxSXVCSDVwR1pmXzZqNkJrcWZyYkhId3VaX3N3VTdGYjR6dTU1ZWhDeWJ3Z2RLMmpLck0wRHc2d0Q1WFE?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Economic growth and carbon emissions: The link is beginning to weaken - The Himalayan Times",
+          "articleId": 79509,
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T01:02:47.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOLWhsN0dwYXZ0YUJEUXlIdzRnQnVDLVg1VUJwVlc1dVBoc2p3SEtYWkxsZV9zRHJTTlpheG9OaUxXcmgwQzVEMkdwVlNkSWZwZmFLVFVqLWc4TEhrN3YxbWpTZEJvLVJ6WjVwTWNaTHg3R240bVFuWmVTOEYwb0IzVWFKbE96eURFWUVzR1F6SHZybG9GYWw5cjQxZnhBTDk2M3ZZNFJwM3RaZ9IBXEFVX3lxTFBzYjhDV25kb3h2MGVsbVZPWEkxblkzR0s4LURndlk3SWVBVXdrT3JOUUFCQUgzS09TRnRyNV9kNDhVcXV1UmZFaXZnc19Zb0xwSHo5OGt6cXBOVlBw?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Climate Change Is a Significant Driver of More Dangerous Wildfire Seasons - The Equation - Union of Concerned Scientists",
+          "articleId": 78250,
+          "source": "Google News: climate",
+          "publishedAt": "2026-04-06T22:16:38.000Z",
+          "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOLTRYeUxwUnZONVhRWVpHWEFmd0FLZkk4OWRuVTNpZFNYcHQ2d05sdDctcXRkM0hEQzl6ZTYxLVQ2djBBSWw1OXY3SlVNNHNtd3hVZzJhU0pTbHRsdFptVV9OOEZBa0RNLVhra3ZxUUVQekM2UE9XQjB2Ymp3MERaODJ0MktGY0FMZmFyY0FTdFlGLXFidWZBNGpxbFhnamJUd0V5bGEyd09nVnNsQkdZ?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Climate change fuels longer allergy seasons across the US - WWLP",
+          "articleId": 78257,
+          "source": "Google News: climate",
+          "publishedAt": "2026-04-06T21:40:58.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxPU1lyNG41SjZYaHJIYm5xak5wTWVTOW5hMHJPNzdLYTZZdnY5LUg5RXMzZVA0YWVZLWcwZkJlQjg1WFVEajk2RDJZYXdTTTJNREYtSXJMeE94b2wycy0wQnJjc2l0UUpKaVFtQWszcVpGRW5pcF9OT05KWHB3Z3g0VHV3M1F1NGs5MFBTTU9xV192elRQVFNkTWx4UmN2RFZSSXfSAacBQVVfeXFMUDJ1M1NWWXpPdzI4NVRlV1V3V2pPb0poWGZ1Z3Fpd2tFZU13Z1BCSjdOQkUzODVZdFRpS21vZ0UxTldlZWdQWU81MkpHMjBJMW5LRE1EMDlsZ3hKMFBDYkFHbDRncEZ0RC1JV2c0eF93MFhZVUp1SmEyYlJzOWFfMEhhUVBSeXZCczlETkUyS0hXSWRNckJIa0pHVkpoc1RyS3RSVThodFU?oc=5"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NEE",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:30.885Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "WM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:37.721Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "LIN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:36.070Z"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "environment-general",
+      "selectedTheme": {
+        "theme": "climate-change",
+        "label": "Climate Change",
+        "lastSharePct": 60,
+        "deltaSharePct": 55.68,
+        "averageSharePct": 20.63,
+        "rank": 1
+      },
+      "peerThemes": [
+        {
+          "theme": "climate-change",
+          "label": "Climate Change",
+          "lastSharePct": 60,
+          "deltaSharePct": 55.68,
+          "rank": 1
+        },
+        {
+          "theme": "resource-scarcity",
+          "label": "Resource Scarcity",
+          "lastSharePct": 20,
+          "deltaSharePct": 19.76,
+          "rank": 2
+        },
+        {
+          "theme": "clean-energy",
+          "label": "Clean Energy",
+          "lastSharePct": 20,
+          "deltaSharePct": -74.96,
+          "rank": 3
+        },
+        {
+          "theme": "food-agriculture",
+          "label": "Food Agriculture",
+          "lastSharePct": 0,
+          "deltaSharePct": -0.48,
+          "rank": 4
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change relative share",
+          "parentTheme": "environment-general",
+          "sharePct": 60,
+          "deltaSharePct": 55.68
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connected",
+      "entities": [
+        {
+          "entityType": "company",
+          "entityKey": "NEE",
+          "ticker": "NEE",
+          "companyName": "NEXTERA ENERGY, INC.",
+          "cik": "0000753308",
+          "sectorHint": "Electric Services",
+          "relationType": "proxy",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for NEE.",
+          "filingCount": 25,
+          "latestFiledAt": "2026-03-19T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:30.885Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "WM",
+          "ticker": "WM",
+          "companyName": "WASTE MANAGEMENT INC",
+          "cik": "0000823768",
+          "sectorHint": "Refuse Systems",
+          "relationType": "proxy",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for WM.",
+          "filingCount": 17,
+          "latestFiledAt": "2026-03-24T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:37.721Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "LIN",
+          "ticker": "LIN",
+          "companyName": "LINDE PLC",
+          "cik": "0001707925",
+          "sectorHint": "Industrial Inorganic Chemicals",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for LIN.",
+          "filingCount": 14,
+          "latestFiledAt": "2026-02-24T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:36.070Z"
+        }
+      ],
+      "pathways": [
+        {
+          "relationType": "proxy",
+          "status": "positive",
+          "note": "NEXTERA ENERGY, INC. is linked as proxy with confidence 0.82 and 25 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "proxy",
+          "status": "positive",
+          "note": "WASTE MANAGEMENT INC is linked as proxy with confidence 0.82 and 17 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "LINDE PLC is linked as beneficiary with confidence 0.82 and 14 filing-backed touchpoint(s)."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "NEE",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:30.885Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "WM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:37.721Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "LIN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:36.070Z"
+        }
+      ]
+    },
+    "adjacentPathways": {
+      "status": "no-attachments",
+      "items": [],
+      "evidenceClasses": [
+        {
+          "key": "codex_attachment",
+          "label": "Adjacent pathway",
+          "description": "Codex-attached adjacent or indirect pathway under an existing theme.",
+          "sourceType": "analysis",
+          "count": 0
+        }
+      ],
+      "provenance": [],
+      "summary": null
+    },
+    "risks": [
+      "Recent curated coverage is thin, so the theme may be structurally important without having strong current confirmation in the latest digest window."
+    ],
+    "watchpoints": [
+      "Monitor whether Climate Change keeps positive acceleration over the next quarter window.",
+      "Check if source diversity expands beyond 0.8889 and whether geographic spread broadens from 0.",
+      "Track whether Climate Change holds or expands its 60% share inside Environment General.",
+      "Look for new evidence classes beyond news, especially filings, research, patents, or code activity as those connectors come online."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "climate-change",
+        "environment-general",
+        "environment"
+      ],
+      "exportTitle": "Climate Change Quarter Theme Brief",
+      "promptSeed": "What changed in Climate Change, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change quarter aggregate",
+          "articleCount": 30,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 2900
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change share movement inside Environment General",
+          "sharePct": 60,
+          "deltaSharePct": 55.68
+        }
+      ],
+      "claimCount": 4
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change aggregate context",
+          "lifecycleStage": "growing",
+          "vsYearAgoPct": 2900,
+          "acceleration": 200
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change relative-share context",
+          "parentTheme": "environment-general",
+          "deltaSharePct": 55.68
+        }
+      ],
+      "claimCount": 2
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change aggregate",
+          "articleCount": 30,
+          "lifecycleStage": "growing"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "SHEIN Teams Up with DHL to Cut Air Cargo Emissions with Sustainable Fuel - CarbonCredits.com",
+          "articleId": 79452,
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T17:21:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxPbXJ2T08wdnpPblpjb3RaMGxwdHFQZEs1UlhUQXF5NVFOZWI0UldkZFRPRDhvakdyYWRBdzNhZENOTmV5Vkppb3NWVE9hOTR0WjNVNmxfSHdEcHdqM3lPVG4tMFJIdVZJNUVCYXc2S2lnS0FBOUxFY3N5eEs0U3hEQVM0TjNPSXZEM005YUNXZVBlekJjR2tnbmQ0OXJseHFG?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Reducing cost, waste, and carbon emissions in cataract surgery through reusable devices - EyeWorld",
+          "articleId": 79448,
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T11:01:32.000Z",
+          "url": "https://news.google.com/rss/articles/CBMitwFBVV95cUxNdDJRQi03c1lfd05SbmFhUXQ3d0hMLWdZSzdXZm1SZWJTUTQyWGxyZDZRbDl0ZVlrZndjcU9MVlZ0R241dG1FdlVJNlhnakx4NzNRRGxxaVVpeUxFd1hmS1dZS1VnTmEzcVBFU0hMYmhqYmV3eENnUXdOUWpxSXVCSDVwR1pmXzZqNkJrcWZyYkhId3VaX3N3VTdGYjR6dTU1ZWhDeWJ3Z2RLMmpLck0wRHc2d0Q1WFE?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Economic growth and carbon emissions: The link is beginning to weaken - The Himalayan Times",
+          "articleId": 79509,
+          "source": "Google News: emissions",
+          "publishedAt": "2026-04-07T01:02:47.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOLWhsN0dwYXZ0YUJEUXlIdzRnQnVDLVg1VUJwVlc1dVBoc2p3SEtYWkxsZV9zRHJTTlpheG9OaUxXcmgwQzVEMkdwVlNkSWZwZmFLVFVqLWc4TEhrN3YxbWpTZEJvLVJ6WjVwTWNaTHg3R240bVFuWmVTOEYwb0IzVWFKbE96eURFWUVzR1F6SHZybG9GYWw5cjQxZnhBTDk2M3ZZNFJwM3RaZ9IBXEFVX3lxTFBzYjhDV25kb3h2MGVsbVZPWEkxblkzR0s4LURndlk3SWVBVXdrT3JOUUFCQUgzS09TRnRyNV9kNDhVcXV1UmZFaXZnc19Zb0xwSHo5OGt6cXBOVlBw?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Climate Change Is a Significant Driver of More Dangerous Wildfire Seasons - The Equation - Union of Concerned Scientists",
+          "articleId": 78250,
+          "source": "Google News: climate",
+          "publishedAt": "2026-04-06T22:16:38.000Z",
+          "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOLTRYeUxwUnZONVhRWVpHWEFmd0FLZkk4OWRuVTNpZFNYcHQ2d05sdDctcXRkM0hEQzl6ZTYxLVQ2djBBSWw1OXY3SlVNNHNtd3hVZzJhU0pTbHRsdFptVV9OOEZBa0RNLVhra3ZxUUVQekM2UE9XQjB2Ymp3MERaODJ0MktGY0FMZmFyY0FTdFlGLXFidWZBNGpxbFhnamJUd0V5bGEyd09nVnNsQkdZ?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Climate change fuels longer allergy seasons across the US - WWLP",
+          "articleId": 78257,
+          "source": "Google News: climate",
+          "publishedAt": "2026-04-06T21:40:58.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxPU1lyNG41SjZYaHJIYm5xak5wTWVTOW5hMHJPNzdLYTZZdnY5LUg5RXMzZVA0YWVZLWcwZkJlQjg1WFVEajk2RDJZYXdTTTJNREYtSXJMeE94b2wycy0wQnJjc2l0UUpKaVFtQWszcVpGRW5pcF9OT05KWHB3Z3g0VHV3M1F1NGs5MFBTTU9xV192elRQVFNkTWx4UmN2RFZSSXfSAacBQVVfeXFMUDJ1M1NWWXpPdzI4NVRlV1V3V2pPb0poWGZ1Z3Fpd2tFZU13Z1BCSjdOQkUzODVZdFRpS21vZ0UxTldlZWdQWU81MkpHMjBJMW5LRE1EMDlsZ3hKMFBDYkFHbDRncEZ0RC1JV2c0eF93MFhZVUp1SmEyYlJzOWFfMEhhUVBSeXZCczlETkUyS0hXSWRNckJIa0pHVkpoc1RyS3RSVThodFU?oc=5"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NEE",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:30.885Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "WM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:37.721Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "LIN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:36.070Z"
+        }
+      ],
+      "sourceCount": 2
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change relative share",
+          "parentTheme": "environment-general",
+          "sharePct": 60,
+          "deltaSharePct": 55.68
+        }
+      ],
+      "peerThemeCount": 4
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "NEE",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:30.885Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "WM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:37.721Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "LIN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:36.070Z"
+        }
+      ],
+      "entityCount": 3
+    },
+    "adjacentPathways": {
+      "section": "adjacentPathways",
+      "evidenceClasses": [
+        {
+          "key": "codex_attachment",
+          "label": "Adjacent pathway",
+          "description": "Codex-attached adjacent or indirect pathway under an existing theme.",
+          "sourceType": "analysis",
+          "count": 0
+        }
+      ],
+      "provenance": [],
+      "pathwayCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change risk baseline",
+          "articleCount": 30,
+          "lifecycleStage": "growing",
+          "sourceDiversity": 0.8889,
+          "acceleration": 200
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change share baseline",
+          "parentTheme": "environment-general",
+          "sharePct": 60,
+          "deltaSharePct": 55.68
+        }
+      ],
+      "claimCount": 1
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Climate Change risk baseline",
+          "articleCount": 30,
+          "lifecycleStage": "growing",
+          "sourceDiversity": 0.8889,
+          "acceleration": 200
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Climate Change share baseline",
+          "parentTheme": "environment-general",
+          "sharePct": 60,
+          "deltaSharePct": 55.68
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Climate Change watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "climate-change::quarter",
+    "theme": "climate-change",
+    "periodType": "quarter",
+    "label": "Climate Change",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-12T17:50:38.407Z",
+    "stale": false
+  }
+}

@@ -15,7 +15,7 @@
  *   PG_PASSWORD
  *
  * Optional environment:
- *   PG_HOST (default: 192.168.0.76)
+ *   PG_HOST (default: 192.168.0.2)
  *   PG_PORT (default: 5433)
  *   PG_DATABASE (default: lattice)
  *   PG_USER (default: postgres)

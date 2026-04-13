@@ -1,112 +1,282 @@
 {
   "themes": [
-    "conflict",
-    "economy",
-    "energy",
-    "politics",
-    "tech"
+    "climate-change",
+    "cybersecurity",
+    "defense-industrial",
+    "diplomacy",
+    "monetary-policy",
+    "space",
+    "tech",
+    "technology-general"
   ],
   "symbols": [
-    "GLD",
     "ITA",
-    "TLT",
-    "USO",
-    "XLE",
-    "DBC",
+    "QQQ",
     "SPY",
-    "UUP",
     "CIBR",
-    "NVDA"
+    "DBC",
+    "NVDA",
+    "SMH",
+    "COP",
+    "VIXY",
+    "FRO"
   ],
   "cells": [
     {
-      "theme": "conflict",
-      "symbol": "GLD",
-      "hitRate": 0.590958690568979
-    },
-    {
-      "theme": "conflict",
+      "theme": "climate-change",
       "symbol": "ITA",
-      "hitRate": 0.5511301636788777
+      "hitRate": 0,
+      "avgReturn": -4.473749176583717
     },
     {
-      "theme": "conflict",
-      "symbol": "TLT",
-      "hitRate": 0.4184723304754482
+      "theme": "climate-change",
+      "symbol": "QQQ",
+      "hitRate": 0.6666666666666666,
+      "avgReturn": 1.4126785074977637
     },
     {
-      "theme": "conflict",
-      "symbol": "USO",
-      "hitRate": 0.556664068589244
+      "theme": "climate-change",
+      "symbol": "SPY",
+      "hitRate": 0.8214285714285714,
+      "avgReturn": 1.218562570515958
     },
     {
-      "theme": "conflict",
-      "symbol": "XLE",
-      "hitRate": 0.5526890101325019
+      "theme": "cybersecurity",
+      "symbol": "CIBR",
+      "hitRate": 0.3333333333333333,
+      "avgReturn": -1.5989792327020633
     },
     {
-      "theme": "economy",
+      "theme": "cybersecurity",
       "symbol": "DBC",
-      "hitRate": 0.5735166005226987
+      "hitRate": 0.3333333333333333,
+      "avgReturn": -2.57985351626282
     },
     {
-      "theme": "economy",
+      "theme": "cybersecurity",
+      "symbol": "ITA",
+      "hitRate": 1,
+      "avgReturn": 6.99000535215714
+    },
+    {
+      "theme": "cybersecurity",
+      "symbol": "NVDA",
+      "hitRate": 0.3333333333333333,
+      "avgReturn": -1.786809721981416
+    },
+    {
+      "theme": "cybersecurity",
+      "symbol": "QQQ",
+      "hitRate": 0.4,
+      "avgReturn": -1.6544846250876135
+    },
+    {
+      "theme": "cybersecurity",
+      "symbol": "SMH",
+      "hitRate": 0.3333333333333333,
+      "avgReturn": -2.39720899074369
+    },
+    {
+      "theme": "cybersecurity",
       "symbol": "SPY",
-      "hitRate": 0.6216242377311005
+      "hitRate": 0.3333333333333333,
+      "avgReturn": -2.0623587968650265
     },
     {
-      "theme": "economy",
-      "symbol": "TLT",
-      "hitRate": 0.41767495886167844
+      "theme": "defense-industrial",
+      "symbol": "CIBR",
+      "hitRate": 1,
+      "avgReturn": 2.449917683049205
     },
     {
-      "theme": "economy",
-      "symbol": "UUP",
-      "hitRate": 0.47966429954809553
+      "theme": "defense-industrial",
+      "symbol": "DBC",
+      "hitRate": 0,
+      "avgReturn": -1.21054383681869
     },
     {
-      "theme": "energy",
-      "symbol": "USO",
-      "hitRate": 0.5515352274175054
+      "theme": "defense-industrial",
+      "symbol": "ITA",
+      "hitRate": 0.72,
+      "avgReturn": 1.5278436758195792
     },
     {
-      "theme": "energy",
-      "symbol": "XLE",
-      "hitRate": 0.5257994648999873
+      "theme": "defense-industrial",
+      "symbol": "NVDA",
+      "hitRate": 1,
+      "avgReturn": 5.86468054256542
     },
     {
-      "theme": "politics",
-      "symbol": "GLD",
-      "hitRate": 0.6017733733211631
+      "theme": "defense-industrial",
+      "symbol": "QQQ",
+      "hitRate": 1,
+      "avgReturn": 2.9401607108357
     },
     {
-      "theme": "politics",
+      "theme": "defense-industrial",
+      "symbol": "SMH",
+      "hitRate": 1,
+      "avgReturn": 5.749002694494123
+    },
+    {
+      "theme": "defense-industrial",
       "symbol": "SPY",
-      "hitRate": 0.618594340852784
+      "hitRate": 0,
+      "avgReturn": -5.80443407761927
     },
     {
-      "theme": "politics",
-      "symbol": "TLT",
-      "hitRate": 0.4108749511018386
+      "theme": "diplomacy",
+      "symbol": "COP",
+      "hitRate": 0.6,
+      "avgReturn": -2.8958406915011414
     },
     {
-      "theme": "politics",
-      "symbol": "UUP",
-      "hitRate": 0.4809384164222874
+      "theme": "diplomacy",
+      "symbol": "NVDA",
+      "hitRate": 1,
+      "avgReturn": 7.126127711511226
+    },
+    {
+      "theme": "diplomacy",
+      "symbol": "QQQ",
+      "hitRate": 1,
+      "avgReturn": 2.2241287162734067
+    },
+    {
+      "theme": "diplomacy",
+      "symbol": "SPY",
+      "hitRate": 0.5,
+      "avgReturn": -0.9004055607539604
+    },
+    {
+      "theme": "diplomacy",
+      "symbol": "VIXY",
+      "hitRate": 0,
+      "avgReturn": -6.01504118821218
+    },
+    {
+      "theme": "monetary-policy",
+      "symbol": "CIBR",
+      "hitRate": 0.7096774193548387,
+      "avgReturn": 1.6942388151815027
+    },
+    {
+      "theme": "monetary-policy",
+      "symbol": "COP",
+      "hitRate": 0,
+      "avgReturn": -7.28296720038254
+    },
+    {
+      "theme": "monetary-policy",
+      "symbol": "DBC",
+      "hitRate": 0.504,
+      "avgReturn": -0.36275983032747605
+    },
+    {
+      "theme": "monetary-policy",
+      "symbol": "QQQ",
+      "hitRate": 0.7419354838709677,
+      "avgReturn": 1.6363211202307566
+    },
+    {
+      "theme": "monetary-policy",
+      "symbol": "SMH",
+      "hitRate": 0.6451612903225806,
+      "avgReturn": 2.3579562076610268
+    },
+    {
+      "theme": "space",
+      "symbol": "CIBR",
+      "hitRate": 1,
+      "avgReturn": 13.5303625793104
+    },
+    {
+      "theme": "space",
+      "symbol": "COP",
+      "hitRate": 0,
+      "avgReturn": -0.589288984026228
+    },
+    {
+      "theme": "space",
+      "symbol": "DBC",
+      "hitRate": 1,
+      "avgReturn": 5.3992399904444
+    },
+    {
+      "theme": "space",
+      "symbol": "NVDA",
+      "hitRate": 1,
+      "avgReturn": 23.2208011254835
+    },
+    {
+      "theme": "space",
+      "symbol": "QQQ",
+      "hitRate": 1,
+      "avgReturn": 7.85457227635813
+    },
+    {
+      "theme": "space",
+      "symbol": "SMH",
+      "hitRate": 1,
+      "avgReturn": 11.3369942678416
+    },
+    {
+      "theme": "space",
+      "symbol": "SPY",
+      "hitRate": 0.5,
+      "avgReturn": 1.7150820438904115
     },
     {
       "theme": "tech",
       "symbol": "CIBR",
-      "hitRate": 0.5940456958227556
+      "hitRate": 0.5940239963082603,
+      "avgReturn": 0.6357432475446141
+    },
+    {
+      "theme": "tech",
+      "symbol": "FRO",
+      "hitRate": 1,
+      "avgReturn": 5.99920629441718
     },
     {
       "theme": "tech",
       "symbol": "NVDA",
-      "hitRate": 0.6048926840526194
+      "hitRate": 0.6047531149053992,
+      "avgReturn": 2.6297542081529324
+    },
+    {
+      "theme": "tech",
+      "symbol": "QQQ",
+      "hitRate": 0.6070604522381172,
+      "avgReturn": 0.7003189181111731
+    },
+    {
+      "theme": "tech",
+      "symbol": "SMH",
+      "hitRate": 0.5986386709736964,
+      "avgReturn": 1.184851703277298
+    },
+    {
+      "theme": "technology-general",
+      "symbol": "DBC",
+      "hitRate": 1,
+      "avgReturn": 2.2293114242271583
+    },
+    {
+      "theme": "technology-general",
+      "symbol": "FRO",
+      "hitRate": 1,
+      "avgReturn": 5.99920629441718
+    },
+    {
+      "theme": "technology-general",
+      "symbol": "ITA",
+      "hitRate": 0.3333333333333333,
+      "avgReturn": -1.438939995074934
     }
   ],
   "meta": {
-    "updatedAt": "2026-04-05T17:22:30.559Z",
+    "updatedAt": "2026-04-13T19:39:38.534Z",
     "stale": false
   }
 }

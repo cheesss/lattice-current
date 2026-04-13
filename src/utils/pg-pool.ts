@@ -34,7 +34,7 @@ function resolveEnv(keys: string[], fallback: string): string {
 }
 
 export function resolveNasPgConfig(overrides: Partial<pg.PoolConfig> = {}): pg.PoolConfig {
-  const host = resolveEnv(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'], '192.168.0.76');
+  const host = resolveEnv(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'], '192.168.0.2');
   const portRaw = Number(resolveEnv(['INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'], '5433'));
   const port = Number.isFinite(portRaw) && portRaw > 0 ? portRaw : 5433;
   const database = resolveEnv(['INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'], 'lattice');

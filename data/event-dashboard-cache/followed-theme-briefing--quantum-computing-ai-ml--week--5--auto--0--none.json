@@ -1,0 +1,1189 @@
+{
+  "items": [
+    {
+      "label": "Quantum Computing",
+      "risks": [
+        "Year-on-year growth remains positive, but near-term acceleration is weakening. This can indicate a cooling burst rather than compounding structural adoption.",
+        "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+      ],
+      "score": 45.75,
+      "theme": "quantum-computing",
+      "detail": "Quantum Computing logged 3 items, -25% versus the prior week and +100% versus a year ago.",
+      "summary": {
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "label": "Quantum Computing summary baseline",
+            "sourceType": "aggregate",
+            "articleCount": 3,
+            "vsYearAgoPct": 100,
+            "evidenceClass": "trend_snapshot",
+            "vsPreviousPct": -25,
+            "lifecycleStage": "emerging"
+          }
+        ],
+        "acceleration": -125,
+        "articleCount": 3,
+        "vsYearAgoPct": 100,
+        "vsPreviousPct": -25,
+        "lifecycleStage": "emerging",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "count": 1,
+            "label": "Trend aggregate",
+            "sourceType": "aggregate",
+            "description": "Current period aggregate row for the canonical theme."
+          }
+        ],
+        "sourceDiversity": 0.8889,
+        "geographicSpread": 0
+      },
+      "category": "technology",
+      "headline": "Coverage changed versus prior comparison windows",
+      "topChange": {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Quantum Computing logged 3 items, -25% versus the prior week and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 3,
+          "vsYearAgoPct": 100,
+          "vsPreviousPct": -25
+        },
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "label": "Quantum Computing week aggregate",
+            "sourceType": "aggregate",
+            "articleCount": 3,
+            "vsYearAgoPct": 100,
+            "evidenceClass": "trend_snapshot",
+            "vsPreviousPct": -25
+          }
+        ],
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "count": 1,
+            "label": "Trend aggregate",
+            "sourceType": "aggregate",
+            "description": "Current period aggregate row for the canonical theme."
+          }
+        ]
+      },
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "label": "Quantum Computing week aggregate",
+          "sourceType": "aggregate",
+          "articleCount": 3,
+          "vsYearAgoPct": 100,
+          "evidenceClass": "trend_snapshot",
+          "vsPreviousPct": -25
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Quantum Computing share movement inside Technology General",
+          "sharePct": 7.5,
+          "sourceType": "aggregate",
+          "deltaSharePct": 7.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "curated_digest",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "source": "hackernews",
+          "articleId": 79866,
+          "sourceType": "digest",
+          "publishedAt": "2026-04-06T15:31:20.000Z",
+          "evidenceClass": "curated_digest"
+        },
+        {
+          "type": "curated_digest",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "source": "Google News: jobs",
+          "articleId": 79707,
+          "sourceType": "digest",
+          "publishedAt": "2026-04-07T09:00:00.000Z",
+          "evidenceClass": "curated_digest"
+        },
+        {
+          "type": "trend_snapshot",
+          "label": "Quantum Computing aggregate context",
+          "sourceType": "aggregate",
+          "acceleration": -125,
+          "vsYearAgoPct": 100,
+          "evidenceClass": "trend_snapshot",
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Quantum Computing relative-share context",
+          "sourceType": "aggregate",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 7.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "openalex_research",
+          "label": "Logical quantum processor based on reconfigurable atom arrays",
+          "source": "Nature",
+          "workId": "https://openalex.org/W4389373471",
+          "sourceType": "research",
+          "publishedAt": "2023-12-05T15:00:00.000Z",
+          "citedByCount": 941,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+          "source": "Nature",
+          "workId": "https://openalex.org/W4387542025",
+          "sourceType": "research",
+          "publishedAt": "2023-10-10T15:00:00.000Z",
+          "citedByCount": 450,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "The future of quantum computing with superconducting qubits",
+          "source": "Journal of Applied Physics",
+          "workId": "https://openalex.org/W4307283983",
+          "sourceType": "research",
+          "publishedAt": "2022-10-25T15:00:00.000Z",
+          "citedByCount": 318,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "url": "https://github.com/sindresorhus/awesome",
+          "type": "github_code",
+          "forks": 34016,
+          "label": "sindresorhus/awesome",
+          "stars": 452904,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+          "pushedAt": "2026-04-02T16:30:33.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/vinta/awesome-python",
+          "type": "github_code",
+          "forks": 27602,
+          "label": "vinta/awesome-python",
+          "stars": 291200,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+          "pushedAt": "2026-04-07T03:34:03.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/xtekky/gpt4free",
+          "type": "github_code",
+          "forks": 13626,
+          "label": "xtekky/gpt4free",
+          "stars": 65977,
+          "source": "GitHub",
+          "repoKey": "R_kgDOJQK9zA",
+          "pushedAt": "2026-04-07T15:35:03.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "type": "trend_snapshot",
+          "label": "Quantum Computing aggregate",
+          "sourceType": "aggregate",
+          "articleCount": 3,
+          "evidenceClass": "trend_snapshot",
+          "lifecycleStage": "emerging"
+        },
+        {
+          "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxPZXM3c3hfbktmLXU0TUtoWHEtdFJqY25MSENBQkNmc0xCMnNnVFhIRU5BcWM2NW1ZVlBndHZqSHU0aGVUeUd6SW1zUVVlQUhnZ0xZaVlpSTVOcHdsVUtfNjU3OHEtZHRWeEVla1FfRFlyekxhV3BEanZ4UmFvd0VFY0UyR2JBSGNwNjBuVVFlVktmV1NEakhyU1JCak9tdENXN0ZJeEJiR3gzcGM?oc=5",
+          "type": "recent_article",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "source": "Google News: jobs",
+          "articleId": 79707,
+          "sourceType": "article",
+          "publishedAt": "2026-04-07T09:00:00.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "url": "https://words.filippo.io/crqc-timeline/",
+          "type": "recent_article",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "source": "hackernews",
+          "articleId": 79866,
+          "sourceType": "article",
+          "publishedAt": "2026-04-06T15:31:20.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "url": "https://arxiv.org/abs/2604.03501v1",
+          "type": "recent_article",
+          "label": "The Augmentation Trap: AI Productivity and the Cost of Cognitive Offloading",
+          "source": "arxiv",
+          "articleId": 81760,
+          "sourceType": "article",
+          "publishedAt": "2026-04-03T22:50:32.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "url": "https://arxiv.org/abs/2604.03435v1",
+          "type": "recent_article",
+          "label": "A High Motional Frequency Ion Trapping Regime for Quantum Information Science",
+          "source": "arxiv",
+          "articleId": 81920,
+          "sourceType": "article",
+          "publishedAt": "2026-04-03T20:19:30.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "QBTS",
+          "updatedAt": "2026-04-07T21:20:12.754Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IONQ",
+          "updatedAt": "2026-04-07T21:20:09.958Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "RGTI",
+          "updatedAt": "2026-04-07T21:20:11.419Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IBM",
+          "updatedAt": "2026-04-07T21:20:07.950Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "openalex_research",
+          "label": "Realization of an Error-Correcting Surface Code with Superconducting Qubits",
+          "source": "Physical Review Letters",
+          "workId": "https://openalex.org/W4285029287",
+          "sourceType": "research",
+          "publishedAt": "2022-07-10T15:00:00.000Z",
+          "citedByCount": 307,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "Fusion-based quantum computation",
+          "source": "Nature Communications",
+          "workId": "https://openalex.org/W3122257190",
+          "sourceType": "research",
+          "publishedAt": "2023-02-16T15:00:00.000Z",
+          "citedByCount": 286,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "Quantum Machine Learning Revolution in Healthcare: A Systematic Review of Emerging Perspectives and Applications",
+          "source": "IEEE Access",
+          "workId": "https://openalex.org/W4390831829",
+          "sourceType": "research",
+          "publishedAt": "2023-12-31T15:00:00.000Z",
+          "citedByCount": 148,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "Low-overhead fault-tolerant quantum computing using long-range connectivity",
+          "source": "Science Advances",
+          "workId": "https://openalex.org/W3205637696",
+          "sourceType": "research",
+          "publishedAt": "2022-05-19T15:00:00.000Z",
+          "citedByCount": 96,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "Molecular nanomagnets: a viable path toward quantum information processing?",
+          "source": "Reports on Progress in Physics",
+          "workId": "https://openalex.org/W4391533570",
+          "sourceType": "research",
+          "publishedAt": "2024-02-04T15:00:00.000Z",
+          "citedByCount": 72,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "url": "https://github.com/fffaraz/awesome-cpp",
+          "type": "github_code",
+          "forks": 8259,
+          "label": "fffaraz/awesome-cpp",
+          "stars": 70697,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTkzNTAzMQ==",
+          "pushedAt": "2026-04-06T04:47:06.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/Developer-Y/cs-video-courses",
+          "type": "github_code",
+          "forks": 10975,
+          "label": "Developer-Y/cs-video-courses",
+          "stars": 79718,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk3MTU4MzYwMg==",
+          "pushedAt": "2026-03-27T17:43:39.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+          "type": "github_code",
+          "forks": 6034,
+          "label": "nextlevelbuilder/ui-ux-pro-max-skill",
+          "stars": 60676,
+          "source": "GitHub",
+          "repoKey": "R_kgDOQfttOw",
+          "pushedAt": "2026-04-03T05:08:19.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/ruvnet/RuView",
+          "type": "github_code",
+          "forks": 6209,
+          "label": "ruvnet/RuView",
+          "stars": 46001,
+          "source": "GitHub",
+          "repoKey": "R_kgDOO3hF2A",
+          "pushedAt": "2026-04-07T18:25:25.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/prakhar1989/awesome-courses",
+          "type": "github_code",
+          "forks": 8335,
+          "label": "prakhar1989/awesome-courses",
+          "stars": 67522,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjY4OTU5OA==",
+          "pushedAt": "2023-05-04T12:49:34.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Quantum Computing relative share",
+          "sharePct": 7.5,
+          "sourceType": "aggregate",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 7.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "trend_snapshot",
+          "label": "Quantum Computing risk baseline",
+          "sourceType": "aggregate",
+          "acceleration": -125,
+          "articleCount": 3,
+          "evidenceClass": "trend_snapshot",
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0.8889
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Quantum Computing share baseline",
+          "sharePct": 7.5,
+          "sourceType": "aggregate",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 7.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "taxonomy",
+          "label": "Quantum Computing watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes.",
+          "sourceType": "taxonomy",
+          "evidenceClass": "taxonomy"
+        }
+      ],
+      "watchpoint": "",
+      "parentTheme": "technology-general",
+      "watchpoints": [
+        "Monitor whether Quantum Computing keeps positive acceleration over the next week window.",
+        "Check if source diversity expands beyond 0.8889 and whether geographic spread broadens from 0."
+      ],
+      "whatChanged": [
+        {
+          "type": "coverage_shift",
+          "title": "Coverage changed versus prior comparison windows",
+          "detail": "Quantum Computing logged 3 items, -25% versus the prior week and +100% versus a year ago.",
+          "metric": {
+            "articleCount": 3,
+            "vsYearAgoPct": 100,
+            "vsPreviousPct": -25
+          },
+          "provenance": [
+            {
+              "type": "trend_snapshot",
+              "label": "Quantum Computing week aggregate",
+              "sourceType": "aggregate",
+              "articleCount": 3,
+              "vsYearAgoPct": 100,
+              "evidenceClass": "trend_snapshot",
+              "vsPreviousPct": -25
+            }
+          ],
+          "evidenceClasses": [
+            {
+              "key": "trend_snapshot",
+              "count": 1,
+              "label": "Trend aggregate",
+              "sourceType": "aggregate",
+              "description": "Current period aggregate row for the canonical theme."
+            }
+          ]
+        },
+        {
+          "type": "acceleration",
+          "title": "Acceleration is weakening",
+          "detail": "Quantum Computing is showing negative acceleration of -125 in the current week comparison.",
+          "metric": {
+            "acceleration": -125,
+            "sourceDiversity": 0.8889
+          },
+          "provenance": [
+            {
+              "type": "trend_snapshot",
+              "label": "Quantum Computing week aggregate",
+              "sourceType": "aggregate",
+              "articleCount": 3,
+              "vsYearAgoPct": 100,
+              "evidenceClass": "trend_snapshot",
+              "vsPreviousPct": -25
+            }
+          ],
+          "evidenceClasses": [
+            {
+              "key": "trend_snapshot",
+              "count": 1,
+              "label": "Trend aggregate",
+              "sourceType": "aggregate",
+              "description": "Current period aggregate row for the canonical theme."
+            }
+          ]
+        },
+        {
+          "type": "subtopic_share",
+          "title": "Share inside the parent theme moved",
+          "detail": "Quantum Computing now represents 7.5% of Technology General coverage, a +7.5 point move across the selected range.",
+          "metric": {
+            "lastSharePct": 7.5,
+            "deltaSharePct": 7.5
+          },
+          "provenance": [
+            {
+              "type": "theme_evolution",
+              "label": "Quantum Computing share movement inside Technology General",
+              "sharePct": 7.5,
+              "sourceType": "aggregate",
+              "deltaSharePct": 7.5,
+              "evidenceClass": "theme_evolution"
+            }
+          ],
+          "evidenceClasses": [
+            {
+              "key": "theme_evolution",
+              "count": 1,
+              "label": "Theme evolution",
+              "sourceType": "aggregate",
+              "description": "Relative share movement inside the parent theme."
+            }
+          ]
+        }
+      ],
+      "whyItMatters": "Quantum Computing matters because it is emerging with positive year-on-year movement and softening acceleration.",
+      "categoryLabel": "Technology",
+      "lastEvidenceAt": "2026-04-07T21:20:12.754Z",
+      "adjacentSummary": null,
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "count": 3,
+          "label": "Trend aggregate",
+          "sourceType": "aggregate",
+          "description": "Current period aggregate row for the canonical theme."
+        },
+        {
+          "key": "theme_evolution",
+          "count": 8,
+          "label": "Theme evolution",
+          "sourceType": "aggregate",
+          "description": "Relative share movement inside the parent theme."
+        },
+        {
+          "key": "curated_digest",
+          "count": 4,
+          "label": "Curated digest",
+          "sourceType": "digest",
+          "description": "Ranked curated items linked to the theme."
+        },
+        {
+          "key": "openalex_research",
+          "count": 8,
+          "label": "OpenAlex research",
+          "sourceType": "research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering."
+        },
+        {
+          "key": "github_code",
+          "count": 8,
+          "label": "GitHub code",
+          "sourceType": "code",
+          "description": "Repositories linked to the theme through GitHub search and ranking."
+        },
+        {
+          "key": "recent_articles",
+          "count": 4,
+          "label": "Recent articles",
+          "sourceType": "article",
+          "description": "Recent article-level evidence from the theme stream."
+        },
+        {
+          "key": "sec_filings",
+          "count": 8,
+          "label": "SEC-backed entities",
+          "sourceType": "filing",
+          "description": "Theme-to-entity links backed by SEC connector data."
+        },
+        {
+          "key": "codex_attachment",
+          "count": 0,
+          "label": "Adjacent pathway",
+          "sourceType": "analysis",
+          "description": "Codex-attached adjacent or indirect pathway under an existing theme."
+        },
+        {
+          "key": "taxonomy",
+          "count": 1,
+          "label": "Taxonomy governance",
+          "sourceType": "taxonomy",
+          "description": "Canonical taxonomy and fallback tracking evidence."
+        }
+      ],
+      "adjacentPathways": [],
+      "deltaSinceLastVisit": null
+    },
+    {
+      "label": "emerging-tech",
+      "risks": [
+        "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+        "Year-on-year growth remains positive, but near-term acceleration is weakening. This can indicate a cooling burst rather than compounding structural adoption."
+      ],
+      "score": -14,
+      "theme": "ai-ml",
+      "detail": "emerging-tech logged 27 items, +80% versus the prior week and +100% versus a year ago.",
+      "summary": {
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "label": "emerging-tech summary baseline",
+            "sourceType": "aggregate",
+            "articleCount": 27,
+            "vsYearAgoPct": 100,
+            "evidenceClass": "trend_snapshot",
+            "vsPreviousPct": 80,
+            "lifecycleStage": "growing"
+          }
+        ],
+        "acceleration": -1320,
+        "articleCount": 27,
+        "vsYearAgoPct": 100,
+        "vsPreviousPct": 80,
+        "lifecycleStage": "growing",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "count": 1,
+            "label": "Trend aggregate",
+            "sourceType": "aggregate",
+            "description": "Current period aggregate row for the canonical theme."
+          }
+        ],
+        "sourceDiversity": 0.2099,
+        "geographicSpread": 0
+      },
+      "category": "technology",
+      "headline": "Coverage changed versus prior comparison windows",
+      "topChange": {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "emerging-tech logged 27 items, +80% versus the prior week and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 27,
+          "vsYearAgoPct": 100,
+          "vsPreviousPct": 80
+        },
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "label": "emerging-tech week aggregate",
+            "sourceType": "aggregate",
+            "articleCount": 27,
+            "vsYearAgoPct": 100,
+            "evidenceClass": "trend_snapshot",
+            "vsPreviousPct": 80
+          }
+        ],
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "count": 1,
+            "label": "Trend aggregate",
+            "sourceType": "aggregate",
+            "description": "Current period aggregate row for the canonical theme."
+          }
+        ]
+      },
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "label": "emerging-tech week aggregate",
+          "sourceType": "aggregate",
+          "articleCount": 27,
+          "vsYearAgoPct": 100,
+          "evidenceClass": "trend_snapshot",
+          "vsPreviousPct": 80
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Ai Ml share movement inside Technology General",
+          "sharePct": 67.5,
+          "sourceType": "aggregate",
+          "deltaSharePct": 67.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "curated_digest",
+          "label": "Agentic Federated Learning: The Future of Distributed Training Orchestration",
+          "source": "arxiv",
+          "articleId": 79794,
+          "sourceType": "digest",
+          "publishedAt": "2026-04-06T17:43:30.000Z",
+          "evidenceClass": "curated_digest"
+        },
+        {
+          "type": "curated_digest",
+          "label": "Synthetic Sandbox for Training Machine Learning Engineering Agents",
+          "source": "arxiv",
+          "articleId": 79821,
+          "sourceType": "digest",
+          "publishedAt": "2026-04-06T17:19:29.000Z",
+          "evidenceClass": "curated_digest"
+        },
+        {
+          "type": "trend_snapshot",
+          "label": "emerging-tech aggregate context",
+          "sourceType": "aggregate",
+          "acceleration": -1320,
+          "vsYearAgoPct": 100,
+          "evidenceClass": "trend_snapshot",
+          "lifecycleStage": "growing"
+        },
+        {
+          "type": "theme_evolution",
+          "label": "emerging-tech relative-share context",
+          "sourceType": "aggregate",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 67.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "openalex_research",
+          "label": "Unlocking the opportunities through ChatGPT Tool towards ameliorating the education system",
+          "source": "BenchCouncil Transactions on Benchmarks Standards and Evaluations",
+          "workId": "https://openalex.org/W4378473491",
+          "sourceType": "research",
+          "publishedAt": "2023-05-25T15:00:00.000Z",
+          "citedByCount": 494,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "Nonhuman “Authors” and Implications for the Integrity of Scientific Publication and Medical Knowledge",
+          "source": "JAMA",
+          "workId": "https://openalex.org/W4318671267",
+          "sourceType": "research",
+          "publishedAt": "2023-01-30T15:00:00.000Z",
+          "citedByCount": 378,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face",
+          "source": "arXiv (Cornell University)",
+          "workId": "https://openalex.org/W4361866031",
+          "sourceType": "research",
+          "publishedAt": "2023-03-29T15:00:00.000Z",
+          "citedByCount": 264,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "url": "https://github.com/Lightning-AI/pytorch-lightning",
+          "type": "github_code",
+          "forks": 3702,
+          "label": "Lightning-AI/pytorch-lightning",
+          "stars": 31009,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNzg2MjY3MjA=",
+          "pushedAt": "2026-04-07T08:06:44.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/ultralytics/yolov5",
+          "type": "github_code",
+          "forks": 17450,
+          "label": "ultralytics/yolov5",
+          "stars": 57167,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjQ4MTg2ODY=",
+          "pushedAt": "2026-04-02T14:13:02.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/sorrycc/awesome-javascript",
+          "type": "github_code",
+          "forks": 4528,
+          "label": "sorrycc/awesome-javascript",
+          "stars": 34932,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTM5Mzg3MQ==",
+          "pushedAt": "2026-04-02T13:21:16.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "type": "trend_snapshot",
+          "label": "emerging-tech aggregate",
+          "sourceType": "aggregate",
+          "articleCount": 27,
+          "evidenceClass": "trend_snapshot",
+          "lifecycleStage": "growing"
+        },
+        {
+          "url": "https://rajnandan.com/posts/taste-in-the-age-of-ai-and-llms/",
+          "type": "recent_article",
+          "label": "Taste in the age of AI and LLMs",
+          "source": "hackernews",
+          "articleId": 79748,
+          "sourceType": "article",
+          "publishedAt": "2026-04-07T15:54:16.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxOcEZ1QzRRT0U5dmxxQzctY1BEWkRtaXNpaWlkSWNCYzhOY29vRXYyaWNFYjh6TnR4QU1yeWdzWG1jR0hid2tPYmZUcFBwWDl0dS04SzNsTk9hUFp6WE5BQjJHcTBRZGJjRk9PZ1hwclFQc0dSTk1pN3BJbXpwQU9nVWZ2akx3RVBKc3EzUnBVaDF3alJVZGowWHlCSWktQXd0aVBLcVNQMWZ0d0hWMnJORkhtNzhqZTlpaFdmbXNoZ1dfSVYzSGpYVGN3WG1ETUpJTGt5UGV3UGRUM2s?oc=5",
+          "type": "recent_article",
+          "label": "Outpaced by the US, China’s military places selective bets on artificial intelligence - Defense News",
+          "source": "Google News: military",
+          "articleId": 78953,
+          "sourceType": "article",
+          "publishedAt": "2026-04-07T09:57:38.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "url": "https://arxiv.org/abs/2604.04895v1",
+          "type": "recent_article",
+          "label": "Agentic Federated Learning: The Future of Distributed Training Orchestration",
+          "source": "arxiv",
+          "articleId": 79794,
+          "sourceType": "article",
+          "publishedAt": "2026-04-06T17:43:30.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "url": "https://arxiv.org/abs/2604.04872v1",
+          "type": "recent_article",
+          "label": "Synthetic Sandbox for Training Machine Learning Engineering Agents",
+          "source": "arxiv",
+          "articleId": 79821,
+          "sourceType": "article",
+          "publishedAt": "2026-04-06T17:19:29.000Z",
+          "evidenceClass": "recent_article"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "AMD",
+          "updatedAt": "2026-04-07T21:20:06.351Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "GOOGL",
+          "updatedAt": "2026-04-07T21:20:04.723Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "NVDA",
+          "updatedAt": "2026-04-07T21:20:01.257Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MSFT",
+          "updatedAt": "2026-04-07T21:20:03.037Z",
+          "evidenceSource": "theme_entity_seed+sec"
+        },
+        {
+          "type": "openalex_research",
+          "label": "Unraveling the Ethical Enigma: Artificial Intelligence in Healthcare",
+          "source": "Cureus",
+          "workId": "https://openalex.org/W4385724150",
+          "sourceType": "research",
+          "publishedAt": "2023-08-09T15:00:00.000Z",
+          "citedByCount": 228,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "Application of Large Language Models to Software Engineering Tasks: Opportunities, Risks, and Implications",
+          "source": "IEEE Software",
+          "workId": "https://openalex.org/W4367059011",
+          "sourceType": "research",
+          "publishedAt": "2023-04-25T15:00:00.000Z",
+          "citedByCount": 173,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "ChatMOF: an artificial intelligence system for predicting and generating metal-organic frameworks using large language models",
+          "source": "Nature Communications",
+          "workId": "https://openalex.org/W4399290669",
+          "sourceType": "research",
+          "publishedAt": "2024-06-02T15:00:00.000Z",
+          "citedByCount": 167,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "A Primer on Generative Artificial Intelligence",
+          "source": "Education Sciences",
+          "workId": "https://openalex.org/W4391615642",
+          "sourceType": "research",
+          "publishedAt": "2024-02-06T15:00:00.000Z",
+          "citedByCount": 127,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "type": "openalex_research",
+          "label": "GPT versus Resident Physicians — A Benchmark Based on Official Board Scores",
+          "source": "NEJM AI",
+          "workId": "https://openalex.org/W4394767601",
+          "sourceType": "research",
+          "publishedAt": "2024-04-11T15:00:00.000Z",
+          "citedByCount": 121,
+          "evidenceClass": "openalex_research",
+          "researchSignalScore": 0
+        },
+        {
+          "url": "https://github.com/dipakkr/A-to-Z-Resources-for-Students",
+          "type": "github_code",
+          "forks": 4815,
+          "label": "dipakkr/A-to-Z-Resources-for-Students",
+          "stars": 21596,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNDkxMTM1MTQ=",
+          "pushedAt": "2026-02-27T09:14:51.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/thangchung/awesome-dotnet-core",
+          "type": "github_code",
+          "forks": 2953,
+          "label": "thangchung/awesome-dotnet-core",
+          "stars": 21156,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk1NDA4Njk2OQ==",
+          "pushedAt": "2026-02-27T03:26:22.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/zhaoolee/ChromeAppHeroes",
+          "type": "github_code",
+          "forks": 2618,
+          "label": "zhaoolee/ChromeAppHeroes",
+          "stars": 25424,
+          "source": "GitHub",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkxNjk1Mjk1Njc=",
+          "pushedAt": "2026-02-11T03:18:26.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/datawhalechina/llm-cookbook",
+          "type": "github_code",
+          "forks": 2875,
+          "label": "datawhalechina/llm-cookbook",
+          "stars": 23718,
+          "source": "GitHub",
+          "repoKey": "R_kgDOJckNQg",
+          "pushedAt": "2025-06-12T14:48:07.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "url": "https://github.com/karpathy/llama2.c",
+          "type": "github_code",
+          "forks": 2491,
+          "label": "karpathy/llama2.c",
+          "stars": 19366,
+          "source": "GitHub",
+          "repoKey": "R_kgDOJ-qZHA",
+          "pushedAt": "2024-08-06T09:44:40.000Z",
+          "sourceType": "code",
+          "evidenceClass": "github_code"
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Ai Ml relative share",
+          "sharePct": 67.5,
+          "sourceType": "aggregate",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 67.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "trend_snapshot",
+          "label": "emerging-tech risk baseline",
+          "sourceType": "aggregate",
+          "acceleration": -1320,
+          "articleCount": 27,
+          "evidenceClass": "trend_snapshot",
+          "lifecycleStage": "growing",
+          "sourceDiversity": 0.2099
+        },
+        {
+          "type": "theme_evolution",
+          "label": "Ai Ml share baseline",
+          "sharePct": 67.5,
+          "sourceType": "aggregate",
+          "parentTheme": "technology-general",
+          "deltaSharePct": 67.5,
+          "evidenceClass": "theme_evolution"
+        },
+        {
+          "type": "taxonomy",
+          "label": "emerging-tech watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes.",
+          "sourceType": "taxonomy",
+          "evidenceClass": "taxonomy"
+        }
+      ],
+      "watchpoint": "",
+      "parentTheme": "technology-general",
+      "watchpoints": [
+        "Monitor whether emerging-tech keeps positive acceleration over the next week window.",
+        "Check if source diversity expands beyond 0.2099 and whether geographic spread broadens from 0."
+      ],
+      "whatChanged": [
+        {
+          "type": "coverage_shift",
+          "title": "Coverage changed versus prior comparison windows",
+          "detail": "emerging-tech logged 27 items, +80% versus the prior week and +100% versus a year ago.",
+          "metric": {
+            "articleCount": 27,
+            "vsYearAgoPct": 100,
+            "vsPreviousPct": 80
+          },
+          "provenance": [
+            {
+              "type": "trend_snapshot",
+              "label": "emerging-tech week aggregate",
+              "sourceType": "aggregate",
+              "articleCount": 27,
+              "vsYearAgoPct": 100,
+              "evidenceClass": "trend_snapshot",
+              "vsPreviousPct": 80
+            }
+          ],
+          "evidenceClasses": [
+            {
+              "key": "trend_snapshot",
+              "count": 1,
+              "label": "Trend aggregate",
+              "sourceType": "aggregate",
+              "description": "Current period aggregate row for the canonical theme."
+            }
+          ]
+        },
+        {
+          "type": "acceleration",
+          "title": "Acceleration is weakening",
+          "detail": "emerging-tech is showing negative acceleration of -1320 in the current week comparison.",
+          "metric": {
+            "acceleration": -1320,
+            "sourceDiversity": 0.2099
+          },
+          "provenance": [
+            {
+              "type": "trend_snapshot",
+              "label": "emerging-tech week aggregate",
+              "sourceType": "aggregate",
+              "articleCount": 27,
+              "vsYearAgoPct": 100,
+              "evidenceClass": "trend_snapshot",
+              "vsPreviousPct": 80
+            }
+          ],
+          "evidenceClasses": [
+            {
+              "key": "trend_snapshot",
+              "count": 1,
+              "label": "Trend aggregate",
+              "sourceType": "aggregate",
+              "description": "Current period aggregate row for the canonical theme."
+            }
+          ]
+        },
+        {
+          "type": "subtopic_share",
+          "title": "Share inside the parent theme moved",
+          "detail": "Ai Ml now represents 67.5% of Technology General coverage, a +67.5 point move across the selected range.",
+          "metric": {
+            "lastSharePct": 67.5,
+            "deltaSharePct": 67.5
+          },
+          "provenance": [
+            {
+              "type": "theme_evolution",
+              "label": "Ai Ml share movement inside Technology General",
+              "sharePct": 67.5,
+              "sourceType": "aggregate",
+              "deltaSharePct": 67.5,
+              "evidenceClass": "theme_evolution"
+            }
+          ],
+          "evidenceClasses": [
+            {
+              "key": "theme_evolution",
+              "count": 1,
+              "label": "Theme evolution",
+              "sourceType": "aggregate",
+              "description": "Relative share movement inside the parent theme."
+            }
+          ]
+        }
+      ],
+      "whyItMatters": "emerging-tech matters because it is growing with positive year-on-year movement and softening acceleration.",
+      "categoryLabel": "Technology",
+      "lastEvidenceAt": "2026-04-07T21:20:06.351Z",
+      "adjacentSummary": null,
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "count": 3,
+          "label": "Trend aggregate",
+          "sourceType": "aggregate",
+          "description": "Current period aggregate row for the canonical theme."
+        },
+        {
+          "key": "theme_evolution",
+          "count": 8,
+          "label": "Theme evolution",
+          "sourceType": "aggregate",
+          "description": "Relative share movement inside the parent theme."
+        },
+        {
+          "key": "curated_digest",
+          "count": 4,
+          "label": "Curated digest",
+          "sourceType": "digest",
+          "description": "Ranked curated items linked to the theme."
+        },
+        {
+          "key": "openalex_research",
+          "count": 8,
+          "label": "OpenAlex research",
+          "sourceType": "research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering."
+        },
+        {
+          "key": "github_code",
+          "count": 8,
+          "label": "GitHub code",
+          "sourceType": "code",
+          "description": "Repositories linked to the theme through GitHub search and ranking."
+        },
+        {
+          "key": "recent_articles",
+          "count": 4,
+          "label": "Recent articles",
+          "sourceType": "article",
+          "description": "Recent article-level evidence from the theme stream."
+        },
+        {
+          "key": "sec_filings",
+          "count": 8,
+          "label": "SEC-backed entities",
+          "sourceType": "filing",
+          "description": "Theme-to-entity links backed by SEC connector data."
+        },
+        {
+          "key": "codex_attachment",
+          "count": 0,
+          "label": "Adjacent pathway",
+          "sourceType": "analysis",
+          "description": "Codex-attached adjacent or indirect pathway under an existing theme."
+        },
+        {
+          "key": "taxonomy",
+          "count": 1,
+          "label": "Taxonomy governance",
+          "sourceType": "taxonomy",
+          "description": "Canonical taxonomy and fallback tracking evidence."
+        }
+      ],
+      "adjacentPathways": [],
+      "deltaSinceLastVisit": null
+    }
+  ],
+  "themes": [
+    "quantum-computing",
+    "ai-ml"
+  ],
+  "headline": "Weekly structural briefing for 2 followed themes.",
+  "periodType": "week",
+  "themeCount": 2,
+  "generatedAt": "2026-04-08T13:14:06.709Z",
+  "snapshot": {
+    "persisted": true,
+    "snapshotKey": "8976e9b2d828091449ec3be8a3822e1ffa8d730e::week::2026-04-06",
+    "snapshotDate": "2026-04-05",
+    "generatedAt": "2026-04-08T13:14:06.709Z",
+    "source": "followed-theme-briefing-generator"
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T13:20:37.703Z",
+    "stale": false
+  }
+}

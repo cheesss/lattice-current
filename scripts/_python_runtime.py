@@ -37,7 +37,7 @@ def resolve_nas_pg_config(overrides: dict | None = None) -> dict:
     host = str(
         overrides.get("host")
         or first_defined_env(["INTEL_PG_HOST", "NAS_PG_HOST", "PG_HOST"])
-        or "192.168.0.76"
+        or "192.168.0.2"
     ).strip()
     port = int(
         overrides.get("port")

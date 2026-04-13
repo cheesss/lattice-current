@@ -1,0 +1,1058 @@
+{
+  "theme": "food-agriculture",
+  "label": "Food / Agriculture",
+  "category": "environment",
+  "categoryLabel": "Environment",
+  "parentTheme": "environment-general",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 0,
+    "lifecycleStage": "nascent",
+    "vsPreviousPct": 0,
+    "vsYearAgoPct": 0,
+    "acceleration": 0,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Food / Agriculture summary baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 3
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 6
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 2
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Food / Agriculture week aggregate",
+        "articleCount": 0,
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Food Agriculture share movement inside Environment General",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Food / Agriculture aggregate context",
+        "lifecycleStage": "nascent",
+        "vsYearAgoPct": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Food / Agriculture aggregate",
+        "articleCount": 0,
+        "lifecycleStage": "nascent"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Over a pint in Oxford, we may have stumbled upon the holy grail of agriculture | George Monbiot",
+        "articleId": 73161,
+        "source": "guardian",
+        "publishedAt": "2025-12-05T06:00:42.000Z",
+        "url": "https://www.theguardian.com/commentisfree/2025/dec/05/agriculture-revolution-soil-farming-earth-rover-program"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Trump officials threaten to withhold Snap funds from Democratic-led states",
+        "articleId": 73117,
+        "source": "guardian",
+        "publishedAt": "2025-12-02T22:54:06.000Z",
+        "url": "https://www.theguardian.com/us-news/2025/dec/02/trump-snap-benefits-threat-democratic-states"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "‘A win-win for farmers’: how flooding fields in north-west England could boost crops",
+        "articleId": 66031,
+        "source": "guardian",
+        "publishedAt": "2025-05-02T05:00:58.000Z",
+        "url": "https://www.theguardian.com/environment/2025/may/02/win-win-farmers-how-rewetting-peatland-boost-crops-cut-co2"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Scientists dismayed as UK ministers clear way for gene editing of crops - but not animals",
+        "articleId": 59951,
+        "source": "guardian",
+        "publishedAt": "2024-11-02T13:49:07.000Z",
+        "url": "https://www.theguardian.com/science/2024/nov/02/scientists-dismayed-as-uk-ministers-clear-way-for-gene-editing-of-crops-but-not-animals"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "‘VCs need their money back’: why sustainable startups struggle to fix our broken food system",
+        "articleId": 59017,
+        "source": "guardian",
+        "publishedAt": "2024-10-04T14:00:05.000Z",
+        "url": "https://www.theguardian.com/environment/2024/oct/04/sustainable-food-brands"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Food Agriculture relative share",
+        "parentTheme": "environment-general",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Food Agriculture connector placeholder",
+        "detail": "Exposure connectors not yet populated for this theme."
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Food / Agriculture risk baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "sourceDiversity": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Food Agriculture share baseline",
+        "parentTheme": "environment-general",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Food / Agriculture watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Food / Agriculture logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Food / Agriculture week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Food / Agriculture is showing positive acceleration of 0 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Food / Agriculture week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Food Agriculture now represents 0% of Environment General coverage, a +0 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Food Agriculture share movement inside Environment General",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Food / Agriculture matters because it is nascent with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Food / Agriculture aggregate context",
+            "lifecycleStage": "nascent",
+            "vsYearAgoPct": 0,
+            "acceleration": 0
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Food Agriculture share movement",
+        "detail": "Food Agriculture is ranked #4 inside Environment General with 0% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Food Agriculture relative share",
+            "parentTheme": "environment-general",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Food / Agriculture logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "metric": {
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Food / Agriculture week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Food / Agriculture is showing positive acceleration of 0 in the current week comparison.",
+        "metric": {
+          "acceleration": 0,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Food / Agriculture week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Food Agriculture now represents 0% of Environment General coverage, a +0 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 0,
+          "deltaSharePct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Food Agriculture share movement inside Environment General",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Food / Agriculture matters because it is nascent with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Food / Agriculture matters because it is nascent with positive year-on-year movement and still building acceleration."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0,
+        "acceleration": 0,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [],
+      "recentArticles": [
+        {
+          "articleId": 73161,
+          "title": "Over a pint in Oxford, we may have stumbled upon the holy grail of agriculture | George Monbiot",
+          "source": "guardian",
+          "publishedAt": "2025-12-05T06:00:42.000Z",
+          "url": "https://www.theguardian.com/commentisfree/2025/dec/05/agriculture-revolution-soil-farming-earth-rover-program"
+        },
+        {
+          "articleId": 73117,
+          "title": "Trump officials threaten to withhold Snap funds from Democratic-led states",
+          "source": "guardian",
+          "publishedAt": "2025-12-02T22:54:06.000Z",
+          "url": "https://www.theguardian.com/us-news/2025/dec/02/trump-snap-benefits-threat-democratic-states"
+        },
+        {
+          "articleId": 66031,
+          "title": "‘A win-win for farmers’: how flooding fields in north-west England could boost crops",
+          "source": "guardian",
+          "publishedAt": "2025-05-02T05:00:58.000Z",
+          "url": "https://www.theguardian.com/environment/2025/may/02/win-win-farmers-how-rewetting-peatland-boost-crops-cut-co2"
+        },
+        {
+          "articleId": 59951,
+          "title": "Scientists dismayed as UK ministers clear way for gene editing of crops - but not animals",
+          "source": "guardian",
+          "publishedAt": "2024-11-02T13:49:07.000Z",
+          "url": "https://www.theguardian.com/science/2024/nov/02/scientists-dismayed-as-uk-ministers-clear-way-for-gene-editing-of-crops-but-not-animals"
+        },
+        {
+          "articleId": 59017,
+          "title": "‘VCs need their money back’: why sustainable startups struggle to fix our broken food system",
+          "source": "guardian",
+          "publishedAt": "2024-10-04T14:00:05.000Z",
+          "url": "https://www.theguardian.com/environment/2024/oct/04/sustainable-food-brands"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "works": []
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "guardian",
+          "sourceQuality": 0.9,
+          "curatedItemCount": 0,
+          "recentArticleCount": 5,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 5,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2025-12-05T06:00:42.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "sourceClasses": [
+        "guardian"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Over a pint in Oxford, we may have stumbled upon the holy grail of agriculture | George Monbiot",
+          "articleId": 73161,
+          "source": "guardian",
+          "publishedAt": "2025-12-05T06:00:42.000Z",
+          "url": "https://www.theguardian.com/commentisfree/2025/dec/05/agriculture-revolution-soil-farming-earth-rover-program"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Trump officials threaten to withhold Snap funds from Democratic-led states",
+          "articleId": 73117,
+          "source": "guardian",
+          "publishedAt": "2025-12-02T22:54:06.000Z",
+          "url": "https://www.theguardian.com/us-news/2025/dec/02/trump-snap-benefits-threat-democratic-states"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "‘A win-win for farmers’: how flooding fields in north-west England could boost crops",
+          "articleId": 66031,
+          "source": "guardian",
+          "publishedAt": "2025-05-02T05:00:58.000Z",
+          "url": "https://www.theguardian.com/environment/2025/may/02/win-win-farmers-how-rewetting-peatland-boost-crops-cut-co2"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Scientists dismayed as UK ministers clear way for gene editing of crops - but not animals",
+          "articleId": 59951,
+          "source": "guardian",
+          "publishedAt": "2024-11-02T13:49:07.000Z",
+          "url": "https://www.theguardian.com/science/2024/nov/02/scientists-dismayed-as-uk-ministers-clear-way-for-gene-editing-of-crops-but-not-animals"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "‘VCs need their money back’: why sustainable startups struggle to fix our broken food system",
+          "articleId": 59017,
+          "source": "guardian",
+          "publishedAt": "2024-10-04T14:00:05.000Z",
+          "url": "https://www.theguardian.com/environment/2024/oct/04/sustainable-food-brands"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "environment-general",
+      "selectedTheme": {
+        "theme": "food-agriculture",
+        "label": "Food Agriculture",
+        "lastSharePct": 0,
+        "deltaSharePct": 0,
+        "averageSharePct": 0,
+        "rank": 4
+      },
+      "peerThemes": [
+        {
+          "theme": "climate-change",
+          "label": "Climate Change",
+          "lastSharePct": 60,
+          "deltaSharePct": 60,
+          "rank": 1
+        },
+        {
+          "theme": "clean-energy",
+          "label": "Clean Energy",
+          "lastSharePct": 20,
+          "deltaSharePct": 20,
+          "rank": 2
+        },
+        {
+          "theme": "resource-scarcity",
+          "label": "Resource Scarcity",
+          "lastSharePct": 20,
+          "deltaSharePct": 20,
+          "rank": 3
+        },
+        {
+          "theme": "food-agriculture",
+          "label": "Food Agriculture",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 4
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Food Agriculture relative share",
+          "parentTheme": "environment-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connector-pending",
+      "entities": [],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "pending",
+          "note": "Entity linkage for Food Agriculture will populate once exposure connectors are enabled."
+        },
+        {
+          "relationType": "supplier",
+          "status": "pending",
+          "note": "The current foundation only tracks theme objects. Environment exposure mapping is scheduled after SEC and OpenAlex."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Food Agriculture connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "Recent curated coverage is thin, so the theme may be structurally important without having strong current confirmation in the latest digest window.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Food / Agriculture keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Food Agriculture holds or expands its 0% share inside Environment General.",
+      "Look for new evidence classes beyond news, especially filings, research, patents, or code activity as those connectors come online."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "food-agriculture",
+        "environment-general",
+        "environment"
+      ],
+      "exportTitle": "Food / Agriculture Week Theme Brief",
+      "promptSeed": "What changed in Food / Agriculture, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 2
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture week aggregate",
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Food Agriculture share movement inside Environment General",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 3
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ],
+      "claimCount": 1
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Over a pint in Oxford, we may have stumbled upon the holy grail of agriculture | George Monbiot",
+          "articleId": 73161,
+          "source": "guardian",
+          "publishedAt": "2025-12-05T06:00:42.000Z",
+          "url": "https://www.theguardian.com/commentisfree/2025/dec/05/agriculture-revolution-soil-farming-earth-rover-program"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Trump officials threaten to withhold Snap funds from Democratic-led states",
+          "articleId": 73117,
+          "source": "guardian",
+          "publishedAt": "2025-12-02T22:54:06.000Z",
+          "url": "https://www.theguardian.com/us-news/2025/dec/02/trump-snap-benefits-threat-democratic-states"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "‘A win-win for farmers’: how flooding fields in north-west England could boost crops",
+          "articleId": 66031,
+          "source": "guardian",
+          "publishedAt": "2025-05-02T05:00:58.000Z",
+          "url": "https://www.theguardian.com/environment/2025/may/02/win-win-farmers-how-rewetting-peatland-boost-crops-cut-co2"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Scientists dismayed as UK ministers clear way for gene editing of crops - but not animals",
+          "articleId": 59951,
+          "source": "guardian",
+          "publishedAt": "2024-11-02T13:49:07.000Z",
+          "url": "https://www.theguardian.com/science/2024/nov/02/scientists-dismayed-as-uk-ministers-clear-way-for-gene-editing-of-crops-but-not-animals"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "‘VCs need their money back’: why sustainable startups struggle to fix our broken food system",
+          "articleId": 59017,
+          "source": "guardian",
+          "publishedAt": "2024-10-04T14:00:05.000Z",
+          "url": "https://www.theguardian.com/environment/2024/oct/04/sustainable-food-brands"
+        }
+      ],
+      "sourceCount": 1
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Food Agriculture relative share",
+          "parentTheme": "environment-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "peerThemeCount": 4
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Food Agriculture connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ],
+      "entityCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Food Agriculture share baseline",
+          "parentTheme": "environment-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 3
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Food / Agriculture risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Food Agriculture share baseline",
+          "parentTheme": "environment-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Food / Agriculture watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "food-agriculture::week",
+    "theme": "food-agriculture",
+    "periodType": "week",
+    "label": "Food Agriculture",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:45.666Z",
+    "stale": false
+  }
+}

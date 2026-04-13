@@ -1,0 +1,3284 @@
+{
+  "theme": "quantum-computing",
+  "label": "Quantum Computing",
+  "category": "technology",
+  "categoryLabel": "Technology",
+  "parentTheme": "technology-general",
+  "periodType": "quarter",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 7,
+    "lifecycleStage": "emerging",
+    "vsPreviousPct": 100,
+    "vsYearAgoPct": 100,
+    "acceleration": 100,
+    "sourceDiversity": 0.9184,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing summary baseline",
+        "articleCount": 7,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 10
+      },
+      {
+        "key": "curated_digest",
+        "label": "Curated digest",
+        "description": "Ranked curated items linked to the theme.",
+        "sourceType": "digest",
+        "count": 4
+      },
+      {
+        "key": "openalex_research",
+        "label": "OpenAlex research",
+        "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+        "sourceType": "research",
+        "count": 8
+      },
+      {
+        "key": "github_code",
+        "label": "GitHub code",
+        "description": "Repositories linked to the theme through GitHub search and ranking.",
+        "sourceType": "code",
+        "count": 8
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "sec_filings",
+        "label": "SEC-backed entities",
+        "description": "Theme-to-entity links backed by SEC connector data.",
+        "sourceType": "filing",
+        "count": 8
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing quarter aggregate",
+        "articleCount": 7,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing share movement inside Technology General",
+        "sharePct": 9.09,
+        "deltaSharePct": -24.24
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "A cryptography engineer's perspective on quantum computing timelines",
+        "articleId": 79866,
+        "source": "hackernews",
+        "publishedAt": "2026-04-06T15:31:20.000Z"
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+        "articleId": 79707,
+        "source": "Google News: jobs",
+        "publishedAt": "2026-04-07T09:00:00.000Z"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing aggregate context",
+        "lifecycleStage": "emerging",
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing relative-share context",
+        "parentTheme": "technology-general",
+        "deltaSharePct": -24.24
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Logical quantum processor based on reconfigurable atom arrays",
+        "workId": "https://openalex.org/W4389373471",
+        "publishedAt": "2023-12-05T15:00:00.000Z",
+        "citedByCount": 941,
+        "researchSignalScore": 0,
+        "source": "Nature"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+        "workId": "https://openalex.org/W4387542025",
+        "publishedAt": "2023-10-10T15:00:00.000Z",
+        "citedByCount": 450,
+        "researchSignalScore": 0,
+        "source": "Nature"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "The future of quantum computing with superconducting qubits",
+        "workId": "https://openalex.org/W4307283983",
+        "publishedAt": "2022-10-25T15:00:00.000Z",
+        "citedByCount": 318,
+        "researchSignalScore": 0,
+        "source": "Journal of Applied Physics"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "sindresorhus/awesome",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+        "stars": 452904,
+        "forks": 34016,
+        "pushedAt": "2026-04-02T16:30:33.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/sindresorhus/awesome"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "vinta/awesome-python",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+        "stars": 291200,
+        "forks": 27602,
+        "pushedAt": "2026-04-07T03:34:03.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/vinta/awesome-python"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "xtekky/gpt4free",
+        "repoKey": "R_kgDOJQK9zA",
+        "stars": 65977,
+        "forks": 13626,
+        "pushedAt": "2026-04-07T15:35:03.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/xtekky/gpt4free"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing aggregate",
+        "articleCount": 7,
+        "lifecycleStage": "emerging"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+        "articleId": 79707,
+        "source": "Google News: jobs",
+        "publishedAt": "2026-04-07T09:00:00.000Z",
+        "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxPZXM3c3hfbktmLXU0TUtoWHEtdFJqY25MSENBQkNmc0xCMnNnVFhIRU5BcWM2NW1ZVlBndHZqSHU0aGVUeUd6SW1zUVVlQUhnZ0xZaVlpSTVOcHdsVUtfNjU3OHEtZHRWeEVla1FfRFlyekxhV3BEanZ4UmFvd0VFY0UyR2JBSGNwNjBuVVFlVktmV1NEakhyU1JCak9tdENXN0ZJeEJiR3gzcGM?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "A cryptography engineer's perspective on quantum computing timelines",
+        "articleId": 79866,
+        "source": "hackernews",
+        "publishedAt": "2026-04-06T15:31:20.000Z",
+        "url": "https://words.filippo.io/crqc-timeline/"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "The Augmentation Trap: AI Productivity and the Cost of Cognitive Offloading",
+        "articleId": 81760,
+        "source": "arxiv",
+        "publishedAt": "2026-04-03T22:50:32.000Z",
+        "url": "https://arxiv.org/abs/2604.03501v1"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "A High Motional Frequency Ion Trapping Regime for Quantum Information Science",
+        "articleId": 81920,
+        "source": "arxiv",
+        "publishedAt": "2026-04-03T20:19:30.000Z",
+        "url": "https://arxiv.org/abs/2604.03435v1"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Novel permanent magnet array geometries for scalable trapped-ion quantum computing in a laser-free entanglement architecture",
+        "articleId": 82221,
+        "source": "arxiv",
+        "publishedAt": "2026-04-03T15:40:36.000Z",
+        "url": "https://arxiv.org/abs/2604.03116v1"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "QBTS",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:12.754Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "IONQ",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:09.958Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "RGTI",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:11.419Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "IBM",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:07.950Z"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Realization of an Error-Correcting Surface Code with Superconducting Qubits",
+        "workId": "https://openalex.org/W4285029287",
+        "publishedAt": "2022-07-10T15:00:00.000Z",
+        "citedByCount": 307,
+        "researchSignalScore": 0,
+        "source": "Physical Review Letters"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Fusion-based quantum computation",
+        "workId": "https://openalex.org/W3122257190",
+        "publishedAt": "2023-02-16T15:00:00.000Z",
+        "citedByCount": 286,
+        "researchSignalScore": 0,
+        "source": "Nature Communications"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Quantum Machine Learning Revolution in Healthcare: A Systematic Review of Emerging Perspectives and Applications",
+        "workId": "https://openalex.org/W4390831829",
+        "publishedAt": "2023-12-31T15:00:00.000Z",
+        "citedByCount": 148,
+        "researchSignalScore": 0,
+        "source": "IEEE Access"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Low-overhead fault-tolerant quantum computing using long-range connectivity",
+        "workId": "https://openalex.org/W3205637696",
+        "publishedAt": "2022-05-19T15:00:00.000Z",
+        "citedByCount": 96,
+        "researchSignalScore": 0,
+        "source": "Science Advances"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Molecular nanomagnets: a viable path toward quantum information processing?",
+        "workId": "https://openalex.org/W4391533570",
+        "publishedAt": "2024-02-04T15:00:00.000Z",
+        "citedByCount": 72,
+        "researchSignalScore": 0,
+        "source": "Reports on Progress in Physics"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "fffaraz/awesome-cpp",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkyMTkzNTAzMQ==",
+        "stars": 70697,
+        "forks": 8259,
+        "pushedAt": "2026-04-06T04:47:06.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/fffaraz/awesome-cpp"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "Developer-Y/cs-video-courses",
+        "repoKey": "MDEwOlJlcG9zaXRvcnk3MTU4MzYwMg==",
+        "stars": 79718,
+        "forks": 10975,
+        "pushedAt": "2026-03-27T17:43:39.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/Developer-Y/cs-video-courses"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "nextlevelbuilder/ui-ux-pro-max-skill",
+        "repoKey": "R_kgDOQfttOw",
+        "stars": 60676,
+        "forks": 6034,
+        "pushedAt": "2026-04-03T05:08:19.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "ruvnet/RuView",
+        "repoKey": "R_kgDOO3hF2A",
+        "stars": 46001,
+        "forks": 6209,
+        "pushedAt": "2026-04-07T18:25:25.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/ruvnet/RuView"
+      },
+      {
+        "type": "github_code",
+        "evidenceClass": "github_code",
+        "sourceType": "code",
+        "label": "prakhar1989/awesome-courses",
+        "repoKey": "MDEwOlJlcG9zaXRvcnkyNjY4OTU5OA==",
+        "stars": 67522,
+        "forks": 8335,
+        "pushedAt": "2023-05-04T12:49:34.000Z",
+        "source": "GitHub",
+        "url": "https://github.com/prakhar1989/awesome-courses"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing relative share",
+        "parentTheme": "technology-general",
+        "sharePct": 9.09,
+        "deltaSharePct": -24.24
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing risk baseline",
+        "articleCount": 7,
+        "lifecycleStage": "emerging",
+        "sourceDiversity": 0.9184,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Quantum Computing share baseline",
+        "parentTheme": "technology-general",
+        "sharePct": 9.09,
+        "deltaSharePct": -24.24
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Quantum Computing watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Quantum Computing changed lifecycle stage",
+        "detail": "Quantum Computing moved from declining to emerging in the current quarter lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing quarter aggregate",
+            "articleCount": 7,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Quantum Computing logged 7 items, +100% versus the prior quarter and +100% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing quarter aggregate",
+            "articleCount": 7,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Quantum Computing is showing positive acceleration of 100 in the current quarter comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing quarter aggregate",
+            "articleCount": 7,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Quantum Computing now represents 9.09% of Technology General coverage, a -24.24 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing share movement inside Technology General",
+            "sharePct": 9.09,
+            "deltaSharePct": -24.24
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "2 curated items mapped to Quantum Computing in the recent digest window.",
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "A cryptography engineer's perspective on quantum computing timelines",
+            "articleId": 79866,
+            "source": "hackernews",
+            "publishedAt": "2026-04-06T15:31:20.000Z"
+          },
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+            "articleId": 79707,
+            "source": "Google News: jobs",
+            "publishedAt": "2026-04-07T09:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Quantum Computing matters because it is emerging with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "openalex_research",
+            "label": "OpenAlex research",
+            "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+            "sourceType": "research",
+            "count": 0
+          },
+          {
+            "key": "github_code",
+            "label": "GitHub code",
+            "description": "Repositories linked to the theme through GitHub search and ranking.",
+            "sourceType": "code",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing aggregate context",
+            "lifecycleStage": "emerging",
+            "vsYearAgoPct": 100,
+            "acceleration": 100
+          },
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing relative-share context",
+            "parentTheme": "technology-general",
+            "deltaSharePct": -24.24
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Logical quantum processor based on reconfigurable atom arrays",
+            "workId": "https://openalex.org/W4389373471",
+            "publishedAt": "2023-12-05T15:00:00.000Z",
+            "citedByCount": 941,
+            "researchSignalScore": 0,
+            "source": "Nature"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+            "workId": "https://openalex.org/W4387542025",
+            "publishedAt": "2023-10-10T15:00:00.000Z",
+            "citedByCount": 450,
+            "researchSignalScore": 0,
+            "source": "Nature"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "The future of quantum computing with superconducting qubits",
+            "workId": "https://openalex.org/W4307283983",
+            "publishedAt": "2022-10-25T15:00:00.000Z",
+            "citedByCount": 318,
+            "researchSignalScore": 0,
+            "source": "Journal of Applied Physics"
+          },
+          {
+            "type": "github_code",
+            "evidenceClass": "github_code",
+            "sourceType": "code",
+            "label": "sindresorhus/awesome",
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+            "stars": 452904,
+            "forks": 34016,
+            "pushedAt": "2026-04-02T16:30:33.000Z",
+            "source": "GitHub",
+            "url": "https://github.com/sindresorhus/awesome"
+          },
+          {
+            "type": "github_code",
+            "evidenceClass": "github_code",
+            "sourceType": "code",
+            "label": "vinta/awesome-python",
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+            "stars": 291200,
+            "forks": 27602,
+            "pushedAt": "2026-04-07T03:34:03.000Z",
+            "source": "GitHub",
+            "url": "https://github.com/vinta/awesome-python"
+          },
+          {
+            "type": "github_code",
+            "evidenceClass": "github_code",
+            "sourceType": "code",
+            "label": "xtekky/gpt4free",
+            "repoKey": "R_kgDOJQK9zA",
+            "stars": 65977,
+            "forks": 13626,
+            "pushedAt": "2026-04-07T15:35:03.000Z",
+            "source": "GitHub",
+            "url": "https://github.com/xtekky/gpt4free"
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Quantum Computing share movement",
+        "detail": "Quantum Computing is ranked #5 inside Technology General with 9.09% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 8
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing relative share",
+            "parentTheme": "technology-general",
+            "sharePct": 9.09,
+            "deltaSharePct": -24.24
+          }
+        ]
+      },
+      {
+        "section": "relatedEntities",
+        "claimType": "entity_exposure",
+        "title": "Theme-to-entity linkage",
+        "detail": "4 entity links are attached to this theme.",
+        "evidenceClasses": [
+          {
+            "key": "sec_filings",
+            "label": "SEC-backed entities",
+            "description": "Theme-to-entity links backed by SEC connector data.",
+            "sourceType": "filing",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "sec_connector",
+            "entityKey": "QBTS",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:12.754Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "IONQ",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:09.958Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "RGTI",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:11.419Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "IBM",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:07.950Z"
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Quantum Computing changed lifecycle stage",
+        "detail": "Quantum Computing moved from declining to emerging in the current quarter lens.",
+        "metric": {
+          "from": "declining",
+          "to": "emerging"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing quarter aggregate",
+            "articleCount": 7,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Quantum Computing logged 7 items, +100% versus the prior quarter and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 7,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing quarter aggregate",
+            "articleCount": 7,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Quantum Computing is showing positive acceleration of 100 in the current quarter comparison.",
+        "metric": {
+          "acceleration": 100,
+          "sourceDiversity": 0.9184
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing quarter aggregate",
+            "articleCount": 7,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Quantum Computing now represents 9.09% of Technology General coverage, a -24.24 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 9.09,
+          "deltaSharePct": -24.24
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Quantum Computing share movement inside Technology General",
+            "sharePct": 9.09,
+            "deltaSharePct": -24.24
+          }
+        ]
+      },
+      {
+        "type": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "2 curated items mapped to Quantum Computing in the recent digest window.",
+        "metric": {
+          "curatedItems": 2
+        },
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "A cryptography engineer's perspective on quantum computing timelines",
+            "articleId": 79866,
+            "source": "hackernews",
+            "publishedAt": "2026-04-06T15:31:20.000Z"
+          },
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+            "articleId": 79707,
+            "source": "Google News: jobs",
+            "publishedAt": "2026-04-07T09:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Quantum Computing matters because it is emerging with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Quantum Computing matters because it is emerging with positive year-on-year movement and still building acceleration.",
+        "Quantum Computing is not just moving in isolation. It is shifting relative share inside Technology General, which makes it a structural signal rather than a single headline burst.",
+        "Quantum Computing is also reinforced by 8 OpenAlex-linked research works, including 5 from the last three publication years, which suggests the theme has live research momentum and not just media attention.",
+        "The research lane clusters around Quantum computer, Computer science, Quantum, which sharpens the evidence base behind the theme beyond general news coverage.",
+        "Quantum Computing is also supported by 8 GitHub repositories with 7 active pushes in the last 90 days, which points to live builder traction instead of media-only narrative strength.",
+        "Code activity clusters around Python, Rust, which helps frame where the implementation layer is concentrating."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing relative-share context",
+          "parentTheme": "technology-general",
+          "deltaSharePct": -24.24
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Logical quantum processor based on reconfigurable atom arrays",
+          "workId": "https://openalex.org/W4389373471",
+          "publishedAt": "2023-12-05T15:00:00.000Z",
+          "citedByCount": 941,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+          "workId": "https://openalex.org/W4387542025",
+          "publishedAt": "2023-10-10T15:00:00.000Z",
+          "citedByCount": 450,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The future of quantum computing with superconducting qubits",
+          "workId": "https://openalex.org/W4307283983",
+          "publishedAt": "2022-10-25T15:00:00.000Z",
+          "citedByCount": 318,
+          "researchSignalScore": 0,
+          "source": "Journal of Applied Physics"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sindresorhus/awesome",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+          "stars": 452904,
+          "forks": 34016,
+          "pushedAt": "2026-04-02T16:30:33.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sindresorhus/awesome"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "vinta/awesome-python",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+          "stars": 291200,
+          "forks": 27602,
+          "pushedAt": "2026-04-07T03:34:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/vinta/awesome-python"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "xtekky/gpt4free",
+          "repoKey": "R_kgDOJQK9zA",
+          "stars": 65977,
+          "forks": 13626,
+          "pushedAt": "2026-04-07T15:35:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/xtekky/gpt4free"
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 7,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "acceleration": 100,
+        "sourceDiversity": 0.9184,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [
+        {
+          "title": "A cryptography engineer's perspective on quantum computing timelines",
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z",
+          "whyItMatters": "Quantum Computing is cooling 60% versus the prior week.",
+          "oneLineSummary": "Hacker News score 530 | comments 230 | author thadt | hn_id 47662234",
+          "relatedTopics": []
+        },
+        {
+          "title": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z",
+          "whyItMatters": "Quantum Computing is cooling 60% versus the prior week.",
+          "oneLineSummary": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "relatedTopics": []
+        }
+      ],
+      "recentArticles": [
+        {
+          "articleId": 79707,
+          "title": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxPZXM3c3hfbktmLXU0TUtoWHEtdFJqY25MSENBQkNmc0xCMnNnVFhIRU5BcWM2NW1ZVlBndHZqSHU0aGVUeUd6SW1zUVVlQUhnZ0xZaVlpSTVOcHdsVUtfNjU3OHEtZHRWeEVla1FfRFlyekxhV3BEanZ4UmFvd0VFY0UyR2JBSGNwNjBuVVFlVktmV1NEakhyU1JCak9tdENXN0ZJeEJiR3gzcGM?oc=5"
+        },
+        {
+          "articleId": 79866,
+          "title": "A cryptography engineer's perspective on quantum computing timelines",
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z",
+          "url": "https://words.filippo.io/crqc-timeline/"
+        },
+        {
+          "articleId": 81760,
+          "title": "The Augmentation Trap: AI Productivity and the Cost of Cognitive Offloading",
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T22:50:32.000Z",
+          "url": "https://arxiv.org/abs/2604.03501v1"
+        },
+        {
+          "articleId": 81920,
+          "title": "A High Motional Frequency Ion Trapping Regime for Quantum Information Science",
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T20:19:30.000Z",
+          "url": "https://arxiv.org/abs/2604.03435v1"
+        },
+        {
+          "articleId": 82221,
+          "title": "Novel permanent magnet array geometries for scalable trapped-ion quantum computing in a laser-free entanglement architecture",
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T15:40:36.000Z",
+          "url": "https://arxiv.org/abs/2604.03116v1"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connected",
+        "summary": {
+          "workCount": 8,
+          "recentCount": 5,
+          "totalCitations": 2618,
+          "avgResearchSignalScore": 0,
+          "topConcepts": [
+            "Quantum computer",
+            "Computer science",
+            "Quantum",
+            "Atom (system on chip)",
+            "Parallel computing"
+          ]
+        },
+        "works": [
+          {
+            "workId": "https://openalex.org/W4389373471",
+            "title": "Logical quantum processor based on reconfigurable atom arrays",
+            "publicationYear": 2023,
+            "publicationDate": "2023-12-05T15:00:00.000Z",
+            "citedByCount": 941,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit",
+              "quantum processor",
+              "quantum error correction"
+            ],
+            "sourceDisplayName": "Nature",
+            "primaryTopic": "Quantum Computing Algorithms and Architecture",
+            "landingPageUrl": "https://doi.org/10.1038/s41586-023-06927-3",
+            "abstractSummary": "Suppressing errors is the central challenge for useful quantum computing<sup>1</sup>, requiring quantum error correction (QEC)<sup>2-6</sup> for large-scale processing. However, the overhead in the realization of error-corrected 'logical' qubits, in which information is encoded across many physical qubits for redundan…",
+            "concepts": [
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum",
+                "score": 0
+              },
+              {
+                "displayName": "Atom (system on chip)",
+                "score": 0
+              },
+              {
+                "displayName": "Parallel computing",
+                "score": 0
+              },
+              {
+                "displayName": "Computer architecture",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Dolev Bluvstein",
+              "Simon J. Evered",
+              "Alexandra A. Geim",
+              "Sophie H. Li"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4387542025",
+            "title": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+            "publicationYear": 2023,
+            "publicationDate": "2023-10-10T15:00:00.000Z",
+            "citedByCount": 450,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit",
+              "quantum error correction"
+            ],
+            "sourceDisplayName": "Nature",
+            "primaryTopic": "Quantum Information and Cryptography",
+            "landingPageUrl": "https://doi.org/10.1038/s41586-023-06481-y",
+            "abstractSummary": "The ability to perform entangling quantum operations with low error rates in a scalable fashion is a central element of useful quantum information processing<sup>1</sup>. Neutral-atom arrays have recently emerged as a promising quantum computing platform, featuring coherent control over hundreds of qubits<sup>2,3</sup…",
+            "concepts": [
+              {
+                "displayName": "Qubit",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Scalability",
+                "score": 0
+              },
+              {
+                "displayName": "Rydberg atom",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum gate",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Simon J. Evered",
+              "Dolev Bluvstein",
+              "M. W. Kalinowski",
+              "Sepehr Ebadi"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4307283983",
+            "title": "The future of quantum computing with superconducting qubits",
+            "publicationYear": 2022,
+            "publicationDate": "2022-10-25T15:00:00.000Z",
+            "citedByCount": 318,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit",
+              "quantum error correction",
+              "quantum algorithm"
+            ],
+            "sourceDisplayName": "Journal of Applied Physics",
+            "primaryTopic": "Quantum Computing Algorithms and Architecture",
+            "landingPageUrl": "https://doi.org/10.1063/5.0082975",
+            "abstractSummary": "For the first time in history, we are seeing a branching point in computing paradigms with the emergence of quantum processing units (QPUs). Extracting the full potential of computation and realizing quantum algorithms with a super-polynomial speedup will most likely require major advances in quantum error correction…",
+            "concepts": [
+              {
+                "displayName": "Superconducting quantum computing",
+                "score": 0
+              },
+              {
+                "displayName": "Qubit",
+                "score": 0
+              },
+              {
+                "displayName": "Superconductivity",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Physics",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Sergey Bravyi",
+              "Oliver Dial",
+              "Jay Gambetta",
+              "Darı́o Gil"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4285029287",
+            "title": "Realization of an Error-Correcting Surface Code with Superconducting Qubits",
+            "publicationYear": 2022,
+            "publicationDate": "2022-07-10T15:00:00.000Z",
+            "citedByCount": 307,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit",
+              "quantum processor",
+              "quantum error correction"
+            ],
+            "sourceDisplayName": "Physical Review Letters",
+            "primaryTopic": "Quantum Computing Algorithms and Architecture",
+            "landingPageUrl": "https://doi.org/10.1103/physrevlett.129.030501",
+            "abstractSummary": "Quantum error correction is a critical technique for transitioning from noisy intermediate-scale quantum devices to fully fledged quantum computers. The surface code, which has a high threshold error rate, is the leading quantum error correction code for two-dimensional grid architecture. So far, the repeated error co…",
+            "concepts": [
+              {
+                "displayName": "Realization (probability)",
+                "score": 0
+              },
+              {
+                "displayName": "Qubit",
+                "score": 0
+              },
+              {
+                "displayName": "Superconductivity",
+                "score": 0
+              },
+              {
+                "displayName": "Code (set theory)",
+                "score": 0
+              },
+              {
+                "displayName": "Physics",
+                "score": 0
+              },
+              {
+                "displayName": "Surface (topology)",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Youwei Zhao",
+              "Yangsen Ye",
+              "He-Liang Huang",
+              "Yiming Zhang"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3122257190",
+            "title": "Fusion-based quantum computation",
+            "publicationYear": 2023,
+            "publicationDate": "2023-02-16T15:00:00.000Z",
+            "citedByCount": 286,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit",
+              "quantum error correction"
+            ],
+            "sourceDisplayName": "Nature Communications",
+            "primaryTopic": "Quantum Information and Cryptography",
+            "landingPageUrl": "https://doi.org/10.1038/s41467-023-36493-1",
+            "abstractSummary": "The standard primitives of quantum computing include deterministic unitary entangling gates, which are not natural operations in many systems including photonics. Here, we present fusion-based quantum computation, a model for fault tolerant quantum computing constructed from physical primitives readily accessible in p…",
+            "concepts": [
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Photonics",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum network",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum error correction",
+                "score": 0
+              },
+              {
+                "displayName": "Probabilistic logic",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Sara Bartolucci",
+              "Patrick M. Birchall",
+              "Hector Bombín",
+              "Hugo Cable"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4390831829",
+            "title": "Quantum Machine Learning Revolution in Healthcare: A Systematic Review of Emerging Perspectives and Applications",
+            "publicationYear": 2024,
+            "publicationDate": "2023-12-31T15:00:00.000Z",
+            "citedByCount": 148,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit"
+            ],
+            "sourceDisplayName": "IEEE Access",
+            "primaryTopic": "Quantum Computing Algorithms and Architecture",
+            "landingPageUrl": "https://doi.org/10.1109/access.2024.3353461",
+            "abstractSummary": "Quantum computing (QC) stands apart from traditional computing systems by employing revolutionary techniques for processing information. It leverages the power of quantum bits (qubits) and harnesses the unique properties exhibited by subatomic particles, such as superposition, entanglement, and interference. These qua…",
+            "concepts": [
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Qubit",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Scalability",
+                "score": 0
+              },
+              {
+                "displayName": "Health care",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum entanglement",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Ubaid Ullah",
+              "Begonya García-Zapirain"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3205637696",
+            "title": "Low-overhead fault-tolerant quantum computing using long-range connectivity",
+            "publicationYear": 2022,
+            "publicationDate": "2022-05-19T15:00:00.000Z",
+            "citedByCount": 96,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "quantum computing",
+              "qubit",
+              "quantum error correction"
+            ],
+            "sourceDisplayName": "Science Advances",
+            "primaryTopic": "Quantum Computing Algorithms and Architecture",
+            "landingPageUrl": "https://doi.org/10.1126/sciadv.abn1717",
+            "abstractSummary": "Vast numbers of qubits will be needed for large-scale quantum computing because of the overheads associated with error correction. We present a scheme for low-overhead fault-tolerant quantum computation based on quantum low-density parity-check (LDPC) codes, where long-range interactions enable many logical qubits to…",
+            "concepts": [
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Qubit",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Low-density parity-check code",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum error correction",
+                "score": 0
+              },
+              {
+                "displayName": "Overhead (engineering)",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Lawrence Z. Cohen",
+              "Isaac H. Kim",
+              "Stephen D. Bartlett",
+              "Benjamin J. Brown"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4391533570",
+            "title": "Molecular nanomagnets: a viable path toward quantum information processing?",
+            "publicationYear": 2024,
+            "publicationDate": "2024-02-04T15:00:00.000Z",
+            "citedByCount": 72,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "qubit",
+              "quantum error correction"
+            ],
+            "sourceDisplayName": "Reports on Progress in Physics",
+            "primaryTopic": "Magnetism in coordination complexes",
+            "landingPageUrl": "https://doi.org/10.1088/1361-6633/ad1f81",
+            "abstractSummary": "Molecular nanomagnets (MNMs), molecules containing interacting spins, have been a playground for quantum mechanics. They are characterized by many accessible low-energy levels that can be exploited to store and process quantum information. This naturally opens the possibility of using them as qudits, thus enlarging th…",
+            "concepts": [
+              {
+                "displayName": "Qubit",
+                "score": 0
+              },
+              {
+                "displayName": "Physics",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum computer",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum information",
+                "score": 0
+              },
+              {
+                "displayName": "Quantum",
+                "score": 0
+              },
+              {
+                "displayName": "Coherence (philosophical gambling strategy)",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Alessandro Chiesa",
+              "P. Santini",
+              "Elena Garlatti",
+              "Fernando Luis"
+            ]
+          }
+        ]
+      },
+      "githubEvidence": {
+        "status": "connected",
+        "summary": {
+          "repoCount": 8,
+          "totalStars": 1134695,
+          "recentPushedCount": 7,
+          "avgGithubSignalScore": 4.78,
+          "topLanguages": [
+            "Python",
+            "Rust"
+          ]
+        },
+        "repos": [
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+            "fullName": "sindresorhus/awesome",
+            "name": "awesome",
+            "htmlUrl": "https://github.com/sindresorhus/awesome",
+            "homepageUrl": "",
+            "description": "😎 Awesome lists about all kinds of interesting topics",
+            "language": "",
+            "topics": [
+              "awesome",
+              "awesome-list",
+              "lists",
+              "resources",
+              "unicorns"
+            ],
+            "stargazersCount": 452904,
+            "forksCount": 34016,
+            "watchersCount": 452904,
+            "openIssuesCount": 60,
+            "defaultBranch": "main",
+            "licenseName": "CC0-1.0",
+            "pushedAt": "2026-04-02T16:30:33.000Z",
+            "updatedAt": "2026-04-07T21:21:07.352Z",
+            "githubSignalScore": 5.41,
+            "matchedKeywords": [],
+            "ownerLogin": "sindresorhus"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+            "fullName": "vinta/awesome-python",
+            "name": "awesome-python",
+            "htmlUrl": "https://github.com/vinta/awesome-python",
+            "homepageUrl": "https://awesome-python.com/",
+            "description": "An opinionated list of Python frameworks, libraries, tools, and resources",
+            "language": "Python",
+            "topics": [
+              "awesome",
+              "collections",
+              "python",
+              "python-frameworks",
+              "python-libraries",
+              "python-tools"
+            ],
+            "stargazersCount": 291200,
+            "forksCount": 27602,
+            "watchersCount": 291200,
+            "openIssuesCount": 18,
+            "defaultBranch": "master",
+            "licenseName": "NOASSERTION",
+            "pushedAt": "2026-04-07T03:34:03.000Z",
+            "updatedAt": "2026-04-07T21:21:07.663Z",
+            "githubSignalScore": 5.35,
+            "matchedKeywords": [],
+            "ownerLogin": "vinta"
+          },
+          {
+            "repoKey": "R_kgDOJQK9zA",
+            "fullName": "xtekky/gpt4free",
+            "name": "gpt4free",
+            "htmlUrl": "https://github.com/xtekky/gpt4free",
+            "homepageUrl": "https://t.me/g4f_channel",
+            "description": "The official gpt4free repository | various collection of powerful language models | opus 4.6 gpt 5.3 kimi 2.5 deepseek v3.2 gemini 3",
+            "language": "Python",
+            "topics": [
+              "chatbot",
+              "chatbots",
+              "chatgpt",
+              "chatgpt-4",
+              "chatgpt-api",
+              "chatgpt-free"
+            ],
+            "stargazersCount": 65977,
+            "forksCount": 13626,
+            "watchersCount": 65977,
+            "openIssuesCount": 3,
+            "defaultBranch": "main",
+            "licenseName": "GPL-3.0",
+            "pushedAt": "2026-04-07T15:35:03.000Z",
+            "updatedAt": "2026-04-07T21:21:07.703Z",
+            "githubSignalScore": 5.05,
+            "matchedKeywords": [],
+            "ownerLogin": "xtekky"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyMTkzNTAzMQ==",
+            "fullName": "fffaraz/awesome-cpp",
+            "name": "awesome-cpp",
+            "htmlUrl": "https://github.com/fffaraz/awesome-cpp",
+            "homepageUrl": "http://fffaraz.github.io/awesome-cpp/",
+            "description": "A curated list of awesome C++ (or C) frameworks, libraries, resources, and shiny things. Inspired by awesome-... stuff.",
+            "language": "",
+            "topics": [
+              "awesome",
+              "awesome-list",
+              "c",
+              "c-plus-plus",
+              "cpp",
+              "cpp-library"
+            ],
+            "stargazersCount": 70697,
+            "forksCount": 8259,
+            "watchersCount": 70697,
+            "openIssuesCount": 307,
+            "defaultBranch": "master",
+            "licenseName": "MIT",
+            "pushedAt": "2026-04-06T04:47:06.000Z",
+            "updatedAt": "2026-04-07T21:21:07.952Z",
+            "githubSignalScore": 5.02,
+            "matchedKeywords": [],
+            "ownerLogin": "fffaraz"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnk3MTU4MzYwMg==",
+            "fullName": "Developer-Y/cs-video-courses",
+            "name": "cs-video-courses",
+            "htmlUrl": "https://github.com/Developer-Y/cs-video-courses",
+            "homepageUrl": "",
+            "description": "List of Computer Science courses with video lectures.",
+            "language": "",
+            "topics": [
+              "algorithms",
+              "bioinformatics",
+              "computational-biology",
+              "computational-physics",
+              "computer-architecture",
+              "computer-science"
+            ],
+            "stargazersCount": 79718,
+            "forksCount": 10975,
+            "watchersCount": 79718,
+            "openIssuesCount": 6,
+            "defaultBranch": "master",
+            "licenseName": "",
+            "pushedAt": "2026-03-27T17:43:39.000Z",
+            "updatedAt": "2026-04-07T21:21:07.994Z",
+            "githubSignalScore": 4.99,
+            "matchedKeywords": [],
+            "ownerLogin": "Developer-Y"
+          },
+          {
+            "repoKey": "R_kgDOQfttOw",
+            "fullName": "nextlevelbuilder/ui-ux-pro-max-skill",
+            "name": "ui-ux-pro-max-skill",
+            "htmlUrl": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+            "homepageUrl": "https://www.uupm.cc/",
+            "description": "An AI SKILL that provide design intelligence for building professional UI/UX multiple platforms",
+            "language": "Python",
+            "topics": [
+              "ai-skills",
+              "antigravity",
+              "claude",
+              "claude-code",
+              "codex",
+              "command-line"
+            ],
+            "stargazersCount": 60676,
+            "forksCount": 6034,
+            "watchersCount": 60676,
+            "openIssuesCount": 80,
+            "defaultBranch": "main",
+            "licenseName": "MIT",
+            "pushedAt": "2026-04-03T05:08:19.000Z",
+            "updatedAt": "2026-04-07T21:21:08.259Z",
+            "githubSignalScore": 4.95,
+            "matchedKeywords": [],
+            "ownerLogin": "nextlevelbuilder"
+          },
+          {
+            "repoKey": "R_kgDOO3hF2A",
+            "fullName": "ruvnet/RuView",
+            "name": "RuView",
+            "htmlUrl": "https://github.com/ruvnet/RuView",
+            "homepageUrl": "https://Cognitum.One",
+            "description": "π RuView: WiFi DensePose turns commodity WiFi signals into real-time human pose estimation, vital sign monitoring, and presence detection — all without a single pixel of video.",
+            "language": "Rust",
+            "topics": [
+              "agentic-ai",
+              "densepose",
+              "esp32",
+              "firmware",
+              "mcu",
+              "mincut"
+            ],
+            "stargazersCount": 46001,
+            "forksCount": 6209,
+            "watchersCount": 46001,
+            "openIssuesCount": 47,
+            "defaultBranch": "main",
+            "licenseName": "MIT",
+            "pushedAt": "2026-04-07T18:25:25.000Z",
+            "updatedAt": "2026-04-07T21:21:08.305Z",
+            "githubSignalScore": 4.93,
+            "matchedKeywords": [],
+            "ownerLogin": "ruvnet"
+          },
+          {
+            "repoKey": "MDEwOlJlcG9zaXRvcnkyNjY4OTU5OA==",
+            "fullName": "prakhar1989/awesome-courses",
+            "name": "awesome-courses",
+            "htmlUrl": "https://github.com/prakhar1989/awesome-courses",
+            "homepageUrl": "",
+            "description": ":books: List of awesome university courses for learning Computer Science!",
+            "language": "",
+            "topics": [
+              "awesome",
+              "awesome-list",
+              "computer-science",
+              "courses"
+            ],
+            "stargazersCount": 67522,
+            "forksCount": 8335,
+            "watchersCount": 67522,
+            "openIssuesCount": 60,
+            "defaultBranch": "master",
+            "licenseName": "",
+            "pushedAt": "2023-05-04T12:49:34.000Z",
+            "updatedAt": "2026-04-07T21:21:08.636Z",
+            "githubSignalScore": 2.52,
+            "matchedKeywords": [],
+            "ownerLogin": "prakhar1989"
+          }
+        ]
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "github",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 0,
+          "codeCount": 8,
+          "totalCount": 8,
+          "evidenceClasses": [
+            "github_code"
+          ],
+          "latestPublishedAt": "2026-04-07T18:25:25.000Z"
+        },
+        {
+          "source": "arxiv",
+          "sourceQuality": 0.92,
+          "curatedItemCount": 0,
+          "recentArticleCount": 3,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 3,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-03T22:50:32.000Z"
+        },
+        {
+          "source": "hackernews",
+          "sourceQuality": 0.78,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-06T15:31:20.000Z"
+        },
+        {
+          "source": "google news: jobs",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-07T09:00:00.000Z"
+        },
+        {
+          "source": "nature",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 2,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-12-05T15:00:00.000Z"
+        },
+        {
+          "source": "journal of applied physics",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2022-10-25T15:00:00.000Z"
+        },
+        {
+          "source": "physical review letters",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2022-07-10T15:00:00.000Z"
+        },
+        {
+          "source": "nature communications",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-02-16T15:00:00.000Z"
+        },
+        {
+          "source": "ieee access",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-12-31T15:00:00.000Z"
+        },
+        {
+          "source": "science advances",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2022-05-19T15:00:00.000Z"
+        },
+        {
+          "source": "reports on progress in physics",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2024-02-04T15:00:00.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 8
+        }
+      ],
+      "sourceClasses": [
+        "github",
+        "arxiv",
+        "hackernews",
+        "google news: jobs",
+        "nature",
+        "journal of applied physics",
+        "physical review letters",
+        "nature communications",
+        "ieee access",
+        "science advances",
+        "reports on progress in physics"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing aggregate",
+          "articleCount": 7,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "articleId": 79866,
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "articleId": 79707,
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "articleId": 79707,
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxPZXM3c3hfbktmLXU0TUtoWHEtdFJqY25MSENBQkNmc0xCMnNnVFhIRU5BcWM2NW1ZVlBndHZqSHU0aGVUeUd6SW1zUVVlQUhnZ0xZaVlpSTVOcHdsVUtfNjU3OHEtZHRWeEVla1FfRFlyekxhV3BEanZ4UmFvd0VFY0UyR2JBSGNwNjBuVVFlVktmV1NEakhyU1JCak9tdENXN0ZJeEJiR3gzcGM?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "articleId": 79866,
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z",
+          "url": "https://words.filippo.io/crqc-timeline/"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "The Augmentation Trap: AI Productivity and the Cost of Cognitive Offloading",
+          "articleId": 81760,
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T22:50:32.000Z",
+          "url": "https://arxiv.org/abs/2604.03501v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "A High Motional Frequency Ion Trapping Regime for Quantum Information Science",
+          "articleId": 81920,
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T20:19:30.000Z",
+          "url": "https://arxiv.org/abs/2604.03435v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Novel permanent magnet array geometries for scalable trapped-ion quantum computing in a laser-free entanglement architecture",
+          "articleId": 82221,
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T15:40:36.000Z",
+          "url": "https://arxiv.org/abs/2604.03116v1"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "QBTS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:12.754Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IONQ",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:09.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "RGTI",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:11.419Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IBM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:07.950Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Logical quantum processor based on reconfigurable atom arrays",
+          "workId": "https://openalex.org/W4389373471",
+          "publishedAt": "2023-12-05T15:00:00.000Z",
+          "citedByCount": 941,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+          "workId": "https://openalex.org/W4387542025",
+          "publishedAt": "2023-10-10T15:00:00.000Z",
+          "citedByCount": 450,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The future of quantum computing with superconducting qubits",
+          "workId": "https://openalex.org/W4307283983",
+          "publishedAt": "2022-10-25T15:00:00.000Z",
+          "citedByCount": 318,
+          "researchSignalScore": 0,
+          "source": "Journal of Applied Physics"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Realization of an Error-Correcting Surface Code with Superconducting Qubits",
+          "workId": "https://openalex.org/W4285029287",
+          "publishedAt": "2022-07-10T15:00:00.000Z",
+          "citedByCount": 307,
+          "researchSignalScore": 0,
+          "source": "Physical Review Letters"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Fusion-based quantum computation",
+          "workId": "https://openalex.org/W3122257190",
+          "publishedAt": "2023-02-16T15:00:00.000Z",
+          "citedByCount": 286,
+          "researchSignalScore": 0,
+          "source": "Nature Communications"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Quantum Machine Learning Revolution in Healthcare: A Systematic Review of Emerging Perspectives and Applications",
+          "workId": "https://openalex.org/W4390831829",
+          "publishedAt": "2023-12-31T15:00:00.000Z",
+          "citedByCount": 148,
+          "researchSignalScore": 0,
+          "source": "IEEE Access"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Low-overhead fault-tolerant quantum computing using long-range connectivity",
+          "workId": "https://openalex.org/W3205637696",
+          "publishedAt": "2022-05-19T15:00:00.000Z",
+          "citedByCount": 96,
+          "researchSignalScore": 0,
+          "source": "Science Advances"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Molecular nanomagnets: a viable path toward quantum information processing?",
+          "workId": "https://openalex.org/W4391533570",
+          "publishedAt": "2024-02-04T15:00:00.000Z",
+          "citedByCount": 72,
+          "researchSignalScore": 0,
+          "source": "Reports on Progress in Physics"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sindresorhus/awesome",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+          "stars": 452904,
+          "forks": 34016,
+          "pushedAt": "2026-04-02T16:30:33.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sindresorhus/awesome"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "vinta/awesome-python",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+          "stars": 291200,
+          "forks": 27602,
+          "pushedAt": "2026-04-07T03:34:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/vinta/awesome-python"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "xtekky/gpt4free",
+          "repoKey": "R_kgDOJQK9zA",
+          "stars": 65977,
+          "forks": 13626,
+          "pushedAt": "2026-04-07T15:35:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/xtekky/gpt4free"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "fffaraz/awesome-cpp",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTkzNTAzMQ==",
+          "stars": 70697,
+          "forks": 8259,
+          "pushedAt": "2026-04-06T04:47:06.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/fffaraz/awesome-cpp"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Developer-Y/cs-video-courses",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk3MTU4MzYwMg==",
+          "stars": 79718,
+          "forks": 10975,
+          "pushedAt": "2026-03-27T17:43:39.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Developer-Y/cs-video-courses"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "nextlevelbuilder/ui-ux-pro-max-skill",
+          "repoKey": "R_kgDOQfttOw",
+          "stars": 60676,
+          "forks": 6034,
+          "pushedAt": "2026-04-03T05:08:19.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ruvnet/RuView",
+          "repoKey": "R_kgDOO3hF2A",
+          "stars": 46001,
+          "forks": 6209,
+          "pushedAt": "2026-04-07T18:25:25.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ruvnet/RuView"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "prakhar1989/awesome-courses",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjY4OTU5OA==",
+          "stars": 67522,
+          "forks": 8335,
+          "pushedAt": "2023-05-04T12:49:34.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/prakhar1989/awesome-courses"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "technology-general",
+      "selectedTheme": {
+        "theme": "quantum-computing",
+        "label": "Quantum Computing",
+        "lastSharePct": 9.09,
+        "deltaSharePct": -24.24,
+        "averageSharePct": 6.31,
+        "rank": 5
+      },
+      "peerThemes": [
+        {
+          "theme": "cloud-infrastructure",
+          "label": "Cloud Infrastructure",
+          "lastSharePct": 45.45,
+          "deltaSharePct": 45.45,
+          "rank": 1
+        },
+        {
+          "theme": "robotics-automation",
+          "label": "Robotics Automation",
+          "lastSharePct": 18.18,
+          "deltaSharePct": 18.18,
+          "rank": 2
+        },
+        {
+          "theme": "ai-ml",
+          "label": "Ai Ml",
+          "lastSharePct": 18.18,
+          "deltaSharePct": -15.15,
+          "rank": 3
+        },
+        {
+          "theme": "autonomous-mobility",
+          "label": "Autonomous Mobility",
+          "lastSharePct": 9.09,
+          "deltaSharePct": 9.09,
+          "rank": 4
+        },
+        {
+          "theme": "quantum-computing",
+          "label": "Quantum Computing",
+          "lastSharePct": 9.09,
+          "deltaSharePct": -24.24,
+          "rank": 5
+        },
+        {
+          "theme": "cybersecurity",
+          "label": "Cybersecurity",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 6
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 9.09,
+          "deltaSharePct": -24.24
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connected",
+      "entities": [
+        {
+          "entityType": "company",
+          "entityKey": "QBTS",
+          "ticker": "QBTS",
+          "companyName": "D-WAVE QUANTUM INC.",
+          "cik": "0001907982",
+          "sectorHint": "Services-Computer Processing & Data Preparation",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for QBTS.",
+          "filingCount": 25,
+          "latestFiledAt": "2026-02-25T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:12.754Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "IONQ",
+          "ticker": "IONQ",
+          "companyName": "IonQ, Inc.",
+          "cik": "0001824920",
+          "sectorHint": "Services-Computer Integrated Systems Design",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for IONQ.",
+          "filingCount": 25,
+          "latestFiledAt": "2026-03-24T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:09.958Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "RGTI",
+          "ticker": "RGTI",
+          "companyName": "RIGETTI COMPUTING, INC.",
+          "cik": "0001838359",
+          "sectorHint": "Services-Computer Programming Services",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for RGTI.",
+          "filingCount": 18,
+          "latestFiledAt": "2026-04-06T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:11.419Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "IBM",
+          "ticker": "IBM",
+          "companyName": "INTERNATIONAL BUSINESS MACHINES CORPORATION",
+          "cik": "0000051143",
+          "sectorHint": "Computer & office Equipment",
+          "relationType": "adopter",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for IBM.",
+          "filingCount": 17,
+          "latestFiledAt": "2026-03-02T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:07.950Z"
+        }
+      ],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "D-WAVE QUANTUM INC. is linked as beneficiary with confidence 0.82 and 25 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "IonQ, Inc. is linked as beneficiary with confidence 0.82 and 25 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "RIGETTI COMPUTING, INC. is linked as beneficiary with confidence 0.82 and 18 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "adopter",
+          "status": "positive",
+          "note": "INTERNATIONAL BUSINESS MACHINES CORPORATION is linked as adopter with confidence 0.82 and 17 filing-backed touchpoint(s)."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "QBTS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:12.754Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IONQ",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:09.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "RGTI",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:11.419Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IBM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:07.950Z"
+        }
+      ]
+    },
+    "risks": [
+      "Share inside Technology General is declining, which weakens the case for sustained relative momentum.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Quantum Computing keeps positive acceleration over the next quarter window.",
+      "Check if source diversity expands beyond 0.9184 and whether geographic spread broadens from 0.",
+      "Track whether Quantum Computing holds or expands its 9.09% share inside Technology General.",
+      "Watch whether research coverage for this theme stays above 8 tracked OpenAlex works and whether new papers broaden beyond Quantum computer / Computer science."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "quantum-computing",
+        "technology-general",
+        "technology"
+      ],
+      "exportTitle": "Quantum Computing Quarter Theme Brief",
+      "promptSeed": "What changed in Quantum Computing, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "Track policy catalysts and supplier exposure.",
+      "pinned": true,
+      "savedTags": [
+        "quantum-computing",
+        "watch"
+      ],
+      "shareToken": "bd74c9a10aae46a4a8f25ff599250f7d",
+      "shareUrl": "/api/theme-brief-shared/bd74c9a10aae46a4a8f25ff599250f7d",
+      "sharedAt": "2026-04-07T19:08:37.195Z",
+      "exportCount": 11,
+      "lastExportedAt": "2026-04-07T19:30:36.729Z",
+      "updatedAt": "2026-04-07T19:30:36.729Z"
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing quarter aggregate",
+          "articleCount": 7,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing share movement inside Technology General",
+          "sharePct": 9.09,
+          "deltaSharePct": -24.24
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "articleId": 79866,
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "articleId": 79707,
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z"
+        }
+      ],
+      "claimCount": 5
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing relative-share context",
+          "parentTheme": "technology-general",
+          "deltaSharePct": -24.24
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Logical quantum processor based on reconfigurable atom arrays",
+          "workId": "https://openalex.org/W4389373471",
+          "publishedAt": "2023-12-05T15:00:00.000Z",
+          "citedByCount": 941,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+          "workId": "https://openalex.org/W4387542025",
+          "publishedAt": "2023-10-10T15:00:00.000Z",
+          "citedByCount": 450,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The future of quantum computing with superconducting qubits",
+          "workId": "https://openalex.org/W4307283983",
+          "publishedAt": "2022-10-25T15:00:00.000Z",
+          "citedByCount": 318,
+          "researchSignalScore": 0,
+          "source": "Journal of Applied Physics"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sindresorhus/awesome",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+          "stars": 452904,
+          "forks": 34016,
+          "pushedAt": "2026-04-02T16:30:33.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sindresorhus/awesome"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "vinta/awesome-python",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+          "stars": 291200,
+          "forks": 27602,
+          "pushedAt": "2026-04-07T03:34:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/vinta/awesome-python"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "xtekky/gpt4free",
+          "repoKey": "R_kgDOJQK9zA",
+          "stars": 65977,
+          "forks": 13626,
+          "pushedAt": "2026-04-07T15:35:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/xtekky/gpt4free"
+        }
+      ],
+      "claimCount": 6
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        },
+        {
+          "key": "github_code",
+          "label": "GitHub code",
+          "description": "Repositories linked to the theme through GitHub search and ranking.",
+          "sourceType": "code",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing aggregate",
+          "articleCount": 7,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "articleId": 79866,
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "articleId": 79707,
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "articleId": 79707,
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxPZXM3c3hfbktmLXU0TUtoWHEtdFJqY25MSENBQkNmc0xCMnNnVFhIRU5BcWM2NW1ZVlBndHZqSHU0aGVUeUd6SW1zUVVlQUhnZ0xZaVlpSTVOcHdsVUtfNjU3OHEtZHRWeEVla1FfRFlyekxhV3BEanZ4UmFvd0VFY0UyR2JBSGNwNjBuVVFlVktmV1NEakhyU1JCak9tdENXN0ZJeEJiR3gzcGM?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "articleId": 79866,
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z",
+          "url": "https://words.filippo.io/crqc-timeline/"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "The Augmentation Trap: AI Productivity and the Cost of Cognitive Offloading",
+          "articleId": 81760,
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T22:50:32.000Z",
+          "url": "https://arxiv.org/abs/2604.03501v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "A High Motional Frequency Ion Trapping Regime for Quantum Information Science",
+          "articleId": 81920,
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T20:19:30.000Z",
+          "url": "https://arxiv.org/abs/2604.03435v1"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Novel permanent magnet array geometries for scalable trapped-ion quantum computing in a laser-free entanglement architecture",
+          "articleId": 82221,
+          "source": "arxiv",
+          "publishedAt": "2026-04-03T15:40:36.000Z",
+          "url": "https://arxiv.org/abs/2604.03116v1"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "QBTS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:12.754Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IONQ",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:09.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "RGTI",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:11.419Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IBM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:07.950Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Logical quantum processor based on reconfigurable atom arrays",
+          "workId": "https://openalex.org/W4389373471",
+          "publishedAt": "2023-12-05T15:00:00.000Z",
+          "citedByCount": 941,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "High-fidelity parallel entangling gates on a neutral-atom quantum computer",
+          "workId": "https://openalex.org/W4387542025",
+          "publishedAt": "2023-10-10T15:00:00.000Z",
+          "citedByCount": 450,
+          "researchSignalScore": 0,
+          "source": "Nature"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The future of quantum computing with superconducting qubits",
+          "workId": "https://openalex.org/W4307283983",
+          "publishedAt": "2022-10-25T15:00:00.000Z",
+          "citedByCount": 318,
+          "researchSignalScore": 0,
+          "source": "Journal of Applied Physics"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Realization of an Error-Correcting Surface Code with Superconducting Qubits",
+          "workId": "https://openalex.org/W4285029287",
+          "publishedAt": "2022-07-10T15:00:00.000Z",
+          "citedByCount": 307,
+          "researchSignalScore": 0,
+          "source": "Physical Review Letters"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Fusion-based quantum computation",
+          "workId": "https://openalex.org/W3122257190",
+          "publishedAt": "2023-02-16T15:00:00.000Z",
+          "citedByCount": 286,
+          "researchSignalScore": 0,
+          "source": "Nature Communications"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Quantum Machine Learning Revolution in Healthcare: A Systematic Review of Emerging Perspectives and Applications",
+          "workId": "https://openalex.org/W4390831829",
+          "publishedAt": "2023-12-31T15:00:00.000Z",
+          "citedByCount": 148,
+          "researchSignalScore": 0,
+          "source": "IEEE Access"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Low-overhead fault-tolerant quantum computing using long-range connectivity",
+          "workId": "https://openalex.org/W3205637696",
+          "publishedAt": "2022-05-19T15:00:00.000Z",
+          "citedByCount": 96,
+          "researchSignalScore": 0,
+          "source": "Science Advances"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Molecular nanomagnets: a viable path toward quantum information processing?",
+          "workId": "https://openalex.org/W4391533570",
+          "publishedAt": "2024-02-04T15:00:00.000Z",
+          "citedByCount": 72,
+          "researchSignalScore": 0,
+          "source": "Reports on Progress in Physics"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "sindresorhus/awesome",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTczNzQ2NQ==",
+          "stars": 452904,
+          "forks": 34016,
+          "pushedAt": "2026-04-02T16:30:33.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/sindresorhus/awesome"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "vinta/awesome-python",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTI4OTExMA==",
+          "stars": 291200,
+          "forks": 27602,
+          "pushedAt": "2026-04-07T03:34:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/vinta/awesome-python"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "xtekky/gpt4free",
+          "repoKey": "R_kgDOJQK9zA",
+          "stars": 65977,
+          "forks": 13626,
+          "pushedAt": "2026-04-07T15:35:03.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/xtekky/gpt4free"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "fffaraz/awesome-cpp",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyMTkzNTAzMQ==",
+          "stars": 70697,
+          "forks": 8259,
+          "pushedAt": "2026-04-06T04:47:06.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/fffaraz/awesome-cpp"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "Developer-Y/cs-video-courses",
+          "repoKey": "MDEwOlJlcG9zaXRvcnk3MTU4MzYwMg==",
+          "stars": 79718,
+          "forks": 10975,
+          "pushedAt": "2026-03-27T17:43:39.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/Developer-Y/cs-video-courses"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "nextlevelbuilder/ui-ux-pro-max-skill",
+          "repoKey": "R_kgDOQfttOw",
+          "stars": 60676,
+          "forks": 6034,
+          "pushedAt": "2026-04-03T05:08:19.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "ruvnet/RuView",
+          "repoKey": "R_kgDOO3hF2A",
+          "stars": 46001,
+          "forks": 6209,
+          "pushedAt": "2026-04-07T18:25:25.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/ruvnet/RuView"
+        },
+        {
+          "type": "github_code",
+          "evidenceClass": "github_code",
+          "sourceType": "code",
+          "label": "prakhar1989/awesome-courses",
+          "repoKey": "MDEwOlJlcG9zaXRvcnkyNjY4OTU5OA==",
+          "stars": 67522,
+          "forks": 8335,
+          "pushedAt": "2023-05-04T12:49:34.000Z",
+          "source": "GitHub",
+          "url": "https://github.com/prakhar1989/awesome-courses"
+        }
+      ],
+      "sourceCount": 11
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 9.09,
+          "deltaSharePct": -24.24
+        }
+      ],
+      "peerThemeCount": 6
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "QBTS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:12.754Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IONQ",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:09.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "RGTI",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:11.419Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "IBM",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:07.950Z"
+        }
+      ],
+      "entityCount": 4
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing risk baseline",
+          "articleCount": 7,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0.9184,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 9.09,
+          "deltaSharePct": -24.24
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "A cryptography engineer's perspective on quantum computing timelines",
+          "articleId": 79866,
+          "source": "hackernews",
+          "publishedAt": "2026-04-06T15:31:20.000Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Top Degrees That Lead to High-Paying Quantum Computing Jobs Right Now - Investopedia",
+          "articleId": 79707,
+          "source": "Google News: jobs",
+          "publishedAt": "2026-04-07T09:00:00.000Z"
+        }
+      ],
+      "claimCount": 2
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing risk baseline",
+          "articleCount": 7,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0.9184,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Quantum Computing share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 9.09,
+          "deltaSharePct": -24.24
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Quantum Computing watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "quantum-computing::quarter",
+    "theme": "quantum-computing",
+    "periodType": "quarter",
+    "label": "Quantum Computing",
+    "noteMarkdown": "Track policy catalysts and supplier exposure.",
+    "pinned": true,
+    "tags": [
+      "quantum-computing",
+      "watch"
+    ],
+    "shareToken": "bd74c9a10aae46a4a8f25ff599250f7d",
+    "sharedAt": "2026-04-07T19:08:37.195Z",
+    "shareUrl": "/api/theme-brief-shared/bd74c9a10aae46a4a8f25ff599250f7d",
+    "exportCount": 11,
+    "lastExportedAt": "2026-04-07T19:30:36.729Z",
+    "updatedAt": "2026-04-07T19:30:36.729Z",
+    "createdAt": "2026-04-07T19:08:37.736Z",
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:53:12.585Z",
+    "stale": false
+  }
+}

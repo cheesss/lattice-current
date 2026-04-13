@@ -1,0 +1,12 @@
+{
+  "totalCalls": 3,
+  "parseSuccess": 0,
+  "parseFail": 3,
+  "validationErrors": 0,
+  "avgConfidence": 0,
+  "parseSuccessRate": 0,
+  "lastCallAt": "2026-04-08T04:32:06.799Z",
+  "lastWarnings": [
+    "codex exec failed: Reading prompt from stdin..."
+  ]
+}

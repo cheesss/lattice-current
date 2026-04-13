@@ -6,7 +6,7 @@
  * pipeline can consume them downstream.
  *
  * Uses the same lazy pg.Pool singleton pattern as article-ingestor.ts.
- * NAS PostgreSQL: 192.168.0.76:5433, DB: lattice
+ * NAS PostgreSQL: 192.168.0.2:5433, DB: lattice
  */
 
 import { createLogger } from '@/utils/logger';

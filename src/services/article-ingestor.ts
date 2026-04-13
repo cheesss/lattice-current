@@ -5,7 +5,7 @@
  * auto-classifies themes via pgvector nearest-neighbor, and creates
  * pending_outcomes entries for auto-mapped symbols.
  *
- * NAS PostgreSQL: 192.168.0.76:5433, DB: lattice
+ * NAS PostgreSQL: 192.168.0.2:5433, DB: lattice
  */
 
 import type { PoolClient } from 'pg';

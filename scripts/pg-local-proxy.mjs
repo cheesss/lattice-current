@@ -2,8 +2,8 @@
 /**
  * pg-local-proxy.mjs — NAS PostgreSQL을 localhost로 프록시
  *
- * Codex sandbox가 외부 IP(192.168.0.76)를 차단하므로,
- * localhost:15433 → 192.168.0.76:5433 TCP 프록시를 실행합니다.
+ * Codex sandbox가 외부 IP(192.168.0.2)를 차단하므로,
+ * localhost:15433 → 192.168.0.2:5433 TCP 프록시를 실행합니다.
  *
  * Usage:
  *   node scripts/pg-local-proxy.mjs &          # 백그라운드 실행
@@ -15,7 +15,7 @@ import { loadOptionalEnvFile } from './_shared/nas-runtime.mjs';
 
 loadOptionalEnvFile();
 
-const REMOTE_HOST = process.env.PG_HOST || '192.168.0.76';
+const REMOTE_HOST = process.env.PG_HOST || '192.168.0.2';
 const REMOTE_PORT = Number(process.env.PG_PORT || 5433);
 const LOCAL_PORT = Number(process.env.PG_PROXY_PORT || 15433);
 

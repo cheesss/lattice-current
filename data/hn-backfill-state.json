@@ -1,0 +1,18 @@
+{
+  "source": "hackernews",
+  "stateVersion": 2,
+  "queryMode": "algolia",
+  "since": "2021-01-01",
+  "scoreMin": 20,
+  "hitsPerPage": 100,
+  "startedAt": "2026-04-08T15:17:32.904Z",
+  "completedAt": "2026-04-08T15:17:33.341Z",
+  "errorMessage": "",
+  "totalFetched": 0,
+  "totalInserted": 0,
+  "lastProcessedId": 0,
+  "lastProcessedPage": 10,
+  "resumeFromPage": 10,
+  "resumeReset": false,
+  "resumeReason": "continue"
+}

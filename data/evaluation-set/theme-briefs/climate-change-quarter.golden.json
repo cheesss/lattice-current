@@ -1,0 +1,95 @@
+{
+  "theme": "climate-change",
+  "periodType": "quarter",
+  "periodLabel": "rolling-quarter",
+  "reviewStatus": "gold",
+  "reviewedBy": "product-review",
+  "reviewedAt": "2026-04-08",
+  "sections": {
+    "whatChanged": [
+      {
+        "title": "Climate coverage remained mainstream but became more transmission-focused",
+        "detail": "Insurance, adaptation, and infrastructure language appeared alongside emissions and weather framing.",
+        "importance": "high"
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Climate becomes more decision-useful when the theme moves from abstract awareness into financing, insurance, infrastructure, and policy transmission.",
+      "statements": [
+        "Pure weather coverage is weaker than repeated evidence of pricing, regulation, and adaptation investment.",
+        "The theme should be treated as structural when multiple sectors inherit the consequences."
+      ]
+    },
+    "evidence": {
+      "requiredSourceClasses": [
+        "news",
+        "policy",
+        "industry"
+      ],
+      "requiredClaims": [
+        "The brief should cite non-weather transmission, such as insurance repricing or infrastructure adaptation.",
+        "At least one policy or institutional evidence lane should support the quarter."
+      ],
+      "provenanceExpectations": [
+        "Use aggregate theme movement for persistence and curated items for consequence framing."
+      ],
+      "notes": [
+        "Do not reduce climate to a weather digest."
+      ]
+    },
+    "subtopicMovement": [
+      {
+        "subtheme": "insurance and risk transfer",
+        "direction": "up",
+        "rationale": "Financial transmission signals are becoming more visible."
+      },
+      {
+        "subtheme": "adaptation infrastructure",
+        "direction": "up",
+        "rationale": "Infrastructure and resilience narratives make the theme more actionable."
+      }
+    ],
+    "relatedEntities": {
+      "pathways": [
+        {
+          "entity": "Munich Re",
+          "symbol": null,
+          "relationType": "risk-bearer",
+          "note": "Reinsurers often show whether climate risk is becoming operationally priced."
+        },
+        {
+          "entity": "NextEra Energy",
+          "symbol": "NEE",
+          "relationType": "beneficiary",
+          "note": "Transition and grid investment can create indirect exposure pathways."
+        }
+      ]
+    },
+    "risks": [
+      {
+        "title": "Storm headline bias",
+        "detail": "Disaster coverage can inflate urgency without proving structural transmission."
+      }
+    ],
+    "watchpoints": [
+      {
+        "horizon": "90d",
+        "trigger": "Insurance, grid, and policy evidence all remain active",
+        "implication": "Confidence rises that the theme is broadening beyond awareness into capital allocation."
+      }
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "climate-change",
+        "environment-general",
+        "transmission"
+      ],
+      "prompts": [
+        "Which climate subtheme is producing the clearest economic transmission signal this quarter?"
+      ]
+    }
+  },
+  "notes": [
+    "This file exists to keep climate briefs consequence-oriented rather than headline-oriented."
+  ]
+}

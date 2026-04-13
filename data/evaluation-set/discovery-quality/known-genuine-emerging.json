@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "evaluation-set-v0",
+  "reviewStatus": "gold",
+  "datasetType": "known-genuine-emerging",
+  "reviewedAt": "2026-04-08",
+  "items": [
+    {
+      "label": "silicon photonics for AI interconnect bottlenecks",
+      "expectedDisposition": "watch",
+      "expectedTheme": "optical-computing",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "Novelty is high, the signal crosses research and infrastructure coverage, and the topic is coherent with an existing canonical child theme."
+    },
+    {
+      "label": "robotics software stack consolidation for humanoid fleets",
+      "expectedDisposition": "watch",
+      "expectedTheme": "robotics-automation",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "The cluster points to commercialization and deployment depth inside an already viable parent theme rather than pure media noise."
+    },
+    {
+      "label": "grid-scale solid-state battery manufacturing pilots",
+      "expectedDisposition": "watch",
+      "expectedTheme": "materials-science",
+      "expectedParentTheme": "science-general",
+      "expectedCategory": "science",
+      "rationale": "The topic combines materials breakthroughs with early industrial pilots, which is exactly the kind of bridge signal the watch state should retain."
+    },
+    {
+      "label": "commercial quantum error-correction roadmaps",
+      "expectedDisposition": "watch",
+      "expectedTheme": "quantum-computing",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "Repeated mentions of fault tolerance and vendor roadmaps strengthen the theme beyond one-off qubit headline bursts."
+    },
+    {
+      "label": "satellite-based defense sensing constellations",
+      "expectedDisposition": "watch",
+      "expectedTheme": "space",
+      "expectedParentTheme": "technology-general",
+      "expectedCategory": "technology",
+      "rationale": "The signal has cross-domain backing from space infrastructure and defense procurement, and should not be suppressed as general geopolitics."
+    }
+  ]
+}

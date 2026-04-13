@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "evaluation-set-v0",
+  "reviewStatus": "gold",
+  "datasetType": "known-noise-clusters",
+  "reviewedAt": "2026-04-08",
+  "items": [
+    {
+      "label": "sports tournament burst",
+      "expectedDisposition": "suppressed",
+      "rationale": "Article volume can spike sharply, but the topic is outside the structural theme scope and does not deserve a watch slot."
+    },
+    {
+      "label": "local protest-only coverage spike",
+      "expectedDisposition": "suppressed",
+      "rationale": "The cluster is episodic, geographically narrow, and lacks durable policy, market, or technology implications."
+    },
+    {
+      "label": "celebrity lawsuit cascade",
+      "expectedDisposition": "suppressed",
+      "rationale": "This is high-attention entertainment coverage with no stable parent-theme fit for the product's thesis."
+    },
+    {
+      "label": "festival and concert announcement wave",
+      "expectedDisposition": "suppressed",
+      "rationale": "Coverage is bursty and seasonal, but not structurally useful for long-horizon theme monitoring."
+    },
+    {
+      "label": "single-day meme-stock social chatter",
+      "expectedDisposition": "suppressed",
+      "rationale": "The cluster may look financially relevant, but it is too tactical, too noisy, and too detached from the long-horizon product direction."
+    }
+  ]
+}

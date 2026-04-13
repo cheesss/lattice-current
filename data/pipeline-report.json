@@ -25,24 +25,52 @@
       "step": 6,
       "status": "ok",
       "stats": {
-        "articles": "60721",
+        "articles": "66220",
         "outcomes": "619495",
         "signals": [
+          {
+            "signal_name": "e2e_probe",
+            "n": "1"
+          },
+          {
+            "signal_name": "cot_treasury_10y",
+            "n": "274"
+          },
+          {
+            "signal_name": "ig_credit_spread",
+            "n": "1386"
+          },
           {
             "signal_name": "cot_sp500",
             "n": "274"
           },
           {
+            "signal_name": "fedFundsRate",
+            "n": "63"
+          },
+          {
             "signal_name": "gpr",
-            "n": "1743"
+            "n": "1754"
           },
           {
             "signal_name": "vix",
-            "n": "1346"
+            "n": "1359"
+          },
+          {
+            "signal_name": "bdi",
+            "n": "1330"
+          },
+          {
+            "signal_name": "cpiIndex",
+            "n": "61"
+          },
+          {
+            "signal_name": "tedSpread",
+            "n": "258"
           },
           {
             "signal_name": "hy_credit_spread",
-            "n": "1374"
+            "n": "1387"
           },
           {
             "signal_name": "eventIntensity",
@@ -65,8 +93,20 @@
             "n": "2473"
           },
           {
+            "signal_name": "unemployment",
+            "n": "62"
+          },
+          {
+            "signal_name": "dollarIndex",
+            "n": "1324"
+          },
+          {
             "signal_name": "transmissionStrength",
             "n": "2473"
+          },
+          {
+            "signal_name": "treasury10y",
+            "n": "1325"
           },
           {
             "signal_name": "cot_euro_fx",
@@ -74,66 +114,142 @@
           },
           {
             "signal_name": "yieldSpread",
-            "n": "1313"
+            "n": "1325"
           },
           {
-            "signal_name": "ted_spread",
-            "n": "258"
-          },
-          {
-            "signal_name": "e2e_probe",
-            "n": "1"
-          },
-          {
-            "signal_name": "cot_treasury_10y",
-            "n": "274"
-          },
-          {
-            "signal_name": "ig_credit_spread",
-            "n": "1373"
+            "signal_name": "oilPrice",
+            "n": "1308"
           }
         ],
-        "sensitivity": "139",
+        "sensitivity": "1387",
         "conditions": [
           {
             "condition_type": "tone_sentiment",
-            "n": "312"
+            "n": "982"
           },
           {
             "condition_type": "goldstein_intensity",
-            "n": "165"
+            "n": "661"
           },
           {
             "condition_type": "positioning_extreme",
-            "n": "76"
+            "n": "218"
+          },
+          {
+            "condition_type": "signal_hy_credit_spread",
+            "n": "211"
+          },
+          {
+            "condition_type": "signal_ig_credit_spread",
+            "n": "205"
           },
           {
             "condition_type": "credit_regime",
-            "n": "75"
+            "n": "201"
+          },
+          {
+            "condition_type": "signal_transmissionStrength",
+            "n": "199"
+          },
+          {
+            "condition_type": "signal_vix",
+            "n": "197"
+          },
+          {
+            "condition_type": "signal_bdi",
+            "n": "196"
+          },
+          {
+            "condition_type": "signal_oilPrice",
+            "n": "194"
+          },
+          {
+            "condition_type": "signal_treasury10y",
+            "n": "191"
+          },
+          {
+            "condition_type": "signal_dollarIndex",
+            "n": "190"
+          },
+          {
+            "condition_type": "signal_yieldSpread",
+            "n": "189"
           },
           {
             "condition_type": "vix_momentum",
-            "n": "75"
+            "n": "178"
           },
           {
-            "condition_type": "signal_freshness",
-            "n": "30"
+            "condition_type": "signal_unemployment",
+            "n": "119"
+          },
+          {
+            "condition_type": "signal_fedFundsRate",
+            "n": "119"
+          },
+          {
+            "condition_type": "signal_cpiIndex",
+            "n": "117"
+          },
+          {
+            "condition_type": "signal_tedSpread",
+            "n": "116"
+          },
+          {
+            "condition_type": "signal_marketStress",
+            "n": "109"
           },
           {
             "condition_type": "stress_level",
-            "n": "30"
+            "n": "109"
+          },
+          {
+            "condition_type": "signal_freshness",
+            "n": "109"
+          },
+          {
+            "condition_type": "signal_eventIntensity",
+            "n": "77"
+          },
+          {
+            "condition_type": "signal_cot_euro_fx",
+            "n": "73"
+          },
+          {
+            "condition_type": "signal_cot_sp500",
+            "n": "71"
+          },
+          {
+            "condition_type": "signal_cot_gold",
+            "n": "70"
+          },
+          {
+            "condition_type": "signal_cot_oil",
+            "n": "70"
+          },
+          {
+            "condition_type": "signal_cot_treasury_10y",
+            "n": "67"
+          },
+          {
+            "condition_type": "signal_gpr",
+            "n": "53"
           }
         ],
         "proposals": [
           {
+            "status": "skipped",
+            "n": "29"
+          },
+          {
             "status": "executed",
-            "n": "5"
+            "n": "55"
           }
         ],
         "autoSymbols": "19"
       }
     }
   ],
-  "timestamp": "2026-04-05T23:49:42.536Z",
-  "elapsedSeconds": "228"
+  "timestamp": "2026-04-08T06:22:07.758Z",
+  "elapsedSeconds": "387"
 }

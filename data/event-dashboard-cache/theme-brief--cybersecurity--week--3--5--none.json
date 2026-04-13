@@ -1,0 +1,1142 @@
+{
+  "theme": "cybersecurity",
+  "label": "Cybersecurity",
+  "category": "technology",
+  "categoryLabel": "Technology",
+  "parentTheme": "technology-general",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 0,
+    "lifecycleStage": "nascent",
+    "vsPreviousPct": 0,
+    "vsYearAgoPct": 0,
+    "acceleration": 0,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity summary baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 10
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 2
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity week aggregate",
+        "articleCount": 0,
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity share movement inside Technology General",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity aggregate context",
+        "lifecycleStage": "nascent",
+        "vsYearAgoPct": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity aggregate",
+        "articleCount": 0,
+        "lifecycleStage": "nascent"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Zero Days: Electric Motorcycles Are a Security Nightmare",
+        "articleId": 81351,
+        "source": "hackernews",
+        "publishedAt": "2026-03-26T17:38:17.000Z",
+        "url": "https://persephonekarnstein.github.io/post/zero-days/"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Japan days away from running out of Asahi Super Dry due to cyber attack – reports",
+        "articleId": 71252,
+        "source": "guardian",
+        "publishedAt": "2025-10-03T04:03:32.000Z",
+        "url": "https://www.theguardian.com/world/2025/oct/03/asahi-super-dry-days-away-from-running-out-in-japan-due-to-cyber-attack"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Zero Day is a political thriller without a political position or even point",
+        "articleId": 63300,
+        "source": "guardian",
+        "publishedAt": "2025-02-25T09:08:35.000Z",
+        "url": "https://www.theguardian.com/tv-and-radio/2025/feb/25/zero-day-politics-netflix"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Zero Day review – De Niro’s cyberhacking thriller is an astonishing amount of fun",
+        "articleId": 63269,
+        "source": "guardian",
+        "publishedAt": "2025-02-20T05:00:31.000Z",
+        "url": "https://www.theguardian.com/tv-and-radio/2025/feb/20/zero-day-review-de-niro-trump"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Zero Day to A Thousand Blows: the seven best shows to stream this week",
+        "articleId": 63226,
+        "source": "guardian",
+        "publishedAt": "2025-02-14T07:00:03.000Z",
+        "url": "https://www.theguardian.com/tv-and-radio/2025/feb/14/zero-day-to-a-thousand-blows-the-seven-best-shows-to-stream-this-week"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity relative share",
+        "parentTheme": "technology-general",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Cybersecurity connector placeholder",
+        "detail": "Exposure connectors not yet populated for this theme."
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity risk baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "sourceDiversity": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Cybersecurity share baseline",
+        "parentTheme": "technology-general",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Cybersecurity watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Cybersecurity changed lifecycle stage",
+        "detail": "Cybersecurity moved from declining to nascent in the current week lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Cybersecurity logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Cybersecurity is showing positive acceleration of 0 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Cybersecurity now represents 0% of Technology General coverage, a +0 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity share movement inside Technology General",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Cybersecurity matters because it is nascent with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity aggregate context",
+            "lifecycleStage": "nascent",
+            "vsYearAgoPct": 0,
+            "acceleration": 0
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Cybersecurity share movement",
+        "detail": "Cybersecurity is ranked #6 inside Technology General with 0% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 8
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity relative share",
+            "parentTheme": "technology-general",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Cybersecurity changed lifecycle stage",
+        "detail": "Cybersecurity moved from declining to nascent in the current week lens.",
+        "metric": {
+          "from": "declining",
+          "to": "nascent"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Cybersecurity logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "metric": {
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Cybersecurity is showing positive acceleration of 0 in the current week comparison.",
+        "metric": {
+          "acceleration": 0,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Cybersecurity now represents 0% of Technology General coverage, a +0 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 0,
+          "deltaSharePct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Cybersecurity share movement inside Technology General",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Cybersecurity matters because it is nascent with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Cybersecurity matters because it is nascent with positive year-on-year movement and still building acceleration."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0,
+        "acceleration": 0,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [],
+      "recentArticles": [
+        {
+          "articleId": 81351,
+          "title": "Zero Days: Electric Motorcycles Are a Security Nightmare",
+          "source": "hackernews",
+          "publishedAt": "2026-03-26T17:38:17.000Z",
+          "url": "https://persephonekarnstein.github.io/post/zero-days/"
+        },
+        {
+          "articleId": 71252,
+          "title": "Japan days away from running out of Asahi Super Dry due to cyber attack – reports",
+          "source": "guardian",
+          "publishedAt": "2025-10-03T04:03:32.000Z",
+          "url": "https://www.theguardian.com/world/2025/oct/03/asahi-super-dry-days-away-from-running-out-in-japan-due-to-cyber-attack"
+        },
+        {
+          "articleId": 63300,
+          "title": "Zero Day is a political thriller without a political position or even point",
+          "source": "guardian",
+          "publishedAt": "2025-02-25T09:08:35.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/25/zero-day-politics-netflix"
+        },
+        {
+          "articleId": 63269,
+          "title": "Zero Day review – De Niro’s cyberhacking thriller is an astonishing amount of fun",
+          "source": "guardian",
+          "publishedAt": "2025-02-20T05:00:31.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/20/zero-day-review-de-niro-trump"
+        },
+        {
+          "articleId": 63226,
+          "title": "Zero Day to A Thousand Blows: the seven best shows to stream this week",
+          "source": "guardian",
+          "publishedAt": "2025-02-14T07:00:03.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/14/zero-day-to-a-thousand-blows-the-seven-best-shows-to-stream-this-week"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "works": []
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "guardian",
+          "sourceQuality": 0.9,
+          "curatedItemCount": 0,
+          "recentArticleCount": 4,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 4,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2025-10-03T04:03:32.000Z"
+        },
+        {
+          "source": "hackernews",
+          "sourceQuality": 0.78,
+          "curatedItemCount": 0,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-03-26T17:38:17.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "sourceClasses": [
+        "guardian",
+        "hackernews"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Days: Electric Motorcycles Are a Security Nightmare",
+          "articleId": 81351,
+          "source": "hackernews",
+          "publishedAt": "2026-03-26T17:38:17.000Z",
+          "url": "https://persephonekarnstein.github.io/post/zero-days/"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Japan days away from running out of Asahi Super Dry due to cyber attack – reports",
+          "articleId": 71252,
+          "source": "guardian",
+          "publishedAt": "2025-10-03T04:03:32.000Z",
+          "url": "https://www.theguardian.com/world/2025/oct/03/asahi-super-dry-days-away-from-running-out-in-japan-due-to-cyber-attack"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Day is a political thriller without a political position or even point",
+          "articleId": 63300,
+          "source": "guardian",
+          "publishedAt": "2025-02-25T09:08:35.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/25/zero-day-politics-netflix"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Day review – De Niro’s cyberhacking thriller is an astonishing amount of fun",
+          "articleId": 63269,
+          "source": "guardian",
+          "publishedAt": "2025-02-20T05:00:31.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/20/zero-day-review-de-niro-trump"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Day to A Thousand Blows: the seven best shows to stream this week",
+          "articleId": 63226,
+          "source": "guardian",
+          "publishedAt": "2025-02-14T07:00:03.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/14/zero-day-to-a-thousand-blows-the-seven-best-shows-to-stream-this-week"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "technology-general",
+      "selectedTheme": {
+        "theme": "cybersecurity",
+        "label": "Cybersecurity",
+        "lastSharePct": 0,
+        "deltaSharePct": 0,
+        "averageSharePct": 1.79,
+        "rank": 6
+      },
+      "peerThemes": [
+        {
+          "theme": "cloud-infrastructure",
+          "label": "Cloud Infrastructure",
+          "lastSharePct": 45.45,
+          "deltaSharePct": 45.45,
+          "rank": 1
+        },
+        {
+          "theme": "ai-ml",
+          "label": "Ai Ml",
+          "lastSharePct": 18.18,
+          "deltaSharePct": 18.18,
+          "rank": 2
+        },
+        {
+          "theme": "robotics-automation",
+          "label": "Robotics Automation",
+          "lastSharePct": 18.18,
+          "deltaSharePct": 18.18,
+          "rank": 3
+        },
+        {
+          "theme": "autonomous-mobility",
+          "label": "Autonomous Mobility",
+          "lastSharePct": 9.09,
+          "deltaSharePct": 9.09,
+          "rank": 4
+        },
+        {
+          "theme": "quantum-computing",
+          "label": "Quantum Computing",
+          "lastSharePct": 9.09,
+          "deltaSharePct": 9.09,
+          "rank": 5
+        },
+        {
+          "theme": "cybersecurity",
+          "label": "Cybersecurity",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 6
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connector-pending",
+      "entities": [],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "pending",
+          "note": "Entity linkage for Cybersecurity will populate once exposure connectors are enabled."
+        },
+        {
+          "relationType": "supplier",
+          "status": "pending",
+          "note": "The current foundation only tracks theme objects. Technology exposure mapping is scheduled after SEC and OpenAlex."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Cybersecurity connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "Recent curated coverage is thin, so the theme may be structurally important without having strong current confirmation in the latest digest window.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely.",
+      "Research-class evidence is still thin, so the theme may be running ahead of durable technical confirmation."
+    ],
+    "watchpoints": [
+      "Monitor whether Cybersecurity keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Cybersecurity holds or expands its 0% share inside Technology General.",
+      "Look for new evidence classes beyond news, especially filings, research, patents, or code activity as those connectors come online."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "cybersecurity",
+        "technology-general",
+        "technology"
+      ],
+      "exportTitle": "Cybersecurity Week Theme Brief",
+      "promptSeed": "What changed in Cybersecurity, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity week aggregate",
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity share movement inside Technology General",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 4
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ],
+      "claimCount": 1
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Days: Electric Motorcycles Are a Security Nightmare",
+          "articleId": 81351,
+          "source": "hackernews",
+          "publishedAt": "2026-03-26T17:38:17.000Z",
+          "url": "https://persephonekarnstein.github.io/post/zero-days/"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Japan days away from running out of Asahi Super Dry due to cyber attack – reports",
+          "articleId": 71252,
+          "source": "guardian",
+          "publishedAt": "2025-10-03T04:03:32.000Z",
+          "url": "https://www.theguardian.com/world/2025/oct/03/asahi-super-dry-days-away-from-running-out-in-japan-due-to-cyber-attack"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Day is a political thriller without a political position or even point",
+          "articleId": 63300,
+          "source": "guardian",
+          "publishedAt": "2025-02-25T09:08:35.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/25/zero-day-politics-netflix"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Day review – De Niro’s cyberhacking thriller is an astonishing amount of fun",
+          "articleId": 63269,
+          "source": "guardian",
+          "publishedAt": "2025-02-20T05:00:31.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/20/zero-day-review-de-niro-trump"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zero Day to A Thousand Blows: the seven best shows to stream this week",
+          "articleId": 63226,
+          "source": "guardian",
+          "publishedAt": "2025-02-14T07:00:03.000Z",
+          "url": "https://www.theguardian.com/tv-and-radio/2025/feb/14/zero-day-to-a-thousand-blows-the-seven-best-shows-to-stream-this-week"
+        }
+      ],
+      "sourceCount": 2
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity relative share",
+          "parentTheme": "technology-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "peerThemeCount": 6
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Cybersecurity connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ],
+      "entityCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 4
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Cybersecurity share baseline",
+          "parentTheme": "technology-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Cybersecurity watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "cybersecurity::week",
+    "theme": "cybersecurity",
+    "periodType": "week",
+    "label": "Cybersecurity",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:39.098Z",
+    "stale": false
+  }
+}

@@ -1,0 +1,2218 @@
+{
+  "theme": "biotech",
+  "label": "Biotech",
+  "category": "science",
+  "categoryLabel": "Science",
+  "parentTheme": "science-general",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 0,
+    "lifecycleStage": "nascent",
+    "vsPreviousPct": 0,
+    "vsYearAgoPct": 0,
+    "acceleration": 100,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Biotech summary baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "openalex_research",
+        "label": "OpenAlex research",
+        "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+        "sourceType": "research",
+        "count": 8
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "sec_filings",
+        "label": "SEC-backed entities",
+        "description": "Theme-to-entity links backed by SEC connector data.",
+        "sourceType": "filing",
+        "count": 8
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Biotech week aggregate",
+        "articleCount": 0,
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Biotech share movement inside Science General",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Biotech aggregate context",
+        "lifecycleStage": "nascent",
+        "vsYearAgoPct": 0,
+        "acceleration": 100
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Ferroptosis: mechanisms and links with diseases",
+        "workId": "https://openalex.org/W3127839532",
+        "publishedAt": "2021-02-02T15:00:00.000Z",
+        "citedByCount": 1362,
+        "researchSignalScore": 0,
+        "source": "Signal Transduction and Targeted Therapy"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+        "workId": "https://openalex.org/W4220837089",
+        "publishedAt": "2022-02-28T15:00:00.000Z",
+        "citedByCount": 1190,
+        "researchSignalScore": 0,
+        "source": "Clinical and Translational Medicine"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Nanomaterials for cancer therapy: current progress and perspectives",
+        "workId": "https://openalex.org/W3164577482",
+        "publishedAt": "2021-05-30T15:00:00.000Z",
+        "citedByCount": 1091,
+        "researchSignalScore": 0,
+        "source": "Journal of Hematology & Oncology"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Biotech aggregate",
+        "articleCount": 0,
+        "lifecycleStage": "nascent"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "A new gene therapy is giving people born deaf the chance to hear",
+        "articleId": 80170,
+        "source": "hackernews",
+        "publishedAt": "2026-04-04T17:35:40.000Z",
+        "url": "https://www.sciencedaily.com/releases/2026/04/260403044651.htm"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Embracing Bayesian methods in clinical trials",
+        "articleId": 82167,
+        "source": "hackernews",
+        "publishedAt": "2026-03-24T03:08:56.000Z",
+        "url": "https://jamanetwork.com/journals/jama/fullarticle/2847011"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Australian pregnancy drugs shortage sparks call to include pregnant women in clinical trials",
+        "articleId": 58157,
+        "source": "guardian",
+        "publishedAt": "2024-09-08T15:00:52.000Z",
+        "url": "https://www.theguardian.com/australia-news/article/2024/sep/09/pregnancy-drugs-shortage-pregnant-women-clinical-trials-supply-pathways-off-label-medications"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Elon Musk’s brain chip firm Neuralink lines up clinical trials in humans",
+        "articleId": 25880,
+        "source": "guardian",
+        "publishedAt": "2022-01-20T17:01:37.000Z",
+        "url": "https://www.theguardian.com/technology/2022/jan/20/elon-musk-brain-chip-firm-neuralink-lines-up-clinical-trials-in-humans"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Matt Hancock calls for more volunteers to take part in 'essential' clinical trials – as it happened",
+        "articleId": 4604,
+        "source": "guardian",
+        "publishedAt": "2020-04-03T17:25:11.000Z",
+        "url": "https://www.theguardian.com/politics/live/2020/apr/03/uk-coronavirus-live-emergency-nightingale-hospital-opens-today-matt-hancock-covid-19-latest-updates"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "MRNA",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:40.154Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "CRSP",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:44.910Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "REGN",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:43.532Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "VRTX",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:41.951Z"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "mRNA-based therapeutics: powerful and versatile tools to combat diseases",
+        "workId": "https://openalex.org/W4281254240",
+        "publishedAt": "2022-05-20T15:00:00.000Z",
+        "citedByCount": 684,
+        "researchSignalScore": 0,
+        "source": "Signal Transduction and Targeted Therapy"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Tumor biomarkers for diagnosis, prognosis and targeted therapy",
+        "workId": "https://openalex.org/W4397293886",
+        "publishedAt": "2024-05-19T15:00:00.000Z",
+        "citedByCount": 561,
+        "researchSignalScore": 0,
+        "source": "Signal Transduction and Targeted Therapy"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "The Limitless Future of RNA Therapeutics",
+        "workId": "https://openalex.org/W3137008460",
+        "publishedAt": "2021-03-17T15:00:00.000Z",
+        "citedByCount": 528,
+        "researchSignalScore": 0,
+        "source": "Frontiers in Bioengineering and Biotechnology"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "A CRISPR/Cas12a-empowered surface plasmon resonance platform for rapid and specific diagnosis of the Omicron variant of SARS-CoV-2",
+        "workId": "https://openalex.org/W4282004200",
+        "publishedAt": "2022-06-02T15:00:00.000Z",
+        "citedByCount": 461,
+        "researchSignalScore": 0,
+        "source": "National Science Review"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Current advance of nanotechnology in diagnosis and treatment for malignant tumors",
+        "workId": "https://openalex.org/W4401497204",
+        "publishedAt": "2024-08-11T15:00:00.000Z",
+        "citedByCount": 418,
+        "researchSignalScore": 0,
+        "source": "Signal Transduction and Targeted Therapy"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Biotech relative share",
+        "parentTheme": "science-general",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Biotech risk baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "sourceDiversity": 0,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Biotech share baseline",
+        "parentTheme": "science-general",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Biotech watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Biotech changed lifecycle stage",
+        "detail": "Biotech moved from emerging to nascent in the current week lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Biotech logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Biotech is showing positive acceleration of 100 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Biotech now represents 0% of Science General coverage, a +0 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Biotech share movement inside Science General",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Biotech matters because it is nascent with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "openalex_research",
+            "label": "OpenAlex research",
+            "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+            "sourceType": "research",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech aggregate context",
+            "lifecycleStage": "nascent",
+            "vsYearAgoPct": 0,
+            "acceleration": 100
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Ferroptosis: mechanisms and links with diseases",
+            "workId": "https://openalex.org/W3127839532",
+            "publishedAt": "2021-02-02T15:00:00.000Z",
+            "citedByCount": 1362,
+            "researchSignalScore": 0,
+            "source": "Signal Transduction and Targeted Therapy"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+            "workId": "https://openalex.org/W4220837089",
+            "publishedAt": "2022-02-28T15:00:00.000Z",
+            "citedByCount": 1190,
+            "researchSignalScore": 0,
+            "source": "Clinical and Translational Medicine"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Nanomaterials for cancer therapy: current progress and perspectives",
+            "workId": "https://openalex.org/W3164577482",
+            "publishedAt": "2021-05-30T15:00:00.000Z",
+            "citedByCount": 1091,
+            "researchSignalScore": 0,
+            "source": "Journal of Hematology & Oncology"
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Biotech share movement",
+        "detail": "Biotech is ranked #2 inside Science General with 0% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Biotech relative share",
+            "parentTheme": "science-general",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "section": "relatedEntities",
+        "claimType": "entity_exposure",
+        "title": "Theme-to-entity linkage",
+        "detail": "4 entity links are attached to this theme.",
+        "evidenceClasses": [
+          {
+            "key": "sec_filings",
+            "label": "SEC-backed entities",
+            "description": "Theme-to-entity links backed by SEC connector data.",
+            "sourceType": "filing",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "sec_connector",
+            "entityKey": "MRNA",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:40.154Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "CRSP",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:44.910Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "REGN",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:43.532Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "VRTX",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:41.951Z"
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Biotech changed lifecycle stage",
+        "detail": "Biotech moved from emerging to nascent in the current week lens.",
+        "metric": {
+          "from": "emerging",
+          "to": "nascent"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Biotech logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "metric": {
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Biotech is showing positive acceleration of 100 in the current week comparison.",
+        "metric": {
+          "acceleration": 100,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Biotech week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Biotech now represents 0% of Science General coverage, a +0 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 0,
+          "deltaSharePct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Biotech share movement inside Science General",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Biotech matters because it is nascent with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Biotech matters because it is nascent with positive year-on-year movement and still building acceleration.",
+        "Biotech is also reinforced by 8 OpenAlex-linked research works, including 2 from the last three publication years, which suggests the theme has live research momentum and not just media attention.",
+        "The research lane clusters around Programmed cell death, Autophagy, Apoptosis, which sharpens the evidence base behind the theme beyond general news coverage."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ferroptosis: mechanisms and links with diseases",
+          "workId": "https://openalex.org/W3127839532",
+          "publishedAt": "2021-02-02T15:00:00.000Z",
+          "citedByCount": 1362,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+          "workId": "https://openalex.org/W4220837089",
+          "publishedAt": "2022-02-28T15:00:00.000Z",
+          "citedByCount": 1190,
+          "researchSignalScore": 0,
+          "source": "Clinical and Translational Medicine"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nanomaterials for cancer therapy: current progress and perspectives",
+          "workId": "https://openalex.org/W3164577482",
+          "publishedAt": "2021-05-30T15:00:00.000Z",
+          "citedByCount": 1091,
+          "researchSignalScore": 0,
+          "source": "Journal of Hematology & Oncology"
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0,
+        "acceleration": 100,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [],
+      "recentArticles": [
+        {
+          "articleId": 80170,
+          "title": "A new gene therapy is giving people born deaf the chance to hear",
+          "source": "hackernews",
+          "publishedAt": "2026-04-04T17:35:40.000Z",
+          "url": "https://www.sciencedaily.com/releases/2026/04/260403044651.htm"
+        },
+        {
+          "articleId": 82167,
+          "title": "Embracing Bayesian methods in clinical trials",
+          "source": "hackernews",
+          "publishedAt": "2026-03-24T03:08:56.000Z",
+          "url": "https://jamanetwork.com/journals/jama/fullarticle/2847011"
+        },
+        {
+          "articleId": 58157,
+          "title": "Australian pregnancy drugs shortage sparks call to include pregnant women in clinical trials",
+          "source": "guardian",
+          "publishedAt": "2024-09-08T15:00:52.000Z",
+          "url": "https://www.theguardian.com/australia-news/article/2024/sep/09/pregnancy-drugs-shortage-pregnant-women-clinical-trials-supply-pathways-off-label-medications"
+        },
+        {
+          "articleId": 25880,
+          "title": "Elon Musk’s brain chip firm Neuralink lines up clinical trials in humans",
+          "source": "guardian",
+          "publishedAt": "2022-01-20T17:01:37.000Z",
+          "url": "https://www.theguardian.com/technology/2022/jan/20/elon-musk-brain-chip-firm-neuralink-lines-up-clinical-trials-in-humans"
+        },
+        {
+          "articleId": 4604,
+          "title": "Matt Hancock calls for more volunteers to take part in 'essential' clinical trials – as it happened",
+          "source": "guardian",
+          "publishedAt": "2020-04-03T17:25:11.000Z",
+          "url": "https://www.theguardian.com/politics/live/2020/apr/03/uk-coronavirus-live-emergency-nightingale-hospital-opens-today-matt-hancock-covid-19-latest-updates"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connected",
+        "summary": {
+          "workCount": 8,
+          "recentCount": 2,
+          "totalCitations": 6295,
+          "avgResearchSignalScore": 0,
+          "topConcepts": [
+            "Programmed cell death",
+            "Autophagy",
+            "Apoptosis",
+            "Lipid peroxidation",
+            "Deferoxamine"
+          ]
+        },
+        "works": [
+          {
+            "workId": "https://openalex.org/W3127839532",
+            "title": "Ferroptosis: mechanisms and links with diseases",
+            "publicationYear": 2021,
+            "publicationDate": "2021-02-02T15:00:00.000Z",
+            "citedByCount": 1362,
+            "researchSignalScore": 0,
+            "matchedKeywords": [],
+            "sourceDisplayName": "Signal Transduction and Targeted Therapy",
+            "primaryTopic": "Ferroptosis and cancer prognosis",
+            "landingPageUrl": "https://doi.org/10.1038/s41392-020-00428-9",
+            "abstractSummary": "Ferroptosis is an iron-dependent cell death, which is different from apoptosis, necrosis, autophagy, and other forms of cell death. The process of ferroptotic cell death is defined by the accumulation of lethal lipid species derived from the peroxidation of lipids, which can be prevented by iron chelators (e.g., defer…",
+            "concepts": [
+              {
+                "displayName": "Programmed cell death",
+                "score": 0
+              },
+              {
+                "displayName": "Autophagy",
+                "score": 0
+              },
+              {
+                "displayName": "Apoptosis",
+                "score": 0
+              },
+              {
+                "displayName": "Lipid peroxidation",
+                "score": 0
+              },
+              {
+                "displayName": "Deferoxamine",
+                "score": 0
+              },
+              {
+                "displayName": "Disease",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Hong-Fa Yan",
+              "Ting Zou",
+              "Qing‐zhang Tuo",
+              "Shuo Xu"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4220837089",
+            "title": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+            "publicationYear": 2022,
+            "publicationDate": "2022-02-28T15:00:00.000Z",
+            "citedByCount": 1190,
+            "researchSignalScore": 0,
+            "matchedKeywords": [],
+            "sourceDisplayName": "Clinical and Translational Medicine",
+            "primaryTopic": "Single-cell and spatial transcriptomics",
+            "landingPageUrl": "https://doi.org/10.1002/ctm2.694",
+            "abstractSummary": "Single-cell RNA sequencing (scRNA-seq) technology has become the state-of-the-art approach for unravelling the heterogeneity and complexity of RNA transcripts within individual cells, as well as revealing the composition of different cell types and functions within highly organized tissues/organs/organisms. Since its…",
+            "concepts": [
+              {
+                "displayName": "Computational biology",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Biology",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Dragomirka Jovic",
+              "Xue Liang",
+              "Hua Zeng",
+              "Lin Lin"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3164577482",
+            "title": "Nanomaterials for cancer therapy: current progress and perspectives",
+            "publicationYear": 2021,
+            "publicationDate": "2021-05-30T15:00:00.000Z",
+            "citedByCount": 1091,
+            "researchSignalScore": 0,
+            "matchedKeywords": [],
+            "sourceDisplayName": "Journal of Hematology & Oncology",
+            "primaryTopic": "Nanoparticle-Based Drug Delivery",
+            "landingPageUrl": "https://doi.org/10.1186/s13045-021-01096-0",
+            "abstractSummary": "Cancer is a disease with complex pathological process. Current chemotherapy faces problems such as lack of specificity, cytotoxicity, induction of multi-drug resistance and stem-like cells growth. Nanomaterials are materials in the nanorange 1-100 nm which possess unique optical, magnetic, and electrical properties. N…",
+            "concepts": [
+              {
+                "displayName": "Medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Cancer",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Drug delivery",
+                "score": 0
+              },
+              {
+                "displayName": "Pharmacology",
+                "score": 0
+              },
+              {
+                "displayName": "Cancer research",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Zhe Cheng",
+              "Maoyu Li",
+              "Raja Dey",
+              "Yongheng Chen"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4281254240",
+            "title": "mRNA-based therapeutics: powerful and versatile tools to combat diseases",
+            "publicationYear": 2022,
+            "publicationDate": "2022-05-20T15:00:00.000Z",
+            "citedByCount": 684,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "biotech",
+              "mrna"
+            ],
+            "sourceDisplayName": "Signal Transduction and Targeted Therapy",
+            "primaryTopic": "RNA Interference and Gene Delivery",
+            "landingPageUrl": "https://doi.org/10.1038/s41392-022-01007-w",
+            "abstractSummary": "The therapeutic use of messenger RNA (mRNA) has fueled great hope to combat a wide range of incurable diseases. Recent rapid advances in biotechnology and molecular medicine have enabled the production of almost any functional protein/peptide in the human body by introducing mRNA as a vaccine or therapeutic agent. Thi…",
+            "concepts": [
+              {
+                "displayName": "Computational biology",
+                "score": 0
+              },
+              {
+                "displayName": "Messenger RNA",
+                "score": 0
+              },
+              {
+                "displayName": "Immunogenicity",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Biology",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Shugang Qin",
+              "Xiaoshan Tang",
+              "Yuting Chen",
+              "Kepan Chen"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4397293886",
+            "title": "Tumor biomarkers for diagnosis, prognosis and targeted therapy",
+            "publicationYear": 2024,
+            "publicationDate": "2024-05-19T15:00:00.000Z",
+            "citedByCount": 561,
+            "researchSignalScore": 0,
+            "matchedKeywords": [],
+            "sourceDisplayName": "Signal Transduction and Targeted Therapy",
+            "primaryTopic": "Cancer Cells and Metastasis",
+            "landingPageUrl": "https://doi.org/10.1038/s41392-024-01823-2",
+            "abstractSummary": "Tumor biomarkers, the substances which are produced by tumors or the body's responses to tumors during tumorigenesis and progression, have been demonstrated to possess critical and encouraging value in screening and early diagnosis, prognosis prediction, recurrence detection, and therapeutic efficacy monitoring of can…",
+            "concepts": [
+              {
+                "displayName": "Biomarker discovery",
+                "score": 0
+              },
+              {
+                "displayName": "Biomarker",
+                "score": 0
+              },
+              {
+                "displayName": "Precision medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Personalized medicine",
+                "score": 0
+              },
+              {
+                "displayName": "Cancer",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Yue Zhou",
+              "Lei Tao",
+              "Jiahao Qiu",
+              "Jing Xu"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3137008460",
+            "title": "The Limitless Future of RNA Therapeutics",
+            "publicationYear": 2021,
+            "publicationDate": "2021-03-17T15:00:00.000Z",
+            "citedByCount": 528,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "biotech"
+            ],
+            "sourceDisplayName": "Frontiers in Bioengineering and Biotechnology",
+            "primaryTopic": "RNA Interference and Gene Delivery",
+            "landingPageUrl": "https://doi.org/10.3389/fbioe.2021.628137",
+            "abstractSummary": "Recent advances in the generation, purification and cellular delivery of RNA have enabled development of RNA-based therapeutics for a broad array of applications. RNA therapeutics comprise a rapidly expanding category of drugs that will change the standard of care for many diseases and actualize personalized medicine.…",
+            "concepts": [
+              {
+                "displayName": "RNA",
+                "score": 0
+              },
+              {
+                "displayName": "microRNA",
+                "score": 0
+              },
+              {
+                "displayName": "Aptamer",
+                "score": 0
+              },
+              {
+                "displayName": "Computational biology",
+                "score": 0
+              },
+              {
+                "displayName": "Small interfering RNA",
+                "score": 0
+              },
+              {
+                "displayName": "RNA interference",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Tulsi Ram Damase",
+              "Roman Sukhovershin",
+              "Christian Boada",
+              "Francesca Taraballi"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4282004200",
+            "title": "A CRISPR/Cas12a-empowered surface plasmon resonance platform for rapid and specific diagnosis of the Omicron variant of SARS-CoV-2",
+            "publicationYear": 2022,
+            "publicationDate": "2022-06-02T15:00:00.000Z",
+            "citedByCount": 461,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "crispr"
+            ],
+            "sourceDisplayName": "National Science Review",
+            "primaryTopic": "CRISPR and Genetic Engineering",
+            "landingPageUrl": "https://doi.org/10.1093/nsr/nwac104",
+            "abstractSummary": "The outbreak of the COVID-19 pandemic was partially due to the challenge of identifying asymptomatic and presymptomatic carriers of the virus, and thus highlights a strong motivation for diagnostics with high sensitivity that can be rapidly deployed. On the other hand, several concerning SARS-CoV-2 variants, including…",
+            "concepts": [
+              {
+                "displayName": "CRISPR",
+                "score": 0
+              },
+              {
+                "displayName": "Computational biology",
+                "score": 0
+              },
+              {
+                "displayName": "Severe acute respiratory syndrome coronavirus 2 (SARS-CoV-2)",
+                "score": 0
+              },
+              {
+                "displayName": "Coronavirus disease 2019 (COVID-19)",
+                "score": 0
+              },
+              {
+                "displayName": "Surface plasmon resonance",
+                "score": 0
+              },
+              {
+                "displayName": "Biology",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Zhi Chen",
+              "Jingfeng Li",
+              "Tianzhong Li",
+              "Taojian Fan"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4401497204",
+            "title": "Current advance of nanotechnology in diagnosis and treatment for malignant tumors",
+            "publicationYear": 2024,
+            "publicationDate": "2024-08-11T15:00:00.000Z",
+            "citedByCount": 418,
+            "researchSignalScore": 0,
+            "matchedKeywords": [],
+            "sourceDisplayName": "Signal Transduction and Targeted Therapy",
+            "primaryTopic": "Nanoplatforms for cancer theranostics",
+            "landingPageUrl": "https://doi.org/10.1038/s41392-024-01889-y",
+            "abstractSummary": "Cancer remains a significant risk to human health. Nanomedicine is a new multidisciplinary field that is garnering a lot of interest and investigation. Nanomedicine shows great potential for cancer diagnosis and treatment. Specifically engineered nanoparticles can be employed as contrast agents in cancer diagnostics t…",
+            "concepts": [
+              {
+                "displayName": "Nanomedicine",
+                "score": 0
+              },
+              {
+                "displayName": "Photothermal therapy",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Cancer",
+                "score": 0
+              },
+              {
+                "displayName": "Context (archaeology)",
+                "score": 0
+              },
+              {
+                "displayName": "Medicine",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Bilan Wang",
+              "Shiqi Hu",
+              "Yan Teng",
+              "Junli Chen"
+            ]
+          }
+        ]
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "signal transduction and targeted therapy",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 4,
+          "codeCount": 0,
+          "totalCount": 4,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2024-08-11T15:00:00.000Z"
+        },
+        {
+          "source": "guardian",
+          "sourceQuality": 0.9,
+          "curatedItemCount": 0,
+          "recentArticleCount": 3,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 3,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2024-09-08T15:00:52.000Z"
+        },
+        {
+          "source": "hackernews",
+          "sourceQuality": 0.78,
+          "curatedItemCount": 0,
+          "recentArticleCount": 2,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-04T17:35:40.000Z"
+        },
+        {
+          "source": "clinical and translational medicine",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2022-02-28T15:00:00.000Z"
+        },
+        {
+          "source": "journal of hematology & oncology",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2021-05-30T15:00:00.000Z"
+        },
+        {
+          "source": "frontiers in bioengineering and biotechnology",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2021-03-17T15:00:00.000Z"
+        },
+        {
+          "source": "national science review",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2022-06-02T15:00:00.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        }
+      ],
+      "sourceClasses": [
+        "signal transduction and targeted therapy",
+        "guardian",
+        "hackernews",
+        "clinical and translational medicine",
+        "journal of hematology & oncology",
+        "frontiers in bioengineering and biotechnology",
+        "national science review"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "A new gene therapy is giving people born deaf the chance to hear",
+          "articleId": 80170,
+          "source": "hackernews",
+          "publishedAt": "2026-04-04T17:35:40.000Z",
+          "url": "https://www.sciencedaily.com/releases/2026/04/260403044651.htm"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Embracing Bayesian methods in clinical trials",
+          "articleId": 82167,
+          "source": "hackernews",
+          "publishedAt": "2026-03-24T03:08:56.000Z",
+          "url": "https://jamanetwork.com/journals/jama/fullarticle/2847011"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Australian pregnancy drugs shortage sparks call to include pregnant women in clinical trials",
+          "articleId": 58157,
+          "source": "guardian",
+          "publishedAt": "2024-09-08T15:00:52.000Z",
+          "url": "https://www.theguardian.com/australia-news/article/2024/sep/09/pregnancy-drugs-shortage-pregnant-women-clinical-trials-supply-pathways-off-label-medications"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Elon Musk’s brain chip firm Neuralink lines up clinical trials in humans",
+          "articleId": 25880,
+          "source": "guardian",
+          "publishedAt": "2022-01-20T17:01:37.000Z",
+          "url": "https://www.theguardian.com/technology/2022/jan/20/elon-musk-brain-chip-firm-neuralink-lines-up-clinical-trials-in-humans"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Matt Hancock calls for more volunteers to take part in 'essential' clinical trials – as it happened",
+          "articleId": 4604,
+          "source": "guardian",
+          "publishedAt": "2020-04-03T17:25:11.000Z",
+          "url": "https://www.theguardian.com/politics/live/2020/apr/03/uk-coronavirus-live-emergency-nightingale-hospital-opens-today-matt-hancock-covid-19-latest-updates"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MRNA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:40.154Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "CRSP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:44.910Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "REGN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:43.532Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "VRTX",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:41.951Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ferroptosis: mechanisms and links with diseases",
+          "workId": "https://openalex.org/W3127839532",
+          "publishedAt": "2021-02-02T15:00:00.000Z",
+          "citedByCount": 1362,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+          "workId": "https://openalex.org/W4220837089",
+          "publishedAt": "2022-02-28T15:00:00.000Z",
+          "citedByCount": 1190,
+          "researchSignalScore": 0,
+          "source": "Clinical and Translational Medicine"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nanomaterials for cancer therapy: current progress and perspectives",
+          "workId": "https://openalex.org/W3164577482",
+          "publishedAt": "2021-05-30T15:00:00.000Z",
+          "citedByCount": 1091,
+          "researchSignalScore": 0,
+          "source": "Journal of Hematology & Oncology"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "mRNA-based therapeutics: powerful and versatile tools to combat diseases",
+          "workId": "https://openalex.org/W4281254240",
+          "publishedAt": "2022-05-20T15:00:00.000Z",
+          "citedByCount": 684,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Tumor biomarkers for diagnosis, prognosis and targeted therapy",
+          "workId": "https://openalex.org/W4397293886",
+          "publishedAt": "2024-05-19T15:00:00.000Z",
+          "citedByCount": 561,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The Limitless Future of RNA Therapeutics",
+          "workId": "https://openalex.org/W3137008460",
+          "publishedAt": "2021-03-17T15:00:00.000Z",
+          "citedByCount": 528,
+          "researchSignalScore": 0,
+          "source": "Frontiers in Bioengineering and Biotechnology"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A CRISPR/Cas12a-empowered surface plasmon resonance platform for rapid and specific diagnosis of the Omicron variant of SARS-CoV-2",
+          "workId": "https://openalex.org/W4282004200",
+          "publishedAt": "2022-06-02T15:00:00.000Z",
+          "citedByCount": 461,
+          "researchSignalScore": 0,
+          "source": "National Science Review"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Current advance of nanotechnology in diagnosis and treatment for malignant tumors",
+          "workId": "https://openalex.org/W4401497204",
+          "publishedAt": "2024-08-11T15:00:00.000Z",
+          "citedByCount": 418,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "science-general",
+      "selectedTheme": {
+        "theme": "biotech",
+        "label": "Biotech",
+        "lastSharePct": 0,
+        "deltaSharePct": 0,
+        "averageSharePct": 20.83,
+        "rank": 2
+      },
+      "peerThemes": [
+        {
+          "theme": "materials-science",
+          "label": "Materials Science",
+          "lastSharePct": 100,
+          "deltaSharePct": 100,
+          "rank": 1
+        },
+        {
+          "theme": "biotech",
+          "label": "Biotech",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 2
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Biotech relative share",
+          "parentTheme": "science-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connected",
+      "entities": [
+        {
+          "entityType": "company",
+          "entityKey": "MRNA",
+          "ticker": "MRNA",
+          "companyName": "MODERNA, INC.",
+          "cik": "0001682852",
+          "sectorHint": "Biological Products, (No Diagnostic Substances)",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for MRNA.",
+          "filingCount": 16,
+          "latestFiledAt": "2026-03-04T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:40.154Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "CRSP",
+          "ticker": "CRSP",
+          "companyName": "CRISPR THERAPEUTICS AG",
+          "cik": "0001674416",
+          "sectorHint": "Biological Products, (No Diagnostic Substances)",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for CRSP.",
+          "filingCount": 15,
+          "latestFiledAt": "2026-03-15T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:44.910Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "REGN",
+          "ticker": "REGN",
+          "companyName": "REGENERON PHARMACEUTICALS, INC.",
+          "cik": "0000872589",
+          "sectorHint": "Pharmaceutical Preparations",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for REGN.",
+          "filingCount": 11,
+          "latestFiledAt": "2026-02-03T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:43.532Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "VRTX",
+          "ticker": "VRTX",
+          "companyName": "VERTEX PHARMACEUTICALS INC / MA",
+          "cik": "0000875320",
+          "sectorHint": "Pharmaceutical Preparations",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for VRTX.",
+          "filingCount": 11,
+          "latestFiledAt": "2026-03-30T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:41.951Z"
+        }
+      ],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "MODERNA, INC. is linked as beneficiary with confidence 0.82 and 16 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "CRISPR THERAPEUTICS AG is linked as beneficiary with confidence 0.82 and 15 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "REGENERON PHARMACEUTICALS, INC. is linked as beneficiary with confidence 0.82 and 11 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "VERTEX PHARMACEUTICALS INC / MA is linked as beneficiary with confidence 0.82 and 11 filing-backed touchpoint(s)."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "MRNA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:40.154Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "CRSP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:44.910Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "REGN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:43.532Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "VRTX",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:41.951Z"
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "Recent curated coverage is thin, so the theme may be structurally important without having strong current confirmation in the latest digest window.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Biotech keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Biotech holds or expands its 0% share inside Science General.",
+      "Watch whether research coverage for this theme stays above 8 tracked OpenAlex works and whether new papers broaden beyond Programmed cell death / Autophagy."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "biotech",
+        "science-general",
+        "science"
+      ],
+      "exportTitle": "Biotech Week Theme Brief",
+      "promptSeed": "What changed in Biotech, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech week aggregate",
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Biotech share movement inside Science General",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 4
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ferroptosis: mechanisms and links with diseases",
+          "workId": "https://openalex.org/W3127839532",
+          "publishedAt": "2021-02-02T15:00:00.000Z",
+          "citedByCount": 1362,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+          "workId": "https://openalex.org/W4220837089",
+          "publishedAt": "2022-02-28T15:00:00.000Z",
+          "citedByCount": 1190,
+          "researchSignalScore": 0,
+          "source": "Clinical and Translational Medicine"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nanomaterials for cancer therapy: current progress and perspectives",
+          "workId": "https://openalex.org/W3164577482",
+          "publishedAt": "2021-05-30T15:00:00.000Z",
+          "citedByCount": 1091,
+          "researchSignalScore": 0,
+          "source": "Journal of Hematology & Oncology"
+        }
+      ],
+      "claimCount": 3
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "A new gene therapy is giving people born deaf the chance to hear",
+          "articleId": 80170,
+          "source": "hackernews",
+          "publishedAt": "2026-04-04T17:35:40.000Z",
+          "url": "https://www.sciencedaily.com/releases/2026/04/260403044651.htm"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Embracing Bayesian methods in clinical trials",
+          "articleId": 82167,
+          "source": "hackernews",
+          "publishedAt": "2026-03-24T03:08:56.000Z",
+          "url": "https://jamanetwork.com/journals/jama/fullarticle/2847011"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Australian pregnancy drugs shortage sparks call to include pregnant women in clinical trials",
+          "articleId": 58157,
+          "source": "guardian",
+          "publishedAt": "2024-09-08T15:00:52.000Z",
+          "url": "https://www.theguardian.com/australia-news/article/2024/sep/09/pregnancy-drugs-shortage-pregnant-women-clinical-trials-supply-pathways-off-label-medications"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Elon Musk’s brain chip firm Neuralink lines up clinical trials in humans",
+          "articleId": 25880,
+          "source": "guardian",
+          "publishedAt": "2022-01-20T17:01:37.000Z",
+          "url": "https://www.theguardian.com/technology/2022/jan/20/elon-musk-brain-chip-firm-neuralink-lines-up-clinical-trials-in-humans"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Matt Hancock calls for more volunteers to take part in 'essential' clinical trials – as it happened",
+          "articleId": 4604,
+          "source": "guardian",
+          "publishedAt": "2020-04-03T17:25:11.000Z",
+          "url": "https://www.theguardian.com/politics/live/2020/apr/03/uk-coronavirus-live-emergency-nightingale-hospital-opens-today-matt-hancock-covid-19-latest-updates"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MRNA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:40.154Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "CRSP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:44.910Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "REGN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:43.532Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "VRTX",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:41.951Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ferroptosis: mechanisms and links with diseases",
+          "workId": "https://openalex.org/W3127839532",
+          "publishedAt": "2021-02-02T15:00:00.000Z",
+          "citedByCount": 1362,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Single‐cell RNA sequencing technologies and applications: A brief overview",
+          "workId": "https://openalex.org/W4220837089",
+          "publishedAt": "2022-02-28T15:00:00.000Z",
+          "citedByCount": 1190,
+          "researchSignalScore": 0,
+          "source": "Clinical and Translational Medicine"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Nanomaterials for cancer therapy: current progress and perspectives",
+          "workId": "https://openalex.org/W3164577482",
+          "publishedAt": "2021-05-30T15:00:00.000Z",
+          "citedByCount": 1091,
+          "researchSignalScore": 0,
+          "source": "Journal of Hematology & Oncology"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "mRNA-based therapeutics: powerful and versatile tools to combat diseases",
+          "workId": "https://openalex.org/W4281254240",
+          "publishedAt": "2022-05-20T15:00:00.000Z",
+          "citedByCount": 684,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Tumor biomarkers for diagnosis, prognosis and targeted therapy",
+          "workId": "https://openalex.org/W4397293886",
+          "publishedAt": "2024-05-19T15:00:00.000Z",
+          "citedByCount": 561,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "The Limitless Future of RNA Therapeutics",
+          "workId": "https://openalex.org/W3137008460",
+          "publishedAt": "2021-03-17T15:00:00.000Z",
+          "citedByCount": 528,
+          "researchSignalScore": 0,
+          "source": "Frontiers in Bioengineering and Biotechnology"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A CRISPR/Cas12a-empowered surface plasmon resonance platform for rapid and specific diagnosis of the Omicron variant of SARS-CoV-2",
+          "workId": "https://openalex.org/W4282004200",
+          "publishedAt": "2022-06-02T15:00:00.000Z",
+          "citedByCount": 461,
+          "researchSignalScore": 0,
+          "source": "National Science Review"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Current advance of nanotechnology in diagnosis and treatment for malignant tumors",
+          "workId": "https://openalex.org/W4401497204",
+          "publishedAt": "2024-08-11T15:00:00.000Z",
+          "citedByCount": 418,
+          "researchSignalScore": 0,
+          "source": "Signal Transduction and Targeted Therapy"
+        }
+      ],
+      "sourceCount": 7
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Biotech relative share",
+          "parentTheme": "science-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "peerThemeCount": 2
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "MRNA",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:40.154Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "CRSP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:44.910Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "REGN",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:43.532Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "VRTX",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:41.951Z"
+        }
+      ],
+      "entityCount": 4
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Biotech share baseline",
+          "parentTheme": "science-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 3
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Biotech risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Biotech share baseline",
+          "parentTheme": "science-general",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Biotech watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "biotech::week",
+    "theme": "biotech",
+    "periodType": "week",
+    "label": "Biotech",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:47.116Z",
+    "stale": false
+  }
+}

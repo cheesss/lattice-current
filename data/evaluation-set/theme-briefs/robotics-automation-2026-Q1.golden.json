@@ -1,0 +1,125 @@
+{
+  "theme": "robotics-automation",
+  "periodType": "quarter",
+  "periodLabel": "2026-Q1",
+  "reviewStatus": "gold",
+  "reviewedBy": "product-review",
+  "reviewedAt": "2026-04-08",
+  "asOf": "2026-04-08",
+  "sections": {
+    "whatChanged": [
+      {
+        "title": "Automation moved from concept coverage toward deployment stories",
+        "detail": "Factory, warehouse, and humanoid pilot stories appeared more often than generic robotics hype.",
+        "importance": "high"
+      },
+      {
+        "title": "The theme gained relevance inside Technology",
+        "detail": "Robotics-automation became a clearer sibling to AI infrastructure rather than a niche subtopic.",
+        "importance": "medium"
+      }
+    ],
+    "whyItMatters": {
+      "summary": "A durable robotics theme signals real-world adoption and industrial workflow change rather than isolated prototype headlines.",
+      "statements": [
+        "Repeated deployment evidence matters more than eye-catching demo videos.",
+        "Robotics often becomes structurally important when it attaches to labor scarcity, cost pressure, and manufacturing throughput.",
+        "The right question is whether deployment breadth is widening, not whether one robot launch went viral."
+      ]
+    },
+    "evidence": {
+      "requiredSourceClasses": [
+        "news",
+        "industry",
+        "company"
+      ],
+      "requiredClaims": [
+        "The quarterly aggregate should show persistent coverage rather than a one-week spike.",
+        "Coverage should reference deployments, supply chains, or integrators, not only concept demos.",
+        "At least one company or buyer class should recur across the quarter."
+      ],
+      "provenanceExpectations": [
+        "Use deployment and procurement stories as higher-grade evidence than product teaser content.",
+        "Expect future SEC and hiring signals to strengthen this brief."
+      ],
+      "notes": [
+        "Humanoid excitement alone is not enough to call the theme structurally stronger."
+      ]
+    },
+    "subtopicMovement": [
+      {
+        "subtheme": "industrial automation",
+        "direction": "up",
+        "rationale": "Line-side and warehouse deployment is the strongest recurring signal."
+      },
+      {
+        "subtheme": "humanoid pilots",
+        "direction": "up",
+        "rationale": "Humanoid systems are drawing attention, but still need real deployment proof."
+      },
+      {
+        "subtheme": "robot software tooling",
+        "direction": "watch",
+        "rationale": "Middleware and orchestration are less visible but may become the better structural signal."
+      }
+    ],
+    "relatedEntities": {
+      "pathways": [
+        {
+          "entity": "Teradyne",
+          "symbol": "TER",
+          "relationType": "supplier",
+          "note": "Industrial automation exposure gives TER a plausible public-market link."
+        },
+        {
+          "entity": "ABB",
+          "symbol": null,
+          "relationType": "integrator",
+          "note": "Large industrial automation players often confirm whether adoption is broadening."
+        },
+        {
+          "entity": "BMW",
+          "symbol": null,
+          "relationType": "adopter",
+          "note": "Repeated manufacturer pilots help separate deployment evidence from robotics hype."
+        }
+      ]
+    },
+    "risks": [
+      {
+        "title": "Demo-video bias",
+        "detail": "Visual novelty can overwhelm weak commercialization evidence."
+      },
+      {
+        "title": "AI narrative bleed",
+        "detail": "Generic AI headlines can leak into robotics unless deployment-specific terms are present."
+      }
+    ],
+    "watchpoints": [
+      {
+        "horizon": "30d",
+        "trigger": "A second wave of deployment stories lands outside one flagship vendor",
+        "implication": "Confidence rises that the theme is broadening rather than concentrating."
+      },
+      {
+        "horizon": "90d",
+        "trigger": "Filings, capex commentary, or supplier disclosures mention robotics demand",
+        "implication": "The theme gets stronger links to real operating budgets."
+      }
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "robotics-automation",
+        "technology-general",
+        "deployment-evidence"
+      ],
+      "prompts": [
+        "Which robotics subtheme is gaining share because of real deployment rather than narrative spillover?",
+        "What evidence would show robotics is becoming budgeted infrastructure instead of optional experimentation?"
+      ]
+    }
+  },
+  "notes": [
+    "Use this file to catch regressions where generated briefs over-index on hype and under-index on deployment evidence."
+  ]
+}

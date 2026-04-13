@@ -1,0 +1,1058 @@
+{
+  "theme": "inflation-costs",
+  "label": "Inflation / Costs",
+  "category": "macro",
+  "categoryLabel": "Macro",
+  "parentTheme": "macroeconomics",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 0,
+    "lifecycleStage": "nascent",
+    "vsPreviousPct": 0,
+    "vsYearAgoPct": 0,
+    "acceleration": 0,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Inflation / Costs summary baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 3
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 6
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 2
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Inflation / Costs week aggregate",
+        "articleCount": 0,
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Inflation Costs share movement inside Macroeconomics",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Inflation / Costs aggregate context",
+        "lifecycleStage": "nascent",
+        "vsYearAgoPct": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Inflation / Costs aggregate",
+        "articleCount": 0,
+        "lifecycleStage": "nascent"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "US inflation rises to 3.4%; global trade ‘drops 1.3%’ as Red Sea attacks disrupt shipping – as it happened",
+        "articleId": 352,
+        "source": "guardian",
+        "publishedAt": "2024-01-11T16:04:28.000Z",
+        "url": "https://www.theguardian.com/business/live/2024/jan/11/tesco-lifts-profit-forecast-christmas-marks-spencer-us-inflation-business-live"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "How Britain became the G7’s inflation outlier – in one chart",
+        "articleId": 44026,
+        "source": "guardian",
+        "publishedAt": "2023-07-15T23:05:43.000Z",
+        "url": "https://www.theguardian.com/business/2023/jul/16/how-britain-became-the-g7s-inflation-outlier-in-one-chart"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "UK must renew industrial strategy and stop ‘flip flopping’, say manufacturers",
+        "articleId": 41680,
+        "source": "guardian",
+        "publishedAt": "2023-05-08T23:01:04.000Z",
+        "url": "https://www.theguardian.com/business/2023/may/09/uk-industrial-strategy-manufacturers-make-uk-joe-biden-inflation-reduction-act"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Pound rallies as US PPI inflation falls; insolvencies jump as UK economy weakens – as it happened",
+        "articleId": 35995,
+        "source": "guardian",
+        "publishedAt": "2022-11-15T15:08:00.000Z",
+        "url": "https://www.theguardian.com/business/live/2022/nov/15/uk-unemployment-rate-rises-real-wages-strikes-vacancies-business-live"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Shopping around grocery inflation: the best-value buys for autumn",
+        "articleId": 28477,
+        "source": "guardian",
+        "publishedAt": "2022-04-10T17:30:27.000Z",
+        "url": "https://www.theguardian.com/lifeandstyle/2022/apr/11/shopping-around-grocery-inflation-the-best-value-buys-for-autumn"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Inflation Costs relative share",
+        "parentTheme": "macroeconomics",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Inflation Costs connector placeholder",
+        "detail": "Exposure connectors not yet populated for this theme."
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Inflation / Costs risk baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "sourceDiversity": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Inflation Costs share baseline",
+        "parentTheme": "macroeconomics",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Inflation / Costs watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Inflation / Costs logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Inflation / Costs week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Inflation / Costs is showing positive acceleration of 0 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Inflation / Costs week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Inflation Costs now represents 0% of Macroeconomics coverage, a +0 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Inflation Costs share movement inside Macroeconomics",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Inflation / Costs matters because it is nascent with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Inflation / Costs aggregate context",
+            "lifecycleStage": "nascent",
+            "vsYearAgoPct": 0,
+            "acceleration": 0
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Inflation Costs share movement",
+        "detail": "Inflation Costs is ranked #2 inside Macroeconomics with 0% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Inflation Costs relative share",
+            "parentTheme": "macroeconomics",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Inflation / Costs logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "metric": {
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Inflation / Costs week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Inflation / Costs is showing positive acceleration of 0 in the current week comparison.",
+        "metric": {
+          "acceleration": 0,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Inflation / Costs week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Inflation Costs now represents 0% of Macroeconomics coverage, a +0 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 0,
+          "deltaSharePct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Inflation Costs share movement inside Macroeconomics",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Inflation / Costs matters because it is nascent with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Inflation / Costs matters because it is nascent with positive year-on-year movement and still building acceleration."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0,
+        "acceleration": 0,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [],
+      "recentArticles": [
+        {
+          "articleId": 352,
+          "title": "US inflation rises to 3.4%; global trade ‘drops 1.3%’ as Red Sea attacks disrupt shipping – as it happened",
+          "source": "guardian",
+          "publishedAt": "2024-01-11T16:04:28.000Z",
+          "url": "https://www.theguardian.com/business/live/2024/jan/11/tesco-lifts-profit-forecast-christmas-marks-spencer-us-inflation-business-live"
+        },
+        {
+          "articleId": 44026,
+          "title": "How Britain became the G7’s inflation outlier – in one chart",
+          "source": "guardian",
+          "publishedAt": "2023-07-15T23:05:43.000Z",
+          "url": "https://www.theguardian.com/business/2023/jul/16/how-britain-became-the-g7s-inflation-outlier-in-one-chart"
+        },
+        {
+          "articleId": 41680,
+          "title": "UK must renew industrial strategy and stop ‘flip flopping’, say manufacturers",
+          "source": "guardian",
+          "publishedAt": "2023-05-08T23:01:04.000Z",
+          "url": "https://www.theguardian.com/business/2023/may/09/uk-industrial-strategy-manufacturers-make-uk-joe-biden-inflation-reduction-act"
+        },
+        {
+          "articleId": 35995,
+          "title": "Pound rallies as US PPI inflation falls; insolvencies jump as UK economy weakens – as it happened",
+          "source": "guardian",
+          "publishedAt": "2022-11-15T15:08:00.000Z",
+          "url": "https://www.theguardian.com/business/live/2022/nov/15/uk-unemployment-rate-rises-real-wages-strikes-vacancies-business-live"
+        },
+        {
+          "articleId": 28477,
+          "title": "Shopping around grocery inflation: the best-value buys for autumn",
+          "source": "guardian",
+          "publishedAt": "2022-04-10T17:30:27.000Z",
+          "url": "https://www.theguardian.com/lifeandstyle/2022/apr/11/shopping-around-grocery-inflation-the-best-value-buys-for-autumn"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "works": []
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "guardian",
+          "sourceQuality": 0.9,
+          "curatedItemCount": 0,
+          "recentArticleCount": 5,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 5,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2024-01-11T16:04:28.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "sourceClasses": [
+        "guardian"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "US inflation rises to 3.4%; global trade ‘drops 1.3%’ as Red Sea attacks disrupt shipping – as it happened",
+          "articleId": 352,
+          "source": "guardian",
+          "publishedAt": "2024-01-11T16:04:28.000Z",
+          "url": "https://www.theguardian.com/business/live/2024/jan/11/tesco-lifts-profit-forecast-christmas-marks-spencer-us-inflation-business-live"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "How Britain became the G7’s inflation outlier – in one chart",
+          "articleId": 44026,
+          "source": "guardian",
+          "publishedAt": "2023-07-15T23:05:43.000Z",
+          "url": "https://www.theguardian.com/business/2023/jul/16/how-britain-became-the-g7s-inflation-outlier-in-one-chart"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "UK must renew industrial strategy and stop ‘flip flopping’, say manufacturers",
+          "articleId": 41680,
+          "source": "guardian",
+          "publishedAt": "2023-05-08T23:01:04.000Z",
+          "url": "https://www.theguardian.com/business/2023/may/09/uk-industrial-strategy-manufacturers-make-uk-joe-biden-inflation-reduction-act"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Pound rallies as US PPI inflation falls; insolvencies jump as UK economy weakens – as it happened",
+          "articleId": 35995,
+          "source": "guardian",
+          "publishedAt": "2022-11-15T15:08:00.000Z",
+          "url": "https://www.theguardian.com/business/live/2022/nov/15/uk-unemployment-rate-rises-real-wages-strikes-vacancies-business-live"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Shopping around grocery inflation: the best-value buys for autumn",
+          "articleId": 28477,
+          "source": "guardian",
+          "publishedAt": "2022-04-10T17:30:27.000Z",
+          "url": "https://www.theguardian.com/lifeandstyle/2022/apr/11/shopping-around-grocery-inflation-the-best-value-buys-for-autumn"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "macroeconomics",
+      "selectedTheme": {
+        "theme": "inflation-costs",
+        "label": "Inflation Costs",
+        "lastSharePct": 0,
+        "deltaSharePct": 0,
+        "averageSharePct": 0,
+        "rank": 2
+      },
+      "peerThemes": [
+        {
+          "theme": "fiscal-policy",
+          "label": "Fiscal Policy",
+          "lastSharePct": 100,
+          "deltaSharePct": 100,
+          "rank": 1
+        },
+        {
+          "theme": "inflation-costs",
+          "label": "Inflation Costs",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 2
+        },
+        {
+          "theme": "monetary-policy",
+          "label": "Monetary Policy",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 3
+        },
+        {
+          "theme": "trade-globalization",
+          "label": "Trade Globalization",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 4
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Inflation Costs relative share",
+          "parentTheme": "macroeconomics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connector-pending",
+      "entities": [],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "pending",
+          "note": "Entity linkage for Inflation Costs will populate once exposure connectors are enabled."
+        },
+        {
+          "relationType": "supplier",
+          "status": "pending",
+          "note": "The current foundation only tracks theme objects. Macro exposure mapping is scheduled after SEC and OpenAlex."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Inflation Costs connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "Recent curated coverage is thin, so the theme may be structurally important without having strong current confirmation in the latest digest window.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Inflation / Costs keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Inflation Costs holds or expands its 0% share inside Macroeconomics.",
+      "Look for new evidence classes beyond news, especially filings, research, patents, or code activity as those connectors come online."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "inflation-costs",
+        "macroeconomics",
+        "macro"
+      ],
+      "exportTitle": "Inflation / Costs Week Theme Brief",
+      "promptSeed": "What changed in Inflation / Costs, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 2
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs week aggregate",
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Inflation Costs share movement inside Macroeconomics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 3
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ],
+      "claimCount": 1
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "US inflation rises to 3.4%; global trade ‘drops 1.3%’ as Red Sea attacks disrupt shipping – as it happened",
+          "articleId": 352,
+          "source": "guardian",
+          "publishedAt": "2024-01-11T16:04:28.000Z",
+          "url": "https://www.theguardian.com/business/live/2024/jan/11/tesco-lifts-profit-forecast-christmas-marks-spencer-us-inflation-business-live"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "How Britain became the G7’s inflation outlier – in one chart",
+          "articleId": 44026,
+          "source": "guardian",
+          "publishedAt": "2023-07-15T23:05:43.000Z",
+          "url": "https://www.theguardian.com/business/2023/jul/16/how-britain-became-the-g7s-inflation-outlier-in-one-chart"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "UK must renew industrial strategy and stop ‘flip flopping’, say manufacturers",
+          "articleId": 41680,
+          "source": "guardian",
+          "publishedAt": "2023-05-08T23:01:04.000Z",
+          "url": "https://www.theguardian.com/business/2023/may/09/uk-industrial-strategy-manufacturers-make-uk-joe-biden-inflation-reduction-act"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Pound rallies as US PPI inflation falls; insolvencies jump as UK economy weakens – as it happened",
+          "articleId": 35995,
+          "source": "guardian",
+          "publishedAt": "2022-11-15T15:08:00.000Z",
+          "url": "https://www.theguardian.com/business/live/2022/nov/15/uk-unemployment-rate-rises-real-wages-strikes-vacancies-business-live"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Shopping around grocery inflation: the best-value buys for autumn",
+          "articleId": 28477,
+          "source": "guardian",
+          "publishedAt": "2022-04-10T17:30:27.000Z",
+          "url": "https://www.theguardian.com/lifeandstyle/2022/apr/11/shopping-around-grocery-inflation-the-best-value-buys-for-autumn"
+        }
+      ],
+      "sourceCount": 1
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Inflation Costs relative share",
+          "parentTheme": "macroeconomics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "peerThemeCount": 4
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Inflation Costs connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ],
+      "entityCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Inflation Costs share baseline",
+          "parentTheme": "macroeconomics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "claimCount": 3
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Inflation / Costs risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Inflation Costs share baseline",
+          "parentTheme": "macroeconomics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Inflation / Costs watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "inflation-costs::week",
+    "theme": "inflation-costs",
+    "periodType": "week",
+    "label": "Inflation Costs",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:42.731Z",
+    "stale": false
+  }
+}

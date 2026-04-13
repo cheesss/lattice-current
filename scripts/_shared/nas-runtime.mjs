@@ -40,7 +40,7 @@ export function resolveNasPgConfig(overrides = {}) {
   const host = String(
     overrides.host
     || firstDefinedEnv(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'])
-    || '192.168.0.76',
+    || '192.168.0.2',
   ).trim();
   const port = Number(
     overrides.port

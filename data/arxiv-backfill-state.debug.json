@@ -1,0 +1,21 @@
+{
+  "source": "arxiv",
+  "since": "2021-01-01",
+  "categories": [
+    "cs.AI",
+    "cs.LG",
+    "cs.CV",
+    "cs.RO",
+    "cs.NE",
+    "quant-ph",
+    "q-bio.QM",
+    "cond-mat.mtrl-sci"
+  ],
+  "batchSize": 100,
+  "startedAt": "2026-04-07T20:36:08.333Z",
+  "completedAt": "2026-04-07T20:36:21.497Z",
+  "errorMessage": "",
+  "totalFetched": 100,
+  "totalInserted": 9,
+  "lastProcessedOffset": 0
+}

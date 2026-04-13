@@ -3,7 +3,7 @@ export default async function handler(req, res) {
   try {
     const pg = await import('pg');
     const pool = new pg.default.Pool({
-      host: process.env.PG_HOST || '192.168.0.76', port: Number(process.env.PG_PORT || 5433),
+      host: process.env.PG_HOST || '192.168.0.2', port: Number(process.env.PG_PORT || 5433),
       user: process.env.PG_USER || 'postgres',
       password: process.env.PG_PASSWORD || process.env.PGPASSWORD || process.env.INTEL_PG_PASSWORD || 'lattice1234',
       database: process.env.PG_DATABASE || 'lattice', max: 2, idleTimeoutMillis: 10000,

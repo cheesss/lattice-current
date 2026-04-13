@@ -1,0 +1,111 @@
+{
+  "parent": "science-general",
+  "requestedParent": "science-general",
+  "periodType": "month",
+  "periods": [
+    {
+      "key": "2025-09",
+      "label": "2025-09",
+      "periodStart": "2025-09-01",
+      "periodEnd": "2025-09-30"
+    },
+    {
+      "key": "2025-10",
+      "label": "2025-10",
+      "periodStart": "2025-10-01",
+      "periodEnd": "2025-10-31"
+    },
+    {
+      "key": "2025-11",
+      "label": "2025-11",
+      "periodStart": "2025-11-01",
+      "periodEnd": "2025-11-30"
+    },
+    {
+      "key": "2025-12",
+      "label": "2025-12",
+      "periodStart": "2025-12-01",
+      "periodEnd": "2025-12-31"
+    },
+    {
+      "key": "2026-01",
+      "label": "2026-01",
+      "periodStart": "2026-01-01",
+      "periodEnd": "2026-01-31"
+    },
+    {
+      "key": "2026-02",
+      "label": "2026-02",
+      "periodStart": "2026-02-01",
+      "periodEnd": "2026-02-28"
+    },
+    {
+      "key": "2026-03",
+      "label": "2026-03",
+      "periodStart": "2026-03-01",
+      "periodEnd": "2026-03-31"
+    },
+    {
+      "key": "2026-04",
+      "label": "2026-04",
+      "periodStart": "2026-04-01",
+      "periodEnd": "2026-04-30"
+    }
+  ],
+  "subThemes": [
+    {
+      "theme": "materials-science",
+      "label": "Materials Science",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        33.33,
+        100
+      ],
+      "currentRank": 2,
+      "parentTheme": "science-general",
+      "lastSharePct": 100,
+      "deltaSharePct": 100,
+      "averageSharePct": 16.67
+    },
+    {
+      "theme": "biotech",
+      "label": "Biotech",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        100,
+        66.67,
+        0
+      ],
+      "currentRank": 1,
+      "parentTheme": "science-general",
+      "lastSharePct": 0,
+      "deltaSharePct": 0,
+      "averageSharePct": 20.83
+    }
+  ],
+  "insights": [
+    {
+      "type": "rising_star",
+      "theme": "materials-science",
+      "label": "Materials Science",
+      "deltaSharePct": 100,
+      "lastSharePct": 100,
+      "summary": "Materials Science gained 100 share points over the selected range and now represents 100% of Science General coverage."
+    }
+  ],
+  "source": "theme_evolution",
+  "taxonomyFiltering": "canonical-only",
+  "meta": {
+    "updatedAt": "2026-04-08T03:11:02.688Z",
+    "stale": false
+  }
+}

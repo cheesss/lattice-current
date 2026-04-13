@@ -1,0 +1,127 @@
+{
+  "theme": "quantum-computing",
+  "periodType": "quarter",
+  "periodLabel": "2026-Q1",
+  "reviewStatus": "gold",
+  "reviewedBy": "product-review",
+  "reviewedAt": "2026-04-08",
+  "asOf": "2026-04-08",
+  "sections": {
+    "whatChanged": [
+      {
+        "title": "Share inside Technology rose from a low base",
+        "detail": "Quantum coverage remained smaller than AI or semis, but its relative weight inside technology-general improved versus the prior quarter.",
+        "importance": "medium"
+      },
+      {
+        "title": "Evidence diversified beyond headline news",
+        "detail": "Roadmap updates, public-sector funding language, and infrastructure narratives began appearing together instead of as isolated hardware headlines.",
+        "importance": "high"
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Quantum matters when it persists across research, policy, and commercialization evidence classes rather than flashing as a single-cycle media burst.",
+      "statements": [
+        "A rising share from a small base is only meaningful if it repeats over multiple windows.",
+        "The theme becomes structurally more credible when error correction, platform roadmaps, and ecosystem tooling appear together.",
+        "This brief is a long-horizon monitoring object, not a buy or sell signal."
+      ]
+    },
+    "evidence": {
+      "requiredSourceClasses": [
+        "news",
+        "research",
+        "policy"
+      ],
+      "requiredClaims": [
+        "Coverage growth should be visible in the quarterly aggregate and not be declining.",
+        "Subtopic movement should show quantum gaining or at least holding share inside technology-general.",
+        "At least one evidence lane beyond news should corroborate the theme."
+      ],
+      "provenanceExpectations": [
+        "Use aggregate metrics for trend strength.",
+        "Use curated items or article clusters for narrative direction.",
+        "Use future filings, patents, or code activity as upgrade evidence."
+      ],
+      "notes": [
+        "Do not treat general AI compute demand as quantum evidence.",
+        "Do not mark the theme as strong if only one vendor announcement dominates the quarter."
+      ]
+    },
+    "subtopicMovement": [
+      {
+        "subtheme": "quantum hardware",
+        "direction": "up",
+        "rationale": "Roadmaps and processor announcements remain the visible edge of the theme."
+      },
+      {
+        "subtheme": "error correction",
+        "direction": "up",
+        "rationale": "Error-correction language is a stronger structural signal than raw qubit counts."
+      },
+      {
+        "subtheme": "ecosystem tooling",
+        "direction": "flat",
+        "rationale": "Tooling remains early, but recurring mentions would strengthen the commercialization case."
+      }
+    ],
+    "relatedEntities": {
+      "pathways": [
+        {
+          "entity": "IBM",
+          "symbol": "IBM",
+          "relationType": "platform-operator",
+          "note": "Roadmap and ecosystem evidence make IBM a recurring public-market reference point."
+        },
+        {
+          "entity": "IonQ",
+          "symbol": "IONQ",
+          "relationType": "specialist-exposure",
+          "note": "Pure-play exposure is useful for tracking narrative intensity, but not sufficient alone."
+        },
+        {
+          "entity": "Rigetti Computing",
+          "symbol": "RGTI",
+          "relationType": "specialist-exposure",
+          "note": "Small-cap specialists can amplify noise, so evidence burden should remain high."
+        }
+      ]
+    },
+    "risks": [
+      {
+        "title": "Narrative inflation from low absolute volume",
+        "detail": "A small lift in article count can look dramatic if the base is tiny."
+      },
+      {
+        "title": "Vendor-led announcement concentration",
+        "detail": "If one company dominates the quarter, the theme may be over-read as structural progress."
+      }
+    ],
+    "watchpoints": [
+      {
+        "horizon": "30d",
+        "trigger": "More than one source class continues to confirm the theme",
+        "implication": "Confidence rises that the quarter was not a one-cycle media spike."
+      },
+      {
+        "horizon": "90d",
+        "trigger": "Patents, public filings, or code activity appear alongside research and policy",
+        "implication": "The theme graduates from curiosity to stronger commercialization monitoring."
+      }
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "quantum-computing",
+        "technology-general",
+        "theme-brief-gold"
+      ],
+      "prompts": [
+        "What evidence would invalidate this quarter's rise as a structural change?",
+        "Which adjacent technology themes would quantum most likely borrow attention from next?"
+      ]
+    }
+  },
+  "notes": [
+    "The goal is section quality and evidence burden, not exact wording parity with generated output."
+  ]
+}

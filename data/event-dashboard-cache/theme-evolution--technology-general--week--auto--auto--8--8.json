@@ -1,0 +1,241 @@
+{
+  "parent": "technology-general",
+  "requestedParent": "technology-general",
+  "periodType": "week",
+  "periods": [
+    {
+      "key": "2026-W07",
+      "label": "2026-W07",
+      "periodStart": "2026-02-16",
+      "periodEnd": "2026-02-22"
+    },
+    {
+      "key": "2026-W08",
+      "label": "2026-W08",
+      "periodStart": "2026-02-23",
+      "periodEnd": "2026-03-01"
+    },
+    {
+      "key": "2026-W09",
+      "label": "2026-W09",
+      "periodStart": "2026-03-02",
+      "periodEnd": "2026-03-08"
+    },
+    {
+      "key": "2026-W10",
+      "label": "2026-W10",
+      "periodStart": "2026-03-09",
+      "periodEnd": "2026-03-15"
+    },
+    {
+      "key": "2026-W11",
+      "label": "2026-W11",
+      "periodStart": "2026-03-16",
+      "periodEnd": "2026-03-22"
+    },
+    {
+      "key": "2026-W12",
+      "label": "2026-W12",
+      "periodStart": "2026-03-23",
+      "periodEnd": "2026-03-29"
+    },
+    {
+      "key": "2026-W13",
+      "label": "2026-W13",
+      "periodStart": "2026-03-30",
+      "periodEnd": "2026-04-05"
+    },
+    {
+      "key": "2026-W14",
+      "label": "2026-W14",
+      "periodStart": "2026-04-06",
+      "periodEnd": "2026-04-12"
+    }
+  ],
+  "subThemes": [
+    {
+      "theme": "ai-ml",
+      "label": "Ai Ml",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        100,
+        14.29,
+        75.54,
+        67.5
+      ],
+      "currentRank": 1,
+      "parentTheme": "technology-general",
+      "lastSharePct": 67.5,
+      "deltaSharePct": 67.5,
+      "averageSharePct": 32.17
+    },
+    {
+      "theme": "cloud-infrastructure",
+      "label": "Cloud Infrastructure",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        42.86,
+        7.19,
+        12.5
+      ],
+      "currentRank": 3,
+      "parentTheme": "technology-general",
+      "lastSharePct": 12.5,
+      "deltaSharePct": 12.5,
+      "averageSharePct": 7.82
+    },
+    {
+      "theme": "quantum-computing",
+      "label": "Quantum Computing",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8.63,
+        7.5
+      ],
+      "currentRank": 6,
+      "parentTheme": "technology-general",
+      "lastSharePct": 7.5,
+      "deltaSharePct": 7.5,
+      "averageSharePct": 2.02
+    },
+    {
+      "theme": "robotics-automation",
+      "label": "Robotics Automation",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5.04,
+        7.5
+      ],
+      "currentRank": 7,
+      "parentTheme": "technology-general",
+      "lastSharePct": 7.5,
+      "deltaSharePct": 7.5,
+      "averageSharePct": 1.57
+    },
+    {
+      "theme": "autonomous-mobility",
+      "label": "Autonomous Mobility",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2.16,
+        2.5
+      ],
+      "currentRank": 2,
+      "parentTheme": "technology-general",
+      "lastSharePct": 2.5,
+      "deltaSharePct": 2.5,
+      "averageSharePct": 0.58
+    },
+    {
+      "theme": "space",
+      "label": "Space",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        28.57,
+        0.72,
+        2.5
+      ],
+      "currentRank": 9,
+      "parentTheme": "technology-general",
+      "lastSharePct": 2.5,
+      "deltaSharePct": 2.5,
+      "averageSharePct": 3.97
+    },
+    {
+      "theme": "cybersecurity",
+      "label": "Cybersecurity",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        14.29,
+        0,
+        0
+      ],
+      "currentRank": 4,
+      "parentTheme": "technology-general",
+      "lastSharePct": 0,
+      "deltaSharePct": 0,
+      "averageSharePct": 1.79
+    },
+    {
+      "theme": "optical-computing",
+      "label": "Optical Computing",
+      "sharePctSeries": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.72,
+        0
+      ],
+      "currentRank": 5,
+      "parentTheme": "technology-general",
+      "lastSharePct": 0,
+      "deltaSharePct": 0,
+      "averageSharePct": 0.09
+    }
+  ],
+  "insights": [
+    {
+      "type": "rising_star",
+      "theme": "ai-ml",
+      "label": "Ai Ml",
+      "deltaSharePct": 67.5,
+      "lastSharePct": 67.5,
+      "summary": "Ai Ml gained 67.5 share points over the selected range and now represents 67.5% of Technology General coverage."
+    },
+    {
+      "type": "rising_star",
+      "theme": "cloud-infrastructure",
+      "label": "Cloud Infrastructure",
+      "deltaSharePct": 12.5,
+      "lastSharePct": 12.5,
+      "summary": "Cloud Infrastructure gained 12.5 share points over the selected range and now represents 12.5% of Technology General coverage."
+    },
+    {
+      "type": "rising_star",
+      "theme": "quantum-computing",
+      "label": "Quantum Computing",
+      "deltaSharePct": 7.5,
+      "lastSharePct": 7.5,
+      "summary": "Quantum Computing gained 7.5 share points over the selected range and now represents 7.5% of Technology General coverage."
+    }
+  ],
+  "source": "theme_evolution",
+  "taxonomyFiltering": "canonical-only",
+  "meta": {
+    "updatedAt": "2026-04-08T17:53:17.226Z",
+    "stale": false
+  }
+}

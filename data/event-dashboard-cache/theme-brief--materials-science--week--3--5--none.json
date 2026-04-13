@@ -1,0 +1,2218 @@
+{
+  "theme": "materials-science",
+  "label": "Materials Science",
+  "category": "science",
+  "categoryLabel": "Science",
+  "parentTheme": "science-general",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 1,
+    "lifecycleStage": "emerging",
+    "vsPreviousPct": 100,
+    "vsYearAgoPct": 100,
+    "acceleration": 100,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Materials Science summary baseline",
+        "articleCount": 1,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "curated_digest",
+        "label": "Curated digest",
+        "description": "Ranked curated items linked to the theme.",
+        "sourceType": "digest",
+        "count": 2
+      },
+      {
+        "key": "openalex_research",
+        "label": "OpenAlex research",
+        "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+        "sourceType": "research",
+        "count": 8
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 1
+      },
+      {
+        "key": "sec_filings",
+        "label": "SEC-backed entities",
+        "description": "Theme-to-entity links backed by SEC connector data.",
+        "sourceType": "filing",
+        "count": 6
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Materials Science week aggregate",
+        "articleCount": 1,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Materials Science share movement inside Science General",
+        "sharePct": 100,
+        "deltaSharePct": 100
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+        "articleId": 77653,
+        "source": "Google News: company",
+        "publishedAt": "2026-04-07T04:04:59.000Z"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Materials Science aggregate context",
+        "lifecycleStage": "emerging",
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Materials Science relative-share context",
+        "parentTheme": "science-general",
+        "deltaSharePct": 100
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+        "workId": "https://openalex.org/W3126951392",
+        "publishedAt": "2021-02-04T15:00:00.000Z",
+        "citedByCount": 1851,
+        "researchSignalScore": 0,
+        "source": "Sensors"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Technology Roadmap for Flexible Sensors",
+        "workId": "https://openalex.org/W4323653529",
+        "publishedAt": "2023-03-08T15:00:00.000Z",
+        "citedByCount": 1174,
+        "researchSignalScore": 0,
+        "source": "ACS Nano"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Ten Years of Progress in the Synthesis and Development of MXenes",
+        "workId": "https://openalex.org/W3193369452",
+        "publishedAt": "2021-08-15T15:00:00.000Z",
+        "citedByCount": 1167,
+        "researchSignalScore": 0,
+        "source": "Advanced Materials"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Materials Science aggregate",
+        "articleCount": 1,
+        "lifecycleStage": "emerging"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+        "articleId": 77653,
+        "source": "Google News: company",
+        "publishedAt": "2026-04-07T04:04:59.000Z",
+        "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxPT3lWMVlkWno2LVlVZW5mek1qRlliZWhxb1JDUFRTZlBaOVhIbWRRam1pM1VSUk9tMmREZS1wUGtveUhSY0g4UTlXU25Ea0lQUy0zNW1aM1FnWWEwVk5COTM0NkFSYUg1UzMtaWFPVU5namN5VUFSeUpyVmVVNTl1ckNRYjgyemtwdFZKU01IUUZfeGZha296VEFKLUs3UEcydnF6a1F6NkpyWEN4S1FYenR6elY?oc=5"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "QS",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:46.236Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "ALB",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:47.958Z"
+      },
+      {
+        "type": "sec_connector",
+        "entityKey": "MP",
+        "evidenceSource": "theme_entity_seed+sec",
+        "updatedAt": "2026-04-07T21:20:49.546Z"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Covalent organic frameworks (COFs) for electrochemical applications",
+        "workId": "https://openalex.org/W3154409837",
+        "publishedAt": "2020-12-31T15:00:00.000Z",
+        "citedByCount": 1058,
+        "researchSignalScore": 0,
+        "source": "Chemical Society Reviews"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Regulating Fe-spin state by atomically dispersed Mn-N in Fe-N-C catalysts with high oxygen reduction activity",
+        "workId": "https://openalex.org/W3136472111",
+        "publishedAt": "2021-03-18T15:00:00.000Z",
+        "citedByCount": 945,
+        "researchSignalScore": 0,
+        "source": "Nature Communications"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Recent Progress in Emerging Organic Semiconductors",
+        "workId": "https://openalex.org/W4281687746",
+        "publishedAt": "2022-05-31T15:00:00.000Z",
+        "citedByCount": 79,
+        "researchSignalScore": 0,
+        "source": "Advanced Materials"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Advances in Emerging Crystalline Porous Materials",
+        "workId": "https://openalex.org/W3164577295",
+        "publishedAt": "2021-05-31T15:00:00.000Z",
+        "citedByCount": 47,
+        "researchSignalScore": 0,
+        "source": "Small"
+      },
+      {
+        "type": "openalex_research",
+        "evidenceClass": "openalex_research",
+        "sourceType": "research",
+        "label": "Programmable Materials",
+        "workId": "https://openalex.org/W4200412017",
+        "publishedAt": "2021-10-31T15:00:00.000Z",
+        "citedByCount": 18,
+        "researchSignalScore": 0,
+        "source": "Advanced Materials"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Materials Science relative share",
+        "parentTheme": "science-general",
+        "sharePct": 100,
+        "deltaSharePct": 100
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Materials Science risk baseline",
+        "articleCount": 1,
+        "lifecycleStage": "emerging",
+        "sourceDiversity": 0,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Materials Science share baseline",
+        "parentTheme": "science-general",
+        "sharePct": 100,
+        "deltaSharePct": 100
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Materials Science watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Materials Science changed lifecycle stage",
+        "detail": "Materials Science moved from nascent to emerging in the current week lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Materials Science logged 1 items, +100% versus the prior week and +100% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Materials Science is showing positive acceleration of 100 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Materials Science now represents 100% of Science General coverage, a +100 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Materials Science share movement inside Science General",
+            "sharePct": 100,
+            "deltaSharePct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "1 curated item mapped to Materials Science in the recent digest window.",
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+            "articleId": 77653,
+            "source": "Google News: company",
+            "publishedAt": "2026-04-07T04:04:59.000Z"
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Materials Science matters because it is emerging with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "openalex_research",
+            "label": "OpenAlex research",
+            "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+            "sourceType": "research",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science aggregate context",
+            "lifecycleStage": "emerging",
+            "vsYearAgoPct": 100,
+            "acceleration": 100
+          },
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Materials Science relative-share context",
+            "parentTheme": "science-general",
+            "deltaSharePct": 100
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+            "workId": "https://openalex.org/W3126951392",
+            "publishedAt": "2021-02-04T15:00:00.000Z",
+            "citedByCount": 1851,
+            "researchSignalScore": 0,
+            "source": "Sensors"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Technology Roadmap for Flexible Sensors",
+            "workId": "https://openalex.org/W4323653529",
+            "publishedAt": "2023-03-08T15:00:00.000Z",
+            "citedByCount": 1174,
+            "researchSignalScore": 0,
+            "source": "ACS Nano"
+          },
+          {
+            "type": "openalex_research",
+            "evidenceClass": "openalex_research",
+            "sourceType": "research",
+            "label": "Ten Years of Progress in the Synthesis and Development of MXenes",
+            "workId": "https://openalex.org/W3193369452",
+            "publishedAt": "2021-08-15T15:00:00.000Z",
+            "citedByCount": 1167,
+            "researchSignalScore": 0,
+            "source": "Advanced Materials"
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Materials Science share movement",
+        "detail": "Materials Science is ranked #1 inside Science General with 100% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Materials Science relative share",
+            "parentTheme": "science-general",
+            "sharePct": 100,
+            "deltaSharePct": 100
+          }
+        ]
+      },
+      {
+        "section": "relatedEntities",
+        "claimType": "entity_exposure",
+        "title": "Theme-to-entity linkage",
+        "detail": "3 entity links are attached to this theme.",
+        "evidenceClasses": [
+          {
+            "key": "sec_filings",
+            "label": "SEC-backed entities",
+            "description": "Theme-to-entity links backed by SEC connector data.",
+            "sourceType": "filing",
+            "count": 3
+          }
+        ],
+        "provenance": [
+          {
+            "type": "sec_connector",
+            "entityKey": "QS",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:46.236Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "ALB",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:47.958Z"
+          },
+          {
+            "type": "sec_connector",
+            "entityKey": "MP",
+            "evidenceSource": "theme_entity_seed+sec",
+            "updatedAt": "2026-04-07T21:20:49.546Z"
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Materials Science changed lifecycle stage",
+        "detail": "Materials Science moved from nascent to emerging in the current week lens.",
+        "metric": {
+          "from": "nascent",
+          "to": "emerging"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Materials Science logged 1 items, +100% versus the prior week and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 1,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Materials Science is showing positive acceleration of 100 in the current week comparison.",
+        "metric": {
+          "acceleration": 100,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Materials Science week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Materials Science now represents 100% of Science General coverage, a +100 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 100,
+          "deltaSharePct": 100
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Materials Science share movement inside Science General",
+            "sharePct": 100,
+            "deltaSharePct": 100
+          }
+        ]
+      },
+      {
+        "type": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "1 curated item mapped to Materials Science in the recent digest window.",
+        "metric": {
+          "curatedItems": 1
+        },
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+            "articleId": 77653,
+            "source": "Google News: company",
+            "publishedAt": "2026-04-07T04:04:59.000Z"
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Materials Science matters because it is emerging with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Materials Science matters because it is emerging with positive year-on-year movement and still building acceleration.",
+        "Materials Science is not just moving in isolation. It is shifting relative share inside Science General, which makes it a structural signal rather than a single headline burst.",
+        "Materials Science is also reinforced by 8 OpenAlex-linked research works, including 1 from the last three publication years, which suggests the theme has live research momentum and not just media attention.",
+        "The research lane clusters around Biosensor, Nanotechnology, Nanomaterials, which sharpens the evidence base behind the theme beyond general news coverage."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science relative-share context",
+          "parentTheme": "science-general",
+          "deltaSharePct": 100
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+          "workId": "https://openalex.org/W3126951392",
+          "publishedAt": "2021-02-04T15:00:00.000Z",
+          "citedByCount": 1851,
+          "researchSignalScore": 0,
+          "source": "Sensors"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Technology Roadmap for Flexible Sensors",
+          "workId": "https://openalex.org/W4323653529",
+          "publishedAt": "2023-03-08T15:00:00.000Z",
+          "citedByCount": 1174,
+          "researchSignalScore": 0,
+          "source": "ACS Nano"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ten Years of Progress in the Synthesis and Development of MXenes",
+          "workId": "https://openalex.org/W3193369452",
+          "publishedAt": "2021-08-15T15:00:00.000Z",
+          "citedByCount": 1167,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 1,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "acceleration": 100,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [
+        {
+          "title": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z",
+          "whyItMatters": "Materials Science is accelerating 300% versus the prior week.",
+          "oneLineSummary": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "relatedTopics": []
+        }
+      ],
+      "recentArticles": [
+        {
+          "articleId": 77653,
+          "title": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z",
+          "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxPT3lWMVlkWno2LVlVZW5mek1qRlliZWhxb1JDUFRTZlBaOVhIbWRRam1pM1VSUk9tMmREZS1wUGtveUhSY0g4UTlXU25Ea0lQUy0zNW1aM1FnWWEwVk5COTM0NkFSYUg1UzMtaWFPVU5namN5VUFSeUpyVmVVNTl1ckNRYjgyemtwdFZKU01IUUZfeGZha296VEFKLUs3UEcydnF6a1F6NkpyWEN4S1FYenR6elY?oc=5"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connected",
+        "summary": {
+          "workCount": 8,
+          "recentCount": 1,
+          "totalCitations": 6339,
+          "avgResearchSignalScore": 0,
+          "topConcepts": [
+            "Biosensor",
+            "Nanotechnology",
+            "Nanomaterials",
+            "Materials science",
+            "Nanowire"
+          ]
+        },
+        "works": [
+          {
+            "workId": "https://openalex.org/W3126951392",
+            "title": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+            "publicationYear": 2021,
+            "publicationDate": "2021-02-04T15:00:00.000Z",
+            "citedByCount": 1851,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Sensors",
+            "primaryTopic": "Advanced biosensing and bioanalysis techniques",
+            "landingPageUrl": "https://doi.org/10.3390/s21041109",
+            "abstractSummary": "A biosensor is an integrated receptor-transducer device, which can convert a biological response into an electrical signal. The design and development of biosensors have taken a center stage for researchers or scientists in the recent decade owing to the wide range of biosensor applications, such as health care and di…",
+            "concepts": [
+              {
+                "displayName": "Biosensor",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Nanomaterials",
+                "score": 0
+              },
+              {
+                "displayName": "Materials science",
+                "score": 0
+              },
+              {
+                "displayName": "Nanowire",
+                "score": 0
+              },
+              {
+                "displayName": "Transducer",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "V. Naresh",
+              "Nohyun Lee"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4323653529",
+            "title": "Technology Roadmap for Flexible Sensors",
+            "publicationYear": 2023,
+            "publicationDate": "2023-03-08T15:00:00.000Z",
+            "citedByCount": 1174,
+            "researchSignalScore": 0,
+            "matchedKeywords": [],
+            "sourceDisplayName": "ACS Nano",
+            "primaryTopic": "Advanced Sensor and Energy Harvesting Materials",
+            "landingPageUrl": "https://doi.org/10.1021/acsnano.2c12606",
+            "abstractSummary": "Humans rely increasingly on sensors to address grand challenges and to improve quality of life in the era of digitalization and big data. For ubiquitous sensing, flexible sensors are developed to overcome the limitations of conventional rigid counterparts. Despite rapid advancement in bench-side research over the last…",
+            "concepts": [
+              {
+                "displayName": "Commercialization",
+                "score": 0
+              },
+              {
+                "displayName": "Software deployment",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Big data",
+                "score": 0
+              },
+              {
+                "displayName": "Wireless sensor network",
+                "score": 0
+              },
+              {
+                "displayName": "Systems engineering",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Yifei Luo",
+              "Mohammad Reza Abidian",
+              "Jong‐Hyun Ahn",
+              "Deji Akinwande"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3193369452",
+            "title": "Ten Years of Progress in the Synthesis and Development of MXenes",
+            "publicationYear": 2021,
+            "publicationDate": "2021-08-15T15:00:00.000Z",
+            "citedByCount": 1167,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Advanced Materials",
+            "primaryTopic": "MXene and MAX Phase Materials",
+            "landingPageUrl": "https://doi.org/10.1002/adma.202103393",
+            "abstractSummary": "Since their discovery in 2011, the number of 2D transition metal carbides and nitrides (MXenes) has steadily increased. Currently more than 40 MXene compositions exist. The ultimate number is far greater and in time they may develop into the largest family of 2D materials known. MXenes' unique properties, such as thei…",
+            "concepts": [
+              {
+                "displayName": "MXenes",
+                "score": 0
+              },
+              {
+                "displayName": "Materials science",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Etching (microfabrication)",
+                "score": 0
+              },
+              {
+                "displayName": "MAX phases",
+                "score": 0
+              },
+              {
+                "displayName": "Carbide",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Michael Naguib",
+              "Michel W. Barsoum",
+              "Yury Gogotsi"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3154409837",
+            "title": "Covalent organic frameworks (COFs) for electrochemical applications",
+            "publicationYear": 2021,
+            "publicationDate": "2020-12-31T15:00:00.000Z",
+            "citedByCount": 1058,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Chemical Society Reviews",
+            "primaryTopic": "Covalent Organic Framework Applications",
+            "landingPageUrl": "https://doi.org/10.1039/d0cs01569e",
+            "abstractSummary": "Covalent organic frameworks are a class of extended crystalline organic materials that possess unique architectures with high surface areas and tuneable pore sizes. Since the first discovery of the topological frameworks in 2005, COFs have been applied as promising materials in diverse areas such as separation and pur…",
+            "concepts": [
+              {
+                "displayName": "Electrochemistry",
+                "score": 0
+              },
+              {
+                "displayName": "Covalent bond",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Chemistry",
+                "score": 0
+              },
+              {
+                "displayName": "Combinatorial chemistry",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Xiaojia Zhao",
+              "Pradip Pachfule",
+              "Arne Thomas"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3136472111",
+            "title": "Regulating Fe-spin state by atomically dispersed Mn-N in Fe-N-C catalysts with high oxygen reduction activity",
+            "publicationYear": 2021,
+            "publicationDate": "2021-03-18T15:00:00.000Z",
+            "citedByCount": 945,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Nature Communications",
+            "primaryTopic": "Electrocatalysts for Energy Conversion",
+            "landingPageUrl": "https://doi.org/10.1038/s41467-021-21919-5",
+            "abstractSummary": "As low-cost electrocatalysts for oxygen reduction reaction applied to fuel cells and metal-air batteries, atomic-dispersed transition metal-nitrogen-carbon materials are emerging, but the genuine mechanism thereof is still arguable. Herein, by rational design and synthesis of dual-metal atomically dispersed Fe,Mn/N-C…",
+            "concepts": [
+              {
+                "displayName": "Catalysis",
+                "score": 0
+              },
+              {
+                "displayName": "Oxygen",
+                "score": 0
+              },
+              {
+                "displayName": "Antibonding molecular orbital",
+                "score": 0
+              },
+              {
+                "displayName": "Transition metal",
+                "score": 0
+              },
+              {
+                "displayName": "Metal",
+                "score": 0
+              },
+              {
+                "displayName": "Materials science",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Gege Yang",
+              "Jiawei Zhu",
+              "Pengfei Yuan",
+              "Yongfeng Hu"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4281687746",
+            "title": "Recent Progress in Emerging Organic Semiconductors",
+            "publicationYear": 2022,
+            "publicationDate": "2022-05-31T15:00:00.000Z",
+            "citedByCount": 79,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Advanced Materials",
+            "primaryTopic": "Conducting polymers and applications",
+            "landingPageUrl": "https://doi.org/10.1002/adma.202108701",
+            "abstractSummary": "We live in a materials’ world, and their development is decisive for new technologies. As one type of material, organic semiconductors (OSCs) are receiving wide research interest due to their attractive properties, such as low-cost preparation, light weight, mechanical flexibility, easy processing, tuning of functions…",
+            "concepts": [
+              {
+                "displayName": "Materials science",
+                "score": 0
+              },
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Organic semiconductor",
+                "score": 0
+              },
+              {
+                "displayName": "Semiconductor",
+                "score": 0
+              },
+              {
+                "displayName": "Engineering physics",
+                "score": 0
+              },
+              {
+                "displayName": "Optoelectronics",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Qichun Zhang",
+              "Wenping Hu",
+              "Henning Sirringhaus",
+              "Kläus Müllen"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W3164577295",
+            "title": "Advances in Emerging Crystalline Porous Materials",
+            "publicationYear": 2021,
+            "publicationDate": "2021-05-31T15:00:00.000Z",
+            "citedByCount": 47,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Small",
+            "primaryTopic": "Covalent Organic Framework Applications",
+            "landingPageUrl": "https://doi.org/10.1002/smll.202102331",
+            "abstractSummary": "Crystalline porous materials (CPMs) have attracted considerable research attention in recent years for their wide applications in many fields, such as the energy storage and conversion, gas separation and storage, water purification, catalysis, optoelectronics, sensors, drug delivery, etc. The wide applications of CPM…",
+            "concepts": [
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Context (archaeology)",
+                "score": 0
+              },
+              {
+                "displayName": "Fabrication",
+                "score": 0
+              },
+              {
+                "displayName": "Materials science",
+                "score": 0
+              },
+              {
+                "displayName": "Paleontology",
+                "score": 0
+              },
+              {
+                "displayName": "Alternative medicine",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Jialiang Xu",
+              "Yunhua Xu",
+              "Xian‐He Bu"
+            ]
+          },
+          {
+            "workId": "https://openalex.org/W4200412017",
+            "title": "Programmable Materials",
+            "publicationYear": 2021,
+            "publicationDate": "2021-10-31T15:00:00.000Z",
+            "citedByCount": 18,
+            "researchSignalScore": 0,
+            "matchedKeywords": [
+              "materials science"
+            ],
+            "sourceDisplayName": "Advanced Materials",
+            "primaryTopic": "Modular Robots and Swarm Intelligence",
+            "landingPageUrl": "https://doi.org/10.1002/adma.202107344",
+            "abstractSummary": "The ability to synthesize materials by design presents one of the greatest scientific challenges. Programmable materials can be designed to be highly dynamic either in form or function. Advances made toward the fabrication of programmable materials can lead to new, unexpected discoveries and novel functionalities in e…",
+            "concepts": [
+              {
+                "displayName": "Nanotechnology",
+                "score": 0
+              },
+              {
+                "displayName": "Adaptability",
+                "score": 0
+              },
+              {
+                "displayName": "Computer science",
+                "score": 0
+              },
+              {
+                "displayName": "Robotics",
+                "score": 0
+              },
+              {
+                "displayName": "Smart material",
+                "score": 0
+              },
+              {
+                "displayName": "Thriving",
+                "score": 0
+              }
+            ],
+            "authors": [
+              "Xiaodong Chen",
+              "Nathan C. Gianneschi",
+              "David S. Ginger",
+              "Jwa‐Min Nam"
+            ]
+          }
+        ]
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "advanced materials",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 3,
+          "codeCount": 0,
+          "totalCount": 3,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2022-05-31T15:00:00.000Z"
+        },
+        {
+          "source": "google news: company",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-07T04:04:59.000Z"
+        },
+        {
+          "source": "sensors",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2021-02-04T15:00:00.000Z"
+        },
+        {
+          "source": "acs nano",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2023-03-08T15:00:00.000Z"
+        },
+        {
+          "source": "chemical society reviews",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2020-12-31T15:00:00.000Z"
+        },
+        {
+          "source": "nature communications",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2021-03-18T15:00:00.000Z"
+        },
+        {
+          "source": "small",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 0,
+          "researchCount": 1,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "openalex_research"
+          ],
+          "latestPublishedAt": "2021-05-31T15:00:00.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 1
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        }
+      ],
+      "sourceClasses": [
+        "advanced materials",
+        "google news: company",
+        "sensors",
+        "acs nano",
+        "chemical society reviews",
+        "nature communications",
+        "small"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science aggregate",
+          "articleCount": 1,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "articleId": 77653,
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "articleId": 77653,
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z",
+          "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxPT3lWMVlkWno2LVlVZW5mek1qRlliZWhxb1JDUFRTZlBaOVhIbWRRam1pM1VSUk9tMmREZS1wUGtveUhSY0g4UTlXU25Ea0lQUy0zNW1aM1FnWWEwVk5COTM0NkFSYUg1UzMtaWFPVU5namN5VUFSeUpyVmVVNTl1ckNRYjgyemtwdFZKU01IUUZfeGZha296VEFKLUs3UEcydnF6a1F6NkpyWEN4S1FYenR6elY?oc=5"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "QS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:46.236Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ALB",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:47.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:49.546Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+          "workId": "https://openalex.org/W3126951392",
+          "publishedAt": "2021-02-04T15:00:00.000Z",
+          "citedByCount": 1851,
+          "researchSignalScore": 0,
+          "source": "Sensors"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Technology Roadmap for Flexible Sensors",
+          "workId": "https://openalex.org/W4323653529",
+          "publishedAt": "2023-03-08T15:00:00.000Z",
+          "citedByCount": 1174,
+          "researchSignalScore": 0,
+          "source": "ACS Nano"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ten Years of Progress in the Synthesis and Development of MXenes",
+          "workId": "https://openalex.org/W3193369452",
+          "publishedAt": "2021-08-15T15:00:00.000Z",
+          "citedByCount": 1167,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Covalent organic frameworks (COFs) for electrochemical applications",
+          "workId": "https://openalex.org/W3154409837",
+          "publishedAt": "2020-12-31T15:00:00.000Z",
+          "citedByCount": 1058,
+          "researchSignalScore": 0,
+          "source": "Chemical Society Reviews"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Regulating Fe-spin state by atomically dispersed Mn-N in Fe-N-C catalysts with high oxygen reduction activity",
+          "workId": "https://openalex.org/W3136472111",
+          "publishedAt": "2021-03-18T15:00:00.000Z",
+          "citedByCount": 945,
+          "researchSignalScore": 0,
+          "source": "Nature Communications"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Recent Progress in Emerging Organic Semiconductors",
+          "workId": "https://openalex.org/W4281687746",
+          "publishedAt": "2022-05-31T15:00:00.000Z",
+          "citedByCount": 79,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Advances in Emerging Crystalline Porous Materials",
+          "workId": "https://openalex.org/W3164577295",
+          "publishedAt": "2021-05-31T15:00:00.000Z",
+          "citedByCount": 47,
+          "researchSignalScore": 0,
+          "source": "Small"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Programmable Materials",
+          "workId": "https://openalex.org/W4200412017",
+          "publishedAt": "2021-10-31T15:00:00.000Z",
+          "citedByCount": 18,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "science-general",
+      "selectedTheme": {
+        "theme": "materials-science",
+        "label": "Materials Science",
+        "lastSharePct": 100,
+        "deltaSharePct": 100,
+        "averageSharePct": 16.67,
+        "rank": 1
+      },
+      "peerThemes": [
+        {
+          "theme": "materials-science",
+          "label": "Materials Science",
+          "lastSharePct": 100,
+          "deltaSharePct": 100,
+          "rank": 1
+        },
+        {
+          "theme": "biotech",
+          "label": "Biotech",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 2
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science relative share",
+          "parentTheme": "science-general",
+          "sharePct": 100,
+          "deltaSharePct": 100
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connected",
+      "entities": [
+        {
+          "entityType": "company",
+          "entityKey": "QS",
+          "ticker": "QS",
+          "companyName": "QuantumScape Corporation",
+          "cik": "0001811414",
+          "sectorHint": "Miscellaneous Electrical Machinery, Equipment & Supplies",
+          "relationType": "beneficiary",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for QS.",
+          "filingCount": 17,
+          "latestFiledAt": "2026-03-04T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:46.236Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "ALB",
+          "ticker": "ALB",
+          "companyName": "ALBEMARLE CORPORATION",
+          "cik": "0000915913",
+          "sectorHint": "Plastic Materials, Synth Resins & Nonvulcan Elastomers",
+          "relationType": "supplier",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for ALB.",
+          "filingCount": 16,
+          "latestFiledAt": "2026-03-24T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:47.958Z"
+        },
+        {
+          "entityType": "company",
+          "entityKey": "MP",
+          "ticker": "MP",
+          "companyName": "MP Materials Corp. / DE",
+          "cik": "0001801368",
+          "sectorHint": "Metal Mining",
+          "relationType": "supplier",
+          "sign": "positive",
+          "confidence": 0.82,
+          "horizon": "long",
+          "evidenceSource": "theme_entity_seed+sec",
+          "evidenceNote": "Seeded from the canonical theme-entity map and refreshed with SEC company facts/filings for MP.",
+          "filingCount": 16,
+          "latestFiledAt": "2026-02-25T15:00:00.000Z",
+          "recentForms": [
+            "10-K",
+            "10-Q",
+            "8-K"
+          ],
+          "updatedAt": "2026-04-07T21:20:49.546Z"
+        }
+      ],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "positive",
+          "note": "QuantumScape Corporation is linked as beneficiary with confidence 0.82 and 17 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "supplier",
+          "status": "positive",
+          "note": "ALBEMARLE CORPORATION is linked as supplier with confidence 0.82 and 16 filing-backed touchpoint(s)."
+        },
+        {
+          "relationType": "supplier",
+          "status": "positive",
+          "note": "MP Materials Corp. / DE is linked as supplier with confidence 0.82 and 16 filing-backed touchpoint(s)."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "QS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:46.236Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ALB",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:47.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:49.546Z"
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Materials Science keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Materials Science holds or expands its 100% share inside Science General.",
+      "Watch whether research coverage for this theme stays above 8 tracked OpenAlex works and whether new papers broaden beyond Biosensor / Nanotechnology."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "materials-science",
+        "science-general",
+        "science"
+      ],
+      "exportTitle": "Materials Science Week Theme Brief",
+      "promptSeed": "What changed in Materials Science, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science week aggregate",
+          "articleCount": 1,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science share movement inside Science General",
+          "sharePct": 100,
+          "deltaSharePct": 100
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "articleId": 77653,
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z"
+        }
+      ],
+      "claimCount": 5
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science relative-share context",
+          "parentTheme": "science-general",
+          "deltaSharePct": 100
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+          "workId": "https://openalex.org/W3126951392",
+          "publishedAt": "2021-02-04T15:00:00.000Z",
+          "citedByCount": 1851,
+          "researchSignalScore": 0,
+          "source": "Sensors"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Technology Roadmap for Flexible Sensors",
+          "workId": "https://openalex.org/W4323653529",
+          "publishedAt": "2023-03-08T15:00:00.000Z",
+          "citedByCount": 1174,
+          "researchSignalScore": 0,
+          "source": "ACS Nano"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ten Years of Progress in the Synthesis and Development of MXenes",
+          "workId": "https://openalex.org/W3193369452",
+          "publishedAt": "2021-08-15T15:00:00.000Z",
+          "citedByCount": 1167,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        }
+      ],
+      "claimCount": 4
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 1
+        },
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        },
+        {
+          "key": "openalex_research",
+          "label": "OpenAlex research",
+          "description": "Research papers linked to the theme through OpenAlex work search and filtering.",
+          "sourceType": "research",
+          "count": 8
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science aggregate",
+          "articleCount": 1,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "articleId": 77653,
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "articleId": 77653,
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z",
+          "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxPT3lWMVlkWno2LVlVZW5mek1qRlliZWhxb1JDUFRTZlBaOVhIbWRRam1pM1VSUk9tMmREZS1wUGtveUhSY0g4UTlXU25Ea0lQUy0zNW1aM1FnWWEwVk5COTM0NkFSYUg1UzMtaWFPVU5namN5VUFSeUpyVmVVNTl1ckNRYjgyemtwdFZKU01IUUZfeGZha296VEFKLUs3UEcydnF6a1F6NkpyWEN4S1FYenR6elY?oc=5"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "QS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:46.236Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ALB",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:47.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:49.546Z"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "A Review on Biosensors and Recent Development of Nanostructured Materials-Enabled Biosensors",
+          "workId": "https://openalex.org/W3126951392",
+          "publishedAt": "2021-02-04T15:00:00.000Z",
+          "citedByCount": 1851,
+          "researchSignalScore": 0,
+          "source": "Sensors"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Technology Roadmap for Flexible Sensors",
+          "workId": "https://openalex.org/W4323653529",
+          "publishedAt": "2023-03-08T15:00:00.000Z",
+          "citedByCount": 1174,
+          "researchSignalScore": 0,
+          "source": "ACS Nano"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Ten Years of Progress in the Synthesis and Development of MXenes",
+          "workId": "https://openalex.org/W3193369452",
+          "publishedAt": "2021-08-15T15:00:00.000Z",
+          "citedByCount": 1167,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Covalent organic frameworks (COFs) for electrochemical applications",
+          "workId": "https://openalex.org/W3154409837",
+          "publishedAt": "2020-12-31T15:00:00.000Z",
+          "citedByCount": 1058,
+          "researchSignalScore": 0,
+          "source": "Chemical Society Reviews"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Regulating Fe-spin state by atomically dispersed Mn-N in Fe-N-C catalysts with high oxygen reduction activity",
+          "workId": "https://openalex.org/W3136472111",
+          "publishedAt": "2021-03-18T15:00:00.000Z",
+          "citedByCount": 945,
+          "researchSignalScore": 0,
+          "source": "Nature Communications"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Recent Progress in Emerging Organic Semiconductors",
+          "workId": "https://openalex.org/W4281687746",
+          "publishedAt": "2022-05-31T15:00:00.000Z",
+          "citedByCount": 79,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Advances in Emerging Crystalline Porous Materials",
+          "workId": "https://openalex.org/W3164577295",
+          "publishedAt": "2021-05-31T15:00:00.000Z",
+          "citedByCount": 47,
+          "researchSignalScore": 0,
+          "source": "Small"
+        },
+        {
+          "type": "openalex_research",
+          "evidenceClass": "openalex_research",
+          "sourceType": "research",
+          "label": "Programmable Materials",
+          "workId": "https://openalex.org/W4200412017",
+          "publishedAt": "2021-10-31T15:00:00.000Z",
+          "citedByCount": 18,
+          "researchSignalScore": 0,
+          "source": "Advanced Materials"
+        }
+      ],
+      "sourceCount": 7
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science relative share",
+          "parentTheme": "science-general",
+          "sharePct": 100,
+          "deltaSharePct": 100
+        }
+      ],
+      "peerThemeCount": 2
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "sec_filings",
+          "label": "SEC-backed entities",
+          "description": "Theme-to-entity links backed by SEC connector data.",
+          "sourceType": "filing",
+          "count": 3
+        }
+      ],
+      "provenance": [
+        {
+          "type": "sec_connector",
+          "entityKey": "QS",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:46.236Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "ALB",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:47.958Z"
+        },
+        {
+          "type": "sec_connector",
+          "entityKey": "MP",
+          "evidenceSource": "theme_entity_seed+sec",
+          "updatedAt": "2026-04-07T21:20:49.546Z"
+        }
+      ],
+      "entityCount": 3
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science risk baseline",
+          "articleCount": 1,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science share baseline",
+          "parentTheme": "science-general",
+          "sharePct": 100,
+          "deltaSharePct": 100
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Company 3D Printing Small Boats Using Advanced Materials - National Defense Magazine",
+          "articleId": 77653,
+          "source": "Google News: company",
+          "publishedAt": "2026-04-07T04:04:59.000Z"
+        }
+      ],
+      "claimCount": 2
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Materials Science risk baseline",
+          "articleCount": 1,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Materials Science share baseline",
+          "parentTheme": "science-general",
+          "sharePct": 100,
+          "deltaSharePct": 100
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Materials Science watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "materials-science::week",
+    "theme": "materials-science",
+    "periodType": "week",
+    "label": "Materials Science",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:35.304Z",
+    "stale": false
+  }
+}

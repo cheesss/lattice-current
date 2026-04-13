@@ -1,0 +1,1370 @@
+{
+  "theme": "diplomacy",
+  "label": "Diplomacy",
+  "category": "geopolitics",
+  "categoryLabel": "Geopolitics",
+  "parentTheme": "geopolitics",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 0,
+    "lifecycleStage": "nascent",
+    "vsPreviousPct": 0,
+    "vsYearAgoPct": 0,
+    "acceleration": 0,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Diplomacy summary baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 6
+      },
+      {
+        "key": "curated_digest",
+        "label": "Curated digest",
+        "description": "Ranked curated items linked to the theme.",
+        "sourceType": "digest",
+        "count": 4
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 2
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Diplomacy week aggregate",
+        "articleCount": 0,
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Diplomacy share movement inside Geopolitics",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+        "articleId": 77070,
+        "source": "CrisisWatch",
+        "publishedAt": "2026-04-05T17:04:12.668Z"
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+        "articleId": 77033,
+        "source": "Reuters Asia",
+        "publishedAt": "2026-04-05T15:19:32.000Z"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Diplomacy aggregate context",
+        "lifecycleStage": "nascent",
+        "vsYearAgoPct": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Diplomacy aggregate",
+        "articleCount": 0,
+        "lifecycleStage": "nascent"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+        "articleId": 77070,
+        "source": "CrisisWatch",
+        "publishedAt": "2026-04-05T17:04:12.668Z",
+        "url": "https://www.crisisgroup.org/anb/asia-pacific/taiwan-strait-china-united-states/taiwan-opposition-leader-prepares-china-trip-ahead-trump-xi-summit"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+        "articleId": 77033,
+        "source": "Reuters Asia",
+        "publishedAt": "2026-04-05T15:19:32.000Z",
+        "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxOUE01SUtPNmZXZEo2LTUzMUsxM2NJdFd6V2FaYmUya1FIUWFkckR2QlhwQUhsWjFCNjNkcUJTRXdVdGVKcXNhX19RdUF5WTV5dE1QQTBwVnVmLXN4dGdQeHpsSGFXT0lOcGxzWU9fTnA1ZFRnYWp2ekR6OGI3V05RRjhtUk95YWpfX09oYVlsNEFHc0pvR2NFYWY1VTlGMnEyOTFFd2c3Vi1XamZWTHdPRVJIc2tKOW5BOWJBUkFieHJ2UmF5R0dN?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "WHO Member States agree to extend negotiations on key annex to the Pandemic Agreement",
+        "articleId": 77256,
+        "source": "WHO",
+        "publishedAt": "2026-03-28T19:14:12.000Z",
+        "url": "https://www.who.int/news/item/28-03-2026-who-member-states-agree-to-extend-negotiations-on-key-annex-to-the-pandemic-agreement"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "I’m in Venezuela. This Is the True Cost of Trump’s Gunboat Diplomacy.",
+        "articleId": 71847,
+        "source": "nyt",
+        "publishedAt": "2025-11-21T06:00:05.000Z",
+        "url": "https://www.nytimes.com/2025/11/21/opinion/venezuela-trump-maduro-machado-regime-change.html"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "The Dangerous Stalemate Over Iran’s Nuclear Program",
+        "articleId": 71842,
+        "source": "nyt",
+        "publishedAt": "2025-11-09T10:01:39.000Z",
+        "url": "https://www.nytimes.com/2025/11/09/world/middleeast/iran-nuclear-program-israel.html"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Diplomacy relative share",
+        "parentTheme": "geopolitics",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Diplomacy connector placeholder",
+        "detail": "Exposure connectors not yet populated for this theme."
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Diplomacy risk baseline",
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "sourceDiversity": 0,
+        "acceleration": 0
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Diplomacy share baseline",
+        "parentTheme": "geopolitics",
+        "sharePct": 0,
+        "deltaSharePct": 0
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Diplomacy watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Diplomacy changed lifecycle stage",
+        "detail": "Diplomacy moved from emerging to nascent in the current week lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Diplomacy logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Diplomacy is showing positive acceleration of 0 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Diplomacy now represents 0% of Geopolitics coverage, a +0 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Diplomacy share movement inside Geopolitics",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "2 curated items mapped to Diplomacy in the recent digest window.",
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+            "articleId": 77070,
+            "source": "CrisisWatch",
+            "publishedAt": "2026-04-05T17:04:12.668Z"
+          },
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+            "articleId": 77033,
+            "source": "Reuters Asia",
+            "publishedAt": "2026-04-05T15:19:32.000Z"
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Diplomacy matters because it is nascent with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy aggregate context",
+            "lifecycleStage": "nascent",
+            "vsYearAgoPct": 0,
+            "acceleration": 0
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Diplomacy share movement",
+        "detail": "Diplomacy is ranked #3 inside Geopolitics with 0% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 4
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Diplomacy relative share",
+            "parentTheme": "geopolitics",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Diplomacy changed lifecycle stage",
+        "detail": "Diplomacy moved from emerging to nascent in the current week lens.",
+        "metric": {
+          "from": "emerging",
+          "to": "nascent"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Diplomacy logged 0 items, +0% versus the prior week and +0% versus a year ago.",
+        "metric": {
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Diplomacy is showing positive acceleration of 0 in the current week comparison.",
+        "metric": {
+          "acceleration": 0,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Diplomacy week aggregate",
+            "articleCount": 0,
+            "vsPreviousPct": 0,
+            "vsYearAgoPct": 0
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Diplomacy now represents 0% of Geopolitics coverage, a +0 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 0,
+          "deltaSharePct": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Diplomacy share movement inside Geopolitics",
+            "sharePct": 0,
+            "deltaSharePct": 0
+          }
+        ]
+      },
+      {
+        "type": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "2 curated items mapped to Diplomacy in the recent digest window.",
+        "metric": {
+          "curatedItems": 2
+        },
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 2
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+            "articleId": 77070,
+            "source": "CrisisWatch",
+            "publishedAt": "2026-04-05T17:04:12.668Z"
+          },
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+            "articleId": 77033,
+            "source": "Reuters Asia",
+            "publishedAt": "2026-04-05T15:19:32.000Z"
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Diplomacy matters because it is nascent with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Diplomacy matters because it is nascent with positive year-on-year movement and still building acceleration."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 0,
+        "lifecycleStage": "nascent",
+        "vsPreviousPct": 0,
+        "vsYearAgoPct": 0,
+        "acceleration": 0,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [
+        {
+          "title": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z",
+          "whyItMatters": "Diplomacy is accelerating 100% versus the prior week.",
+          "oneLineSummary": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "relatedTopics": []
+        },
+        {
+          "title": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z",
+          "whyItMatters": "Diplomacy is accelerating 100% versus the prior week.",
+          "oneLineSummary": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "relatedTopics": []
+        }
+      ],
+      "recentArticles": [
+        {
+          "articleId": 77070,
+          "title": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z",
+          "url": "https://www.crisisgroup.org/anb/asia-pacific/taiwan-strait-china-united-states/taiwan-opposition-leader-prepares-china-trip-ahead-trump-xi-summit"
+        },
+        {
+          "articleId": 77033,
+          "title": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z",
+          "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxOUE01SUtPNmZXZEo2LTUzMUsxM2NJdFd6V2FaYmUya1FIUWFkckR2QlhwQUhsWjFCNjNkcUJTRXdVdGVKcXNhX19RdUF5WTV5dE1QQTBwVnVmLXN4dGdQeHpsSGFXT0lOcGxzWU9fTnA1ZFRnYWp2ekR6OGI3V05RRjhtUk95YWpfX09oYVlsNEFHc0pvR2NFYWY1VTlGMnEyOTFFd2c3Vi1XamZWTHdPRVJIc2tKOW5BOWJBUkFieHJ2UmF5R0dN?oc=5"
+        },
+        {
+          "articleId": 77256,
+          "title": "WHO Member States agree to extend negotiations on key annex to the Pandemic Agreement",
+          "source": "WHO",
+          "publishedAt": "2026-03-28T19:14:12.000Z",
+          "url": "https://www.who.int/news/item/28-03-2026-who-member-states-agree-to-extend-negotiations-on-key-annex-to-the-pandemic-agreement"
+        },
+        {
+          "articleId": 71847,
+          "title": "I’m in Venezuela. This Is the True Cost of Trump’s Gunboat Diplomacy.",
+          "source": "nyt",
+          "publishedAt": "2025-11-21T06:00:05.000Z",
+          "url": "https://www.nytimes.com/2025/11/21/opinion/venezuela-trump-maduro-machado-regime-change.html"
+        },
+        {
+          "articleId": 71842,
+          "title": "The Dangerous Stalemate Over Iran’s Nuclear Program",
+          "source": "nyt",
+          "publishedAt": "2025-11-09T10:01:39.000Z",
+          "url": "https://www.nytimes.com/2025/11/09/world/middleeast/iran-nuclear-program-israel.html"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "works": []
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "crisiswatch",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-05T17:04:12.668Z"
+        },
+        {
+          "source": "reuters asia",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-05T15:19:32.000Z"
+        },
+        {
+          "source": "nyt",
+          "sourceQuality": 0.93,
+          "curatedItemCount": 0,
+          "recentArticleCount": 2,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2025-11-21T06:00:05.000Z"
+        },
+        {
+          "source": "who",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 0,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 1,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-03-28T19:14:12.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "sourceClasses": [
+        "crisiswatch",
+        "reuters asia",
+        "nyt",
+        "who"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "articleId": 77070,
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "articleId": 77033,
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "articleId": 77070,
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z",
+          "url": "https://www.crisisgroup.org/anb/asia-pacific/taiwan-strait-china-united-states/taiwan-opposition-leader-prepares-china-trip-ahead-trump-xi-summit"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "articleId": 77033,
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z",
+          "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxOUE01SUtPNmZXZEo2LTUzMUsxM2NJdFd6V2FaYmUya1FIUWFkckR2QlhwQUhsWjFCNjNkcUJTRXdVdGVKcXNhX19RdUF5WTV5dE1QQTBwVnVmLXN4dGdQeHpsSGFXT0lOcGxzWU9fTnA1ZFRnYWp2ekR6OGI3V05RRjhtUk95YWpfX09oYVlsNEFHc0pvR2NFYWY1VTlGMnEyOTFFd2c3Vi1XamZWTHdPRVJIc2tKOW5BOWJBUkFieHJ2UmF5R0dN?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "WHO Member States agree to extend negotiations on key annex to the Pandemic Agreement",
+          "articleId": 77256,
+          "source": "WHO",
+          "publishedAt": "2026-03-28T19:14:12.000Z",
+          "url": "https://www.who.int/news/item/28-03-2026-who-member-states-agree-to-extend-negotiations-on-key-annex-to-the-pandemic-agreement"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "I’m in Venezuela. This Is the True Cost of Trump’s Gunboat Diplomacy.",
+          "articleId": 71847,
+          "source": "nyt",
+          "publishedAt": "2025-11-21T06:00:05.000Z",
+          "url": "https://www.nytimes.com/2025/11/21/opinion/venezuela-trump-maduro-machado-regime-change.html"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "The Dangerous Stalemate Over Iran’s Nuclear Program",
+          "articleId": 71842,
+          "source": "nyt",
+          "publishedAt": "2025-11-09T10:01:39.000Z",
+          "url": "https://www.nytimes.com/2025/11/09/world/middleeast/iran-nuclear-program-israel.html"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "geopolitics",
+      "selectedTheme": {
+        "theme": "diplomacy",
+        "label": "Diplomacy",
+        "lastSharePct": 0,
+        "deltaSharePct": 0,
+        "averageSharePct": 2.23,
+        "rank": 3
+      },
+      "peerThemes": [
+        {
+          "theme": "defense-industrial",
+          "label": "Defense Industrial",
+          "lastSharePct": 12.5,
+          "deltaSharePct": 12.5,
+          "rank": 1
+        },
+        {
+          "theme": "supply-chain-security",
+          "label": "Supply Chain Security",
+          "lastSharePct": 12.5,
+          "deltaSharePct": 12.5,
+          "rank": 2
+        },
+        {
+          "theme": "diplomacy",
+          "label": "Diplomacy",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 3
+        },
+        {
+          "theme": "sanctions",
+          "label": "Sanctions",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 4
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Diplomacy relative share",
+          "parentTheme": "geopolitics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connector-pending",
+      "entities": [],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "pending",
+          "note": "Entity linkage for Diplomacy will populate once exposure connectors are enabled."
+        },
+        {
+          "relationType": "supplier",
+          "status": "pending",
+          "note": "The current foundation only tracks theme objects. Geopolitics exposure mapping is scheduled after SEC and OpenAlex."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Diplomacy connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Diplomacy keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Diplomacy holds or expands its 0% share inside Geopolitics.",
+      "Look for new evidence classes beyond news, especially filings, research, patents, or code activity as those connectors come online."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "diplomacy",
+        "geopolitics",
+        "geopolitics"
+      ],
+      "exportTitle": "Diplomacy Week Theme Brief",
+      "promptSeed": "What changed in Diplomacy, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy week aggregate",
+          "articleCount": 0,
+          "vsPreviousPct": 0,
+          "vsYearAgoPct": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Diplomacy share movement inside Geopolitics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "articleId": 77070,
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "articleId": 77033,
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z"
+        }
+      ],
+      "claimCount": 5
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy aggregate context",
+          "lifecycleStage": "nascent",
+          "vsYearAgoPct": 0,
+          "acceleration": 0
+        }
+      ],
+      "claimCount": 1
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 2
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy aggregate",
+          "articleCount": 0,
+          "lifecycleStage": "nascent"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "articleId": 77070,
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "articleId": 77033,
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "articleId": 77070,
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z",
+          "url": "https://www.crisisgroup.org/anb/asia-pacific/taiwan-strait-china-united-states/taiwan-opposition-leader-prepares-china-trip-ahead-trump-xi-summit"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "articleId": 77033,
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z",
+          "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxOUE01SUtPNmZXZEo2LTUzMUsxM2NJdFd6V2FaYmUya1FIUWFkckR2QlhwQUhsWjFCNjNkcUJTRXdVdGVKcXNhX19RdUF5WTV5dE1QQTBwVnVmLXN4dGdQeHpsSGFXT0lOcGxzWU9fTnA1ZFRnYWp2ekR6OGI3V05RRjhtUk95YWpfX09oYVlsNEFHc0pvR2NFYWY1VTlGMnEyOTFFd2c3Vi1XamZWTHdPRVJIc2tKOW5BOWJBUkFieHJ2UmF5R0dN?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "WHO Member States agree to extend negotiations on key annex to the Pandemic Agreement",
+          "articleId": 77256,
+          "source": "WHO",
+          "publishedAt": "2026-03-28T19:14:12.000Z",
+          "url": "https://www.who.int/news/item/28-03-2026-who-member-states-agree-to-extend-negotiations-on-key-annex-to-the-pandemic-agreement"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "I’m in Venezuela. This Is the True Cost of Trump’s Gunboat Diplomacy.",
+          "articleId": 71847,
+          "source": "nyt",
+          "publishedAt": "2025-11-21T06:00:05.000Z",
+          "url": "https://www.nytimes.com/2025/11/21/opinion/venezuela-trump-maduro-machado-regime-change.html"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "The Dangerous Stalemate Over Iran’s Nuclear Program",
+          "articleId": 71842,
+          "source": "nyt",
+          "publishedAt": "2025-11-09T10:01:39.000Z",
+          "url": "https://www.nytimes.com/2025/11/09/world/middleeast/iran-nuclear-program-israel.html"
+        }
+      ],
+      "sourceCount": 4
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 4
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Diplomacy relative share",
+          "parentTheme": "geopolitics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        }
+      ],
+      "peerThemeCount": 4
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Diplomacy connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ],
+      "entityCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Diplomacy share baseline",
+          "parentTheme": "geopolitics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Taiwan Opposition Leader Prepares for China Trip ahead of Trump-Xi Summit ",
+          "articleId": 77070,
+          "source": "CrisisWatch",
+          "publishedAt": "2026-04-05T17:04:12.668Z"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "China ready to cooperate with Russia to ease Middle East tension, foreign minister says - Reuters",
+          "articleId": 77033,
+          "source": "Reuters Asia",
+          "publishedAt": "2026-04-05T15:19:32.000Z"
+        }
+      ],
+      "claimCount": 2
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Diplomacy risk baseline",
+          "articleCount": 0,
+          "lifecycleStage": "nascent",
+          "sourceDiversity": 0,
+          "acceleration": 0
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Diplomacy share baseline",
+          "parentTheme": "geopolitics",
+          "sharePct": 0,
+          "deltaSharePct": 0
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Diplomacy watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "diplomacy::week",
+    "theme": "diplomacy",
+    "periodType": "week",
+    "label": "Diplomacy",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:44.102Z",
+    "stale": false
+  }
+}

@@ -1,0 +1,1331 @@
+{
+  "theme": "migration",
+  "label": "Migration",
+  "category": "society",
+  "categoryLabel": "Society",
+  "parentTheme": "society-general",
+  "periodType": "week",
+  "source": "theme_trend_aggregates",
+  "taxonomyFiltering": "canonical-only",
+  "summary": {
+    "articleCount": 1,
+    "lifecycleStage": "emerging",
+    "vsPreviousPct": 100,
+    "vsYearAgoPct": 100,
+    "acceleration": 100,
+    "sourceDiversity": 0,
+    "geographicSpread": 0,
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 1
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Migration summary baseline",
+        "articleCount": 1,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      }
+    ]
+  },
+  "deltaSinceLastVisit": {
+    "active": false,
+    "status": "first-view",
+    "since": null,
+    "headline": "This is the first recorded view for this theme in the current workspace.",
+    "newDigestItemCount": 0,
+    "newArticleCount": 0,
+    "items": []
+  },
+  "evidenceLedger": {
+    "evidenceClasses": [
+      {
+        "key": "trend_snapshot",
+        "label": "Trend aggregate",
+        "description": "Current period aggregate row for the canonical theme.",
+        "sourceType": "aggregate",
+        "count": 4
+      },
+      {
+        "key": "theme_evolution",
+        "label": "Theme evolution",
+        "description": "Relative share movement inside the parent theme.",
+        "sourceType": "aggregate",
+        "count": 7
+      },
+      {
+        "key": "curated_digest",
+        "label": "Curated digest",
+        "description": "Ranked curated items linked to the theme.",
+        "sourceType": "digest",
+        "count": 2
+      },
+      {
+        "key": "recent_articles",
+        "label": "Recent articles",
+        "description": "Recent article-level evidence from the theme stream.",
+        "sourceType": "article",
+        "count": 5
+      },
+      {
+        "key": "taxonomy",
+        "label": "Taxonomy governance",
+        "description": "Canonical taxonomy and fallback tracking evidence.",
+        "sourceType": "taxonomy",
+        "count": 2
+      }
+    ],
+    "provenance": [
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Migration week aggregate",
+        "articleCount": 1,
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Migration share movement inside Society General",
+        "sharePct": 50,
+        "deltaSharePct": 50
+      },
+      {
+        "type": "curated_digest",
+        "evidenceClass": "curated_digest",
+        "sourceType": "digest",
+        "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+        "articleId": 78683,
+        "source": "Google News: bill",
+        "publishedAt": "2026-04-07T11:03:00.000Z"
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Migration aggregate context",
+        "lifecycleStage": "emerging",
+        "vsYearAgoPct": 100,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Migration relative-share context",
+        "parentTheme": "society-general",
+        "deltaSharePct": 50
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Migration aggregate",
+        "articleCount": 1,
+        "lifecycleStage": "emerging"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+        "articleId": 78683,
+        "source": "Google News: bill",
+        "publishedAt": "2026-04-07T11:03:00.000Z",
+        "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxNanRNNnVPek96V3MwaWpHUmJublRxUTlTNndTSzdMWTV4alJubzFwZnBERnVlZnpUT1hBck0xZzFyNHo4UnNLWFdhakdsdVg3VWZsRHVZbHNzTncwVjJYdXJSaTJXdHFLNVRtV3Jzc0d3cGYyQ1FsZDZmWVB0dmxJT0V0WHpoNE5QX2kwekJOWk1aUQ?oc=5"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Trump’s sweeping changes to US immigration policy – here’s what to know",
+        "articleId": 73505,
+        "source": "guardian",
+        "publishedAt": "2025-12-04T13:00:20.000Z",
+        "url": "https://www.theguardian.com/us-news/2025/dec/04/trump-us-immigration-policy-explainer"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Israel urged to open more Gaza border crossings to allow surge of aid",
+        "articleId": 71356,
+        "source": "guardian",
+        "publishedAt": "2025-10-15T17:20:25.000Z",
+        "url": "https://www.theguardian.com/world/2025/oct/15/israel-pulls-back-threat-humanitarian-aid-gaza-hostages-remains-hamas"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Zambia remove US-based players due to Trump immigration policy fears",
+        "articleId": 64830,
+        "source": "guardian",
+        "publishedAt": "2025-04-02T20:33:36.000Z",
+        "url": "https://www.theguardian.com/football/2025/apr/02/zambia-womens-soccer-team-trump-policies"
+      },
+      {
+        "type": "recent_article",
+        "evidenceClass": "recent_article",
+        "sourceType": "article",
+        "label": "Something about the migrant labor camp spooked my mother. Then she learned its dark history",
+        "articleId": 58557,
+        "source": "guardian",
+        "publishedAt": "2024-10-02T12:00:27.000Z",
+        "url": "https://www.theguardian.com/us-news/2024/oct/02/farm-migrant-labor-japanese-american-incarceration-idaho"
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Migration relative share",
+        "parentTheme": "society-general",
+        "sharePct": 50,
+        "deltaSharePct": 50
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Migration connector placeholder",
+        "detail": "Exposure connectors not yet populated for this theme."
+      },
+      {
+        "type": "trend_snapshot",
+        "evidenceClass": "trend_snapshot",
+        "sourceType": "aggregate",
+        "label": "Migration risk baseline",
+        "articleCount": 1,
+        "lifecycleStage": "emerging",
+        "sourceDiversity": 0,
+        "acceleration": 100
+      },
+      {
+        "type": "theme_evolution",
+        "evidenceClass": "theme_evolution",
+        "sourceType": "aggregate",
+        "label": "Migration share baseline",
+        "parentTheme": "society-general",
+        "sharePct": 50,
+        "deltaSharePct": 50
+      },
+      {
+        "type": "taxonomy",
+        "evidenceClass": "taxonomy",
+        "sourceType": "taxonomy",
+        "label": "Migration watchpoint fallback",
+        "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+      }
+    ],
+    "claims": [
+      {
+        "section": "whatChanged",
+        "claimType": "lifecycle_transition",
+        "title": "Migration changed lifecycle stage",
+        "detail": "Migration moved from nascent to emerging in the current week lens.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Migration logged 1 items, +100% versus the prior week and +100% versus a year ago.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Migration is showing positive acceleration of 100 in the current week comparison.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Migration now represents 50% of Society General coverage, a +50 point move across the selected range.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Migration share movement inside Society General",
+            "sharePct": 50,
+            "deltaSharePct": 50
+          }
+        ]
+      },
+      {
+        "section": "whatChanged",
+        "claimType": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "1 curated item mapped to Migration in the recent digest window.",
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+            "articleId": 78683,
+            "source": "Google News: bill",
+            "publishedAt": "2026-04-07T11:03:00.000Z"
+          }
+        ]
+      },
+      {
+        "section": "whyItMatters",
+        "claimType": "summary",
+        "title": "Why it matters",
+        "detail": "Migration matters because it is emerging with positive year-on-year movement and still building acceleration.",
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          },
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 0
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration aggregate context",
+            "lifecycleStage": "emerging",
+            "vsYearAgoPct": 100,
+            "acceleration": 100
+          },
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Migration relative-share context",
+            "parentTheme": "society-general",
+            "deltaSharePct": 50
+          }
+        ]
+      },
+      {
+        "section": "subtopicMovement",
+        "claimType": "relative_share",
+        "title": "Migration share movement",
+        "detail": "Migration is ranked #2 inside Society General with 50% share.",
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 5
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Migration relative share",
+            "parentTheme": "society-general",
+            "sharePct": 50,
+            "deltaSharePct": 50
+          }
+        ]
+      }
+    ]
+  },
+  "sections": {
+    "whatChanged": [
+      {
+        "type": "lifecycle_transition",
+        "title": "Migration changed lifecycle stage",
+        "detail": "Migration moved from nascent to emerging in the current week lens.",
+        "metric": {
+          "from": "nascent",
+          "to": "emerging"
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "coverage_shift",
+        "title": "Coverage changed versus prior comparison windows",
+        "detail": "Migration logged 1 items, +100% versus the prior week and +100% versus a year ago.",
+        "metric": {
+          "articleCount": 1,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "acceleration",
+        "title": "Acceleration remains positive",
+        "detail": "Migration is showing positive acceleration of 100 in the current week comparison.",
+        "metric": {
+          "acceleration": 100,
+          "sourceDiversity": 0
+        },
+        "evidenceClasses": [
+          {
+            "key": "trend_snapshot",
+            "label": "Trend aggregate",
+            "description": "Current period aggregate row for the canonical theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "trend_snapshot",
+            "evidenceClass": "trend_snapshot",
+            "sourceType": "aggregate",
+            "label": "Migration week aggregate",
+            "articleCount": 1,
+            "vsPreviousPct": 100,
+            "vsYearAgoPct": 100
+          }
+        ]
+      },
+      {
+        "type": "subtopic_share",
+        "title": "Share inside the parent theme moved",
+        "detail": "Migration now represents 50% of Society General coverage, a +50 point move across the selected range.",
+        "metric": {
+          "lastSharePct": 50,
+          "deltaSharePct": 50
+        },
+        "evidenceClasses": [
+          {
+            "key": "theme_evolution",
+            "label": "Theme evolution",
+            "description": "Relative share movement inside the parent theme.",
+            "sourceType": "aggregate",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "theme_evolution",
+            "evidenceClass": "theme_evolution",
+            "sourceType": "aggregate",
+            "label": "Migration share movement inside Society General",
+            "sharePct": 50,
+            "deltaSharePct": 50
+          }
+        ]
+      },
+      {
+        "type": "curated_reinforcement",
+        "title": "Recent curated coverage reinforced the theme",
+        "detail": "1 curated item mapped to Migration in the recent digest window.",
+        "metric": {
+          "curatedItems": 1
+        },
+        "evidenceClasses": [
+          {
+            "key": "curated_digest",
+            "label": "Curated digest",
+            "description": "Ranked curated items linked to the theme.",
+            "sourceType": "digest",
+            "count": 1
+          }
+        ],
+        "provenance": [
+          {
+            "type": "curated_digest",
+            "evidenceClass": "curated_digest",
+            "sourceType": "digest",
+            "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+            "articleId": 78683,
+            "source": "Google News: bill",
+            "publishedAt": "2026-04-07T11:03:00.000Z"
+          }
+        ]
+      }
+    ],
+    "whyItMatters": {
+      "summary": "Migration matters because it is emerging with positive year-on-year movement and still building acceleration.",
+      "statements": [
+        "Migration matters because it is emerging with positive year-on-year movement and still building acceleration.",
+        "Migration is not just moving in isolation. It is shifting relative share inside Society General, which makes it a structural signal rather than a single headline burst."
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration relative-share context",
+          "parentTheme": "society-general",
+          "deltaSharePct": 50
+        }
+      ]
+    },
+    "evidence": {
+      "trend": {
+        "articleCount": 1,
+        "lifecycleStage": "emerging",
+        "vsPreviousPct": 100,
+        "vsYearAgoPct": 100,
+        "acceleration": 100,
+        "sourceDiversity": 0,
+        "geographicSpread": 0,
+        "latestArticleAt": null
+      },
+      "curatedItems": [
+        {
+          "title": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z",
+          "whyItMatters": "Migration is accelerating 300% versus the prior week.",
+          "oneLineSummary": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "relatedTopics": []
+        }
+      ],
+      "recentArticles": [
+        {
+          "articleId": 78683,
+          "title": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxNanRNNnVPek96V3MwaWpHUmJublRxUTlTNndTSzdMWTV4alJubzFwZnBERnVlZnpUT1hBck0xZzFyNHo4UnNLWFdhakdsdVg3VWZsRHVZbHNzTncwVjJYdXJSaTJXdHFLNVRtV3Jzc0d3cGYyQ1FsZDZmWVB0dmxJT0V0WHpoNE5QX2kwekJOWk1aUQ?oc=5"
+        },
+        {
+          "articleId": 73505,
+          "title": "Trump’s sweeping changes to US immigration policy – here’s what to know",
+          "source": "guardian",
+          "publishedAt": "2025-12-04T13:00:20.000Z",
+          "url": "https://www.theguardian.com/us-news/2025/dec/04/trump-us-immigration-policy-explainer"
+        },
+        {
+          "articleId": 71356,
+          "title": "Israel urged to open more Gaza border crossings to allow surge of aid",
+          "source": "guardian",
+          "publishedAt": "2025-10-15T17:20:25.000Z",
+          "url": "https://www.theguardian.com/world/2025/oct/15/israel-pulls-back-threat-humanitarian-aid-gaza-hostages-remains-hamas"
+        },
+        {
+          "articleId": 64830,
+          "title": "Zambia remove US-based players due to Trump immigration policy fears",
+          "source": "guardian",
+          "publishedAt": "2025-04-02T20:33:36.000Z",
+          "url": "https://www.theguardian.com/football/2025/apr/02/zambia-womens-soccer-team-trump-policies"
+        },
+        {
+          "articleId": 58557,
+          "title": "Something about the migrant labor camp spooked my mother. Then she learned its dark history",
+          "source": "guardian",
+          "publishedAt": "2024-10-02T12:00:27.000Z",
+          "url": "https://www.theguardian.com/us-news/2024/oct/02/farm-migrant-labor-japanese-american-incarceration-idaho"
+        }
+      ],
+      "researchEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "works": []
+      },
+      "githubEvidence": {
+        "status": "connector-ready-no-matches",
+        "summary": null,
+        "repos": []
+      },
+      "relatedSignals": [],
+      "sourceBreakdown": [
+        {
+          "source": "guardian",
+          "sourceQuality": 0.9,
+          "curatedItemCount": 0,
+          "recentArticleCount": 4,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 4,
+          "evidenceClasses": [
+            "recent_article"
+          ],
+          "latestPublishedAt": "2025-12-04T13:00:20.000Z"
+        },
+        {
+          "source": "google news: bill",
+          "sourceQuality": 0.72,
+          "curatedItemCount": 1,
+          "recentArticleCount": 1,
+          "researchCount": 0,
+          "codeCount": 0,
+          "totalCount": 2,
+          "evidenceClasses": [
+            "curated_digest",
+            "recent_article"
+          ],
+          "latestPublishedAt": "2026-04-07T11:03:00.000Z"
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "sourceClasses": [
+        "guardian",
+        "google news: bill"
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration aggregate",
+          "articleCount": 1,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "articleId": 78683,
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "articleId": 78683,
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxNanRNNnVPek96V3MwaWpHUmJublRxUTlTNndTSzdMWTV4alJubzFwZnBERnVlZnpUT1hBck0xZzFyNHo4UnNLWFdhakdsdVg3VWZsRHVZbHNzTncwVjJYdXJSaTJXdHFLNVRtV3Jzc0d3cGYyQ1FsZDZmWVB0dmxJT0V0WHpoNE5QX2kwekJOWk1aUQ?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Trump’s sweeping changes to US immigration policy – here’s what to know",
+          "articleId": 73505,
+          "source": "guardian",
+          "publishedAt": "2025-12-04T13:00:20.000Z",
+          "url": "https://www.theguardian.com/us-news/2025/dec/04/trump-us-immigration-policy-explainer"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Israel urged to open more Gaza border crossings to allow surge of aid",
+          "articleId": 71356,
+          "source": "guardian",
+          "publishedAt": "2025-10-15T17:20:25.000Z",
+          "url": "https://www.theguardian.com/world/2025/oct/15/israel-pulls-back-threat-humanitarian-aid-gaza-hostages-remains-hamas"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zambia remove US-based players due to Trump immigration policy fears",
+          "articleId": 64830,
+          "source": "guardian",
+          "publishedAt": "2025-04-02T20:33:36.000Z",
+          "url": "https://www.theguardian.com/football/2025/apr/02/zambia-womens-soccer-team-trump-policies"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Something about the migrant labor camp spooked my mother. Then she learned its dark history",
+          "articleId": 58557,
+          "source": "guardian",
+          "publishedAt": "2024-10-02T12:00:27.000Z",
+          "url": "https://www.theguardian.com/us-news/2024/oct/02/farm-migrant-labor-japanese-american-incarceration-idaho"
+        }
+      ]
+    },
+    "subtopicMovement": {
+      "parentTheme": "society-general",
+      "selectedTheme": {
+        "theme": "migration",
+        "label": "Migration",
+        "lastSharePct": 50,
+        "deltaSharePct": 50,
+        "averageSharePct": 12.5,
+        "rank": 2
+      },
+      "peerThemes": [
+        {
+          "theme": "inequality",
+          "label": "Inequality",
+          "lastSharePct": 50,
+          "deltaSharePct": 50,
+          "rank": 1
+        },
+        {
+          "theme": "migration",
+          "label": "Migration",
+          "lastSharePct": 50,
+          "deltaSharePct": 50,
+          "rank": 2
+        },
+        {
+          "theme": "demographics",
+          "label": "Demographics",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 3
+        },
+        {
+          "theme": "labor-future",
+          "label": "Labor Future",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 4
+        },
+        {
+          "theme": "urbanization",
+          "label": "Urbanization",
+          "lastSharePct": 0,
+          "deltaSharePct": 0,
+          "rank": 5
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration relative share",
+          "parentTheme": "society-general",
+          "sharePct": 50,
+          "deltaSharePct": 50
+        }
+      ]
+    },
+    "relatedEntities": {
+      "status": "connector-pending",
+      "entities": [],
+      "pathways": [
+        {
+          "relationType": "beneficiary",
+          "status": "pending",
+          "note": "Entity linkage for Migration will populate once exposure connectors are enabled."
+        },
+        {
+          "relationType": "supplier",
+          "status": "pending",
+          "note": "The current foundation only tracks theme objects. Society exposure mapping is scheduled after SEC and OpenAlex."
+        }
+      ],
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Migration connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ]
+    },
+    "risks": [
+      "Source diversity is still narrow, so the theme may be over-dependent on a small source set.",
+      "The theme is still early-stage, so false starts and sharp narrative reversals are more likely."
+    ],
+    "watchpoints": [
+      "Monitor whether Migration keeps positive acceleration over the next week window.",
+      "Check if source diversity expands beyond 0 and whether geographic spread broadens from 0.",
+      "Track whether Migration holds or expands its 50% share inside Society General.",
+      "Look for new evidence classes beyond news, especially filings, research, patents, or code activity as those connectors come online."
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "migration",
+        "society-general",
+        "society"
+      ],
+      "exportTitle": "Migration Week Theme Brief",
+      "promptSeed": "What changed in Migration, why it matters, and what should remain on the watchlist next?",
+      "noteMarkdown": "",
+      "pinned": false,
+      "savedTags": [],
+      "shareToken": null,
+      "shareUrl": null,
+      "sharedAt": null,
+      "exportCount": 0,
+      "lastExportedAt": null,
+      "updatedAt": null
+    }
+  },
+  "sectionMeta": {
+    "whatChanged": {
+      "section": "whatChanged",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 3
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration week aggregate",
+          "articleCount": 1,
+          "vsPreviousPct": 100,
+          "vsYearAgoPct": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration share movement inside Society General",
+          "sharePct": 50,
+          "deltaSharePct": 50
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "articleId": 78683,
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z"
+        }
+      ],
+      "claimCount": 5
+    },
+    "whyItMatters": {
+      "section": "whyItMatters",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration aggregate context",
+          "lifecycleStage": "emerging",
+          "vsYearAgoPct": 100,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration relative-share context",
+          "parentTheme": "society-general",
+          "deltaSharePct": 50
+        }
+      ],
+      "claimCount": 2
+    },
+    "evidence": {
+      "section": "evidence",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 1
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 1
+        },
+        {
+          "key": "recent_articles",
+          "label": "Recent articles",
+          "description": "Recent article-level evidence from the theme stream.",
+          "sourceType": "article",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration aggregate",
+          "articleCount": 1,
+          "lifecycleStage": "emerging"
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "articleId": 78683,
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "articleId": 78683,
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z",
+          "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxNanRNNnVPek96V3MwaWpHUmJublRxUTlTNndTSzdMWTV4alJubzFwZnBERnVlZnpUT1hBck0xZzFyNHo4UnNLWFdhakdsdVg3VWZsRHVZbHNzTncwVjJYdXJSaTJXdHFLNVRtV3Jzc0d3cGYyQ1FsZDZmWVB0dmxJT0V0WHpoNE5QX2kwekJOWk1aUQ?oc=5"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Trump’s sweeping changes to US immigration policy – here’s what to know",
+          "articleId": 73505,
+          "source": "guardian",
+          "publishedAt": "2025-12-04T13:00:20.000Z",
+          "url": "https://www.theguardian.com/us-news/2025/dec/04/trump-us-immigration-policy-explainer"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Israel urged to open more Gaza border crossings to allow surge of aid",
+          "articleId": 71356,
+          "source": "guardian",
+          "publishedAt": "2025-10-15T17:20:25.000Z",
+          "url": "https://www.theguardian.com/world/2025/oct/15/israel-pulls-back-threat-humanitarian-aid-gaza-hostages-remains-hamas"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Zambia remove US-based players due to Trump immigration policy fears",
+          "articleId": 64830,
+          "source": "guardian",
+          "publishedAt": "2025-04-02T20:33:36.000Z",
+          "url": "https://www.theguardian.com/football/2025/apr/02/zambia-womens-soccer-team-trump-policies"
+        },
+        {
+          "type": "recent_article",
+          "evidenceClass": "recent_article",
+          "sourceType": "article",
+          "label": "Something about the migrant labor camp spooked my mother. Then she learned its dark history",
+          "articleId": 58557,
+          "source": "guardian",
+          "publishedAt": "2024-10-02T12:00:27.000Z",
+          "url": "https://www.theguardian.com/us-news/2024/oct/02/farm-migrant-labor-japanese-american-incarceration-idaho"
+        }
+      ],
+      "sourceCount": 2
+    },
+    "subtopicMovement": {
+      "section": "subtopicMovement",
+      "evidenceClasses": [
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 5
+        }
+      ],
+      "provenance": [
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration relative share",
+          "parentTheme": "society-general",
+          "sharePct": 50,
+          "deltaSharePct": 50
+        }
+      ],
+      "peerThemeCount": 5
+    },
+    "relatedEntities": {
+      "section": "relatedEntities",
+      "evidenceClasses": [
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Migration connector placeholder",
+          "detail": "Exposure connectors not yet populated for this theme."
+        }
+      ],
+      "entityCount": 0
+    },
+    "risks": {
+      "section": "risks",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "curated_digest",
+          "label": "Curated digest",
+          "description": "Ranked curated items linked to the theme.",
+          "sourceType": "digest",
+          "count": 0
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration risk baseline",
+          "articleCount": 1,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration share baseline",
+          "parentTheme": "society-general",
+          "sharePct": 50,
+          "deltaSharePct": 50
+        },
+        {
+          "type": "curated_digest",
+          "evidenceClass": "curated_digest",
+          "sourceType": "digest",
+          "label": "Tennessee Senate passes controversial immigration policy bill - Nashville Banner",
+          "articleId": 78683,
+          "source": "Google News: bill",
+          "publishedAt": "2026-04-07T11:03:00.000Z"
+        }
+      ],
+      "claimCount": 2
+    },
+    "watchpoints": {
+      "section": "watchpoints",
+      "evidenceClasses": [
+        {
+          "key": "trend_snapshot",
+          "label": "Trend aggregate",
+          "description": "Current period aggregate row for the canonical theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "theme_evolution",
+          "label": "Theme evolution",
+          "description": "Relative share movement inside the parent theme.",
+          "sourceType": "aggregate",
+          "count": 0
+        },
+        {
+          "key": "taxonomy",
+          "label": "Taxonomy governance",
+          "description": "Canonical taxonomy and fallback tracking evidence.",
+          "sourceType": "taxonomy",
+          "count": 1
+        }
+      ],
+      "provenance": [
+        {
+          "type": "trend_snapshot",
+          "evidenceClass": "trend_snapshot",
+          "sourceType": "aggregate",
+          "label": "Migration risk baseline",
+          "articleCount": 1,
+          "lifecycleStage": "emerging",
+          "sourceDiversity": 0,
+          "acceleration": 100
+        },
+        {
+          "type": "theme_evolution",
+          "evidenceClass": "theme_evolution",
+          "sourceType": "aggregate",
+          "label": "Migration share baseline",
+          "parentTheme": "society-general",
+          "sharePct": 50,
+          "deltaSharePct": 50
+        },
+        {
+          "type": "taxonomy",
+          "evidenceClass": "taxonomy",
+          "sourceType": "taxonomy",
+          "label": "Migration watchpoint fallback",
+          "detail": "Watchpoints include connector-dependent checks for upcoming evidence classes."
+        }
+      ],
+      "claimCount": 4
+    }
+  },
+  "notebookState": {
+    "notebookKey": "migration::week",
+    "theme": "migration",
+    "periodType": "week",
+    "label": "Migration",
+    "noteMarkdown": "",
+    "pinned": false,
+    "tags": [],
+    "shareToken": null,
+    "sharedAt": null,
+    "shareUrl": null,
+    "exportCount": 0,
+    "lastExportedAt": null,
+    "updatedAt": null,
+    "createdAt": null,
+    "metadata": {}
+  },
+  "meta": {
+    "updatedAt": "2026-04-08T02:35:37.764Z",
+    "stale": false
+  }
+}

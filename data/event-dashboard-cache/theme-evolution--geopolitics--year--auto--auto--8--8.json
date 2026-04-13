@@ -1,0 +1,157 @@
+{
+  "parent": "geopolitics",
+  "requestedParent": "geopolitics",
+  "periodType": "year",
+  "periods": [
+    {
+      "key": "2019",
+      "label": "2019",
+      "periodStart": "2019-01-01",
+      "periodEnd": "2019-12-31"
+    },
+    {
+      "key": "2020",
+      "label": "2020",
+      "periodStart": "2020-01-01",
+      "periodEnd": "2020-12-31"
+    },
+    {
+      "key": "2021",
+      "label": "2021",
+      "periodStart": "2021-01-01",
+      "periodEnd": "2021-12-31"
+    },
+    {
+      "key": "2022",
+      "label": "2022",
+      "periodStart": "2022-01-01",
+      "periodEnd": "2022-12-31"
+    },
+    {
+      "key": "2023",
+      "label": "2023",
+      "periodStart": "2023-01-01",
+      "periodEnd": "2023-12-31"
+    },
+    {
+      "key": "2024",
+      "label": "2024",
+      "periodStart": "2024-01-01",
+      "periodEnd": "2024-12-31"
+    },
+    {
+      "key": "2025",
+      "label": "2025",
+      "periodStart": "2025-01-01",
+      "periodEnd": "2025-12-31"
+    },
+    {
+      "key": "2026",
+      "label": "2026",
+      "periodStart": "2026-01-01",
+      "periodEnd": "2026-12-31"
+    }
+  ],
+  "subThemes": [
+    {
+      "theme": "supply-chain-security",
+      "label": "Supply Chain Security",
+      "sharePctSeries": [
+        0,
+        2.09,
+        0.92,
+        0.22,
+        0.3,
+        0,
+        0,
+        12.5
+      ],
+      "currentRank": 3,
+      "parentTheme": "geopolitics",
+      "lastSharePct": 12.5,
+      "deltaSharePct": 12.5,
+      "averageSharePct": 2
+    },
+    {
+      "theme": "defense-industrial",
+      "label": "Defense Industrial",
+      "sharePctSeries": [
+        0,
+        0.03,
+        0.15,
+        0.44,
+        0,
+        0.15,
+        0,
+        12.5
+      ],
+      "currentRank": 5,
+      "parentTheme": "geopolitics",
+      "lastSharePct": 12.5,
+      "deltaSharePct": 12.5,
+      "averageSharePct": 1.66
+    },
+    {
+      "theme": "sanctions",
+      "label": "Sanctions",
+      "sharePctSeries": [
+        0,
+        2.19,
+        2.83,
+        1.46,
+        1.5,
+        2.17,
+        0,
+        0
+      ],
+      "currentRank": 2,
+      "parentTheme": "geopolitics",
+      "lastSharePct": 0,
+      "deltaSharePct": 0,
+      "averageSharePct": 1.27
+    },
+    {
+      "theme": "diplomacy",
+      "label": "Diplomacy",
+      "sharePctSeries": [
+        0,
+        1.1,
+        0.86,
+        1.09,
+        0.47,
+        0.95,
+        1.62,
+        0
+      ],
+      "currentRank": 4,
+      "parentTheme": "geopolitics",
+      "lastSharePct": 0,
+      "deltaSharePct": 0,
+      "averageSharePct": 0.76
+    }
+  ],
+  "insights": [
+    {
+      "type": "rising_star",
+      "theme": "supply-chain-security",
+      "label": "Supply Chain Security",
+      "deltaSharePct": 12.5,
+      "lastSharePct": 12.5,
+      "summary": "Supply Chain Security gained 12.5 share points over the selected range and now represents 12.5% of Geopolitics coverage."
+    },
+    {
+      "type": "rising_star",
+      "theme": "defense-industrial",
+      "label": "Defense Industrial",
+      "deltaSharePct": 12.5,
+      "lastSharePct": 12.5,
+      "summary": "Defense Industrial gained 12.5 share points over the selected range and now represents 12.5% of Geopolitics coverage."
+    }
+  ],
+  "source": "theme_evolution",
+  "taxonomyFiltering": "canonical-only",
+  "meta": {
+    "updatedAt": "2026-04-08T17:58:44.283Z",
+    "stale": false
+  }
+}

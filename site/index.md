@@ -1,8 +1,8 @@
 ---
 layout: page
 title: Lattice Current
-summary: Full-bleed product landing for live intelligence, replay, and graph-driven operator workflows.
-updated: 2026-04-01
+summary: Theme-led signal shell with canonical events, operator workflows, and Python-backed batch compute.
+updated: 2026-04-12
 owner: core
 outline: false
 aside: false

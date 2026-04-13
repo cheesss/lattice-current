@@ -1,0 +1,96 @@
+{
+  "theme": "ai-ml",
+  "periodType": "quarter",
+  "periodLabel": "rolling-quarter",
+  "reviewStatus": "gold",
+  "reviewedBy": "product-review",
+  "reviewedAt": "2026-04-08",
+  "sections": {
+    "whatChanged": [
+      {
+        "title": "AI stayed large but lost some internal share",
+        "detail": "Coverage remained mainstream, yet adjacent infrastructure and automation themes took incremental attention inside technology-general.",
+        "importance": "high"
+      }
+    ],
+    "whyItMatters": {
+      "summary": "AI can remain structurally important even while leadership rotates toward the infrastructure and deployment layers around it.",
+      "statements": [
+        "The brief should distinguish mainstream persistence from fresh acceleration.",
+        "Softening share is not the same as decline if AI remains the dominant reference frame for adjacent themes."
+      ]
+    },
+    "evidence": {
+      "requiredSourceClasses": [
+        "news",
+        "research",
+        "filings"
+      ],
+      "requiredClaims": [
+        "The theme should still rank among the highest-share technology children.",
+        "Brief language should mention rotation into semiconductors, cloud infrastructure, or robotics when present."
+      ],
+      "provenanceExpectations": [
+        "Use aggregates for relative share, not only article count.",
+        "Future SEC evidence should clarify whether enterprise spend is broadening or concentrating."
+      ],
+      "notes": [
+        "Avoid writing this brief as if AI disappeared just because attention diversified."
+      ]
+    },
+    "subtopicMovement": [
+      {
+        "subtheme": "foundation models",
+        "direction": "flat",
+        "rationale": "The space is mature enough that persistence matters more than raw novelty."
+      },
+      {
+        "subtheme": "inference infrastructure",
+        "direction": "up",
+        "rationale": "Operational deployment and cost efficiency remain strong adjacent signals."
+      }
+    ],
+    "relatedEntities": {
+      "pathways": [
+        {
+          "entity": "Microsoft",
+          "symbol": "MSFT",
+          "relationType": "platform-operator",
+          "note": "Hyperscaler capex and enterprise distribution remain high-grade evidence."
+        },
+        {
+          "entity": "NVIDIA",
+          "symbol": "NVDA",
+          "relationType": "supplier",
+          "note": "Chip suppliers indicate whether AI demand remains infrastructure-heavy."
+        }
+      ]
+    },
+    "risks": [
+      {
+        "title": "Narrative saturation",
+        "detail": "A very large theme can create article-volume bias that looks like structural change when nothing new happened."
+      }
+    ],
+    "watchpoints": [
+      {
+        "horizon": "30d",
+        "trigger": "Capex and enterprise deployment commentary stays strong",
+        "implication": "AI remains the backbone theme even if adjacent children gain share."
+      }
+    ],
+    "notebookHooks": {
+      "suggestedTags": [
+        "ai-ml",
+        "technology-general",
+        "theme-rotation"
+      ],
+      "prompts": [
+        "Is AI losing structural importance, or is value simply shifting to the infrastructure and adoption layers around it?"
+      ]
+    }
+  },
+  "notes": [
+    "This gold brief should stop the generator from confusing relative-share softening with thematic collapse."
+  ]
+}
