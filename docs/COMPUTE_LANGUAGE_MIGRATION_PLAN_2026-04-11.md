@@ -1,4 +1,5 @@
 # Compute Language Migration Plan
+> **Status**: shipped (incremental_event_engine.py + event_engine_full_build.py + meta-model-server.py running; 43x speedup achieved)  
 
 ## Goal
 

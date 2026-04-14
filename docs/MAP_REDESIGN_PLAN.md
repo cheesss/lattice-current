@@ -1,4 +1,5 @@
 # Map Redesign Plan
+> **Status**: shipped (size expansion + LOD + event hotspots + transmission arcs all live; perf still 10-15 FPS, optimization ongoing)  
 
 ## Goal
 

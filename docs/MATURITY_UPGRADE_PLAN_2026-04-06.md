@@ -1,4 +1,5 @@
 # Lattice Current Maturity Upgrade Plan
+> **Status**: active (B → A grade in progress; signal-first reframing complete)  
 
 Date: 2026-04-06  
 Product identity: signal-first decision-support workspace  

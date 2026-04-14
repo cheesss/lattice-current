@@ -1,4 +1,5 @@
 # Signal Engine Experiment Queue — 2026-03-31
+> **Status**: historical (companion to BACKTEST_SIGNAL_ENGINE_ROADMAP_2026-03-31.md, superseded by event-decision-engine)  
 
 This file is the tactical companion to `BACKTEST_SIGNAL_ENGINE_ROADMAP_2026-03-31.md`.
 

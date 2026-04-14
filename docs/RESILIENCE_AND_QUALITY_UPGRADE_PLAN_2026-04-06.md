@@ -1,4 +1,5 @@
 # Resilience & Quality Upgrade
+> **Status**: shipped (records implemented work, not proposed plan; Phase 3 partial)  
 
 Date: 2026-04-06  
 Product identity: signal-first decision-support workspace
