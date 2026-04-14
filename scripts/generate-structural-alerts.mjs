@@ -61,6 +61,63 @@ function toIsoDate(value) {
   return Number.isNaN(date.valueOf()) ? null : date.toISOString().slice(0, 10);
 }
 
+// Dampening factor for near-zero baseline percent changes.
+// When vsPrevious/acceleration is >= 1000% it is almost certainly driven by a
+// near-zero prior baseline (e.g. 1 → 5 articles = 400%). Without dampening
+// these always saturate to ~100 and dominate ranking over true breakouts.
+// baseline context is optional; dampening is triggered purely by magnitude.
+function nearZeroBaselineDamping(pct) {
+  const abs = Math.abs(Number(pct) || 0);
+  if (abs < 400) return 1.0;       // normal range
+  if (abs < 800) return 0.6;       // likely low-volume driven
+  if (abs < 1500) return 0.35;     // strong signal or noise — be cautious
+  return 0.15;                     // almost certainly near-zero baseline artifact
+}
+
+function boundedMomentumScore(value, weight = 1, context = {}) {
+  const numeric = Math.max(0, Number(value) || 0);
+  if (numeric <= 0) return 0;
+  // Additional explicit baseline-count damping (if provided).
+  const baselineCount = Number(context.baselineCount);
+  let extra = 1;
+  if (Number.isFinite(baselineCount) && baselineCount > 0 && baselineCount < 5) {
+    // Fewer than 5 articles in baseline → severely discount.
+    extra = 0.3 + (baselineCount - 1) * 0.15;  // 1→0.3, 2→0.45, 3→0.6, 4→0.75
+  }
+  const raw = Math.min(100, Math.log10(numeric + 1) * 32);
+  return round(raw * weight * nearZeroBaselineDamping(numeric) * extra, 2);
+}
+
+function boundedAccelerationScore(value, weight = 1, context = {}) {
+  const numeric = Math.max(0, Number(value) || 0);
+  if (numeric <= 0) return 0;
+  const baselineCount = Number(context.baselineCount);
+  let extra = 1;
+  if (Number.isFinite(baselineCount) && baselineCount > 0 && baselineCount < 5) {
+    extra = 0.3 + (baselineCount - 1) * 0.15;
+  }
+  const raw = Math.min(100, Math.log10(numeric + 1) * 40);
+  return round(raw * weight * nearZeroBaselineDamping(numeric) * extra, 2);
+}
+
+function structuralDeltaLabel(value, periodType) {
+  const numeric = Number(value) || 0;
+  if (!Number.isFinite(numeric)) return 'versus the previous comparison window';
+  if (Math.abs(numeric) >= 1000) {
+    return `${round(numeric, 1)}% versus the previous ${periodType} window (near-zero baseline)`;
+  }
+  return `${round(numeric, 1)}% versus the previous ${periodType} window`;
+}
+
+function structuralDeltaNarrative(value, periodType) {
+  const numeric = Number(value) || 0;
+  if (!Number.isFinite(numeric)) return `versus the previous ${periodType} window`;
+  if (Math.abs(numeric) >= 1000) {
+    return `from a near-zero baseline versus the previous ${periodType} window`;
+  }
+  return `${round(numeric, 1)}% versus the previous ${periodType} window`;
+}
+
 export function parseArgs(argv = process.argv.slice(2)) {
   const parsed = {
     period: DEFAULT_PERIOD,
@@ -119,7 +176,13 @@ function buildMomentumAlert(snapshot) {
   const acceleration = Number(snapshot.acceleration || 0);
   if (!(vsPrevious >= 45 && acceleration >= 12)) return null;
   const label = snapshot.label || snapshot.theme;
-  const severity = vsPrevious >= 90 || acceleration >= 25 ? 'critical' : 'high';
+  // Baseline count from snapshot (if available) for damping small-base artifacts
+  const baselineCount = Number(snapshot.previousCount ?? snapshot.priorCount ?? snapshot.baselineCount);
+  const ctx = Number.isFinite(baselineCount) ? { baselineCount } : {};
+  // Require stronger absolute base for "critical" when coming off a tiny baseline
+  const isSmallBase = Number.isFinite(baselineCount) && baselineCount < 5;
+  const severity = (!isSmallBase && (vsPrevious >= 90 || acceleration >= 25)) ? 'critical'
+    : isSmallBase ? 'medium' : 'high';
   return {
     theme: snapshot.theme,
     label,
@@ -129,8 +192,11 @@ function buildMomentumAlert(snapshot) {
     alertType: 'acceleration-breakout',
     severity,
     headline: `${label} is breaking out on structural momentum`,
-    detail: `${label} rose ${round(vsPrevious, 1)}% versus the previous ${snapshot.periodType} window with acceleration at ${round(acceleration, 1)}%.`,
-    alertScore: round(vsPrevious * 0.5 + acceleration * 0.5, 2),
+    detail: `${label} rose ${structuralDeltaNarrative(vsPrevious, snapshot.periodType)} with acceleration at ${round(acceleration, 1)}%.${isSmallBase ? ` [low baseline: ${baselineCount}]` : ''}`,
+    alertScore: round(
+      boundedMomentumScore(vsPrevious, 0.55, ctx) + boundedAccelerationScore(acceleration, 0.45, ctx),
+      2,
+    ),
     evidenceClasses: [{ evidenceClass: 'trend_snapshot', label: 'Trend aggregate', count: 1 }],
     provenance: [{
       evidenceClass: 'trend_snapshot',

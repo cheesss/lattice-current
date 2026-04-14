@@ -834,12 +834,21 @@ function renderTrustRow(opts = {}) {
   const why = opts.whyVisible ? `<div class="why-visible">Why shown: ${escapeHtml(opts.whyVisible)}</div>` : '';
   return `<div class="trust-row">${chips.join('')}</div>${why}`;
 }
-// Legacy wrapper for backward compatibility
+// Snapshot badge — prefers internal-data freshness (oldestInternalUpdatedAt or updatedAt)
+// over wrapper generatedAt so stale internals cannot hide behind a fresh wrapper.
 function snapshotStaleBadge(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return '';
+  // Priority:
+  //   1. oldestInternalUpdatedAt (worst internal source → shows true staleness)
+  //   2. updatedAt (API now sets this to oldest internal)
+  //   3. generatedAt (wrapper build time → last resort, flagged as wrapper-only)
+  const dataTs = snapshot.oldestInternalUpdatedAt || snapshot.updatedAt;
+  const wrapperTs = snapshot.generatedAt;
+  const usingWrapperOnly = !dataTs && wrapperTs;
   return renderTrustRow({
-    updatedAt: snapshot.updatedAt || snapshot.generatedAt,
+    updatedAt: dataTs || wrapperTs,
     fallback: snapshot.fallbackMode || snapshot.inFallback,
+    degraded: usingWrapperOnly ? 'Wrapper time only' : undefined,
   });
 }
 function isDisplayableLiveTheme(theme){const normalized=String(theme||'').trim().toLowerCase();return Boolean(normalized)&&!normalized.startsWith('dt-');}
