@@ -1,4 +1,6 @@
-# World Monitor — Bug Registry
+# Lattice Current — Bug Registry
+
+> **Status**: historical (most entries reflect the legacy src/App.ts ecosystem which is no longer the web production path; kept for archival reference and to guide eventual src/ cleanup)
 
 Bugs are prefixed with `BUG-` and a three-digit number.
 Each entry includes severity, description, affected files, and dependencies on other items.
