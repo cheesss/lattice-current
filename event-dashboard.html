@@ -201,9 +201,74 @@ th{color:var(--muted);font-weight:normal}
 .signal-citations{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
 .signal-cite{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;text-decoration:none;border:1px solid transparent}
 .signal-cite:hover{border-color:var(--accent);color:var(--accent)}
-/* Stale/Fallback badges */
+/* Stale/Fallback badges (legacy) */
 .stale-badge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(250,204,21,.12);color:#facc15;border:1px solid rgba(250,204,21,.2);margin-bottom:8px;letter-spacing:.02em}
 .stale-badge.critical{background:rgba(239,68,68,.12);color:#ef4444;border-color:rgba(239,68,68,.2)}
+/* Unified Trust Layer — freshness, fallback, proof, provenance */
+.trust-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0;font-size:10px}
+.trust-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;border:1px solid transparent;letter-spacing:.02em;font-weight:500;white-space:nowrap}
+.trust-chip-fresh{background:rgba(126,224,129,.1);color:#7ee081;border-color:rgba(126,224,129,.18)}
+.trust-chip-recent{background:rgba(96,165,250,.08);color:#60a5fa;border-color:rgba(96,165,250,.15)}
+.trust-chip-stale{background:rgba(250,204,21,.1);color:#facc15;border-color:rgba(250,204,21,.18)}
+.trust-chip-critical{background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.18)}
+.trust-chip-fallback{background:rgba(168,85,247,.1);color:#a855f7;border-color:rgba(168,85,247,.18)}
+.trust-chip-degraded{background:rgba(148,163,184,.1);color:#94a3b8;border-color:rgba(148,163,184,.18)}
+.trust-chip-nohydrate{background:rgba(148,163,184,.05);color:#64748b;border-color:rgba(148,163,184,.1)}
+.trust-chip-sources{background:rgba(255,255,255,.04);color:var(--muted);border-color:rgba(255,255,255,.08)}
+.trust-chip-evidence{background:rgba(126,224,129,.06);color:#7ee081;border-color:rgba(126,224,129,.12)}
+.trust-chip-contradiction{background:rgba(239,68,68,.08);color:#ef4444;border-color:rgba(239,68,68,.15)}
+.trust-chip-proof{font-weight:700;padding:2px 9px}
+.trust-chip-proof.e0{background:rgba(148,163,184,.1);color:#94a3b8}
+.trust-chip-proof.e1{background:rgba(250,204,21,.12);color:#facc15}
+.trust-chip-proof.e2{background:rgba(126,224,129,.15);color:#7ee081}
+.trust-chip-proof.e3{background:rgba(96,165,250,.15);color:#60a5fa}
+.trust-chip-proof.e4{background:rgba(168,85,247,.15);color:#a855f7}
+.trust-chip:hover{filter:brightness(1.15)}
+.trust-chip[title]{cursor:help}
+.why-visible{font-size:10px;color:var(--muted);font-style:italic;margin-top:4px}
+/* Decision Inbox — unified review surface */
+.inbox-container{display:grid;grid-template-columns:minmax(320px,400px) 1fr;gap:14px;margin:14px 0}
+@media (max-width:1024px){.inbox-container{grid-template-columns:1fr}}
+.inbox-list{display:flex;flex-direction:column;gap:6px;max-height:720px;overflow-y:auto;padding-right:4px}
+.inbox-item{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:.15s ease;display:flex;flex-direction:column;gap:4px}
+.inbox-item:hover{border-color:rgba(126,224,129,.25);background:rgba(255,255,255,.03)}
+.inbox-item.selected{border-color:var(--accent);background:rgba(126,224,129,.06)}
+.inbox-item.snoozed{opacity:.5}
+.inbox-item-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.inbox-item-title{font-weight:600;font-size:12px;color:var(--text);line-height:1.3}
+.inbox-item-meta{font-size:10px;color:var(--muted)}
+.inbox-filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:8px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)}
+.inbox-filter-chip{font-size:10px;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.04);color:var(--muted);border:1px solid transparent;cursor:pointer;transition:.15s ease}
+.inbox-filter-chip:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.inbox-filter-chip.active{background:rgba(126,224,129,.15);color:#7ee081;border-color:rgba(126,224,129,.3)}
+.inbox-preview{padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;min-height:400px}
+.inbox-preview-empty{color:var(--muted);font-size:12px;text-align:center;padding:60px 20px}
+.inbox-actions{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.inbox-btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid transparent;cursor:pointer;transition:.15s ease;letter-spacing:.02em}
+.inbox-btn-accept{background:rgba(126,224,129,.15);color:#7ee081;border-color:rgba(126,224,129,.3)}
+.inbox-btn-accept:hover{background:rgba(126,224,129,.25)}
+.inbox-btn-reject{background:rgba(239,68,68,.12);color:#ef4444;border-color:rgba(239,68,68,.25)}
+.inbox-btn-reject:hover{background:rgba(239,68,68,.2)}
+.inbox-btn-snooze{background:rgba(148,163,184,.1);color:#94a3b8;border-color:rgba(148,163,184,.2)}
+.inbox-btn-snooze:hover{background:rgba(148,163,184,.2)}
+.inbox-shortcut{display:inline-block;margin-left:6px;padding:1px 5px;border-radius:3px;background:rgba(0,0,0,.3);font-size:9px;color:var(--muted);font-family:monospace}
+.inbox-bulk-bar{display:none;padding:8px 12px;background:rgba(126,224,129,.08);border:1px solid rgba(126,224,129,.2);border-radius:8px;margin-bottom:8px;gap:10px;align-items:center;font-size:11px}
+.inbox-bulk-bar.active{display:flex}
+/* Numbered citations in Theme Brief */
+.cite-num{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 5px;margin:0 2px;border-radius:3px;background:rgba(126,224,129,.12);color:#7ee081;font-size:9px;font-weight:700;text-decoration:none;border:1px solid rgba(126,224,129,.2);vertical-align:middle;cursor:pointer}
+.cite-num:hover{background:rgba(126,224,129,.25);color:#fff}
+.claim-with-cites{line-height:1.7}
+.cite-popover{position:absolute;z-index:1000;max-width:340px;padding:10px 12px;background:#1a1f1a;border:1px solid var(--accent);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.6);font-size:11px;line-height:1.4}
+.cite-popover-title{font-weight:600;color:var(--text);margin-bottom:4px}
+.cite-popover-meta{color:var(--muted);font-size:10px}
+/* Surface routing nav */
+.surface-nav{position:sticky;top:0;z-index:100;display:flex;gap:2px;padding:8px 12px;background:rgba(10,13,9,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);margin:-12px -12px 12px}
+.surface-nav-btn{padding:8px 16px;background:transparent;color:var(--muted);border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s ease;letter-spacing:.02em}
+.surface-nav-btn:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.surface-nav-btn.active{color:var(--accent);background:rgba(126,224,129,.08)}
+.surface-nav-btn .count{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(126,224,129,.15);color:#7ee081;font-size:10px;font-weight:700}
+.surface{display:none}
+.surface.active{display:block}
 </style>
 </head>
 <body>
@@ -230,6 +295,16 @@ th{color:var(--muted);font-weight:normal}
     </div>
   </header>
 
+  <!-- Surface Navigation — 5 operator surfaces -->
+  <nav class="surface-nav" id="surface-nav" aria-label="Workspace surfaces">
+    <button class="surface-nav-btn active" data-surface="home" onclick="switchSurface('home')">Home</button>
+    <button class="surface-nav-btn" data-surface="inbox" onclick="switchSurface('inbox')">Decision Inbox <span class="count" id="inbox-total-count">0</span></button>
+    <button class="surface-nav-btn" data-surface="investigate" onclick="switchSurface('investigate')">Investigate</button>
+    <button class="surface-nav-btn" data-surface="geo" onclick="switchSurface('geo')">Geo Lens</button>
+    <button class="surface-nav-btn" data-surface="ops" onclick="switchSurface('ops')">Ops</button>
+  </nav>
+
+  <!-- Global bar: KPI + E2 queue visible on all surfaces (monitoring context) -->
   <!-- KPI Summary Bar -->
   <div class="kpi-strip" id="kpi-strip">
     <div class="kpi-chip" title="CBOE Volatility Index"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
@@ -242,32 +317,21 @@ th{color:var(--muted);font-weight:normal}
   </div>
   <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals (E2 = matched-control uplift with t &gt; 1.96).</div>
 
-  <!-- E2 Signal Queue — top actionable signals with evidence -->
+  <!-- E2 Signal Queue — top actionable signals with evidence (visible on all surfaces as top priority) -->
   <div id="e2-signal-queue" class="signal-queue" style="display:none">
-    <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span></div>
+    <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span> <span style="float:right;font-size:10px;color:var(--muted);font-weight:normal">Click card for details · <a href="#inbox" onclick="switchSurface('inbox');return false;" style="color:var(--accent)">Open Decision Inbox</a></span></div>
     <div id="e2-signal-cards" class="signal-card-grid"></div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SURFACE 1: HOME — situational awareness, monitor-first layout       -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="surface active" data-surface="home">
   <div class="hero-grid hero-grid-summary">
     <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div class="desc-text" data-i18n="status-desc">System health: API connections, data pipeline status, and collection freshness. Green = all systems operational.</div><div id="system-status" class="loading">Loading system state...</div></div>
     <div class="card"><div class="card-title">Horizon Focus <span class="badge" id="current-period-badge">Quarterly</span></div><div class="desc-text" data-i18n="horizon-desc">Current analysis time window. Weekly = fast-moving signals. Monthly = confirmed trends. Quarterly = structural shifts.</div><div id="horizon-summary" class="loading">Preparing horizon focus...</div></div>
-    <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Pick a theme from <strong>Curated Items</strong>, <strong>Trend Pyramid</strong>, or <strong>Structural Alerts</strong>.</div><div class="step-item"><span class="step-index">2</span>Use <strong>Open full brief</strong>. The detailed analysis loads in the <strong>Theme Brief</strong> workspace below.</div><div class="step-item"><span class="step-index">3</span><strong>Follow</strong> themes you care about. That builds a reusable weekly briefing and narrows the workspace around your themes.</div></div></div>
+    <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Review <strong>Actionable Signals</strong> above — top E2 signals sorted by uplift magnitude.</div><div class="step-item"><span class="step-index">2</span>Process pending work in <strong>Decision Inbox</strong> — accept/reject proposals, triage discoveries.</div><div class="step-item"><span class="step-index">3</span>Drill into a theme via <strong>Investigate</strong> — evidence dossier, citations, related entities.</div></div></div>
   </div>
-
-  <details class="surface-drawer">
-    <summary>Open Operator Controls, Automation, And Runtime Diagnostics</summary>
-    <section class="section-block secondary-block" style="margin-top:0;border:0;background:transparent;padding:18px 0 0">
-      <div class="grid2">
-        <div class="card"><div class="card-title">Automation Budget</div><div id="automation-budget" class="loading">Loading automation budget...</div></div>
-        <div class="card"><div class="card-title">Automation Audit</div><div id="automation-log" class="loading">Loading automation audit...</div></div>
-      </div>
-      <div class="grid3" style="margin-top:12px">
-        <div class="card"><div class="card-title">System Health</div><div id="operator-health" class="loading">Loading system health...</div></div>
-        <div class="card"><div class="card-title">Data Quality</div><div id="operator-data-quality" class="loading">Loading data quality...</div></div>
-        <div class="card"><div class="card-title">Codex Quality</div><div id="operator-codex-quality" class="loading">Loading Codex quality...</div></div>
-      </div>
-    </section>
-  </details>
 
   <section class="section-block" id="workspace-section">
     <div class="section-heading">
@@ -361,6 +425,46 @@ th{color:var(--muted);font-weight:normal}
     </div>
   </section>
 
+  </div><!-- /surface: home -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SURFACE 2: DECISION INBOX — unified review queue                     -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="surface" data-surface="inbox">
+    <div class="inbox-bulk-bar" id="inbox-bulk-bar">
+      <span id="inbox-bulk-count">0 selected</span>
+      <button class="inbox-btn inbox-btn-accept" onclick="inboxBulkAction('accept')">Accept All <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxBulkAction('reject')">Reject All <span class="inbox-shortcut">R</span></button>
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxBulkAction('snooze')">Snooze All <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn" style="margin-left:auto" onclick="inboxClearSelection()">Clear</button>
+    </div>
+    <div class="inbox-filter-bar" id="inbox-filter-bar">
+      <span style="font-size:11px;color:var(--muted);margin-right:4px">Filter:</span>
+      <button class="inbox-filter-chip active" data-filter="all" onclick="inboxFilter('all')">All <span id="inbox-count-all">0</span></button>
+      <button class="inbox-filter-chip" data-filter="e2-signal" onclick="inboxFilter('e2-signal')">E2 Signals <span id="inbox-count-e2-signal">0</span></button>
+      <button class="inbox-filter-chip" data-filter="proposal" onclick="inboxFilter('proposal')">Proposals <span id="inbox-count-proposal">0</span></button>
+      <button class="inbox-filter-chip" data-filter="approval" onclick="inboxFilter('approval')">Approvals <span id="inbox-count-approval">0</span></button>
+      <button class="inbox-filter-chip" data-filter="triage" onclick="inboxFilter('triage')">Discovery <span id="inbox-count-triage">0</span></button>
+      <span style="font-size:10px;color:var(--muted);margin-left:auto">J/K navigate · 1/2/3 accept/snooze/reject · / search · Esc deselect</span>
+    </div>
+    <div class="inbox-container">
+      <div>
+        <div id="inbox-list" class="inbox-list">
+          <div class="meta-line" style="padding:20px;text-align:center;color:var(--muted)">Loading review items...</div>
+        </div>
+      </div>
+      <div class="inbox-preview" id="inbox-preview">
+        <div id="inbox-preview-content">
+          <div class="inbox-preview-empty">Select an item from the list to preview and take action.<br/><br/>Use <strong>J/K</strong> to navigate, <strong>1</strong> to accept, <strong>2</strong> to snooze, <strong>3</strong> to reject.</div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /surface: inbox -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SURFACE 3: INVESTIGATE — rotation, breadth, analytics, tactical     -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="surface" data-surface="investigate">
   <section class="section-block">
     <div class="section-heading">
       <div><div class="section-kicker">Rotation</div><div class="section-title">Theme Evolution And Structural Shifts</div></div>
@@ -393,26 +497,6 @@ th{color:var(--muted);font-weight:normal}
       <div class="card"><div class="card-title">Selected Report</div><div id="emerging-tech-report-detail" class="loading">Select a report to inspect detail.</div></div>
     </div>
   </section>
-
-  <details class="surface-drawer">
-    <summary>Open Live Reference Surfaces</summary>
-    <section class="section-block secondary-block" style="margin-top:0;border:0;background:transparent;padding:18px 0 0">
-      <div class="section-heading">
-        <div><div class="section-kicker">Secondary</div><div class="section-title">Live Reference Surfaces</div></div>
-        <div class="section-meta">Useful context, but intentionally no longer the main product surface.</div>
-      </div>
-      <div class="grid3">
-        <div class="card"><div class="card-title">Today's Key Events</div><div id="today-events" class="loading">Loading recent events...</div></div>
-        <div class="card"><div class="card-title">Issue Temperature</div><div id="temperatures" class="loading">Loading issue temperatures...</div></div>
-        <div class="card"><div class="card-title">Technology Trends</div><div id="trends" class="loading">Loading technology trends...</div></div>
-      </div>
-      <div class="grid3" style="margin-top:12px">
-        <div class="card"><div class="card-title">Codex Discoveries</div><div id="codex-latest" class="loading">Loading Codex activity...</div></div>
-        <div class="card"><div class="card-title">Anomalies</div><div id="anomalies" class="loading">Loading anomalies...</div></div>
-        <div class="card"><div class="card-title">Pending Validation</div><div id="pending" class="loading">Loading pending validations...</div></div>
-      </div>
-    </section>
-  </details>
 
   <details class="surface-drawer">
     <summary>Open Tactical / Trading Reference Surfaces</summary>
@@ -489,6 +573,60 @@ th{color:var(--muted);font-weight:normal}
       </div>
     </div>
   </section>
+  </div><!-- /surface: investigate -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SURFACE 4: GEO LENS — spatial analysis                              -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="surface" data-surface="geo">
+    <section class="section-block">
+      <div class="section-heading">
+        <div><div class="section-kicker">Geo Context</div><div class="section-title">2D Geo Lens</div></div>
+        <div class="section-meta">Event hotspots, transmission paths, country/corridor pressure, theme-filtered overlays.</div>
+      </div>
+      <div class="card map-primary-card">
+        <iframe class="embed-frame" id="geo-lens-frame" src="event-map-lens.html" title="Geo Lens" loading="lazy"></iframe>
+        <div class="desc-text" style="margin-top:10px">Use the toolbar inside the map to filter by theme, adjust time window, or collapse overlays. Selected themes from other surfaces propagate here automatically.</div>
+      </div>
+    </section>
+  </div><!-- /surface: geo -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- SURFACE 5: OPS — data quality, automation, runtime health           -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="surface" data-surface="ops">
+    <section class="section-block">
+      <div class="section-heading">
+        <div><div class="section-kicker">Operator Controls</div><div class="section-title">Automation And Runtime</div></div>
+        <div class="section-meta">Budget, automation audit, system health, data quality, Codex quality.</div>
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="card-title">Automation Budget</div><div id="automation-budget" class="loading">Loading automation budget...</div></div>
+        <div class="card"><div class="card-title">Automation Audit</div><div id="automation-log" class="loading">Loading automation audit...</div></div>
+      </div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="card"><div class="card-title">System Health</div><div id="operator-health" class="loading">Loading system health...</div></div>
+        <div class="card"><div class="card-title">Data Quality</div><div id="operator-data-quality" class="loading">Loading data quality...</div></div>
+        <div class="card"><div class="card-title">Codex Quality</div><div id="operator-codex-quality" class="loading">Loading Codex quality...</div></div>
+      </div>
+    </section>
+    <section class="section-block secondary-block">
+      <div class="section-heading">
+        <div><div class="section-kicker">Live Reference</div><div class="section-title">Monitoring Feeds</div></div>
+        <div class="section-meta">Useful context for ops monitoring, not the primary decision surface.</div>
+      </div>
+      <div class="grid3">
+        <div class="card"><div class="card-title">Today's Key Events</div><div id="today-events" class="loading">Loading recent events...</div></div>
+        <div class="card"><div class="card-title">Issue Temperature</div><div id="temperatures" class="loading">Loading issue temperatures...</div></div>
+        <div class="card"><div class="card-title">Technology Trends</div><div id="trends" class="loading">Loading technology trends...</div></div>
+      </div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="card"><div class="card-title">Codex Discoveries</div><div id="codex-latest" class="loading">Loading Codex activity...</div></div>
+        <div class="card"><div class="card-title">Anomalies</div><div id="anomalies" class="loading">Loading anomalies...</div></div>
+        <div class="card"><div class="card-title">Pending Validation</div><div id="pending" class="loading">Loading pending validations...</div></div>
+      </div>
+    </section>
+  </div><!-- /surface: ops -->
 </div>
 
 <script>
@@ -624,6 +762,86 @@ function renderTags(items,className='tag-neutral',limit=8){return asArray(items)
 function cacheToken(value){return String(value??'none').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'')||'none';}
 function renderThemeButtons(items,limit=6){return asArray(items).slice(0,limit).map((item)=>{const theme=normalizeTheme(item?.theme||item?.id||item?.label||item);if(!theme||theme==='unknown')return'';const label=item?.label||humanizeTheme(theme);return `<button class="theme-chip" onclick="openThemeBrief('${theme}')">${escapeHtml(label)}</button>`;}).join('');}
 function cachedBadge(ts){if(!ts)return'<span class="badge" style="color:var(--amber)">cached</span>';const label=fmtTime(ts);return `<span class="badge" style="color:var(--amber)">cached ${label}</span>`;}
+// ─── Unified Trust Layer ──────────────────────────────────────────────
+// Single source of truth for freshness / fallback / proof / provenance badges.
+// Usage: renderTrustRow({ updatedAt, fresh, fallback, proofLevel, sources, evidenceCount, contradictionCount, whyVisible })
+function classifyFreshness(updatedAt, slaHours = 48) {
+  if (!updatedAt) return { level: 'nohydrate', label: 'No timestamp' };
+  const ts = typeof updatedAt === 'number' ? updatedAt : Date.parse(updatedAt);
+  if (!Number.isFinite(ts)) return { level: 'nohydrate', label: 'Invalid timestamp' };
+  const ageH = (Date.now() - ts) / 36e5;
+  const crit = slaHours * 4;
+  if (ageH < 1) return { level: 'fresh', label: `Fresh (${Math.round(ageH*60)}m ago)`, ageH };
+  if (ageH < slaHours / 4) return { level: 'fresh', label: `Fresh (${Math.round(ageH)}h ago)`, ageH };
+  if (ageH < slaHours) return { level: 'recent', label: `Recent (${Math.round(ageH)}h ago)`, ageH };
+  if (ageH < crit) return { level: 'stale', label: `Stale (${Math.round(ageH)}h old)`, ageH };
+  return { level: 'critical', label: `Critical (${Math.round(ageH/24)}d old)`, ageH };
+}
+function trustChip(level, label, title = '') {
+  const t = title ? ` title="${escapeHtml(title)}"` : '';
+  return `<span class="trust-chip trust-chip-${level}"${t}>${escapeHtml(label)}</span>`;
+}
+function proofChip(level, extra = '') {
+  if (!level) return '';
+  const norm = String(level).toLowerCase();
+  const title = {
+    e0: 'E0: Noise — no excess return vs matched controls',
+    e1: 'E1: Positive alpha but not statistically significant',
+    e2: 'E2: Statistically significant uplift (t-stat > 1.96)',
+    e3: 'E3: Out-of-sample replication confirmed',
+    e4: 'E4: Mechanism graph path verified',
+  }[norm] || '';
+  return `<span class="trust-chip trust-chip-proof ${norm}" title="${escapeHtml(title)}">${escapeHtml(level.toUpperCase())}${extra?' '+extra:''}</span>`;
+}
+function renderTrustRow(opts = {}) {
+  if (!opts || typeof opts !== 'object') return '';
+  const chips = [];
+  // Freshness
+  if (opts.updatedAt !== undefined) {
+    const fresh = classifyFreshness(opts.updatedAt, opts.slaHours || 48);
+    chips.push(trustChip(fresh.level, fresh.label, `Data last updated ${fmtDateTime(opts.updatedAt)}`));
+  }
+  // Fallback mode
+  if (opts.fallback) {
+    const label = typeof opts.fallback === 'string' ? opts.fallback : 'Fallback mode';
+    chips.push(trustChip('fallback', label, 'System is operating in degraded/fallback mode — not primary data path'));
+  }
+  // Not hydrated (partial state)
+  if (opts.notHydrated) {
+    chips.push(trustChip('nohydrate', 'Not hydrated', 'Subcomponent state is missing — card may show partial information'));
+  }
+  // Degraded
+  if (opts.degraded) {
+    chips.push(trustChip('degraded', opts.degraded === true ? 'Degraded' : opts.degraded, 'Data quality reduced'));
+  }
+  // Proof level
+  if (opts.proofLevel) {
+    chips.push(proofChip(opts.proofLevel));
+  }
+  // Sources count
+  if (Number.isFinite(Number(opts.sources)) && opts.sources > 0) {
+    chips.push(trustChip('sources', `${opts.sources} source${opts.sources===1?'':'s'}`, 'Number of distinct sources contributing to this item'));
+  }
+  // Evidence count
+  if (Number.isFinite(Number(opts.evidenceCount)) && opts.evidenceCount > 0) {
+    chips.push(trustChip('evidence', `${opts.evidenceCount} evidence`, 'Number of linked evidence items'));
+  }
+  // Contradiction
+  if (Number.isFinite(Number(opts.contradictionCount)) && opts.contradictionCount > 0) {
+    chips.push(trustChip('contradiction', `${opts.contradictionCount} contradiction${opts.contradictionCount===1?'':'s'}`, 'Number of contradicting signals detected'));
+  }
+  if (!chips.length) return '';
+  const why = opts.whyVisible ? `<div class="why-visible">Why shown: ${escapeHtml(opts.whyVisible)}</div>` : '';
+  return `<div class="trust-row">${chips.join('')}</div>${why}`;
+}
+// Legacy wrapper for backward compatibility
+function snapshotStaleBadge(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return '';
+  return renderTrustRow({
+    updatedAt: snapshot.updatedAt || snapshot.generatedAt,
+    fallback: snapshot.fallbackMode || snapshot.inFallback,
+  });
+}
 function isDisplayableLiveTheme(theme){const normalized=String(theme||'').trim().toLowerCase();return Boolean(normalized)&&!normalized.startsWith('dt-');}
 function summarizeLiveThemes(items,limit=3){
   const seen=new Set();
@@ -1036,18 +1254,20 @@ async function applyDiscoveryTriageDecision(topicId,decision,normalizedTheme='',
 async function loadStructuralAlerts(){
   const el=document.getElementById('structural-alerts');
   const badge=document.getElementById('structural-alerts-badge');
+  const period=getCurrentPeriod();
+  const periodMeta=PERIODS[period]||PERIODS.quarter;
   const followed=normalizeThemeList(state.myThemes);
-  const params=new URLSearchParams([['period','week'],['limit','8']]);
+  const params=new URLSearchParams([['period',period],['limit','8']]);
   if(followed.length)params.set('themes',followed.join(','));
-  const cacheKey=`structural-alerts-${cacheToken(followed.join('-')||'all')}`;
+  const cacheKey=`structural-alerts-${period}-${cacheToken(followed.join('-')||'all')}`;
   const {data,cached,cachedAt}=await f(`${API}/structural-alerts?${params.toString()}`,cacheKey);
   structuralAlertsPayload=data||{items:[]};
   const items=asArray(data?.items);
-  badge.textContent=`${fmtWhole(items.length)} open`;
+  badge.textContent=`${fmtWhole(items.length)} open | ${periodMeta.label}`;
   let html='';
   if(cached)html+=cachedBadge(cachedAt);
   if(!items.length){
-    el.innerHTML=`${html}<div class="theme-empty">No open structural alerts for the current weekly lens.</div>`;
+    el.innerHTML=`${html}<div class="theme-empty">No open structural alerts for the current ${periodMeta.shortLabel.toLowerCase()} lens.</div>`;
     return;
   }
   html+='<div class="brief-list">';
@@ -1140,6 +1360,341 @@ async function refreshTrendSurfaces(){
   await loadThemeBrief();
   await loadFollowedThemeBriefing();
 }
+// ─── Surface Routing (P3) ──────────────────────────────────────────────
+let currentSurface = 'home';
+const VALID_SURFACES = ['home', 'inbox', 'investigate', 'geo', 'ops'];
+function switchSurface(name) {
+  if (!VALID_SURFACES.includes(name)) return;
+  currentSurface = name;
+  document.querySelectorAll('.surface').forEach(el => {
+    el.classList.toggle('active', el.dataset.surface === name);
+  });
+  document.querySelectorAll('.surface-nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.surface === name);
+  });
+  // Update URL hash for deep linking + back button
+  if (window.location.hash !== '#' + name) {
+    window.history.pushState({ surface: name }, '', '#' + name);
+  }
+  // Lazy-load surface-specific data
+  if (name === 'inbox') refreshDecisionInbox();
+  if (name === 'geo') {
+    // Propagate theme filter to geo lens iframe
+    try {
+      const frame = document.getElementById('geo-lens-frame');
+      if (frame && state.currentTheme) {
+        const url = new URL(frame.src, window.location.origin);
+        url.searchParams.set('theme', state.currentTheme);
+        if (frame.src !== url.toString()) frame.src = url.toString();
+      }
+    } catch {}
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+window.addEventListener('popstate', (ev) => {
+  const name = String(window.location.hash || '#home').slice(1) || 'home';
+  if (VALID_SURFACES.includes(name) && name !== currentSurface) switchSurface(name);
+});
+window.addEventListener('DOMContentLoaded', () => {
+  const hash = String(window.location.hash || '').slice(1);
+  if (VALID_SURFACES.includes(hash) && hash !== 'home') {
+    setTimeout(() => switchSurface(hash), 50);
+  }
+});
+
+// ─── Decision Inbox (P1) ───────────────────────────────────────────────
+let inboxItems = [];
+let inboxFilterType = 'all';
+let inboxSelectedId = null;
+const inboxSelection = new Set();
+function normalizeProposalToReviewItem(proposal) {
+  const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : {};
+  const proposalType = proposal.proposal_type || proposal.proposalType || 'proposal';
+  return {
+    id: 'proposal-' + (proposal.id || Math.random().toString(36).slice(2)),
+    rawId: String(proposal.id || ''),
+    type: 'proposal',
+    subtype: proposalType,
+    theme: payload.targetTheme || payload.theme || '',
+    title: summarizePayloadFocus(payload, proposalType) || 'Proposal',
+    detail: proposal.reasoning || '',
+    payload,
+    urgency: 'medium',
+    updatedAt: proposal.created_at || proposal.createdAt || null,
+    source: proposal.source || 'codex',
+    decisionState: proposal.status || 'pending',
+    whyVisible: `Codex ${proposalType} proposal from ${proposal.source || 'codex'}`,
+  };
+}
+function normalizeApprovalToReviewItem(approval) {
+  const payload = approval.payload && typeof approval.payload === 'object' ? approval.payload : {};
+  const actionType = approval.action_type || 'approval';
+  return {
+    id: 'approval-' + (approval.id || Math.random().toString(36).slice(2)),
+    rawId: String(approval.id || ''),
+    type: 'approval',
+    subtype: actionType,
+    theme: payload.theme || '',
+    title: summarizePayloadFocus(payload, actionType) || 'Approval request',
+    detail: approval.reasoning || '',
+    payload,
+    urgency: 'high',
+    updatedAt: approval.created_at || null,
+    source: 'human review',
+    decisionState: approval.status || 'pending',
+    whyVisible: `Human review required: ${actionType}`,
+  };
+}
+function normalizeTriageToReviewItem(triage) {
+  return {
+    id: 'triage-' + (triage.id || Math.random().toString(36).slice(2)),
+    rawId: String(triage.id || ''),
+    type: 'triage',
+    subtype: triage.category || 'discovery',
+    theme: triage.parentTheme || triage.normalizedTheme || triage.normalizedParentTheme || '',
+    title: triage.label || triage.id,
+    detail: Array.isArray(triage.keywords) ? triage.keywords.slice(0, 6).join(', ') : '',
+    payload: triage,
+    urgency: Number(triage.structuralScore || 0) > 0.5 ? 'high' : 'medium',
+    updatedAt: triage.lastReview?.decidedAt || triage.updatedAt || null,
+    source: 'auto-discovery',
+    decisionState: triage.promotionState || 'watch',
+    whyVisible: `Discovery topic · momentum ${Number(triage.momentum || 0).toFixed(2)} · ${Number(triage.articleCount || 0)} articles`,
+  };
+}
+async function refreshDecisionInbox() {
+  const listEl = document.getElementById('inbox-list');
+  if (!listEl) return;
+  try {
+    const [inboxData, triageRes] = await Promise.all([
+      fetch(`${API}/proposal-inbox?limit=50`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API}/discovery-triage?limit=30`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    const items = [];
+    // E2 signals (from cached queue)
+    (window.__lastE2Items || []).forEach(s => items.push({ ...s, urgency: s.urgency || 'high' }));
+    // Proposals
+    (inboxData?.proposals || []).forEach(p => items.push(normalizeProposalToReviewItem(p)));
+    // Approvals
+    (inboxData?.approvals || []).forEach(a => items.push(normalizeApprovalToReviewItem(a)));
+    // Triage
+    const triageItems = Array.isArray(triageRes?.items) ? triageRes.items : Array.isArray(triageRes) ? triageRes : [];
+    triageItems.forEach(t => items.push(normalizeTriageToReviewItem(t)));
+    inboxItems = items;
+    renderInboxList();
+    updateInboxCounts();
+  } catch (e) {
+    console.warn('Decision Inbox load failed:', e);
+    listEl.innerHTML = '<div class="meta-line" style="padding:20px;text-align:center;color:var(--muted)">Failed to load inbox. Check API server.</div>';
+  }
+}
+function updateInboxCounts() {
+  const counts = { all: inboxItems.length };
+  inboxItems.forEach(it => { counts[it.type] = (counts[it.type] || 0) + 1; });
+  ['all', 'e2-signal', 'proposal', 'approval', 'triage'].forEach(t => {
+    const el = document.getElementById('inbox-count-' + t);
+    if (el) el.textContent = counts[t] || 0;
+  });
+  const total = document.getElementById('inbox-total-count');
+  if (total) total.textContent = counts.all;
+}
+function renderInboxList() {
+  const listEl = document.getElementById('inbox-list');
+  if (!listEl) return;
+  const filtered = inboxFilterType === 'all' ? inboxItems : inboxItems.filter(x => x.type === inboxFilterType);
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="meta-line" style="padding:20px;text-align:center;color:var(--muted)">No items in this filter.</div>';
+    return;
+  }
+  // Sort by urgency then recency
+  const urgencyOrder = { high: 0, medium: 1, low: 2 };
+  filtered.sort((a, b) => {
+    const u = (urgencyOrder[a.urgency] || 1) - (urgencyOrder[b.urgency] || 1);
+    if (u !== 0) return u;
+    return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+  });
+  listEl.innerHTML = filtered.map((it, i) => {
+    const selected = inboxSelectedId === it.id ? ' selected' : '';
+    const multiSelected = inboxSelection.has(it.id) ? ' multi-selected' : '';
+    const typeBadge = { 'e2-signal': 'E2', 'proposal': 'Prop', 'approval': 'Appr', 'triage': 'Disc' }[it.type] || it.type;
+    const urgencyChip = it.urgency === 'high' ? '<span class="trust-chip trust-chip-critical" style="font-size:9px">HI</span>' : '';
+    const fresh = it.updatedAt ? classifyFreshness(it.updatedAt, 48) : null;
+    const freshChip = fresh && fresh.level !== 'nohydrate' ? `<span class="trust-chip trust-chip-${fresh.level}" style="font-size:9px">${fresh.level}</span>` : '';
+    return `<div class="inbox-item${selected}${multiSelected}" data-id="${escapeHtml(it.id)}" data-idx="${i}" onclick="selectInboxItem('${escapeHtml(it.id)}')">
+      <div class="inbox-item-head">
+        <span class="trust-chip trust-chip-sources" style="font-size:9px">${typeBadge}</span>
+        ${urgencyChip}
+        ${freshChip}
+        ${it.proofLevel ? proofChip(it.proofLevel) : ''}
+      </div>
+      <div class="inbox-item-title">${escapeHtml(truncate(it.title || '', 80))}</div>
+      <div class="inbox-item-meta">${escapeHtml(it.theme || it.source || '')} · ${fmtDate(it.updatedAt)}</div>
+    </div>`;
+  }).join('');
+}
+function selectInboxItem(id) {
+  inboxSelectedId = id;
+  const item = inboxItems.find(x => x.id === id);
+  renderInboxList();
+  if (item) renderInboxPreview(item);
+}
+function renderInboxPreview(item) {
+  const preview = document.getElementById('inbox-preview-content');
+  if (!preview) return;
+  const trust = renderTrustRow({
+    updatedAt: item.updatedAt,
+    proofLevel: item.proofLevel,
+    sources: item.sourceCount,
+    whyVisible: item.whyVisible,
+    slaHours: 72,
+  });
+  let body = '';
+  if (item.type === 'e2-signal') {
+    const upliftStr = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '—';
+    body = `<div class="signal-metrics" style="margin:8px 0">
+      <span>Direction: <strong>${item.direction.toUpperCase()}</strong></span>
+      <span>Symbol: <strong>${escapeHtml(item.symbol || '—')}</strong></span>
+      <span>Uplift: <strong>${upliftStr}</strong></span>
+      <span>t-stat: <strong>${item.tStat ? item.tStat.toFixed(2) : '—'}</strong></span>
+      <span>Controls: <strong>${item.matchedControls || '—'}</strong></span>
+    </div>
+    ${item.title ? `<div class="desc-text">${escapeHtml(item.title)}</div>` : ''}`;
+  } else if (item.type === 'proposal' || item.type === 'approval') {
+    body = `${item.detail ? `<div class="desc-text" style="margin-bottom:10px">${escapeHtml(item.detail)}</div>` : ''}
+    <div class="payload-preview">${escapeHtml(truncate(JSON.stringify(item.payload, null, 2), 600))}</div>`;
+  } else if (item.type === 'triage') {
+    const kw = Array.isArray(item.payload.keywords) ? item.payload.keywords : [];
+    body = `<div class="desc-text" style="margin-bottom:10px">${escapeHtml(item.detail || '')}</div>
+    ${kw.length ? `<div class="pill-row" style="margin-top:8px">${renderTags(kw, 'tag-neutral', 10)}</div>` : ''}`;
+  }
+  const actions = buildInboxActions(item);
+  preview.innerHTML = `
+    <div class="card-title" style="margin-bottom:6px">${escapeHtml(item.title || '—')}</div>
+    <div class="meta-line" style="margin-bottom:8px">${escapeHtml(item.type)} · ${escapeHtml(item.subtype || '')} · ${escapeHtml(item.source || '')}</div>
+    ${trust}
+    ${body}
+    <div class="inbox-actions">${actions}</div>
+  `;
+}
+function buildInboxActions(item) {
+  if (item.type === 'proposal') {
+    return `
+      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">1</span></button>
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">2</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">3</span></button>
+      ${item.payload?.targetTheme ? `<button class="inbox-btn" onclick="openThemeBrief('${normalizeTheme(item.payload.targetTheme)}');switchSurface('investigate')">Open brief</button>` : ''}`;
+  }
+  if (item.type === 'approval') {
+    return `
+      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">1</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">3</span></button>`;
+  }
+  if (item.type === 'triage') {
+    return `
+      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('canonical','${escapeHtml(item.id)}')">Canonical <span class="inbox-shortcut">1</span></button>
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('watch','${escapeHtml(item.id)}')">Watch <span class="inbox-shortcut">2</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('suppress','${escapeHtml(item.id)}')">Suppress <span class="inbox-shortcut">3</span></button>`;
+  }
+  if (item.type === 'e2-signal') {
+    const themeParam = item.theme ? `'${normalizeTheme(item.theme)}'` : 'null';
+    return `
+      <button class="inbox-btn" onclick="openThemeBrief(${themeParam});switchSurface('investigate')">Open evidence</button>
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">2</span></button>`;
+  }
+  return '';
+}
+async function inboxAction(decision, id) {
+  const item = inboxItems.find(x => x.id === id);
+  if (!item) return;
+  try {
+    if (item.type === 'proposal') {
+      const map = { accept: 'accept', reject: 'reject', snooze: 'snooze' };
+      await postJson(`${API}/codex-proposals/${encodeURIComponent(item.rawId)}/review`, { decision: map[decision] || decision, reviewer: 'theme-dashboard' });
+    } else if (item.type === 'approval') {
+      await postJson(`${API}/approval-queue/${encodeURIComponent(item.rawId)}/review`, { decision, reviewer: 'theme-dashboard' });
+    } else if (item.type === 'triage') {
+      const p = item.payload || {};
+      await postJson(`${API}/discovery-triage/${encodeURIComponent(item.rawId)}/decision`, {
+        decision,
+        normalizedTheme: p.normalizedTheme || '',
+        parentTheme: p.parentTheme || p.normalizedParentTheme || '',
+        category: p.category || '',
+        reviewer: 'theme-dashboard',
+      });
+    } else if (item.type === 'e2-signal' && decision === 'snooze') {
+      // Local snooze only (no API)
+      item.snoozed = true;
+      renderInboxList();
+      return;
+    }
+    // Remove from list and advance
+    inboxItems = inboxItems.filter(x => x.id !== id);
+    updateInboxCounts();
+    renderInboxList();
+    const preview = document.getElementById('inbox-preview-content');
+    if (preview) preview.innerHTML = '<div class="inbox-preview-empty">Action recorded. Select the next item to continue.</div>';
+    inboxSelectedId = null;
+  } catch (e) {
+    console.warn('Inbox action failed:', e);
+    alert('Action failed: ' + (e?.message || e));
+  }
+}
+function inboxFilter(type) {
+  inboxFilterType = type;
+  document.querySelectorAll('.inbox-filter-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.filter === type);
+  });
+  renderInboxList();
+}
+function inboxClearSelection() {
+  inboxSelection.clear();
+  document.getElementById('inbox-bulk-bar').classList.remove('active');
+  renderInboxList();
+}
+async function inboxBulkAction(decision) {
+  const ids = [...inboxSelection];
+  if (!ids.length) return;
+  if (!confirm(`${decision.toUpperCase()} ${ids.length} items?`)) return;
+  for (const id of ids) {
+    try { await inboxAction(decision, id); } catch {}
+  }
+  inboxClearSelection();
+}
+// Keyboard triage (P1)
+document.addEventListener('keydown', (ev) => {
+  if (currentSurface !== 'inbox') return;
+  if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable)) return;
+  if (!inboxItems.length) return;
+  const filtered = inboxFilterType === 'all' ? inboxItems : inboxItems.filter(x => x.type === inboxFilterType);
+  const currentIdx = filtered.findIndex(x => x.id === inboxSelectedId);
+  if (ev.key === 'j' || ev.key === 'ArrowDown') {
+    ev.preventDefault();
+    const next = filtered[Math.min(filtered.length - 1, currentIdx + 1)] || filtered[0];
+    if (next) selectInboxItem(next.id);
+  } else if (ev.key === 'k' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    const prev = filtered[Math.max(0, currentIdx - 1)] || filtered[filtered.length - 1];
+    if (prev) selectInboxItem(prev.id);
+  } else if (ev.key === '1' && inboxSelectedId) {
+    ev.preventDefault();
+    const item = inboxItems.find(x => x.id === inboxSelectedId);
+    if (item) inboxAction(item.type === 'triage' ? 'canonical' : 'accept', inboxSelectedId);
+  } else if (ev.key === '2' && inboxSelectedId) {
+    ev.preventDefault();
+    const item = inboxItems.find(x => x.id === inboxSelectedId);
+    if (item) inboxAction(item.type === 'triage' ? 'watch' : 'snooze', inboxSelectedId);
+  } else if (ev.key === '3' && inboxSelectedId) {
+    ev.preventDefault();
+    const item = inboxItems.find(x => x.id === inboxSelectedId);
+    if (item) inboxAction(item.type === 'triage' ? 'suppress' : 'reject', inboxSelectedId);
+  } else if (ev.key === 'Escape') {
+    inboxSelectedId = null;
+    renderInboxList();
+    const preview = document.getElementById('inbox-preview-content');
+    if (preview) preview.innerHTML = '<div class="inbox-preview-empty">Select an item to preview.</div>';
+  }
+});
+
 async function refreshAll(){
   renderTabs();
   renderEvolutionSelect();
@@ -1155,6 +1710,9 @@ async function refreshAll(){
   renderMyThemes();
   await loadThemeBrief();
   await loadFollowedThemeBriefing();
+  // Refresh Decision Inbox if currently visible
+  if (currentSurface === 'inbox') refreshDecisionInbox();
+  else updateInboxCounts(); // update count badge on nav
   document.getElementById('last-update').textContent=`Updated ${fmtTime(new Date())}`;
 }
 async function loadStatus(){
@@ -1476,14 +2034,71 @@ async function loadThemeBrief(){
   const followed=isThemeFollowed(state.currentTheme);
   const muted=isThemeMuted(state.currentTheme);
   const sections=data.sections||{};
+  // Collect evidence items for numbered citation (P2 dossier)
+  const briefCitations = [];
+  const citeRegistry = new Map(); // url → citation number
+  const registerCite = (item, kind) => {
+    const key = item.url || item.landingPageUrl || item.htmlUrl || `${kind}::${item.title||''}::${item.publishedAt||''}`;
+    if (citeRegistry.has(key)) return citeRegistry.get(key);
+    const num = briefCitations.length + 1;
+    briefCitations.push({
+      num,
+      title: item.title || item.fullName || item.name || 'Reference',
+      source: item.source || item.sourceDisplayName || (kind === 'github' ? 'GitHub' : kind === 'research' ? 'OpenAlex' : 'source'),
+      url: item.url || item.landingPageUrl || item.htmlUrl || '',
+      date: item.publishedAt || item.publicationDate || item.publicationYear || item.pushedAt || item.updatedAt || null,
+      kind,
+    });
+    citeRegistry.set(key, num);
+    return num;
+  };
+  // Pre-register all evidence items so claim text can reference numbers
+  (sections.evidence?.curatedItems || []).slice(0, 3).forEach(it => registerCite(it, 'curated'));
+  (sections.evidence?.recentArticles || []).slice(0, 2).forEach(it => registerCite(it, 'article'));
+  (sections.evidence?.researchEvidence?.works || []).slice(0, 2).forEach(it => registerCite(it, 'research'));
+  (sections.evidence?.githubEvidence?.repos || []).slice(0, 2).forEach(it => registerCite(it, 'github'));
+  window.__briefCitations = briefCitations; // For citation popover
+
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  // Trust row for the brief itself
+  const latestArticleDate = (sections.evidence?.recentArticles || []).concat(sections.evidence?.curatedItems || [])
+    .map(it => it.publishedAt).filter(Boolean).sort().pop();
+  html += renderTrustRow({
+    updatedAt: data.generatedAt || data.updatedAt || latestArticleDate,
+    sources: Number(data.summary?.sourceDiversity) > 0 ? Math.round(Number(data.summary.sourceDiversity) * 10) : undefined,
+    evidenceCount: briefCitations.length,
+    slaHours: 72,
+  });
   html+=`<div class="info-note"><div class="brief-hero"><div><strong>${escapeHtml(data.label||humanizeTheme(state.currentTheme))}</strong><div class="meta-line" style="margin-top:4px">${escapeHtml(data.categoryLabel||data.category||'Theme')} | ${escapeHtml(data.parentTheme||'parent unavailable')} | ${escapeHtml(PERIODS[getCurrentPeriod()].label)} lens</div>${previousViewedAt?`<div class="meta-line" style="margin-top:4px">Previous view ${escapeHtml(fmtDateTime(previousViewedAt))}</div>`:'<div class="meta-line" style="margin-top:4px">First view in this browser workspace</div>'}</div><div class="theme-actions"><button class="btn" onclick="${followed?`unfollowTheme('${state.currentTheme}')`:`followTheme('${state.currentTheme}')`}">${followed?'Unfollow':'Follow'}</button><button class="btn" onclick="${muted?`unmuteTheme('${state.currentTheme}')`:`muteTheme('${state.currentTheme}')`}">${muted?'Unmute':'Mute'}</button></div></div>${data.summary?`<div class="brief-stats" style="margin-top:10px"><div class="brief-stat"><div class="brief-stat-label">Lifecycle</div><div class="brief-stat-value">${escapeHtml(data.summary.lifecycleStage||'n/a')}</div></div><div class="brief-stat"><div class="brief-stat-label">YoY</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.vsYearAgoPct,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Acceleration</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.acceleration,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Source Diversity</div><div class="brief-stat-value">${escapeHtml(fmt(data.summary.sourceDiversity,2))}</div></div></div>`:''}</div>`;
   html+='<div class="brief-grid" style="margin-top:12px">';
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">What Changed</div><span class="badge">${fmtWhole((sections.whatChanged||[]).length)} claim${(sections.whatChanged||[]).length===1?'':'s'}</span></div><div class="brief-list">${(sections.whatChanged||[]).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Update')}</strong><div class="brief-item-copy">${escapeHtml(item.detail||'')}</div>${item.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',5)}</div>`:''}</div>`).join('')||'<div class="theme-empty">No structural changes recorded yet.</div>'}</div></div>`;
   const deltaSince=data.deltaSinceLastVisit||null;
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Since Last Visit</div><span class="badge">${deltaSince?.active?'updated':'stable'}</span></div>${deltaSince?.headline?`<div class="info-note" style="margin-bottom:8px">${escapeHtml(deltaSince.headline)}</div>`:''}<div class="delta-kpi-row"><div class="brief-stat"><div class="brief-stat-label">New Digest Items</div><div class="brief-stat-value">${escapeHtml(fmtWhole(deltaSince?.newDigestItemCount||0))}</div></div><div class="brief-stat"><div class="brief-stat-label">New Articles</div><div class="brief-stat-value">${escapeHtml(fmtWhole(deltaSince?.newArticleCount||0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Status</div><div class="brief-stat-value">${escapeHtml(deltaSince?.status||'n/a')}</div></div></div><div class="brief-list">${(deltaSince?.items||[]).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Delta')}</strong><div class="brief-item-copy">${escapeHtml(item.detail||'')}</div>${item.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',5)}</div>`:''}</div>`).join('')||'<div class="theme-empty">No newer digest or article evidence was detected since the previous view.</div>'}</div></div>`;
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Why It Matters</div><span class="badge">${fmtWhole(asArray(sections.whyItMatters?.statements).filter(Boolean).length||0)} reads</span></div><div class="brief-list">${[sections.whyItMatters?.summary,...asArray(sections.whyItMatters?.statements).slice(1)].filter(Boolean).map((item,index)=>`<div class="brief-item"><strong>${index===0?'Primary read':`Read ${index+1}`}</strong><div class="brief-item-copy">${escapeHtml(item)}</div></div>`).join('')||'<div class="theme-empty">Reasoning is not available yet.</div>'}</div></div>`;
-  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Evidence</div><span class="badge">${fmtWhole((sections.evidence?.provenance||[]).length)} refs</span></div><div class="brief-list">${(sections.evidence?.curatedItems||[]).slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Curated item')}</strong><div class="meta-line">${escapeHtml(item.source||'unknown')} | ${fmtDate(item.publishedAt)}</div>${item.whyItMatters?`<div class="story-summary">${escapeHtml(truncate(item.whyItMatters,180))}</div>`:''}</div>`).join('')}${(sections.evidence?.recentArticles||[]).slice(0,2).map((item)=>`<div class="brief-item"><strong>${item.url?`<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title||'Recent article')}</a>`:escapeHtml(item.title||'Recent article')}</strong><div class="meta-line">${escapeHtml(item.source||'unknown')} | ${fmtDate(item.publishedAt)}</div></div>`).join('')}${(sections.evidence?.researchEvidence?.works||[]).slice(0,2).map((item)=>`<div class="brief-item"><strong>${item.landingPageUrl?`<a href="${escapeHtml(item.landingPageUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.title||'Research work')}</a>`:escapeHtml(item.title||'Research work')}</strong><div class="meta-line">${escapeHtml(item.sourceDisplayName||'OpenAlex')} | ${item.publicationYear||fmtDate(item.publicationDate)} | citations ${escapeHtml(fmtWhole(item.citedByCount||0))}</div>${item.primaryTopic?`<div class="meta-line" style="margin-top:4px">Topic ${escapeHtml(item.primaryTopic)}</div>`:''}${item.abstractSummary?`<div class="story-summary">${escapeHtml(truncate(item.abstractSummary,180))}</div>`:''}${item.matchedKeywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.matchedKeywords,'tag-neutral',6)}</div>`:''}</div>`).join('')}${(sections.evidence?.githubEvidence?.repos||[]).slice(0,2).map((item)=>`<div class="brief-item"><strong>${item.htmlUrl?`<a href="${escapeHtml(item.htmlUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.fullName||item.name||'GitHub repository')}</a>`:escapeHtml(item.fullName||item.name||'GitHub repository')}</strong><div class="meta-line">GitHub | ${escapeHtml(item.language||'unknown')} | stars ${escapeHtml(fmtWhole(item.stargazersCount||0))} | pushed ${escapeHtml(fmtDate(item.pushedAt||item.updatedAt))}</div>${item.description?`<div class="story-summary">${escapeHtml(truncate(item.description,180))}</div>`:''}${item.matchedKeywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.matchedKeywords,'tag-neutral',6)}</div>`:''}</div>`).join('')}${!(sections.evidence?.curatedItems||[]).length&&!(sections.evidence?.recentArticles||[]).length&&!(sections.evidence?.researchEvidence?.works||[]).length&&!(sections.evidence?.githubEvidence?.repos||[]).length?'<div class="theme-empty">Evidence sources will appear here when digest, article, research, or code links are available.</div>':''}${sections.evidence?.researchEvidence?.summary?`<div class="section-note">Research lane: ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.workCount||0))} works | recent ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.recentCount||0))} | citations ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.totalCitations||0))}</div>`:''}${sections.evidence?.githubEvidence?.summary?`<div class="section-note">Code lane: ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.repoCount||0))} repos | recent pushes ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.recentPushedCount||0))} | stars ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.totalStars||0))}</div>`:''}${sections.evidence?.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(sections.evidence.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',8)}</div>`:''}</div></div>`;
+  // Evidence section with numbered citation badges
+  const evidenceItemHtml = (item, kind, labelFn) => {
+    const num = citeRegistry.get(item.url || item.landingPageUrl || item.htmlUrl || `${kind}::${item.title||''}::${item.publishedAt||''}`);
+    const citeBadge = num ? `<span class="cite-num" data-cite-num="${num}" onclick="showCitationPopover(event, ${num})">${num}</span> ` : '';
+    return labelFn(item, citeBadge);
+  };
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Evidence</div><span class="badge">${fmtWhole(briefCitations.length)} refs</span></div><div class="brief-list">` +
+    (sections.evidence?.curatedItems||[]).slice(0,3).map(item =>
+      evidenceItemHtml(item, 'curated', (it, cite) => `<div class="brief-item">${cite}<strong>${escapeHtml(it.title||'Curated item')}</strong><div class="meta-line">${escapeHtml(it.source||'unknown')} | ${fmtDate(it.publishedAt)}</div>${it.whyItMatters?`<div class="story-summary">${escapeHtml(truncate(it.whyItMatters,180))}</div>`:''}</div>`)
+    ).join('') +
+    (sections.evidence?.recentArticles||[]).slice(0,2).map(item =>
+      evidenceItemHtml(item, 'article', (it, cite) => `<div class="brief-item">${cite}<strong>${it.url?`<a href="${escapeHtml(it.url)}" target="_blank" rel="noreferrer">${escapeHtml(it.title||'Recent article')}</a>`:escapeHtml(it.title||'Recent article')}</strong><div class="meta-line">${escapeHtml(it.source||'unknown')} | ${fmtDate(it.publishedAt)}</div></div>`)
+    ).join('') +
+    (sections.evidence?.researchEvidence?.works||[]).slice(0,2).map(item =>
+      evidenceItemHtml(item, 'research', (it, cite) => `<div class="brief-item">${cite}<strong>${it.landingPageUrl?`<a href="${escapeHtml(it.landingPageUrl)}" target="_blank" rel="noreferrer">${escapeHtml(it.title||'Research work')}</a>`:escapeHtml(it.title||'Research work')}</strong><div class="meta-line">${escapeHtml(it.sourceDisplayName||'OpenAlex')} | ${it.publicationYear||fmtDate(it.publicationDate)} | citations ${escapeHtml(fmtWhole(it.citedByCount||0))}</div>${it.primaryTopic?`<div class="meta-line" style="margin-top:4px">Topic ${escapeHtml(it.primaryTopic)}</div>`:''}${it.abstractSummary?`<div class="story-summary">${escapeHtml(truncate(it.abstractSummary,180))}</div>`:''}${it.matchedKeywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(it.matchedKeywords,'tag-neutral',6)}</div>`:''}</div>`)
+    ).join('') +
+    (sections.evidence?.githubEvidence?.repos||[]).slice(0,2).map(item =>
+      evidenceItemHtml(item, 'github', (it, cite) => `<div class="brief-item">${cite}<strong>${it.htmlUrl?`<a href="${escapeHtml(it.htmlUrl)}" target="_blank" rel="noreferrer">${escapeHtml(it.fullName||it.name||'GitHub repository')}</a>`:escapeHtml(it.fullName||it.name||'GitHub repository')}</strong><div class="meta-line">GitHub | ${escapeHtml(it.language||'unknown')} | stars ${escapeHtml(fmtWhole(it.stargazersCount||0))} | pushed ${escapeHtml(fmtDate(it.pushedAt||it.updatedAt))}</div>${it.description?`<div class="story-summary">${escapeHtml(truncate(it.description,180))}</div>`:''}${it.matchedKeywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(it.matchedKeywords,'tag-neutral',6)}</div>`:''}</div>`)
+    ).join('') +
+    (!briefCitations.length ? '<div class="theme-empty">Evidence sources will appear here when digest, article, research, or code links are available.</div>' : '') +
+    (sections.evidence?.researchEvidence?.summary?`<div class="section-note">Research lane: ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.workCount||0))} works | recent ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.recentCount||0))} | citations ${escapeHtml(fmtWhole(sections.evidence.researchEvidence.summary.totalCitations||0))}</div>`:'') +
+    (sections.evidence?.githubEvidence?.summary?`<div class="section-note">Code lane: ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.repoCount||0))} repos | recent pushes ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.recentPushedCount||0))} | stars ${escapeHtml(fmtWhole(sections.evidence.githubEvidence.summary.totalStars||0))}</div>`:'') +
+    (sections.evidence?.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(sections.evidence.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',8)}</div>`:'') +
+    `</div></div>`;
   const selectedMovement=sections.subtopicMovement?.selectedTheme;
   const peers=sections.subtopicMovement?.peerThemes||[];
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Subtopic Movement</div><span class="badge">${escapeHtml(humanizeTheme(data.parentTheme||'theme'))}</span></div>${selectedMovement?`<div class="brief-item"><strong>${escapeHtml(selectedMovement.label||selectedMovement.theme)}</strong><div class="meta-line">Rank ${fmtWhole(selectedMovement.rank||0)} | share ${pct(selectedMovement.lastSharePct,0)} | delta ${fmtPercent(selectedMovement.deltaSharePct,1)}</div></div>`:''}<div class="brief-list">${peers.slice(0,5).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.theme)}</strong><div class="meta-line">Share ${pct(item.lastSharePct,0)} | delta ${fmtPercent(item.deltaSharePct,1)} | rank ${fmtWhole(item.rank||0)}</div></div>`).join('')||'<div class="theme-empty">Subtopic movement is not available yet.</div>'}</div></div>`;
@@ -1756,12 +2371,30 @@ async function openEmergingTopicDetail(topicId){
     data.symbols.slice(0,8).forEach((row)=>{html+=`<tr><td>${escapeHtml(row.symbol)}</td><td>${rf(row.avgReturn)}</td><td>${pct(row.hitRate)}</td><td>${fmtWhole(row.sampleSize)}</td></tr>`;});
     html+='</table></div></div>';
   }
-  if(Array.isArray(data.articles)&&data.articles.length){
-    html+='<div class="detail-block"><div><strong>Recent articles</strong></div>';
-    data.articles.slice(0,6).forEach((article)=>{
-      const link=article.url?`<a href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer">${escapeHtml(article.title)}</a>`:escapeHtml(article.title);
-      html+=`<div style="margin-top:8px">${link}<div class="meta-line">${escapeHtml(article.source||'unknown')} | ${fmtDate(article.publishedAt)}</div></div>`;
-    });
+  const articleMeta=data.articleMeta||null;
+  const latestLinked=Array.isArray(data.latestLinkedArticles)?data.latestLinkedArticles:[];
+  if(articleMeta||Array.isArray(data.articles)||latestLinked.length){
+    html+='<div class="detail-block"><div><strong>Recent topic articles</strong></div>';
+    if(articleMeta?.recentCount>0){
+      const parts=[`${fmtWhole(articleMeta.windowDays||90)}d window`,`${fmtWhole(articleMeta.recentCount||0)} matches`];
+      if(articleMeta.linkedRecentCount)parts.push(`linked ${fmtWhole(articleMeta.linkedRecentCount)}`);
+      if(articleMeta.derivedRecentCount)parts.push(`derived ${fmtWhole(articleMeta.derivedRecentCount)}`);
+      html+=`<div class="meta-line" style="margin-top:4px">${parts.join(' | ')}</div>`;
+      data.articles.slice(0,6).forEach((article)=>{
+        const link=article.url?`<a href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer">${escapeHtml(article.title)}</a>`:escapeHtml(article.title);
+        const matchBadge=article.matchType==='derived'?'<span class="tag tag-cooling">derived</span>':'<span class="tag tag-growing">linked</span>';
+        html+=`<div style="margin-top:8px">${link}<div class="meta-line">${escapeHtml(article.source||'unknown')} | ${fmtDate(article.publishedAt)} | ${matchBadge}</div></div>`;
+      });
+    }else{
+      html+=`<div class="meta-line" style="margin-top:4px">No topic-matched articles were found in the last ${fmtWhole(articleMeta?.windowDays||90)} days.</div>`;
+      if(articleMeta?.latestLinkedPublishedAt){
+        html+=`<div class="meta-line">Latest older linked article: ${fmtDate(articleMeta.latestLinkedPublishedAt)}</div>`;
+      }
+      latestLinked.slice(0,3).forEach((article)=>{
+        const link=article.url?`<a href="${escapeHtml(article.url)}" target="_blank" rel="noreferrer">${escapeHtml(article.title)}</a>`:escapeHtml(article.title);
+        html+=`<div style="margin-top:8px">${link}<div class="meta-line">${escapeHtml(article.source||'unknown')} | ${fmtDate(article.publishedAt)} | older linked</div></div>`;
+      });
+    }
     html+='</div>';
   }
   if(data.report?.id){
@@ -1870,6 +2503,66 @@ function renderActionableSignalCards(signals){
     </div>`;
   }).join('');
 }
+// Normalize raw signal from /api/event-uplift-grades into standard review-item schema
+function normalizeSignalToReviewItem(s, idx = 0) {
+  const upliftVal = Number(s.uplift) || 0;
+  const abnormal = Number(s.abnormal_return) || 0;
+  const tStat = Number(s.t_stat) || null;
+  const dir = (abnormal || upliftVal) > 0 ? 'long' : 'short';
+  // uplift may be in either decimal (0.023) or percent (2.3) form
+  const upliftPct = Math.abs(upliftVal) < 5 ? upliftVal * 100 : upliftVal;
+  const symbol = s.symbol || '';
+  const theme = s.theme || '';
+  return {
+    id: `signal-${s.canonical_event_id || idx}-${symbol}`,
+    type: 'e2-signal',
+    theme,
+    urgency: Math.abs(tStat || 0) > 3 ? 'high' : 'medium',
+    proofLevel: s.evidence_grade || 'E2',
+    direction: dir,
+    symbol,
+    title: s.title || s.representative_title || '',
+    upliftPct,
+    tStat,
+    abnormalReturn: abnormal,
+    forwardReturn: Number(s.forward_return_pct) || 0,
+    matchedControls: Number(s.matched_controls_count || s.control_count) || 5,
+    sourceCount: Number(s.source_count) || null,
+    updatedAt: s.updated_at || s.computed_at || null,
+    decisionState: s.decision_state || 'pending',
+    whyVisible: tStat ? `t-stat ${tStat.toFixed(2)} exceeds E2 threshold (1.96)` : 'E2 evidence grade',
+    raw: s,
+  };
+}
+// Render a single review item as a signal card with full trust layer
+function renderReviewItemCard(item) {
+  const dirLabel = item.direction.toUpperCase();
+  const upliftStr = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '—';
+  const tStatStr = item.tStat != null ? item.tStat.toFixed(2) : '—';
+  const alphaStr = item.abnormalReturn ? `${item.abnormalReturn >= 0 ? '+' : ''}${(item.abnormalReturn * 100).toFixed(2)}%` : null;
+  const trustRow = renderTrustRow({
+    updatedAt: item.updatedAt,
+    proofLevel: item.proofLevel,
+    sources: item.sourceCount,
+    whyVisible: item.whyVisible,
+    slaHours: 72,
+  });
+  return `<div class="signal-card" data-item-id="${escapeHtml(item.id)}" onclick="selectReviewItem('${escapeHtml(item.id)}')">
+    <div class="signal-card-head">
+      <span class="signal-dir ${item.direction}">${dirLabel}</span>
+      <span class="signal-symbol">${escapeHtml(item.symbol || item.theme || '—')}</span>
+      ${item.theme && item.symbol ? `<span class="trust-chip trust-chip-sources">${escapeHtml(item.theme)}</span>` : ''}
+    </div>
+    ${trustRow}
+    <div class="signal-metrics">
+      <span>Uplift: <strong>${upliftStr}</strong></span>
+      <span>t-stat: <strong>${tStatStr}</strong></span>
+      ${alphaStr ? `<span>Alpha: <strong>${alphaStr}</strong></span>` : ''}
+      <span>Controls: <strong>${item.matchedControls}</strong></span>
+    </div>
+    ${item.title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${escapeHtml(item.title.slice(0,140))}</div>` : ''}
+  </div>`;
+}
 async function loadE2SignalQueue(){
   try {
     const r = await fetch(API + '/event-uplift-grades').catch(() => null);
@@ -1880,43 +2573,72 @@ async function loadE2SignalQueue(){
     const container = document.getElementById('e2-signal-cards');
     const countBadge = document.getElementById('e2-queue-count');
     if (!signals.length) { queue.style.display = 'none'; return; }
-    const topSignals=pickActionableSignals(signals,6);
-    if (topSignals.length) {
-      queue.style.display = '';
-      countBadge.textContent = topSignals.length;
-      container.innerHTML = renderActionableSignalCards(topSignals);
-      return;
+    // Prefer actionable picker if defined, else use uplift magnitude
+    let topSignals = [];
+    if (typeof pickActionableSignals === 'function') {
+      topSignals = pickActionableSignals(signals, 6);
     }
+    if (!topSignals.length) {
+      topSignals = signals
+        .slice()
+        .sort((a, b) => Math.abs(Number(b.uplift) || 0) - Math.abs(Number(a.uplift) || 0))
+        .slice(0, 6);
+    }
+    const items = topSignals.map((s, i) => normalizeSignalToReviewItem(s, i));
+    // Cache for drilldown
+    window.__lastE2Items = items;
     queue.style.display = '';
-    countBadge.textContent = signals.length;
-    // Show top 6 by absolute uplift
-    const top = signals.sort((a, b) => Math.abs(Number(b.uplift)||0) - Math.abs(Number(a.uplift)||0)).slice(0, 6);
-    container.innerHTML = top.map(s => {
-      const upliftVal = Number(s.uplift) || 0;
-      const abnormal = Number(s.abnormal_return) || 0;
-      const dir = (abnormal || upliftVal) > 0 ? 'long' : 'short';
-      const dirLabel = dir.toUpperCase();
-      const symbol = s.symbol || '—';
-      const theme = s.theme || '';
-      // uplift is already in decimal form (e.g., 0.0234 = 2.34%)
-      const upliftPct = Math.abs(upliftVal) < 5 ? (upliftVal * 100).toFixed(2) : Number(upliftVal).toFixed(2);
-      const tStat = s.t_stat ? Number(s.t_stat).toFixed(2) : '—';
-      const title = s.title || '';
-      return `<div class="signal-card">
-        <div class="signal-card-head">
-          <span class="signal-dir ${dir}">${dirLabel}</span>
-          <span class="evidence-badge e2">E2</span>
-          <span class="signal-symbol">${symbol || theme}</span>
-        </div>
-        <div class="signal-metrics">
-          <span>Uplift: <strong>${upliftPct}%</strong></span>
-          <span>t-stat: <strong>${tStat}</strong></span>
-          ${abnormal ? `<span>Alpha: <strong>${(abnormal*100).toFixed(2)}%</strong></span>` : ''}
-        </div>
-        ${title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${title.slice(0,120)}</div>` : ''}
-      </div>`;
-    }).join('');
+    countBadge.textContent = items.length;
+    container.innerHTML = items.map(renderReviewItemCard).join('');
   } catch (e) { console.warn('E2 signal queue failed', e); }
+}
+// Citation popover for Theme Brief dossier (P2)
+let citePopoverEl = null;
+function showCitationPopover(ev, num) {
+  ev.stopPropagation();
+  const cites = window.__briefCitations || [];
+  const cite = cites[num - 1];
+  if (!cite) return;
+  hideCitationPopover();
+  const pop = document.createElement('div');
+  pop.className = 'cite-popover';
+  const fresh = cite.date ? classifyFreshness(cite.date, 30 * 24) : null;
+  const freshChip = fresh ? `<span class="trust-chip trust-chip-${fresh.level}" style="font-size:9px;margin-left:4px">${fresh.label}</span>` : '';
+  pop.innerHTML = `
+    <div class="cite-popover-title">[${num}] ${escapeHtml(cite.title || 'Reference')}</div>
+    <div class="cite-popover-meta">${escapeHtml(cite.source || 'source')} · ${escapeHtml(cite.kind)} ${freshChip}</div>
+    ${cite.date ? `<div class="cite-popover-meta" style="margin-top:4px">${escapeHtml(fmtDate(cite.date))}</div>` : ''}
+    ${cite.url ? `<div style="margin-top:6px"><a href="${escapeHtml(cite.url)}" target="_blank" rel="noreferrer" style="color:var(--accent);font-size:11px">Open source →</a></div>` : ''}
+  `;
+  document.body.appendChild(pop);
+  const rect = ev.target.getBoundingClientRect();
+  pop.style.left = Math.min(window.innerWidth - 360, rect.left) + 'px';
+  pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  citePopoverEl = pop;
+  setTimeout(() => document.addEventListener('click', hideCitationPopover, { once: true }), 0);
+}
+function hideCitationPopover() {
+  if (citePopoverEl && citePopoverEl.parentNode) citePopoverEl.parentNode.removeChild(citePopoverEl);
+  citePopoverEl = null;
+}
+// Selection handler (will be extended for Decision Inbox drilldown)
+function selectReviewItem(id) {
+  try {
+    const items = window.__lastE2Items || [];
+    const item = items.find(x => x.id === id);
+    if (!item) return;
+    // Update URL for context preservation (P2)
+    const url = new URL(window.location.href);
+    url.searchParams.set('select', id);
+    window.history.replaceState({}, '', url.toString());
+    // Visual selection
+    document.querySelectorAll('.signal-card').forEach(el => el.classList.remove('selected'));
+    const card = document.querySelector(`[data-item-id="${id}"]`);
+    if (card) card.classList.add('selected');
+    // If Decision Inbox preview panel exists, populate it
+    const preview = document.getElementById('inbox-preview-content');
+    if (preview) renderInboxPreview(item);
+  } catch (e) { console.warn('selectReviewItem failed', e); }
 }
 async function loadWhatif(){
   const {data,cached,cachedAt}=await f(`${API}/whatif`,'whatif');
@@ -2008,7 +2730,7 @@ function renderGeoPressureSnapshot(snapshot={},cachedAt=null,cached=false){
     html+=`<div class="meta-line" style="margin-top:8px">Transmission ${snapshot.transmissionFresh?'fresh':'stale'}${snapshot.transmissionFreshnessHours!=null?` | age ${fmt(snapshot.transmissionFreshnessHours,1)}h`:''}${snapshot.generatedAt?` | updated ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
   }
   html+=countries.length
-    ? `<div class="brief-list" style="margin-top:10px">${countries.slice(0,4).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.code||'Country')}</strong><div class="meta-line">Strength ${fmt(item.totalStrength||0,1)} | links ${fmtWhole(item.edgeCount||0)}${item.topSymbol?` | top ${escapeHtml(item.topSymbol)}`:''}</div><div class="brief-item-copy">${escapeHtml(truncate(item.strongestEdgeHeadline||'Country-linked transmission path detected.',120))}</div></div>`).join('')}</div>`
+    ? `<div class="brief-list" style="margin-top:10px">${countries.slice(0,4).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.code||'Country')}</strong><div class="meta-line">Pressure ${fmt(item.pressureScore||0,1)} | events ${fmtWhole(item.uniqueEventCount||0)} | links ${fmtWhole(item.edgeCount||0)}${item.topSymbol?` | top ${escapeHtml(item.topSymbol)}`:''}</div><div class="brief-item-copy">${escapeHtml(truncate(item.strongestEdgeHeadline||'Country-linked transmission path detected.',120))}</div></div>`).join('')}</div>`
     : '<div class="theme-empty" style="margin-top:10px">No country-linked pressure paths were detected in the current transmission cache.</div>';
   if(linkedThemes.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(linkedThemes.map((item)=>item.themeLabel||humanizeTheme(item.theme)),'tag-neutral',6)}</div>`;
   html+=renderSnapshotSourceMeta(snapshot.meta);
@@ -2046,13 +2768,6 @@ function renderMacroSnapshot(snapshot={},cachedAt=null,cached=false){
   if(topThemes.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(topThemes.map((item)=>`${humanizeTheme(item.theme)} ${fmtWhole(item.count||0)}`),'tag-neutral',6)}</div>`;
   html+=renderSnapshotSourceMeta(snapshot.meta);
   el.innerHTML=html;
-}
-function snapshotStaleBadge(snapshot){
-  const updated=snapshot.updatedAt||snapshot.generatedAt;
-  if(!updated)return'<div class="stale-badge">No timestamp available</div>';
-  const ageH=(Date.now()-Date.parse(updated))/36e5;
-  if(ageH>48)return`<div class="stale-badge${ageH>168?' critical':''}">Data is ${Math.round(ageH)}h old (updated ${fmtDateTime(updated)})</div>`;
-  return'';
 }
 function renderInvestmentSnapshot(snapshot={},cachedAt=null,cached=false){
   const el=document.getElementById('investment-snapshot');
@@ -2105,7 +2820,7 @@ function renderTransmissionSnapshot(snapshot={},cachedAt=null,cached=false){
   const topCountries=Array.isArray(snapshot.topCountries)?snapshot.topCountries:[];
   const topSymbols=Array.isArray(snapshot.topSymbols)?snapshot.topSymbols:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
-  html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(snapshot.regimeLabel||'Transmission')}</strong><div class="meta-line">Confidence ${fmtWhole(snapshot.regimeConfidence||0)} | edges ${fmtWhole(snapshot.edgeCount||0)} | countries ${fmtWhole(topCountries.length)}</div></div><span class="badge">${fmtWhole(snapshot.edgeCount||0)} links</span></div>`;
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(snapshot.regimeLabel||'Transmission')}</strong><div class="meta-line">Confidence ${fmtWhole(snapshot.regimeConfidence||0)} | links ${fmtWhole(snapshot.edgeCount||0)} | events ${fmtWhole(snapshot.uniqueEventCount||0)} | countries ${fmtWhole(topCountries.length)}</div></div><span class="badge">${fmtWhole(snapshot.edgeCount||0)} links</span></div>`;
   if(snapshot.generatedAt||snapshot.freshnessHours!=null){
     html+=`<div class="meta-line" style="margin-top:8px">Transmission ${snapshot.fresh?'fresh':'stale'}${snapshot.freshnessHours!=null?` | age ${fmt(snapshot.freshnessHours,1)}h`:''}${snapshot.generatedAt?` | updated ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
   }
@@ -2137,7 +2852,9 @@ function renderSourceOpsSnapshot(snapshot={},cachedAt=null,cached=false){
   el.innerHTML=html;
 }
 async function loadThemeShellSnapshots(){
-  const {data,cached,cachedAt}=await f(`${API}/theme-shell-snapshots`,'theme-shell-snapshots');
+  const period=getCurrentPeriod();
+  const cacheKey=`theme-shell-snapshots-${period}`;
+  const {data,cached,cachedAt}=await f(`${API}/theme-shell-snapshots?period=${encodeURIComponent(period)}`,cacheKey);
   renderGeoPressureSnapshot(data?.geoPressure||{},cachedAt,cached);
   renderRiskSnapshot(data?.risk||{},cachedAt,cached);
   renderMacroSnapshot(data?.macro||{},cachedAt,cached);
