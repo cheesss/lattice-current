@@ -364,6 +364,52 @@ def step4_event_features(conn, dry_run=False):
     insert_cur = conn.cursor()
     count = 0
 
+    # Pre-compute sorted date list for lookback calculations
+    sorted_dates = sorted(daily_sig.keys())
+
+    def compute_vix_features(d, vix, sig):
+        """Compute vix_zscore (90-day rolling) and vix_momentum (7-day change rate)."""
+        if vix is None:
+            return 0.0, 0.0
+
+        # vix_momentum: (vix_today - vix_7d_ago) / vix_7d_ago
+        from datetime import timedelta
+        d_date = date_type.fromisoformat(d) if isinstance(d, str) else d
+        d_7ago = (d_date - timedelta(days=7)).isoformat()
+        vix_prev = daily_sig.get(d_7ago, {}).get("vix")
+        vix_momentum = (vix - vix_prev) / max(vix_prev, 1.0) if vix_prev else 0.0
+
+        # vix_zscore: (vix - mean_90d) / std_90d
+        vix_history = []
+        for dd in sorted_dates:
+            if dd > d:
+                break
+            v = daily_sig[dd].get("vix")
+            if v is not None:
+                vix_history.append(v)
+        vix_history = vix_history[-90:]  # last 90 days
+        if len(vix_history) >= 10:
+            import statistics
+            m = statistics.mean(vix_history)
+            s = statistics.stdev(vix_history) if len(vix_history) > 1 else 1.0
+            vix_zscore = (vix - m) / max(s, 0.01)
+        else:
+            vix_zscore = 0.0
+
+        return round(vix_zscore, 4), round(vix_momentum, 4)
+
+    def compute_hawkes_momentum(d, ei):
+        """Compute hawkes_momentum: 7-day change rate of eventIntensity."""
+        if ei is None or ei == 0:
+            return 0.0
+        from datetime import timedelta
+        d_date = date_type.fromisoformat(d) if isinstance(d, str) else d
+        d_7ago = (d_date - timedelta(days=7)).isoformat()
+        ei_prev = daily_sig.get(d_7ago, {}).get("eventIntensity", 0) or 0
+        if ei_prev == 0:
+            return 0.0
+        return round((ei - ei_prev) / max(ei_prev, 0.01), 4)
+
     for evt in events:
         d = evt["event_date"].isoformat() if isinstance(evt["event_date"], date_type) else str(evt["event_date"])[:10]
         sig = daily_sig.get(d, {})
@@ -374,6 +420,9 @@ def step4_event_features(conn, dry_run=False):
         sd = evt["source_diversity"] or 1.0
         ac = evt["article_count"] or 1
         ei = sig.get("eventIntensity", 0) or 0
+
+        vix_zscore, vix_momentum = compute_vix_features(d, vix, sig)
+        hawkes_mom = compute_hawkes_momentum(d, ei)
 
         insert_cur.execute("""
             INSERT INTO event_features (canonical_event_id, source_count, source_diversity, article_count,
@@ -386,7 +435,7 @@ def step4_event_features(conn, dry_run=False):
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT DO NOTHING
         """, (evt["id"], sc, sd, ac,
-              ei, 0, regime, vix, 0, 0,
+              ei, hawkes_mom, regime, vix, vix_zscore, vix_momentum,
               sig.get("yieldSpread"), sig.get("oilPrice"), sig.get("dollarIndex"), sig.get("hy_credit_spread"),
               sig.get("marketStress"), sig.get("transmissionStrength"), sig.get("eventIntensity"),
               regime, rm, clamp(45 + ((vix or 20) - 20) * 2, 4, 100),

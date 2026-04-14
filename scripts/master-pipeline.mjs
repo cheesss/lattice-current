@@ -25,6 +25,7 @@ import pg from 'pg';
 import { execSync } from 'child_process';
 import { existsSync, writeFileSync } from 'fs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+import { withLock } from './_shared/pipeline-lock.mjs';
 
 loadOptionalEnvFile();
 const { Client } = pg;
@@ -348,7 +349,7 @@ async function main() {
     console.log(`AUTO MODE: ${AUTO_INTERVAL_MS / 1000}초 간격으로 무한 반복\n`);
     while (true) {
       try {
-        await runPipeline();
+        await withLock('master-pipeline', runPipeline);
       } catch (e) {
         console.error('Pipeline error:', e.message);
       }
@@ -356,7 +357,7 @@ async function main() {
       await new Promise(r => setTimeout(r, AUTO_INTERVAL_MS));
     }
   } else {
-    await runPipeline();
+    await withLock('master-pipeline', runPipeline);
   }
 }
 
