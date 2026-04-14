@@ -44,6 +44,8 @@ select{padding:7px 12px;min-width:168px}
 .accent-card{border-color:rgba(197,255,109,.18);background:linear-gradient(155deg,rgba(32,43,22,.95),rgba(20,26,17,.97))}
 .sticky-card{position:sticky;top:12px}
 .subcard,.category-card,.insight-card,.interactive-row,.story-card,.stage-item,.kpi,.info-note{padding:12px}
+.interactive-row[onclick]{cursor:pointer;transition:border-color .15s ease,background .15s ease}
+.interactive-row[onclick]:hover{border-color:rgba(126,224,129,.25);background:rgba(255,255,255,.04)}
 .card-title,.subcard-title{color:var(--accent);text-transform:uppercase;letter-spacing:.14em}
 .card-title{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:11px;margin-bottom:10px}
 .subcard-title{font-size:10px;margin-bottom:8px}
@@ -603,8 +605,14 @@ function normalizePercent(value){const n=Number(value);if(!Number.isFinite(n))re
 function pct(value,d=0){const p=normalizePercent(value);return p==null?'--':`${p.toFixed(d)}%`;}
 function fmtPercent(value,d=0){const p=normalizePercent(value);return p==null?'--':`${p>=0?'+':''}${p.toFixed(d)}%`;}
 function rf(value,d=2){const p=normalizePercent(value);if(p==null)return'--';return `<span class="${p>=0?'pos':'neg'}">${p>=0?'+':''}${p.toFixed(d)}%</span>`;}
-function fmtDate(value){if(!value)return'--';const date=new Date(value);return Number.isNaN(date.getTime())?String(value).slice(0,10):date.toLocaleDateString();}
-function fmtDateTime(value){if(!value)return'Never';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString();}
+function getDashboardLocale(){
+  let lang='en';
+  try{lang=String(localStorage.getItem('lattice-lang')||'en').toLowerCase();}catch{}
+  return lang==='ko'?'ko-KR':'en-US';
+}
+function fmtDate(value){if(!value)return'--';const date=new Date(value);return Number.isNaN(date.getTime())?String(value).slice(0,10):date.toLocaleDateString(getDashboardLocale());}
+function fmtDateTime(value){if(!value)return'Never';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString(getDashboardLocale(),{hour12:false});}
+function fmtTime(value){if(!value)return'--';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleTimeString(getDashboardLocale(),{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});}
 function fmtAgeMs(value){const ms=Number(value);if(!Number.isFinite(ms)||ms<0)return'--';if(ms<60_000)return`${Math.round(ms/1000)}s`;if(ms<3_600_000)return`${Math.round(ms/60_000)}m`;if(ms<86_400_000)return`${Math.round(ms/3_600_000)}h`;return`${Math.round(ms/86_400_000)}d`;}
 function qualityClass(score){const n=Number(score);if(!Number.isFinite(n))return'tag-neutral';if(n>=0.8)return'tag-growing';if(n>=0.6)return'tag-nascent';return'tag-declining';}
 function humanizeTheme(value){return String(value||'').replace(/[_-]+/g,' ').replace(/\b\w/g,(char)=>char.toUpperCase()).trim();}
@@ -612,7 +620,22 @@ function parseList(data,keys){for(const key of keys){if(Array.isArray(data?.[key
 function renderTags(items,className='tag-neutral',limit=8){return asArray(items).slice(0,limit).map((item)=>`<span class="tag ${className}">${escapeHtml(readLabel(item))}</span>`).join('');}
 function cacheToken(value){return String(value??'none').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'')||'none';}
 function renderThemeButtons(items,limit=6){return asArray(items).slice(0,limit).map((item)=>{const theme=normalizeTheme(item?.theme||item?.id||item?.label||item);if(!theme||theme==='unknown')return'';const label=item?.label||humanizeTheme(theme);return `<button class="theme-chip" onclick="openThemeBrief('${theme}')">${escapeHtml(label)}</button>`;}).join('');}
-function cachedBadge(ts){if(!ts)return'<span class="badge" style="color:var(--amber)">cached</span>';const label=new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return `<span class="badge" style="color:var(--amber)">cached ${label}</span>`;}
+function cachedBadge(ts){if(!ts)return'<span class="badge" style="color:var(--amber)">cached</span>';const label=fmtTime(ts);return `<span class="badge" style="color:var(--amber)">cached ${label}</span>`;}
+function isDisplayableLiveTheme(theme){const normalized=String(theme||'').trim().toLowerCase();return Boolean(normalized)&&!normalized.startsWith('dt-');}
+function summarizeLiveThemes(items,limit=3){
+  const seen=new Set();
+  return asArray(items)
+    .filter((item)=>isDisplayableLiveTheme(item?.theme))
+    .sort((a,b)=>Number(b?.intensity||0)-Number(a?.intensity||0))
+    .filter((item)=>{
+      const key=String(item?.theme||'').trim().toLowerCase();
+      if(!key||seen.has(key))return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0,limit)
+    .map((item)=>humanizeTheme(item.theme));
+}
 function stageClass(stage){const key=String(stage||'').toLowerCase();if(key.includes('mainstream'))return'tag-mainstream';if(key.includes('grow'))return'tag-growing';if(key.includes('emerg'))return'tag-emerging';if(key.includes('nascent'))return'tag-nascent';if(key.includes('declin'))return'tag-declining';return'tag-neutral';}
 function renderSourceQuality(score,breakdown){const distinctSources=Array.isArray(breakdown?.distinctSources)?breakdown.distinctSources:[];const sourceTypeCounts=breakdown?.sourceTypeCounts||{};return `<div class="meta-line">Source quality ${fmt(score||0,2)} | distinct sources ${distinctSources.length} | types ${Object.keys(sourceTypeCounts).length}</div>`;}
 function getCurrentPeriod(){return PERIODS[state.period]?state.period:'quarter';}
@@ -882,8 +905,9 @@ function renderEvolutionSelect(){
 function renderHorizonSummary(){
   const meta=PERIODS[getCurrentPeriod()];
   const temperatures=Array.isArray(lastStatusSnapshot?.temperatures)?lastStatusSnapshot.temperatures:[];
-  const hotCount=temperatures.filter((row)=>String(row.temperature||'').toUpperCase()==='HOT').length;
-  const strongest=temperatures.slice().sort((a,b)=>Number(b.intensity||0)-Number(a.intensity||0)).slice(0,3).map((item)=>item.theme).filter(Boolean);
+  const canonicalTemperatures=temperatures.filter((row)=>isDisplayableLiveTheme(row?.theme));
+  const hotCount=canonicalTemperatures.filter((row)=>String(row.temperature||'').toUpperCase()==='HOT').length;
+  const strongest=summarizeLiveThemes(canonicalTemperatures,3);
   const el=document.getElementById('horizon-summary');
   if(!el)return;
   el.innerHTML=`
@@ -1128,7 +1152,7 @@ async function refreshAll(){
   renderMyThemes();
   await loadThemeBrief();
   await loadFollowedThemeBriefing();
-  document.getElementById('last-update').textContent=`Updated ${new Date().toLocaleTimeString()}`;
+  document.getElementById('last-update').textContent=`Updated ${fmtTime(new Date())}`;
 }
 async function loadStatus(){
   const {data,cached,cachedAt}=await f(`${API}/live-status`,'status');
@@ -1139,10 +1163,11 @@ async function loadStatus(){
   }
   lastStatusSnapshot=data;
   const temperatures=Array.isArray(data.temperatures)?data.temperatures:[];
+  const visibleTemperatures=temperatures.filter((item)=>isDisplayableLiveTheme(item?.theme));
   const signals=Array.isArray(data.signals)?data.signals:[];
   const todayArticles=Number(data.todayArticles??data.articlesToday??0);
   const pending=Number(data.pending??0);
-  const hottest=temperatures.slice().sort((a,b)=>Number(b.intensity||0)-Number(a.intensity||0)).find((item)=>Number(item.intensity||0)>=0.05)||null;
+  const hottest=visibleTemperatures.slice().sort((a,b)=>Number(b.intensity||0)-Number(a.intensity||0)).find((item)=>Number(item.intensity||0)>=0.05)||null;
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
   html+=`
     <div class="kpi-grid">
@@ -1160,8 +1185,8 @@ async function loadStatus(){
   document.getElementById('status-badge').textContent=cached?'CACHED':todayArticles>0?'LIVE':'IDLE';
 
   let tempHtml='';
-  for(const item of temperatures){
-    tempHtml+=`<div class="interactive-row" style="cursor:default"><div style="display:flex;justify-content:space-between;gap:12px"><strong>${escapeHtml(item.theme||'unknown')}</strong><span class="tag ${stageClass(item.temperature)}">${escapeHtml(item.temperature||'n/a')}</span></div><div class="meta-line" style="margin-top:4px">Intensity ${pct(item.intensity||0,0)}</div></div>`;
+  for(const item of visibleTemperatures){
+    tempHtml+=`<div class="interactive-row" style="cursor:default"><div style="display:flex;justify-content:space-between;gap:12px"><strong>${escapeHtml(item.themeLabel||humanizeTheme(item.theme)||'unknown')}</strong><span class="tag ${stageClass(item.temperature)}">${escapeHtml(item.temperature||'n/a')}</span></div><div class="meta-line" style="margin-top:4px">Intensity ${pct(item.intensity||0,0)}</div></div>`;
   }
   document.getElementById('temperatures').innerHTML=tempHtml||'<div class="meta-line">No live issue temperatures available.</div>';
 
@@ -1773,6 +1798,67 @@ async function loadWeeklyDigest(){
   if(Array.isArray(digest.watchlist)&&digest.watchlist.length)html+=`<div class="pill-row">${renderTags(digest.watchlist,'tag-emerging',8)}</div>`;
   el.innerHTML=html;
 }
+function normalizeSignalCardTitle(value){
+  return String(value||'')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu,' ')
+    .trim();
+}
+function formatSignalPercent(value,d=2){
+  const normalized=normalizePercent(value);
+  return normalized==null?'--':`${normalized>=0?'+':''}${normalized.toFixed(d)}%`;
+}
+function pickActionableSignals(signals,limit=6){
+  const seenTitles=new Set();
+  const symbolCounts=new Map();
+  const candidates=signals
+    .filter((signal)=>String(signal?.evidence_grade||signal?.evidenceGrade||'').toUpperCase()==='E2')
+    .filter((signal)=>Number(signal?.t_stat||signal?.tStat||0)>=1.96)
+    .sort((a,b)=>{
+      const aScore=Math.abs(Number(a?.uplift||0))*0.6+Math.abs(Number(a?.t_stat||0))*0.4;
+      const bScore=Math.abs(Number(b?.uplift||0))*0.6+Math.abs(Number(b?.t_stat||0))*0.4;
+      return bScore-aScore;
+    });
+  const picked=[];
+  for(const signal of candidates){
+    const titleKey=normalizeSignalCardTitle(signal?.title);
+    const symbolKey=String(signal?.symbol||'unknown').toUpperCase();
+    if(titleKey&&seenTitles.has(titleKey))continue;
+    const symbolCount=symbolCounts.get(symbolKey)||0;
+    if(symbolCount>=2)continue;
+    seenTitles.add(titleKey);
+    symbolCounts.set(symbolKey,symbolCount+1);
+    picked.push(signal);
+    if(picked.length>=limit)break;
+  }
+  return picked;
+}
+function renderActionableSignalCards(signals){
+  return signals.map((signal)=>{
+    const upliftVal=Number(signal?.uplift)||0;
+    const abnormal=Number(signal?.abnormal_return)||0;
+    const dir=(abnormal||upliftVal)>0?'long':'short';
+    const dirLabel=dir.toUpperCase();
+    const symbol=String(signal?.symbol||signal?.theme||'asset');
+    const theme=String(signal?.theme||'').trim();
+    const tStat=Number.isFinite(Number(signal?.t_stat))?Number(signal.t_stat).toFixed(2):'--';
+    const title=String(signal?.title||'').trim();
+    return `<div class="signal-card">
+      <div class="signal-card-head">
+        <span class="signal-dir ${dir}">${dirLabel}</span>
+        <span class="evidence-badge e2">E2</span>
+        <span class="signal-symbol">${escapeHtml(symbol)}</span>
+      </div>
+      ${theme?`<div class="meta-line" style="margin-top:4px">${escapeHtml(humanizeTheme(theme))}</div>`:''}
+      <div class="signal-metrics">
+        <span>Uplift: <strong>${formatSignalPercent(upliftVal,2)}</strong></span>
+        <span>t-stat: <strong>${tStat}</strong></span>
+        ${abnormal?`<span>Alpha: <strong>${formatSignalPercent(abnormal,2)}</strong></span>`:''}
+      </div>
+      ${title?`<div style="font-size:10px;color:var(--muted);line-height:1.4">${escapeHtml(title.slice(0,120))}</div>`:''}
+    </div>`;
+  }).join('');
+}
 async function loadE2SignalQueue(){
   try {
     const r = await fetch(API + '/event-uplift-grades').catch(() => null);
@@ -1783,6 +1869,13 @@ async function loadE2SignalQueue(){
     const container = document.getElementById('e2-signal-cards');
     const countBadge = document.getElementById('e2-queue-count');
     if (!signals.length) { queue.style.display = 'none'; return; }
+    const topSignals=pickActionableSignals(signals,6);
+    if (topSignals.length) {
+      queue.style.display = '';
+      countBadge.textContent = topSignals.length;
+      container.innerHTML = renderActionableSignalCards(topSignals);
+      return;
+    }
     queue.style.display = '';
     countBadge.textContent = signals.length;
     // Show top 6 by absolute uplift
@@ -1815,7 +1908,7 @@ async function loadE2SignalQueue(){
   } catch (e) { console.warn('E2 signal queue failed', e); }
 }
 async function loadWhatif(){
-  const {data,cached,cachedAt}=await f(`${API}/whatif//`,'whatif');
+  const {data,cached,cachedAt}=await f(`${API}/whatif`,'whatif');
   const el=document.getElementById('whatif');
   const items=Array.isArray(data)?data:parseList(data,['strategies','items']);
   if(!items.length){
@@ -1900,6 +1993,9 @@ function renderGeoPressureSnapshot(snapshot={},cachedAt=null,cached=false){
   const linkedThemes=Array.isArray(snapshot.linkedThemes)?snapshot.linkedThemes:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>Country and corridor pressure</strong><div class="meta-line">Countries ${fmtWhole(countries.length)} | hotspots ${fmtWhole(hotspots.length)} | linked themes ${fmtWhole(linkedThemes.length)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
+  if(snapshot.generatedAt||snapshot.transmissionFreshnessHours!=null){
+    html+=`<div class="meta-line" style="margin-top:8px">Transmission ${snapshot.transmissionFresh?'fresh':'stale'}${snapshot.transmissionFreshnessHours!=null?` | age ${fmt(snapshot.transmissionFreshnessHours,1)}h`:''}${snapshot.generatedAt?` | updated ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
+  }
   html+=countries.length
     ? `<div class="brief-list" style="margin-top:10px">${countries.slice(0,4).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.code||'Country')}</strong><div class="meta-line">Strength ${fmt(item.totalStrength||0,1)} | links ${fmtWhole(item.edgeCount||0)}${item.topSymbol?` | top ${escapeHtml(item.topSymbol)}`:''}</div><div class="brief-item-copy">${escapeHtml(truncate(item.strongestEdgeHeadline||'Country-linked transmission path detected.',120))}</div></div>`).join('')}</div>`
     : '<div class="theme-empty" style="margin-top:10px">No country-linked pressure paths were detected in the current transmission cache.</div>';
@@ -1932,6 +2028,7 @@ function renderMacroSnapshot(snapshot={},cachedAt=null,cached=false){
   const topThemes=Array.isArray(snapshot.topThemes)?snapshot.topThemes:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(humanizeTheme(snapshot.verdict||'watch'))} macro regime</strong><div class="meta-line">Strategies ${fmtWhole(snapshot.strategyCount||0)} | signals ${fmtWhole(signals.length)}</div></div><span class="tag ${snapshotLevelClass(snapshot.verdict)}">${escapeHtml(snapshot.verdict||'watch')}</span></div>`;
+  if(snapshot.staleSignalCount)html+=`<div class="meta-line" style="margin-top:8px">${fmtWhole(snapshot.staleSignalCount)} stale signal${snapshot.staleSignalCount===1?'':'s'} hidden from this card.</div>`;
   html+=signals.length
     ? `<div class="brief-list" style="margin-top:10px">${signals.slice(0,6).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.channel||'signal')}</strong><div class="meta-line">${escapeHtml(String(item.value??'--'))}${item.updatedAt?` | ${escapeHtml(fmtDateTime(item.updatedAt))}`:''}</div></div>`).join('')}</div>`
     : '<div class="theme-empty" style="margin-top:10px">No macro signals available.</div>';
@@ -2012,7 +2109,8 @@ function renderSourceOpsSnapshot(snapshot={},cachedAt=null,cached=false){
   html+=events.length
     ? `<div class="brief-list" style="margin-top:10px">${events.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Source event')}</strong><div class="meta-line">${escapeHtml(item.action||'updated')} | ${escapeHtml(item.status||'ok')} | ${escapeHtml(item.actor||'system')}${item.createdAt?` | ${escapeHtml(fmtDateTime(item.createdAt))}`:''}</div>${item.detail?`<div class="brief-item-copy">${escapeHtml(truncate(item.detail,120))}</div>`:''}</div>`).join('')}</div>`
     : '<div class="theme-empty" style="margin-top:10px">No recent source operations were logged.</div>';
-  if(categories.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(categories.map((item)=>`${item.category} ${fmtWhole(item.count||0)}`),'tag-neutral',6)}</div>`;
+  const visibleCategories=categories.filter((item)=>!String(item?.category||'').toLowerCase().startsWith('dt-'));
+  if(visibleCategories.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(visibleCategories.map((item)=>`${humanizeTheme(item.category)} ${fmtWhole(item.count||0)}`),'tag-neutral',6)}</div>`;
   html+=renderSnapshotSourceMeta(snapshot.meta);
   el.innerHTML=html;
 }
@@ -2561,7 +2659,7 @@ async function refreshSourceCredibility() {
     if (!r?.ok) return;
     const data = await r.json();
     // Derive from temperatures (theme activity) or todayArticles
-    const temps = data.temperatures || [];
+    const temps = (data.temperatures || []).filter((item)=>isDisplayableLiveTheme(item?.theme));
     const el = document.getElementById('source-credibility-chart');
     const badge = document.getElementById('source-count-badge');
 
@@ -2573,7 +2671,7 @@ async function refreshSourceCredibility() {
         const color = score >= 70 ? 'var(--accent2)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
         const tempLabel = s.temperature || '';
         return `<div class="src-row">
-          <span class="src-name">${s.theme || '?'}</span>
+          <span class="src-name">${escapeHtml(s.themeLabel || humanizeTheme(s.theme) || '?')}</span>
           <div class="src-bar"><div class="src-bar-fill" style="width:${score}%;background:${color}"></div></div>
           <span class="src-score" style="color:${color}">${tempLabel}</span>
         </div>`;

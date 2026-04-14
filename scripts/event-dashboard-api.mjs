@@ -256,6 +256,13 @@ function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+function normalizeSignalQueueTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
 function classifyTemperature(intensity) {
   if (intensity >= 0.8) return 'HOT';
   if (intensity >= 0.45) return 'WARM';
@@ -546,6 +553,51 @@ async function buildLiveStatus() {
     signals,
     pending: Number(pendingR.rows[0]?.count || 0),
     todayArticles: Number(articlesR.rows[0]?.count || 0),
+  };
+}
+
+async function buildSignalSummary() {
+  const [latestSignalsR, vixHistoryR] = await Promise.all([
+    safeQuery(`
+      SELECT DISTINCT ON (signal_name) signal_name, ts, value
+      FROM signal_history
+      ORDER BY signal_name, ts DESC
+    `),
+    safeQuery(`
+      SELECT ts, value
+      FROM signal_history
+      WHERE signal_name = 'vix'
+        AND ts >= NOW() - INTERVAL '30 days'
+      ORDER BY ts
+      LIMIT 64
+    `),
+  ]);
+
+  const rows = latestSignalsR.rows.map((row) => ({
+    signal_name: String(row.signal_name || ''),
+    ts: row.ts,
+    value: Number(row.value || 0),
+  }));
+  const lookup = Object.fromEntries(rows.map((row) => [row.signal_name, row.value]));
+  const vix = Number(lookup.vix);
+  const riskGauge = Number.isFinite(vix)
+    ? Number(clamp(45 + (vix - 20) * 2, 4, 100).toFixed(1))
+    : null;
+  const riskState = Number.isFinite(vix)
+    ? (vix > 25 ? 'risk-off' : vix < 18 ? 'risk-on' : 'balanced')
+    : null;
+
+  return {
+    vix: Number.isFinite(vix) ? vix : null,
+    yieldSpread: Number.isFinite(Number(lookup.yieldSpread)) ? Number(lookup.yieldSpread) : null,
+    oilPrice: Number.isFinite(Number(lookup.oilPrice)) ? Number(lookup.oilPrice) : null,
+    dollarIndex: Number.isFinite(Number(lookup.dollarIndex)) ? Number(lookup.dollarIndex) : null,
+    hyCreditSpread: Number.isFinite(Number(lookup.hy_credit_spread)) ? Number(lookup.hy_credit_spread) : null,
+    marketStress: Number.isFinite(Number(lookup.marketStress)) ? Number(lookup.marketStress) : null,
+    riskGauge,
+    riskState,
+    vixHistory: vixHistoryR.rows.map((row) => Number(row.value || 0)).filter((value) => Number.isFinite(value)),
+    rows,
   };
 }
 
@@ -1401,6 +1453,14 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       return buildJsonResponse(await computeCalibrationDiagnostic(getPool(), { alertFn: sendAlert }));
     }
 
+    if (segments[0] === 'api' && segments[1] === 'kpi-summary') {
+      return buildJsonResponse(await buildSignalSummary());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'signals' && segments.length === 2) {
+      return buildJsonResponse(await buildSignalSummary());
+    }
+
     if (segments[0] === 'api' && segments[1] === 'data-quality') {
       return buildJsonResponse(await buildDataQuality());
     }
@@ -1614,7 +1674,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'reports' && segments[2]) {
-      return buildJsonResponse(await buildReportDetail(segments[2]));
+      return buildJsonResponse(await buildReportDetail(decodeURIComponent(segments[2])));
     }
 
     if (segments[0] === 'api' && segments[1] === 'daily-digest') {
@@ -1856,22 +1916,40 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     // ── /api/event-uplift-grades ──
     if (segments[0] === 'api' && segments[1] === 'event-uplift-grades') {
       const r = await safeQuery(`
-        SELECT eu.evidence_grade, eu.uplift, eu.t_stat,
-               ce.theme, ce.representative_title AS title,
-               lo.symbol, lo.forward_return_pct, lo.abnormal_return
-        FROM event_uplift eu
-        JOIN canonical_events ce ON ce.id = eu.canonical_event_id
-        LEFT JOIN LATERAL (
-          SELECT lo2.symbol, lo2.forward_return_pct, lo2.abnormal_return
-          FROM labeled_outcomes lo2
-          WHERE lo2.canonical_event_id = eu.canonical_event_id
-            AND lo2.symbol != 'SPY'
-            AND lo2.abnormal_return IS NOT NULL
-          ORDER BY ABS(lo2.abnormal_return) DESC
-          LIMIT 1
-        ) lo ON true
-        WHERE eu.evidence_grade IS NOT NULL
-        ORDER BY eu.evidence_grade DESC, ABS(eu.uplift) DESC
+        WITH ranked_uplift AS (
+          SELECT
+            eu.canonical_event_id,
+            eu.evidence_grade,
+            eu.uplift,
+            eu.t_stat,
+            ce.theme,
+            ce.representative_title AS title,
+            lo.symbol,
+            lo.forward_return_pct,
+            lo.abnormal_return,
+            ROW_NUMBER() OVER (
+              PARTITION BY eu.canonical_event_id
+              ORDER BY ABS(COALESCE(lo.abnormal_return, eu.uplift, 0)) DESC,
+                       ABS(COALESCE(eu.uplift, 0)) DESC,
+                       ABS(COALESCE(eu.t_stat, 0)) DESC
+            ) AS event_rank
+          FROM event_uplift eu
+          JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+          LEFT JOIN LATERAL (
+            SELECT lo2.symbol, lo2.forward_return_pct, lo2.abnormal_return
+            FROM labeled_outcomes lo2
+            WHERE lo2.canonical_event_id = eu.canonical_event_id
+              AND lo2.symbol != 'SPY'
+              AND lo2.abnormal_return IS NOT NULL
+            ORDER BY ABS(lo2.abnormal_return) DESC
+            LIMIT 1
+          ) lo ON true
+          WHERE eu.evidence_grade IS NOT NULL
+        )
+        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, symbol, forward_return_pct, abnormal_return
+        FROM ranked_uplift
+        WHERE event_rank = 1
+        ORDER BY evidence_grade DESC, ABS(uplift) DESC
         LIMIT 50000
       `);
       // Separate: summary for chart + top signals for queue
@@ -1886,9 +1964,31 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       for (const s of Object.values(summary)) {
         s.avgUplift = s.count > 0 ? Number((s.totalUplift / s.count).toFixed(4)) : 0;
       }
+      const symbolCounts = new Map();
+      const seenTitles = new Set();
+      const actionableSignals = [];
+      for (const row of grades
+        .filter((item) => String(item.evidence_grade || '').toUpperCase() === 'E2')
+        .sort((a, b) => {
+          const aScore = Math.abs(Number(a.uplift || 0)) * 0.6 + Math.abs(Number(a.t_stat || 0)) * 0.4;
+          const bScore = Math.abs(Number(b.uplift || 0)) * 0.6 + Math.abs(Number(b.t_stat || 0)) * 0.4;
+          return bScore - aScore;
+        })) {
+        const titleKey = normalizeSignalQueueTitle(row.title);
+        const symbolKey = String(row.symbol || 'unknown').toUpperCase();
+        if (titleKey && seenTitles.has(titleKey)) continue;
+        if ((symbolCounts.get(symbolKey) || 0) >= 1) continue;
+        seenTitles.add(titleKey);
+        symbolCounts.set(symbolKey, (symbolCounts.get(symbolKey) || 0) + 1);
+        actionableSignals.push(row);
+        if (actionableSignals.length >= 20) break;
+      }
+      const fallbackSignals = actionableSignals.length
+        ? actionableSignals
+        : grades.filter((item) => String(item.evidence_grade || '').toUpperCase() === 'E2').slice(0, 20);
       return buildJsonResponse({
         grades: Object.values(summary),
-        signals: grades.filter(g => g.evidence_grade === 'E2').slice(0, 20),
+        signals: fallbackSignals,
       });
     }
 
