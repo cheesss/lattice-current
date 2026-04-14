@@ -1778,36 +1778,36 @@ async function loadE2SignalQueue(){
     const r = await fetch(API + '/event-uplift-grades').catch(() => null);
     if (!r?.ok) return;
     const data = await r.json();
-    const grades = data.grades || data;
-    // Filter E2+ signals with uplift data
-    const e2signals = (Array.isArray(grades) ? grades : []).filter(g => g.evidence_grade === 'E2' && g.uplift != null);
+    const signals = data.signals || [];
     const queue = document.getElementById('e2-signal-queue');
     const container = document.getElementById('e2-signal-cards');
     const countBadge = document.getElementById('e2-queue-count');
-    if (!e2signals.length) { queue.style.display = 'none'; return; }
+    if (!signals.length) { queue.style.display = 'none'; return; }
     queue.style.display = '';
-    countBadge.textContent = e2signals.length;
-    // Show top 6
-    const top = e2signals.sort((a, b) => Math.abs(b.uplift) - Math.abs(a.uplift)).slice(0, 6);
+    countBadge.textContent = signals.length;
+    // Show top 6 by absolute uplift
+    const top = signals.sort((a, b) => Math.abs(Number(b.uplift)||0) - Math.abs(Number(a.uplift)||0)).slice(0, 6);
     container.innerHTML = top.map(s => {
-      const dir = s.uplift > 0 ? 'long' : 'short';
+      const upliftVal = Number(s.uplift) || 0;
+      const abnormal = Number(s.abnormal_return) || 0;
+      const dir = (abnormal || upliftVal) > 0 ? 'long' : 'short';
       const dirLabel = dir.toUpperCase();
-      const symbol = s.symbol || s.theme || '—';
+      const symbol = s.symbol || '—';
       const theme = s.theme || '';
-      const uplift = (s.uplift * 100).toFixed(2);
-      const tStat = s.t_stat ? s.t_stat.toFixed(2) : '—';
-      const alphaProb = s.alpha_prob ? (s.alpha_prob * 100).toFixed(0) + '%' : '—';
-      const title = s.title || s.representative_title || '';
+      // uplift is already in decimal form (e.g., 0.0234 = 2.34%)
+      const upliftPct = Math.abs(upliftVal) < 5 ? (upliftVal * 100).toFixed(2) : Number(upliftVal).toFixed(2);
+      const tStat = s.t_stat ? Number(s.t_stat).toFixed(2) : '—';
+      const title = s.title || '';
       return `<div class="signal-card">
         <div class="signal-card-head">
           <span class="signal-dir ${dir}">${dirLabel}</span>
           <span class="evidence-badge e2">E2</span>
-          <span class="signal-symbol">${symbol}</span>
+          <span class="signal-symbol">${symbol || theme}</span>
         </div>
         <div class="signal-metrics">
-          <span>Uplift: <strong>${uplift}%</strong></span>
+          <span>Uplift: <strong>${upliftPct}%</strong></span>
           <span>t-stat: <strong>${tStat}</strong></span>
-          <span>P(α>0): <strong>${alphaProb}</strong></span>
+          ${abnormal ? `<span>Alpha: <strong>${(abnormal*100).toFixed(2)}%</strong></span>` : ''}
         </div>
         ${title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${title.slice(0,120)}</div>` : ''}
       </div>`;
@@ -2294,17 +2294,25 @@ async function refreshEvidenceChart() {
   try {
     const r = await fetch(API + '/event-uplift-grades').catch(() => null);
     if (!r?.ok) return;
-    const rows = await r.json();
-    // Aggregate from detailed rows
+    const data = await r.json();
+    // API now returns { grades: [{grade, count, avgUplift}], signals: [...] }
+    const gradeList = data.grades || data;
     const gradeMap = {};
-    for (const row of rows) {
-      const g = row.evidence_grade || 'E0';
-      if (!gradeMap[g]) gradeMap[g] = { count: 0, totalUplift: 0 };
-      gradeMap[g].count++;
-      gradeMap[g].totalUplift += Number(row.uplift) || 0;
+    if (Array.isArray(gradeList)) {
+      for (const item of gradeList) {
+        const g = item.grade || item.evidence_grade || 'E0';
+        if (item.count != null) {
+          // Pre-aggregated format
+          gradeMap[g] = { count: item.count, avgUplift: item.avgUplift || 0 };
+        } else {
+          // Row-level format (legacy)
+          if (!gradeMap[g]) gradeMap[g] = { count: 0, totalUplift: 0 };
+          gradeMap[g].count++;
+          gradeMap[g].totalUplift = (gradeMap[g].totalUplift || 0) + (Number(item.uplift) || 0);
+        }
+      }
     }
-    // Also add E0 count estimate
-    const total = Object.values(gradeMap).reduce((s, g) => s + g.count, 0);
+    const total = Object.values(gradeMap).reduce((s, g) => s + (g.count || 0), 0);
     const el = document.getElementById('evidence-chart');
     const badge = document.getElementById('evidence-badge');
     if (badge) badge.textContent = total + ' events';
@@ -2317,12 +2325,14 @@ async function refreshEvidenceChart() {
     el.innerHTML = grades.map(g => {
       const d = gradeMap[g];
       const pct = (d.count / total * 100).toFixed(1);
-      const avg = d.count > 0 ? d.totalUplift / d.count : 0;
+      const avg = d.avgUplift != null ? d.avgUplift : (d.count > 0 ? (d.totalUplift || 0) / d.count : 0);
+      // Display uplift: if small decimals, multiply by 100 for percentage
+      const displayAvg = Math.abs(avg) < 5 ? avg * 100 : avg;
       return `<div class="ev-bar-row">
         <span class="ev-bar-label" style="color:${textColors[g]}">${g}</span>
         <div class="ev-bar-track"><div class="ev-bar-fill" style="width:${d.count/maxCount*100}%;background:${colors[g]}"></div></div>
         <span class="ev-bar-count">${d.count.toLocaleString()} (${pct}%)</span>
-        <span class="ev-bar-uplift" style="color:${avg>=0?'var(--accent2)':'var(--red)'}">${avg>=0?'+':''}${avg.toFixed(2)}%</span>
+        <span class="ev-bar-uplift" style="color:${displayAvg>=0?'var(--accent2)':'var(--red)'}">${displayAvg>=0?'+':''}${displayAvg.toFixed(2)}%</span>
       </div>`;
     }).join('');
   } catch (e) { console.warn('Evidence chart failed', e); }

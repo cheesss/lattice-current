@@ -1856,11 +1856,40 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     // ── /api/event-uplift-grades ──
     if (segments[0] === 'api' && segments[1] === 'event-uplift-grades') {
       const r = await safeQuery(`
-        SELECT evidence_grade, uplift FROM event_uplift
-        WHERE evidence_grade IS NOT NULL
+        SELECT eu.evidence_grade, eu.uplift, eu.t_stat,
+               ce.theme, ce.representative_title AS title,
+               lo.symbol, lo.forward_return_pct, lo.abnormal_return
+        FROM event_uplift eu
+        JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+        LEFT JOIN LATERAL (
+          SELECT lo2.symbol, lo2.forward_return_pct, lo2.abnormal_return
+          FROM labeled_outcomes lo2
+          WHERE lo2.canonical_event_id = eu.canonical_event_id
+            AND lo2.symbol != 'SPY'
+            AND lo2.abnormal_return IS NOT NULL
+          ORDER BY ABS(lo2.abnormal_return) DESC
+          LIMIT 1
+        ) lo ON true
+        WHERE eu.evidence_grade IS NOT NULL
+        ORDER BY eu.evidence_grade DESC, ABS(eu.uplift) DESC
         LIMIT 50000
       `);
-      return buildJsonResponse(r.rows);
+      // Separate: summary for chart + top signals for queue
+      const grades = r.rows;
+      const summary = {};
+      for (const row of grades) {
+        const g = row.evidence_grade;
+        if (!summary[g]) summary[g] = { grade: g, count: 0, totalUplift: 0 };
+        summary[g].count++;
+        summary[g].totalUplift += Number(row.uplift || 0);
+      }
+      for (const s of Object.values(summary)) {
+        s.avgUplift = s.count > 0 ? Number((s.totalUplift / s.count).toFixed(4)) : 0;
+      }
+      return buildJsonResponse({
+        grades: Object.values(summary),
+        signals: grades.filter(g => g.evidence_grade === 'E2').slice(0, 20),
+      });
     }
 
     // ── /api/alpha-decay ──
