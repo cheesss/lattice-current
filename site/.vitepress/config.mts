@@ -245,7 +245,7 @@ const ja: LocaleLabels = {
 
 export default defineConfig({
   title: 'Lattice Current',
-  description: 'Theme-led signal shell with canonical events, operator workflows, replay, and Python-backed batch compute.',
+  description: 'News event to asset reaction analysis platform. Canonical event clustering, abnormal returns, counterfactual validation, and meta-model prediction.',
   lang: 'en-US',
   base: '/lattice-current/',
   cleanUrls: true,
@@ -253,7 +253,7 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: '/lattice-current/favicon.svg' }],
     ['meta', { property: 'og:title', content: 'Lattice Current' }],
-    ['meta', { property: 'og:description', content: 'Theme-led signal shell with canonical events, operator workflows, replay, and Python-backed batch compute.' }],
+    ['meta', { property: 'og:description', content: 'News event to asset reaction analysis platform. Canonical event clustering, abnormal returns, counterfactual validation, and meta-model prediction.' }],
     ['meta', { property: 'og:image', content: 'https://cheesss.github.io/lattice-current/images/hero/lattice-current-social-preview.png' }]
   ],
   locales: {
@@ -261,7 +261,7 @@ export default defineConfig({
       label: 'English',
       lang: 'en-US',
       title: 'Lattice Current',
-      description: 'Theme-led signal shell with canonical events, operator workflows, replay, and Python-backed batch compute.',
+      description: 'News event to asset reaction analysis platform. Canonical event clustering, abnormal returns, counterfactual validation, and meta-model prediction.',
       themeConfig: createThemeConfig('', en)
     },
     ko: {
@@ -269,7 +269,7 @@ export default defineConfig({
       lang: 'ko-KR',
       link: '/ko/',
       title: 'Lattice Current',
-      description: 'operator shell, canonical event 계층, Python 배치 계산 경계를 설명하는 문서.',
+      description: '뉴스 이벤트 → 자산 반응 분석 플랫폼. 캐노니컬 이벤트, 초과수익률, 반사실 검증, 메타모델 예측.',
       themeConfig: createThemeConfig('ko', ko)
     },
     ja: {
@@ -277,7 +277,7 @@ export default defineConfig({
       lang: 'ja-JP',
       link: '/ja/',
       title: 'Lattice Current',
-      description: 'オペレーターシェル、canonical event レイヤー、Python バッチ計算を説明するドキュメント。',
+      description: 'News event to asset reaction analysis. Canonical events, abnormal returns, counterfactual validation, meta-model prediction.',
       themeConfig: createThemeConfig('ja', ja)
     }
   }

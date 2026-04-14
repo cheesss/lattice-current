@@ -1,6 +1,6 @@
 {
   "name": "lattice-current",
-  "description": "Signal workspace for live risk, markets, infrastructure, and replay-driven research.",
+  "description": "News event to asset reaction analysis platform with canonical event clustering, abnormal returns, and meta-model prediction.",
   "private": true,
   "version": "2.5.25",
   "license": "AGPL-3.0-only",

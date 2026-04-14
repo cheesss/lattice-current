@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Lattice Current
-summary: Theme-led signal shell with canonical events, operator workflows, and Python-backed batch compute.
+summary: News event to asset reaction analysis platform. 40+ sources, canonical event clustering, abnormal returns, counterfactual validation, and meta-model prediction.
 updated: 2026-04-12
 owner: core
 outline: false
