@@ -1014,15 +1014,35 @@ async function buildEmergingTechDetail(topicId) {
     return { topic: null, report: null, symbols: [], articles: [] };
   }
 
+  // Build keyword filter for fallback article search
+  const topicKeywords = Array.isArray(topic.keywords) ? topic.keywords.filter(k => k && k.length > 3) : [];
+  const keywordIlike = topicKeywords.slice(0, 5).map((_, i) => `a.title ILIKE $${i + 2}`).join(' OR ');
+
   const [articlesResponse, reportResponse, symbolsResponse] = await Promise.all([
+    // Two-source article query: junction table + keyword fallback, deduplicated, newest first
     safeQuery(`
-        SELECT a.id, a.title, a.source, a.published_at, a.url
-        FROM discovery_topic_articles dta
-        JOIN articles a ON a.id = dta.article_id
-        WHERE dta.topic_id = $1
-        ORDER BY published_at DESC
-        LIMIT 20
-      `, [topicId]),
+        WITH linked AS (
+          SELECT a.id, a.title, a.source, a.published_at, a.url, 'linked' AS match_type
+          FROM discovery_topic_articles dta
+          JOIN articles a ON a.id = dta.article_id
+          WHERE dta.topic_id = $1
+        ),
+        keyword_recent AS (
+          SELECT a.id, a.title, a.source, a.published_at, a.url, 'keyword' AS match_type
+          FROM articles a
+          WHERE (${keywordIlike || 'FALSE'})
+            AND a.published_at >= NOW() - INTERVAL '90 days'
+            AND a.id NOT IN (SELECT id FROM linked)
+        ),
+        combined AS (
+          SELECT * FROM linked
+          UNION ALL
+          SELECT * FROM keyword_recent
+        )
+        SELECT DISTINCT ON (id) id, title, source, published_at, url, match_type
+        FROM combined
+        ORDER BY id, published_at DESC
+      `, [topicId, ...topicKeywords.slice(0, 5).map(k => `%${k}%`)]),
     safeQuery(`
       SELECT *
       FROM tech_reports
@@ -1069,13 +1089,17 @@ async function buildEmergingTechDetail(topicId) {
       hitRate: Number(row.hit_rate || 0),
       sampleSize: Number(row.sample_size || 0),
     })),
-    articles: articlesResponse.rows.map((row) => ({
-      id: Number(row.id || 0),
-      title: String(row.title || ''),
-      source: String(row.source || ''),
-      publishedAt: row.published_at,
-      url: String(row.url || ''),
-    })),
+    articles: articlesResponse.rows
+      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+      .slice(0, 20)
+      .map((row) => ({
+        id: Number(row.id || 0),
+        title: String(row.title || ''),
+        source: String(row.source || ''),
+        publishedAt: row.published_at,
+        url: String(row.url || ''),
+        matchType: String(row.match_type || 'linked'),
+      })),
   };
 }
 

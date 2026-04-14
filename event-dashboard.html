@@ -201,6 +201,9 @@ th{color:var(--muted);font-weight:normal}
 .signal-citations{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
 .signal-cite{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;text-decoration:none;border:1px solid transparent}
 .signal-cite:hover{border-color:var(--accent);color:var(--accent)}
+/* Stale/Fallback badges */
+.stale-badge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(250,204,21,.12);color:#facc15;border:1px solid rgba(250,204,21,.2);margin-bottom:8px;letter-spacing:.02em}
+.stale-badge.critical{background:rgba(239,68,68,.12);color:#ef4444;border-color:rgba(239,68,68,.2)}
 </style>
 </head>
 <body>
@@ -1339,8 +1342,12 @@ async function loadCuratedItems(){
   const headline=data?.headline||data?.digest?.headline;
   const summary=data?.summary||data?.digest?.summary;
   const asOf=data?.generatedAt||data?.digestDate||data?.curatedDate||data?.asOf||data?.digest?.generatedAt;
+  const digestSource=data?.source||'';
+  const digestWindow=data?.window||'';
   if(!items.length){
-    el.innerHTML='<div class="meta-line">No curated digest items available for the selected horizon yet.</div>';
+    let emptyMsg='No curated digest items available for the selected horizon yet.';
+    if(digestSource.includes('fallback'))emptyMsg=`Digest in fallback mode (${escapeHtml(digestWindow||digestSource)}). No items passed curation filters.`;
+    el.innerHTML=`<div class="meta-line">${emptyMsg}</div>`;
     return;
   }
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
@@ -1618,7 +1625,11 @@ async function loadToday(){
     el.innerHTML='<div class="meta-line">No recent event feed available.</div>';
     return;
   }
+  const meta=data?.meta||{};
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(meta.window&&meta.window!=='24h'){
+    html+=`<div class="stale-badge">Operating in ${escapeHtml(meta.window)} fallback mode</div>`;
+  }
   items.slice(0,8).forEach((item)=>{
     html+=`<div class="event-row"><div class="event-title">${escapeHtml(item.title||'Untitled event')}</div><div class="meta-line">${escapeHtml(item.source||'unknown')} | ${escapeHtml(item.theme||'general')} | ${fmtDate(item.date||item.publishedAt)}</div>`;
     const reactions=Array.isArray(item.expectedReactions)?item.expectedReactions:[];
@@ -2036,6 +2047,13 @@ function renderMacroSnapshot(snapshot={},cachedAt=null,cached=false){
   html+=renderSnapshotSourceMeta(snapshot.meta);
   el.innerHTML=html;
 }
+function snapshotStaleBadge(snapshot){
+  const updated=snapshot.updatedAt||snapshot.generatedAt;
+  if(!updated)return'<div class="stale-badge">No timestamp available</div>';
+  const ageH=(Date.now()-Date.parse(updated))/36e5;
+  if(ageH>48)return`<div class="stale-badge${ageH>168?' critical':''}">Data is ${Math.round(ageH)}h old (updated ${fmtDateTime(updated)})</div>`;
+  return'';
+}
 function renderInvestmentSnapshot(snapshot={},cachedAt=null,cached=false){
   const el=document.getElementById('investment-snapshot');
   const badge=document.getElementById('investment-snapshot-badge');
@@ -2046,6 +2064,8 @@ function renderInvestmentSnapshot(snapshot={},cachedAt=null,cached=false){
   const tuning=snapshot.experimentRegistry&&typeof snapshot.experimentRegistry==='object'?snapshot.experimentRegistry:null;
   const signalRuntime=snapshot.signalRuntime&&typeof snapshot.signalRuntime==='object'?snapshot.signalRuntime:null;
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
+  if(!signalRuntime&&!tuning)html+='<div class="stale-badge">Signal runtime and experiment registry not hydrated</div>';
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>Investment workflow</strong><div class="meta-line">Strategies ${fmtWhole(snapshot.strategyCount||0)} | tracked ideas ${fmtWhole(snapshot.trackedIdeaCount||0)} | reviews ${fmtWhole(snapshot.reviewCount||0)}</div></div><span class="badge">${snapshot.conviction?.observations?`${fmtWhole(snapshot.conviction.observations)} obs`:'learning'}</span></div>`;
   if(signalRuntime){
     html+=`<div class="meta-line" style="margin-top:8px">Signals ${escapeHtml(signalRuntime.source||'missing')} | coverage ${fmtWhole(signalRuntime.coverage||0)}/5${signalRuntime.signalCapturedAt?` | captured ${escapeHtml(fmtDateTime(signalRuntime.signalCapturedAt))}`:''}${signalRuntime.transmissionFreshnessHours!=null?` | transmission ${signalRuntime.transmissionFresh?'fresh':'stale'} ${fmt(signalRuntime.transmissionFreshnessHours,1)}h`:''}</div>`;
@@ -2067,6 +2087,7 @@ function renderValidationSnapshot(snapshot={},cachedAt=null,cached=false){
   if(badge)badge.textContent=`${fmtWhole(snapshot.runCount||0)} runs`;
   const runs=Array.isArray(snapshot.recentRuns)?snapshot.recentRuns:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>Validation coverage</strong><div class="meta-line">Hit ${pct(snapshot.costAdjustedHitRate,0)} | avg ${rf(snapshot.avgReturnPct,1)} | coverage ${fmt(snapshot.coverageScore||0,1)} | quality ${fmt(snapshot.qualityScore||0,1)}</div></div><span class="badge">${fmt(snapshot.executionScore||0,1)}</span></div>`;
   html+=runs.length
     ? `<div class="brief-list" style="margin-top:10px">${runs.slice(0,3).map((run)=>`<div class="brief-item"><strong>${escapeHtml(run.label||run.id||'run')}</strong><div class="meta-line">${escapeHtml(run.mode||'replay')} | themes ${fmtWhole(run.uniqueThemeCount||0)} | symbols ${fmtWhole(run.uniqueSymbolCount||0)} | hit ${pct(run.hitRate,0)}</div></div>`).join('')}</div>`
@@ -2105,6 +2126,7 @@ function renderSourceOpsSnapshot(snapshot={},cachedAt=null,cached=false){
   const events=Array.isArray(snapshot.recentEvents)?snapshot.recentEvents:[];
   const categories=Array.isArray(snapshot.categoryMix)?snapshot.categoryMix:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>Source and dataflow operations</strong><div class="meta-line">Approved ${fmtWhole(snapshot.approvedCount||0)} | drafts ${fmtWhole(snapshot.draftCount||0)} | discovered ${fmtWhole(snapshot.discoveredCount||0)} | overrides ${fmtWhole(snapshot.overrideCount||0)}</div></div><span class="badge">${fmtWhole(snapshot.profileCount||0)} profiles</span></div>`;
   html+=events.length
     ? `<div class="brief-list" style="margin-top:10px">${events.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Source event')}</strong><div class="meta-line">${escapeHtml(item.action||'updated')} | ${escapeHtml(item.status||'ok')} | ${escapeHtml(item.actor||'system')}${item.createdAt?` | ${escapeHtml(fmtDateTime(item.createdAt))}`:''}</div>${item.detail?`<div class="brief-item-copy">${escapeHtml(truncate(item.detail,120))}</div>`:''}</div>`).join('')}</div>`
