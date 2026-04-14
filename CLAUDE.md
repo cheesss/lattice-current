@@ -22,18 +22,24 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 | `scripts/event-dashboard-api.mjs` | 대시보드 API 서버 |
 | `scripts/event-engine-full-build.mjs` | regime/hawkes/whatif 구축 |
 | `scripts/tech-trend-tracker.mjs` | 기술 트렌드 추적 |
-| `scripts/codex-from-analysis.mjs` | 분석→Codex 제안 (Anthropic API로 전환 예정) |
+| `scripts/codex-from-analysis.mjs` | 분석→Claude API로 테마/종목 제안 생성 |
 | `scripts/incremental-event-engine.mjs` | 증분 이벤트 엔진 (클러스터링+alpha+controls 한번에) |
+| `scripts/incremental_event_engine.py` | 위의 Python 버전 (Python 우선, JS fallback) |
+| `scripts/build-market-returns.py` | 독립 market_returns 테이블 빌드 (SPY+섹터 ETF) |
 | `scripts/meta-model-server.py` | FastAPI GPU 추론 서버 (port 8100) |
 | `scripts/train-meta-model.py` | Multi-Task 메타모델 학습 (PyTorch) |
 | `scripts/compare-models.py` | MLP vs LightGBM vs Logistic 비교 |
+| `scripts/_shared/pipeline-lock.mjs` | 파이프라인 동시성 제어 (PID 기반 file lock) |
+| `scripts/_shared/calibration-diagnostic.mjs` | 메타모델 calibration + drift 알림 |
+| `scripts/_shared/alert-notifier.mjs` | data/alerts.json 구조화된 알림 기록 |
 
 ## NAS 테이블 구조
 
 | 테이블 | 용도 |
 |--------|------|
-| `articles` | 60k 기사 (Guardian/NYT, 임베딩 포함) |
-| `labeled_outcomes` | 619k 기사→종목 수익률 레이블 |
+| `articles` | 67k+ 기사 (Guardian/NYT/40+ 소스, 임베딩 포함) |
+| `labeled_outcomes` | 619k 기사→종목 수익률 레이블 (market_return, abnormal_return 포함) |
+| `market_returns` | SPY + 섹터 ETF 일별 수익률 (date-based join용, 신규) |
 | `stock_sensitivity_matrix` | 테마×종목 민감도 |
 | `auto_theme_symbols` | 자동 감지된 테마-종목 매핑 |
 | `auto_article_themes` | 자동 분류된 기사 테마 |
@@ -61,6 +67,8 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 4. 환경변수 하드코딩 금지 — .env.local에서 로드
 5. 기존 데이터 삭제 금지 — 증분(incremental) 방식으로 새 데이터만 추가/병합. DELETE 후 재생성하지 않음
 6. Python 계산 스크립트는 결과를 NAS에 저장하고, TS는 읽어서 표시하는 구조 유지
+7. silent catch 금지 — try/catch에서 에러를 삼키지 말고 최소한 console.warn에 메시지+컨텍스트 포함
+8. 동시성 주의 — 파일/DB에 쓰는 스크립트는 `_shared/pipeline-lock.mjs`의 `withLock()`으로 래핑
 
 ## 커밋 규칙
 

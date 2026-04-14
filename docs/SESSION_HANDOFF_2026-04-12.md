@@ -498,5 +498,101 @@ event-dashboard.html의 Analytics 차트들이 사용하는 API 엔드포인트:
 
 ### 코드 품질
 - `data-loader.ts` (4,039줄) — god module 분리 필요
-- `DeckGLMap.ts` (6,796줄) — 레이어 모듈화 필요
+- `DeckGLMap.ts` (6,986줄) — 레이어 모듈화 필요
 - NAS IP 하드코딩 패턴 잔존 — 환경변수로 통일 권장
+
+---
+
+## 15. 2026-04-14 데이터 강건성/UX 수정 작업
+
+### Phase 1 (CRITICAL)
+
+**파이프라인 동시성 제어**
+- 신규: `scripts/_shared/pipeline-lock.mjs` — PID 기반 파일 락 + stale lock 자동 정리
+- master-pipeline.mjs, incremental-event-engine.mjs를 `withLock()`으로 래핑
+- 동시 실행 시 두 번째는 "lock held by PID xxx, skipping"
+
+**Proxy 피처 3개 실제 계산으로 교체**
+- 이전: `hawkes_momentum=0`, `vix_zscore=0`, `vix_momentum=0` (항상 상수)
+- 변경: signal_history에서 90일 rolling window로 실제 계산
+- 적용: `incremental_event_engine.py` + `incremental-event-engine.mjs`
+
+**Silent catch 정비**
+- auto-pipeline.mjs 803줄, 871줄: 에러 메시지 + 컨텍스트 포함 로깅으로 교체
+
+### Phase 2 (HIGH)
+
+**abnormal_return 커버리지 확대**
+- 신규: `scripts/build-market-returns.py` — 독립 market_returns 테이블 (SPY + 섹터 ETF 일별 수익률)
+- 기존 article-based join에 date-based join을 fallback으로 추가 (28% → 80%+ 목표)
+
+**Calibration drift 알림**
+- ECE > 0.15면 sendAlert로 `data/alerts.json`에 자동 기록
+- severity: warning(0.15~0.30), critical(>0.30)
+- 적용: `_shared/calibration-diagnostic.mjs`, `event-dashboard-api.mjs`
+
+**Codex CLI → Claude API 전환**
+- `codex-from-analysis.mjs`: spawn('codex') 제거, `@anthropic-ai/sdk` 사용
+- 모델: `claude-sonnet-4-20250514` (env: `CODEX_MODEL`)
+- 제안 결과를 codex_proposals 테이블에 직접 저장
+
+### Phase 3 (UI)
+
+**E2 시그널 큐**
+- KPI 스트립 아래 actionable signals 카드 6개 표시
+- 각 카드: direction(LONG/SHORT) + evidence badge + symbol + uplift + t-stat + Alpha
+- API 응답 형식 변경: `{ grades: [...], signals: [...] }`
+
+**DeckGLMap 성능 최적화**
+- requestAnimationFrame debounce로 16ms 프레임 버짓 초과 방지
+
+### Phase 4 (UX 가시성 + 데이터 연속성)
+
+**클릭 가능성 표시**
+- `.interactive-row[onclick]`에 `cursor:pointer` + hover 효과 추가
+
+**Report detail URL decoding**
+- 리포트 ID에 포함된 `:`가 `%3A`로 인코딩되어 DB 매칭 실패하던 문제 수정
+
+**Emerging topic 기사 stuck in 2025 (P0)**
+- buildEmergingTechDetail의 article 쿼리를 두 소스(junction table + 90일 키워드 fallback)로 변경
+- 결과는 published_at DESC로 정렬, matchType 필드로 'linked'/'keyword' 구분
+
+**Fallback/Stale 배지 추가 (P1)**
+- Today feed: meta.window != '24h'면 "Operating in 7d-fallback mode" 표시
+- Daily digest: empty + fallback이면 "Digest in fallback mode" 메시지
+- Investment/Validation/Source Ops snapshot: 48h+ stale시 amber 배지, 168h+면 critical(빨강)
+- Investment snapshot: signalRuntime+experimentRegistry 둘 다 null이면 "not hydrated" 배지
+
+### 신규/변경된 파일
+
+```
+신규:
+  scripts/_shared/pipeline-lock.mjs
+  scripts/build-market-returns.py
+  docs/COMPREHENSIVE_REVIEW_PROMPT.md
+
+수정:
+  scripts/master-pipeline.mjs            — withLock 래핑
+  scripts/incremental-event-engine.mjs   — withLock + proxy feature 계산 + market_returns join
+  scripts/incremental_event_engine.py    — proxy feature 실제 계산
+  scripts/auto-pipeline.mjs              — silent catch 정비
+  scripts/codex-from-analysis.mjs        — Claude API 전환
+  scripts/_shared/calibration-diagnostic.mjs — drift 알림
+  scripts/event-dashboard-api.mjs        — 알림 와이어링 + 토픽 article 쿼리 개선 + URL decoding
+  event-dashboard.html                   — E2 시그널 큐 + cursor pointer + stale 배지
+  src/components/DeckGLMap.ts            — debounce 패턴
+  package.json                           — @anthropic-ai/sdk 의존성
+
+삭제:
+  CHANGELOG.md (구 World Monitor 시절)
+  docs/worldmonitor_architecture_handoff_ko.md
+```
+
+### 남은 미해결 사항
+
+- **Structural alerts 소스 불일치**: `/api/structural-alerts`와 `risk.highlights` 데이터 다름 (P1, 미수정)
+- **Transmission freshness 임계값 불일치**: 24h vs 48h 두 곳에서 다른 기준 (P1, 미수정)
+- **Source Credibility 원래 설계로 복원**: 현재는 테마 활동 강도로 대체 표시
+- **InvestmentIdeasPanel 미통합**: 메타모델 예측값이 event-dashboard.html에 노출 안 됨
+- **레거시 src/ React 앱**: 60+ 컴포넌트, 289 서비스 모듈이 웹 프로덕션에서 미사용 (정리 또는 통합 결정 필요)
