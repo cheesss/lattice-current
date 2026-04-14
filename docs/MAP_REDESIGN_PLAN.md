@@ -1,228 +1,93 @@
-# 지도 인터페이스 리디자인 계획
+# Map Redesign Plan
 
-## 현재 문제
+## Goal
 
-1. **버벅거림**: DeckGLMap.ts 6,796줄, 25개 레이어 동시 렌더링. GPU 부하 과다.
-2. **크기 부족**: iframe 높이 620px~860px, 전체 화면의 절반도 안 됨.
-3. **패널이 지도 가림**: overlay 카드 2개가 지도 좌상단 차지.
-4. **데이터 반영 부족**: NAS의 분석 데이터(이벤트, alpha, regime)가 지도에 안 나옴.
+Turn the current 2D geo lens into the primary spatial surface for the theme shell without bringing back the heavy globe runtime.
 
----
+## Priorities
 
-## Phase 1: 지도 크기 + 성능 (최우선)
+### 1. Map size expansion + collapsible overlays
 
-### 1-1. 지도 크기 확대
+Status: implemented
 
-```css
-/* 현재 */
-.embed-frame {
-  height: clamp(620px, 72vh, 860px);
-}
+- Increase the parent `iframe` height from `72vh` to `85vh`.
+- Keep mobile height smaller but still larger than the current baseline.
+- Add an overlay collapse button so operators can quickly reclaim the map canvas.
+- Persist overlay collapsed state in `localStorage`.
 
-/* 변경: 화면 거의 전체 높이 */
-.embed-frame {
-  height: clamp(720px, 85vh, 1200px);
-}
-```
+Files:
+- `/Users/chohj/Documents/Playground/lattice-current-fix/event-dashboard.html`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/event-map-lens.html`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/theme-map-lens.ts`
 
-### 1-2. 오버레이 패널 접기 기능
+### 2. Layer LOD (zoom-aware automatic ON/OFF)
 
-```
-현재:
-  ┌──────────────────────────────────┐
-  │ [패널1] [패널2]                   │ ← 지도 가림
-  │                                  │
-  │         지도                     │
-  └──────────────────────────────────┘
+Status: implemented
 
-변경:
-  ┌──────────────────────────────────┐
-  │ [◀]                              │ ← 접기 버튼 (클릭하면 패널 숨김)
-  │                                  │
-  │         지도 (전체)               │
-  └──────────────────────────────────┘
-```
+- Apply zoom thresholds to the expensive infrastructure, finance, protest, AIS, military, climate, and trade-route layers.
+- Keep global zoom focused on broad risk context.
+- Delay dense point and path layers until regional/local zoom.
+- Preserve manual toggles while making the render path cheaper.
 
-구현:
-- 오버레이 패널에 접기/펼치기 토글 버튼 추가
-- 접힌 상태: 아이콘만 표시 (24px)
-- localStorage에 접힌 상태 저장
+Expected effect:
+- noticeably lower layer count at world zoom
+- lower GPU/CPU pressure
+- less visual clutter
 
-### 1-3. 레이어 LOD (Level of Detail)
+Primary file:
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/components/DeckGLMap.ts`
 
-```
-현재: 모든 레이어가 모든 줌 레벨에서 렌더링
-변경: 줌 레벨에 따라 레이어 자동 ON/OFF
+### 3. Event hotspots + E2 signal markers
 
-줌 1~4 (세계):  분쟁 지역 + 지진 + 화재만 (고밀도)
-줌 5~8 (대륙):  + 시위 + 군사 기지 + 케이블
-줌 9~12 (국가): + 군용기 + 선박 + AIS
-줌 13+ (도시):  + 인터넷 장애 + GPS 재밍
-```
+Status: implemented
 
-### 1-4. 레이어 데이터 가상화
+- Add a dashboard API payload dedicated to map overlays.
+- Surface recent canonical events as map hotspots.
+- Surface `E2` uplift rows as distinct signal markers.
+- Feed both into the map lens as visible overlays instead of leaving them only in cards and tables.
 
-```
-현재: 모든 데이터 포인트를 한번에 렌더링
-변경: viewport에 보이는 것만 렌더링
+Files:
+- `/Users/chohj/Documents/Playground/lattice-current-fix/scripts/event-dashboard-api.mjs`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/theme-map-lens.ts`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/components/DeckGLMap.ts`
 
-deck.gl DataFilterExtension 활용:
-- 시간 필터: 최근 24시간 / 7일 / 30일
-- 공간 필터: 현재 viewport bounds 안의 포인트만
-- Supercluster 클러스터링 강화 (줌 아웃 시 합침)
-```
+### 4. Theme filter bar + time slider
 
-### 1-5. 렌더링 최적화
+Status: implemented
 
-```
-현재:
-- 매 프레임 25개 레이어 업데이트 체크
-- 데이터 변경 시 전체 레이어 재생성
+- Add quick filters for `All / Conflict / Macro / Tech / Energy / Climate`.
+- Add a time window slider for `Week / Month / Quarter / Year`.
+- Make filter state local to the lens so the operator can narrow the map without disturbing the full briefing page state.
 
-변경:
-- requestIdleCallback으로 비활성 레이어 지연 업데이트
-- 레이어별 데이터 해시로 변경 감지 (불필요한 재렌더링 방지)
-- ScatterplotLayer의 antialiasing 끄기 (성능 30% 개선)
-- IconLayer를 SpriteSheet 기반으로 (드로우콜 감소)
-```
+Files:
+- `/Users/chohj/Documents/Playground/lattice-current-fix/event-map-lens.html`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/theme-map-lens.ts`
 
----
+### 5. Transmission arcs + relationship mode
 
-## Phase 2: 데이터를 지도에 반영
+Status: implemented
 
-### 2-1. 이벤트 핫스팟 레이어 (canonical_events)
+- Add a relationship mode toggle in the lens toolbar.
+- When enabled, emphasize:
+  - country interaction arcs
+  - transmission overlay arcs
+  - supporting trade/waterway/economic context layers
+- Keep the default mode simpler for everyday scanning.
 
-```
-데이터: canonical_events + articles의 geocoded 위치
-시각화: H3 헥사곤 히트맵
-색상: 이벤트 강도 (Hawkes intensity) → 파란→빨간
-크기: 기사 수에 비례
-클릭: 해당 이벤트의 테마, alpha, evidence grade 팝업
+Files:
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/theme-map-lens.ts`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/src/components/DeckGLMap.ts`
+- `/Users/chohj/Documents/Playground/lattice-current-fix/scripts/event-dashboard-api.mjs`
 
-필터: 테마별 (conflict만 / tech만 / 전체)
-```
+## Implementation notes
 
-### 2-2. Alpha 시그널 마커 (E2 이벤트)
+- The redesign intentionally keeps the globe removed.
+- The redesign uses the existing `DeckGLMap` engine instead of introducing a parallel map stack.
+- Transmission arcs currently use cached event-market transmission data plus spatial anchor inference, which is lighter and safer than rebuilding a new geocoding pipeline in the UI path.
+- Event hotspot and `E2` marker overlays are cached API payloads so the map does not depend on heavy live recomputation on every interaction.
 
-```
-데이터: event_uplift WHERE evidence_grade = 'E2'
-시각화: 별 마커 (★) 또는 다이아몬드
-색상: uplift 양수 = 초록, 음수 = 빨강
-크기: |uplift|에 비례
-클릭: 이벤트 상세 + 관련 종목 + uplift 값 + t-stat
+## Remaining follow-up
 
-의미: "여기서 발생한 이벤트가 통계적으로 유의한 주가 반응을 일으켰다"
-```
-
-### 2-3. 레짐 오버레이
-
-```
-데이터: 현재 regime (risk-off / balanced / risk-on / crisis)
-시각화: 지도 테두리 색상 또는 상단 바
-  crisis = 빨간 테두리 + 펄스 애니메이션
-  risk-off = 주황 테두리
-  balanced = 없음
-  risk-on = 초록 테두리
-```
-
-### 2-4. 전파 경로 (Transmission)
-
-```
-데이터: event-market-transmission 스냅샷
-시각화: ArcLayer (호를 그리는 선)
-  이벤트 발생 위치 → 영향 받는 자산의 거래소 위치
-  예: 이란(이벤트) → 뉴욕(LMT) 호선
-색상: 전파 강도에 따라 투명→불투명
-애니메이션: 데이터 흐름 방향 표시 (deck.gl TripsLayer)
-```
-
----
-
-## Phase 3: 테마/기간별 필터
-
-### 3-1. 테마 필터 바
-
-```
-지도 하단에 테마 칩 바:
-  [ALL] [Conflict ●] [Macro ●] [Tech ●] [Energy ●] [Climate ●]
-
-클릭하면 해당 테마 관련 이벤트/마커만 표시
-복수 선택 가능
-선택한 테마의 색상으로 마커 표시
-```
-
-### 3-2. 시간 슬라이더
-
-```
-지도 하단에 시간 범위 슬라이더:
-  |◄─────────────────●─────────►|
-  2024-01            2026-04
-
-드래그로 기간 선택 → 해당 기간의 이벤트만 표시
-재생 버튼: 시간순 애니메이션 (이벤트가 하나씩 나타남)
-```
-
-### 3-3. 관계도 모드
-
-```
-테마 선택 시 해당 테마의:
-- 이벤트 위치 (마커)
-- 영향 받는 종목/섹터 (거래소 위치에 표시)
-- 전파 경로 (호선)
-- 유사 과거 이벤트 (반투명 마커)
-
-전부 하나의 "스토리"로 연결되어 보임
-```
-
----
-
-## Phase 4: 인터랙션 개선
-
-### 4-1. 클릭 팝업 리디자인
-
-```
-현재: 단순 텍스트 팝업
-변경:
-  ┌────────────────────────────┐
-  │ Iran-Israel Escalation     │
-  │ conflict | 2026-04-08  [E2]│
-  │                            │
-  │ Alpha: +5.2%  P: 72%      │
-  │ Sources: 3  t-stat: 3.07  │
-  │                            │
-  │ Related: LMT +4.1%        │
-  │          XLE +2.3%         │
-  │                            │
-  │ [Open Brief] [Track]       │
-  └────────────────────────────┘
-```
-
-### 4-2. 지도-차트 연동
-
-```
-지도에서 지역 클릭 → 우측 차트들이 해당 지역 필터로 전환
-차트에서 테마 클릭 → 지도가 해당 테마 이벤트 위치로 포커스
-양방향 상호작용
-```
-
----
-
-## 실행 우선순위
-
-```
-1순위 (즉시):  지도 크기 확대 + 오버레이 접기     ← CSS 변경만
-2순위 (빠름):  레이어 LOD + 데이터 가상화         ← 성능 체감 큼
-3순위 (중간):  이벤트 핫스팟 + E2 마커 레이어     ← 데이터 반영
-4순위 (후반):  테마 필터 + 시간 슬라이더          ← UX 완성
-5순위 (선택):  전파 경로 + 관계도 모드            ← 고급 기능
-```
-
----
-
-## 예상 성능 개선
-
-```
-현재: 25개 레이어 상시 렌더링 → 10~15 FPS (버벅)
-Phase 1 후: 줌 레벨별 5~10개만 렌더링 → 30~45 FPS
-Phase 2 후: viewport 필터 + 클러스터링 → 50~60 FPS
-```
+- tighten anchor inference for event-to-location mapping
+- replace inferred transmission targets with asset- or venue-level coordinates when those connectors are available
+- add focused visual regression tests for the lens toolbar and collapsed overlay state

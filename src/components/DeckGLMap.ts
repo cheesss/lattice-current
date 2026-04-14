@@ -225,6 +225,32 @@ interface GlowMarkerDatum {
   radius: number;
 }
 
+interface SignalMarkerDatum {
+  id: string;
+  kind: 'hotspot' | 'e2';
+  title: string;
+  theme?: string | null;
+  lat: number;
+  lon: number;
+  intensity: number;
+  evidenceGrade?: string | null;
+  uplift?: number | null;
+  symbol?: string | null;
+  timestamp?: Date | string | null;
+}
+
+interface TransmissionOverlayArc {
+  id: string;
+  title: string;
+  relationType: string;
+  strength: number;
+  sourceLat: number;
+  sourceLon: number;
+  targetLat: number;
+  targetLon: number;
+  targetLabel: string;
+}
+
 interface ArHudPayload {
   title: string;
   tone: 'alert' | 'cyber' | 'intel' | 'market';
@@ -266,11 +292,36 @@ const LAYER_ZOOM_THRESHOLDS: Partial<Record<keyof MapLayers, { minZoom: number; 
   bases: { minZoom: 3, showLabels: 5 },
   nuclear: { minZoom: 3 },
   conflicts: { minZoom: 1, showLabels: 3 },
+  hotspots: { minZoom: 1.2, showLabels: 4.6 },
+  cables: { minZoom: 2.8 },
+  pipelines: { minZoom: 3 },
+  ais: { minZoom: 3.8 },
+  waterways: { minZoom: 2.8 },
+  outages: { minZoom: 4.4 },
+  cyberThreats: { minZoom: 4.2 },
+  protests: { minZoom: 3.6 },
+  flights: { minZoom: 4.2 },
+  military: { minZoom: 3.2 },
   economic: { minZoom: 3 },
+  stockExchanges: { minZoom: 4.2 },
+  financialCenters: { minZoom: 4.2 },
+  centralBanks: { minZoom: 4.8 },
+  commodityHubs: { minZoom: 4.1 },
   natural: { minZoom: 1, showLabels: 2 },
   datacenters: { minZoom: 5 },
   irradiators: { minZoom: 4 },
   spaceports: { minZoom: 3 },
+  minerals: { minZoom: 4.2 },
+  startupHubs: { minZoom: 4.5 },
+  cloudRegions: { minZoom: 3.4 },
+  accelerators: { minZoom: 4.6 },
+  techHQs: { minZoom: 4.6 },
+  tradeRoutes: { minZoom: 2.6 },
+  climate: { minZoom: 4.2 },
+  ucdpEvents: { minZoom: 3.4 },
+  displacement: { minZoom: 2.8 },
+  gpsJamming: { minZoom: 4.6 },
+  iranAttacks: { minZoom: 3.4 },
   gulfInvestments: { minZoom: 2, showLabels: 5 },
 };
 // Export for external use
@@ -470,6 +521,9 @@ export class DeckGLMap {
   private countryCentroids = new Map<string, { code: string; name: string; lon: number; lat: number }>();
   private countryInteractionArcs: CountryInteractionArc[] = [];
   private countryInteractionNodes: CountryInteractionNode[] = [];
+  private signalMarkers: SignalMarkerDatum[] = [];
+  private transmissionOverlayArcs: TransmissionOverlayArc[] = [];
+  private relationshipMode = true;
   private countryInteractionSignature = '';
   private conflictZoneConfidence = new Map<string, number>();
   private ucdpEvents: UcdpGeoEvent[] = [];
@@ -1811,8 +1865,12 @@ export class DeckGLMap {
   private isLayerVisible(layerKey: keyof MapLayers): boolean {
     const threshold = LAYER_ZOOM_THRESHOLDS[layerKey];
     if (!threshold) return true;
-    const zoom = this.maplibreMap?.getZoom() || 2;
+    const zoom = this.maplibreMap?.getZoom() || this.state.zoom || 2;
     return zoom >= threshold.minZoom;
+  }
+
+  private getFilteredSignalMarkers(): SignalMarkerDatum[] {
+    return this.filterByTime(this.signalMarkers, (marker) => marker.timestamp ?? null);
   }
 
   private buildLayers(): LayersList {
@@ -1841,14 +1899,14 @@ export class DeckGLMap {
       : MILITARY_BASES;
 
     // Undersea cables layer
-    if (mapLayers.cables) {
+    if (mapLayers.cables && this.isLayerVisible('cables') && lodLevel !== 'global') {
       layers.push(this.createCablesLayer());
     } else {
       this.layerCache.delete('cables-layer');
     }
 
     // Pipelines layer
-    if (mapLayers.pipelines) {
+    if (mapLayers.pipelines && this.isLayerVisible('pipelines') && lodLevel !== 'global') {
       layers.push(this.createPipelinesLayer());
     } else {
       this.layerCache.delete('pipelines-layer');
@@ -1902,7 +1960,7 @@ export class DeckGLMap {
     }
 
     // Hotspots layer (all hotspots including high/breaking, with pulse + ghost)
-    if (mapLayers.hotspots) {
+    if (mapLayers.hotspots && this.isLayerVisible('hotspots')) {
       layers.push(...this.createHotspotsLayers());
     }
 
@@ -1916,13 +1974,13 @@ export class DeckGLMap {
     }
 
     // Earthquakes layer + ghost for easier picking
-    if (mapLayers.natural && filteredEarthquakes.length > 0) {
+    if (mapLayers.natural && this.isLayerVisible('natural') && filteredEarthquakes.length > 0) {
       layers.push(this.createEarthquakesLayer(filteredEarthquakes));
       layers.push(this.createGhostLayer('earthquakes-layer', filteredEarthquakes, d => [d.location?.longitude ?? 0, d.location?.latitude ?? 0], { radiusMinPixels: 12 }));
     }
 
     // Natural events layer
-    if (mapLayers.natural && filteredNaturalEvents.length > 0) {
+    if (mapLayers.natural && this.isLayerVisible('natural') && filteredNaturalEvents.length > 0) {
       layers.push(this.createNaturalEventsLayer(filteredNaturalEvents));
     }
 
@@ -1932,7 +1990,7 @@ export class DeckGLMap {
     }
 
     // Weather alerts layer
-    if (mapLayers.weather && filteredWeatherAlerts.length > 0) {
+    if (mapLayers.weather && this.isLayerVisible('weather') && filteredWeatherAlerts.length > 0) {
       layers.push(this.createWeatherLayer(filteredWeatherAlerts));
     }
 
@@ -1949,17 +2007,17 @@ export class DeckGLMap {
     }
 
     // AIS density layer
-    if (mapLayers.ais && this.aisDensity.length > 0) {
+    if (mapLayers.ais && this.isLayerVisible('ais') && this.aisDensity.length > 0) {
       layers.push(this.createAisDensityLayer());
     }
 
     // AIS disruptions layer (spoofing/jamming)
-    if (mapLayers.ais && this.aisDisruptions.length > 0 && lodLevel !== 'global') {
+    if (mapLayers.ais && this.isLayerVisible('ais') && this.aisDisruptions.length > 0 && lodLevel !== 'global') {
       layers.push(this.createAisDisruptionsLayer());
     }
 
     // Strategic ports layer (shown with AIS)
-    if (mapLayers.ais) {
+    if (mapLayers.ais && this.isLayerVisible('ais') && lodLevel !== 'global') {
       layers.push(this.createPortsLayer());
     }
 
@@ -1979,40 +2037,40 @@ export class DeckGLMap {
     }
 
     // Protests layer (Supercluster-based deck.gl layers)
-    if (mapLayers.protests && this.protests.length > 0) {
+    if (mapLayers.protests && this.isLayerVisible('protests') && this.protests.length > 0) {
       layers.push(...this.createProtestClusterLayers());
     }
 
-    if (mapLayers.iranAttacks && this.iranEvents.length > 0 && lodLevel !== 'global') {
+    if (mapLayers.iranAttacks && this.isLayerVisible('iranAttacks') && this.iranEvents.length > 0 && lodLevel !== 'global') {
       layers.push(this.createIranEventsLayer());
     }
 
-    if (mapLayers.gpsJamming && this.gpsJammingHexes.length > 0 && lodLevel !== 'global') {
+    if (mapLayers.gpsJamming && this.isLayerVisible('gpsJamming') && this.gpsJammingHexes.length > 0 && lodLevel !== 'global') {
       layers.push(this.createGpsJammingLayer());
     }
 
     // Military vessels layer
-    if (mapLayers.military && filteredMilitaryVessels.length > 0 && lodLevel === 'local') {
+    if (mapLayers.military && this.isLayerVisible('military') && filteredMilitaryVessels.length > 0 && lodLevel === 'local') {
       layers.push(this.createMilitaryVesselsLayer(filteredMilitaryVessels));
     }
 
     // Military vessel clusters layer
-    if (mapLayers.military && filteredMilitaryVesselClusters.length > 0 && lodLevel !== 'local') {
+    if (mapLayers.military && this.isLayerVisible('military') && filteredMilitaryVesselClusters.length > 0 && lodLevel !== 'local') {
       layers.push(this.createMilitaryVesselClustersLayer(filteredMilitaryVesselClusters));
     }
 
     // Military flights layer
-    if (mapLayers.military && filteredMilitaryFlights.length > 0 && lodLevel === 'local') {
+    if (mapLayers.military && this.isLayerVisible('military') && filteredMilitaryFlights.length > 0 && lodLevel === 'local') {
       layers.push(this.createMilitaryFlightsLayer(filteredMilitaryFlights));
     }
 
     // Military flight clusters layer
-    if (mapLayers.military && filteredMilitaryFlightClusters.length > 0 && lodLevel !== 'local') {
+    if (mapLayers.military && this.isLayerVisible('military') && filteredMilitaryFlightClusters.length > 0 && lodLevel !== 'local') {
       layers.push(this.createMilitaryFlightClustersLayer(filteredMilitaryFlightClusters));
     }
 
     // Strategic waterways layer
-    if (mapLayers.waterways) {
+    if (mapLayers.waterways && this.isLayerVisible('waterways') && lodLevel !== 'global') {
       layers.push(this.createWaterwaysLayer());
     }
 
@@ -2022,21 +2080,21 @@ export class DeckGLMap {
     }
 
     // Finance variant layers
-    if (mapLayers.stockExchanges) {
+    if (mapLayers.stockExchanges && this.isLayerVisible('stockExchanges') && lodLevel !== 'global') {
       layers.push(this.createStockExchangesLayer());
     }
-    if (mapLayers.financialCenters) {
+    if (mapLayers.financialCenters && this.isLayerVisible('financialCenters') && lodLevel !== 'global') {
       layers.push(this.createFinancialCentersLayer());
     }
-    if (mapLayers.centralBanks) {
+    if (mapLayers.centralBanks && this.isLayerVisible('centralBanks') && lodLevel !== 'global') {
       layers.push(this.createCentralBanksLayer());
     }
-    if (mapLayers.commodityHubs) {
+    if (mapLayers.commodityHubs && this.isLayerVisible('commodityHubs') && lodLevel !== 'global') {
       layers.push(this.createCommodityHubsLayer());
     }
 
     // Critical minerals layer
-    if (mapLayers.minerals) {
+    if (mapLayers.minerals && this.isLayerVisible('minerals') && lodLevel !== 'global') {
       layers.push(this.createMineralsLayer());
     }
 
@@ -2046,23 +2104,23 @@ export class DeckGLMap {
     }
 
     // UCDP georeferenced events layer
-    if (mapLayers.ucdpEvents && filteredUcdpEvents.length > 0) {
+    if (mapLayers.ucdpEvents && this.isLayerVisible('ucdpEvents') && filteredUcdpEvents.length > 0) {
       layers.push(this.createUcdpEventsLayer(filteredUcdpEvents));
     }
 
     // Displacement flows arc layer
-    if (mapLayers.displacement && this.displacementFlows.length > 0) {
+    if (mapLayers.displacement && this.isLayerVisible('displacement') && this.displacementFlows.length > 0) {
       layers.push(this.createDisplacementArcsLayer());
     }
 
     // Broad heatmap blobs overwhelm the geopolitical map at world/regional zoom.
     // Keep climate anomalies only for local inspection.
-    if (mapLayers.climate && lodLevel === 'local' && this.climateAnomalies.length > 0) {
+    if (mapLayers.climate && this.isLayerVisible('climate') && lodLevel === 'local' && this.climateAnomalies.length > 0) {
       layers.push(this.createClimateHeatmapLayer());
     }
 
     // Trade routes layer
-    if (mapLayers.tradeRoutes) {
+    if (mapLayers.tradeRoutes && this.isLayerVisible('tradeRoutes') && lodLevel !== 'global') {
       layers.push(this.createTradeRoutesLayer());
       layers.push(this.createTradeChokepointsLayer());
     } else {
@@ -2073,16 +2131,16 @@ export class DeckGLMap {
     // Tech variant layers (Supercluster-based deck.gl layers for HQs and events)
     if (SITE_VARIANT === 'tech') {
       if (mapLayers.startupHubs) {
-        layers.push(this.createStartupHubsLayer());
+        if (this.isLayerVisible('startupHubs')) layers.push(this.createStartupHubsLayer());
       }
       if (mapLayers.techHQs) {
-        layers.push(...this.createTechHQClusterLayers());
+        if (this.isLayerVisible('techHQs')) layers.push(...this.createTechHQClusterLayers());
       }
       if (mapLayers.accelerators) {
-        layers.push(this.createAcceleratorsLayer());
+        if (this.isLayerVisible('accelerators')) layers.push(this.createAcceleratorsLayer());
       }
       if (mapLayers.cloudRegions) {
-        layers.push(this.createCloudRegionsLayer());
+        if (this.isLayerVisible('cloudRegions')) layers.push(this.createCloudRegionsLayer());
       }
       if (mapLayers.techEvents && this.techEvents.length > 0) {
         layers.push(...this.createTechEventClusterLayers());
@@ -2119,8 +2177,16 @@ export class DeckGLMap {
     }
 
     // News geo-locations (always shown if data exists)
-    if (this.countryInteractionArcs.length > 0 || this.countryInteractionNodes.length > 0) {
+    if (this.signalMarkers.length > 0) {
+      layers.push(...this.createSignalMarkerLayers(lodLevel));
+    }
+
+    if (this.relationshipMode && (this.countryInteractionArcs.length > 0 || this.countryInteractionNodes.length > 0)) {
       layers.push(...this.createCountryInteractionLayers(lodLevel));
+    }
+
+    if (this.relationshipMode && this.transmissionOverlayArcs.length > 0) {
+      layers.push(this.createTransmissionOverlayLayer(lodLevel));
     }
 
     // News geo-locations (always shown if data exists)
@@ -3725,6 +3791,104 @@ export class DeckGLMap {
     return [
       this.createCountryInteractionArcsLayer(arcsData),
     ];
+  }
+
+  private createSignalMarkerLayers(lodLevel: MapLodLevel): Layer[] {
+    const filtered = this.getFilteredSignalMarkers();
+    if (filtered.length === 0) return [];
+
+    const budget = lodLevel === 'global' ? 12 : lodLevel === 'regional' ? 24 : 42;
+    const markers = filtered
+      .slice()
+      .sort((left, right) => (right.intensity - left.intensity) || String(right.kind).localeCompare(String(left.kind)))
+      .slice(0, budget);
+
+    const layers: Layer[] = [
+      new ScatterplotLayer<SignalMarkerDatum>({
+        id: 'signal-markers-layer',
+        data: markers,
+        getPosition: (d) => this.getOverlayPosition(d.lon, d.lat, d.kind === 'e2' ? 9000 : 8000),
+        getRadius: (d) => {
+          const base = d.kind === 'e2' ? 12000 : 9000;
+          const weight = d.kind === 'e2'
+            ? Math.min(18000, Math.abs(Number(d.uplift || 0)) * 1800 + d.intensity * 220)
+            : Math.min(16000, d.intensity * 520);
+          return base + weight;
+        },
+        getFillColor: (d) => {
+          if (d.kind === 'e2') {
+            return Number(d.uplift || 0) >= 0
+              ? [124, 184, 255, 210]
+              : [255, 122, 107, 210];
+          }
+          if (d.intensity >= 18) return [255, 86, 86, 210];
+          if (d.intensity >= 10) return [255, 165, 70, 196];
+          return [255, 214, 102, 176];
+        },
+        radiusMinPixels: 4,
+        radiusMaxPixels: 18,
+        stroked: true,
+        lineWidthMinPixels: 1,
+        getLineColor: (d) => d.kind === 'e2'
+          ? [214, 233, 255, 230]
+          : [255, 244, 214, 200],
+        billboard: true,
+        pickable: false,
+      }),
+    ];
+
+    if (lodLevel === 'local') {
+      layers.push(new TextLayer<SignalMarkerDatum>({
+        id: 'signal-marker-labels-layer',
+        data: markers.slice(0, 18),
+        getPosition: (d) => this.getOverlayPosition(d.lon, d.lat, 9500),
+        getText: (d) => d.kind === 'e2'
+          ? `${String(d.symbol || 'E2').toUpperCase()} · ${d.title}`
+          : d.title,
+        getColor: () => [229, 236, 244, 210],
+        getSize: (d) => d.kind === 'e2' ? 12 : 11,
+        getTextAnchor: () => 'start',
+        getAlignmentBaseline: () => 'bottom',
+        getPixelOffset: () => [10, -8],
+        sizeUnits: 'pixels',
+        maxWidth: 260,
+        wordBreak: 'break-word',
+        billboard: true,
+        pickable: false,
+      }));
+    }
+
+    return layers;
+  }
+
+  private createTransmissionOverlayLayer(lodLevel: MapLodLevel): ArcLayer<TransmissionOverlayArc> {
+    const budget = lodLevel === 'global' ? 10 : lodLevel === 'regional' ? 18 : 30;
+    const data = this.transmissionOverlayArcs
+      .slice()
+      .sort((left, right) => right.strength - left.strength)
+      .slice(0, budget);
+    return new ArcLayer<TransmissionOverlayArc>({
+      id: 'transmission-overlay-arcs-layer',
+      data,
+      getSourcePosition: (d) => this.getOverlayPosition(d.sourceLon, d.sourceLat, 8500),
+      getTargetPosition: (d) => this.getOverlayPosition(d.targetLon, d.targetLat, 8500),
+      getSourceColor: (d) => d.relationType === 'commodity'
+        ? [255, 186, 88, 180]
+        : d.relationType === 'equity'
+          ? [124, 184, 255, 170]
+          : [126, 224, 129, 170],
+      getTargetColor: (d) => d.relationType === 'commodity'
+        ? [255, 140, 90, 210]
+        : d.relationType === 'equity'
+          ? [88, 168, 255, 210]
+          : [126, 224, 129, 210],
+      getWidth: (d) => 1 + Math.max(0.8, d.strength / 18),
+      widthMinPixels: 1,
+      widthMaxPixels: 8,
+      getHeight: (d) => 0.18 + Math.min(0.78, d.strength / 140),
+      greatCircle: true,
+      pickable: false,
+    });
   }
 
   private createNewsLocationsLayer(lodLevel: MapLodLevel): ScatterplotLayer[] {
@@ -5974,6 +6138,32 @@ export class DeckGLMap {
   public setGpsJamming(hexes: GpsJamHex[]): void {
     this.gpsJammingHexes = (hexes || []).filter((hex) => Number.isFinite(hex.lat) && Number.isFinite(hex.lon));
     this.updateReplayBounds();
+    this.render();
+  }
+
+  public setSignalMarkers(markers: SignalMarkerDatum[]): void {
+    this.signalMarkers = (markers || []).filter((marker) => (
+      Number.isFinite(marker.lat)
+      && Number.isFinite(marker.lon)
+      && String(marker.title || '').trim().length > 0
+    ));
+    this.render();
+  }
+
+  public setTransmissionOverlayArcs(arcs: TransmissionOverlayArc[]): void {
+    this.transmissionOverlayArcs = (arcs || []).filter((arc) => (
+      Number.isFinite(arc.sourceLat)
+      && Number.isFinite(arc.sourceLon)
+      && Number.isFinite(arc.targetLat)
+      && Number.isFinite(arc.targetLon)
+      && Number.isFinite(arc.strength)
+    ));
+    this.render();
+  }
+
+  public setRelationshipMode(enabled: boolean): void {
+    if (this.relationshipMode === enabled) return;
+    this.relationshipMode = enabled;
     this.render();
   }
 

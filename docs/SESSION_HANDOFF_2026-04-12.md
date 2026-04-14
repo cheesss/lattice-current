@@ -6,7 +6,7 @@ Lattice Current는 **뉴스 이벤트 → 자산 반응 분석 플랫폼**이다
 
 - **이름**: lattice-current (v2.5.25, AGPL-3.0)
 - **코드베이스**: TypeScript 699개 + JavaScript 186개 + Python 7개 + 테스트 154개 = 약 1,090개 파일
-- **데이터**: NAS PostgreSQL (192.168.0.76:5433, DB: lattice) — 66,802 기사, 619,495 labeled_outcomes
+- **데이터**: NAS PostgreSQL (192.168.0.2:5433, DB: lattice) — 67,302 기사, 619,539 labeled_outcomes
 - **AI**: Ollama 로컬 (nomic-embed-text, gemma3:4b), ONNX Runtime, PyTorch
 - **데스크톱**: Tauri (Rust), **웹**: Vite + React 18, **PWA**: 오프라인 지원
 - **변형 빌드**: full(지정학/분쟁), tech(AI/사이버), finance(마켓/매크로)
@@ -260,7 +260,7 @@ LightGBM baseline 비교: Brier 0.219 (MLP와 거의 동등)
 ### 기존 테이블 (수정됨)
 
 ```
-labeled_outcomes — 619,495행
+labeled_outcomes — 619,539행
   + canonical_event_id INT (619,490 연결)
   + market_return DOUBLE PRECISION
   + sector_return DOUBLE PRECISION
@@ -268,7 +268,7 @@ labeled_outcomes — 619,495행
   + market_session TEXT (619,495 태그)
   + aligned_entry_price DOUBLE PRECISION (615,158 보정)
 
-articles — 66,802행
+articles — 67,302행
   + market_session TEXT (전부 태그됨)
 ```
 
@@ -335,20 +335,23 @@ scripts/auto-pipeline.mjs                — abnormal_return 기반 sensitivity
 ## 8. 실행 방법
 
 ```bash
-# 웹 앱 실행
+# 터미널 1: 웹 앱 + meta-model 서버 (dev-full.mjs가 meta-model-server.py 자동 시작)
 npm run dev
 
-# GPU 추론 서버 (별도 터미널)
-python scripts/meta-model-server.py
+# 터미널 2: 5분 주기 자동 파이프라인
+node --import tsx scripts/master-daemon.mjs
 
-# 전체 파이프라인 (수집 + 분석 + 이벤트 엔진)
+# 수동 파이프라인 1회 실행
 node --import tsx scripts/master-pipeline.mjs
 
-# 모델 재학습 (새 데이터 축적 후)
+# 모델 재학습 (event_features 20% 이상 증가 시, 또는 수동)
 python scripts/train-meta-model.py --epochs 50
 
 # 모델 비교
 python scripts/compare-models.py
+
+# 파이프라인 실행 결과 확인
+cat data/pipeline-report.json
 ```
 
 ---
@@ -387,7 +390,7 @@ python scripts/compare-models.py
 - TypeScript는 이번 세션에서 배우기 시작 — TS 코드를 직접 읽거나 수정하기는 아직 어려움
 - 코드 작성은 AI에 위임하되, 설계 방향과 검증은 직접 판단
 - 한국어 의사소통 선호
-- GPU: RTX 2070 SUPER, NAS: Synology (192.168.0.76)
+- GPU: RTX 2070 SUPER, NAS: Synology (192.168.0.2)
 
 ---
 
@@ -401,27 +404,99 @@ python scripts/compare-models.py
 
 ---
 
-## 12. 추가 세션 작업 (2026-04-14)
+## 12. 추가 세션 작업 (2026-04-12 ~ 04-14)
 
 ### NAS IP 변경
-- 192.168.0.76 → 192.168.0.2 (NAS 재부팅 후 IP 변경됨)
-- .env.local + 모든 스크립트/API 파일의 하드코딩 IP 전부 교체
+- 192.168.0.2 → 192.168.0.2 (NAS 재부팅 후 IP 변경됨)
+- .env.local + 모든 스크립트/API 파일의 하드코딩 IP 전부 교체 (30+ 파일)
 
 ### pg 브라우저 번들 버그 수정
 - pg-pool.ts가 Node.js 전용 pg를 import → 브라우저 번들에 포함 → "Buffer is not defined" 에러
 - 수정: vite.config.ts에서 pg를 빈 shim(src/shims/pg.ts)으로 alias
 
+### Python 전환
+- 핵심 배치 계산을 JS → Python으로 전환 (43x 속도 향상)
+- `scripts/incremental_event_engine.py` — 메인 증분 파이프라인 (cluster→alpha→alignment→features→controls)
+- `scripts/event_engine_full_build.py` — regime/Hawkes/WhatIf/Anomaly 벡터화
+- master-pipeline.mjs STEP 3, STEP 6에서 Python 우선 실행 (JS fallback)
+- dev-full.mjs에서 meta-model-server.py 자동 시작
+
 ### 시각화 적용 (event-dashboard.html)
 - KPI 스트립: VIX, 리스크 게이지, 레짐, 스프레드, 유가, 달러, E2 시그널
-- Analytics 섹션: Evidence 분포, Alpha 감쇠, Hawkes 히트맵, 상관행렬, 레짐 타임라인, 소스 신뢰도
+- Analytics 섹션 8개 차트:
+  1. Evidence Grade Distribution — E0/E1/E2 분포 + 평균 uplift
+  2. Alpha Decay by Theme — 테마별 1w/2w/1m alpha 감쇠
+  3. Event Intensity Heatmap — Hawkes 테마×월 히트맵
+  4. Signal Correlation — 6개 시그널 90일 상관행렬
+  5. Regime Timeline — VIX 기반 시장 국면 변화 바
+  6. Conviction vs Realized Alpha — Calibration 산점도 (canvas, ECE/Brier 표시)
+  7. Source Credibility — 테마별 활동 강도 (temperatures)
+  8. (KPI) E2 시그널 카운트
 - EN/KO 언어 토글 (localStorage 저장)
 
 ### 프로덕션 UI 구조
-- 현재 프로덕션: event-dashboard.html (standalone 2,000줄 HTML)
+- 현재 프로덕션: event-dashboard.html (standalone HTML+JS, ~2,500줄)
 - index.html → event-dashboard.html 리다이렉트
 - src/App.ts 기반 앱은 레거시 (코드는 있지만 사용 안 됨)
 - 시각화 변경은 event-dashboard.html에 직접 적용
 
-### 다음 세션 작업: 지도 리디자인
-- 상세 계획: docs/MAP_REDESIGN_PLAN.md
-- 우선순위: 크기 확대 → 성능 최적화 → 데이터 레이어 → 테마/기간 필터
+### 파이프라인 운영 상태 (2026-04-14 확인)
+- 정상 작동 확인: 67,302 기사, 619,539 outcomes, 23개 시그널, 1,387 sensitivity
+- 60개 proposal 실행, 29개 skipped, 19개 autoSymbols
+- 실행 시간: 310초 (5분 10초)
+- Codex automation 정상 (attach-theme, generate-codex-theme-proposals)
+
+### 실행 방법
+```
+터미널 1: npm run dev (Vite + sidecar + meta-model-server)
+터미널 2: node --import tsx scripts/master-daemon.mjs (5분 주기 파이프라인)
+```
+- master-daemon.mjs가 master-pipeline.mjs를 5분마다 호출
+- master-pipeline.mjs STEP 0~7: 데이터 수집 → 분류 → 이벤트 엔진 → Codex → 제안 실행 → 증분 이벤트 엔진 → 시그널 스냅샷
+
+---
+
+## 13. 차트 API 라우트 매핑 (중요)
+
+event-dashboard.html의 Analytics 차트들이 사용하는 API 엔드포인트:
+
+| 차트 | HTML에서 호출 | API 서버 라우트 | 상태 |
+|------|-------------|----------------|------|
+| Evidence Grade | `/api/event-uplift-grades` | `event-dashboard-api.mjs` | 추가됨 (04-14) |
+| Alpha Decay | `/api/alpha-decay` | `event-dashboard-api.mjs` | 추가됨 (04-14) |
+| Signal Correlation | `/api/signal-correlation` | `event-dashboard-api.mjs` | 추가됨 (04-14) |
+| Hawkes Heatmap | `/api/hawkes-heatmap` | `event-dashboard-api.mjs` | 추가됨 (04-14) |
+| Regime Timeline | `/api/regime-timeline` | `event-dashboard-api.mjs` | 기존 (응답 형식 변환 적용) |
+| Calibration | `/api/calibration` | `event-dashboard-api.mjs` | 기존 (HTML 렌더러 추가됨 04-14) |
+| Source Credibility | `/api/live-status` → temperatures | `event-dashboard-api.mjs` | 기존 (데이터 소스 수정됨 04-14) |
+| KPI | `/api/kpi-summary` + `/api/signals` | `event-dashboard-api.mjs` | 기존 |
+
+**주의**: 기존 `/api/correlation`은 테마별 sensitivity 조회(theme 파라미터 필수), `/api/signal-correlation`은 시그널 간 cross-correlation — 다른 것임.
+
+---
+
+## 14. 알려진 미해결 사항
+
+### Analytics 차트 관련
+- 04-14에 API 엔드포인트 4개 + HTML 렌더러 2개 추가했으나, **API 서버 재시작 필요** (재시작 전에는 404)
+- Calibration 차트의 ECE 0.365, Brier 0.236 — "drift detected" 경고 표시 중
+- Source Credibility는 원래 설계(소스별 예측 정확도)와 달리 테마 활동 강도로 대체 표시 중
+
+### InvestmentIdeasPanel
+- 메타모델 예측값(alphaProb, expectedAlpha 등)이 TS 컴포넌트에 구현되어 있으나 event-dashboard.html에 미통합
+- event-dashboard.html에 별도 패널로 추가하려면 새 API + HTML 섹션 필요
+
+### 지도
+- DeckGLMap.ts 25개 레이어 → 10~15 FPS 버벅거림
+- 상세 개선 계획: docs/MAP_REDESIGN_PLAN.md
+- 우선순위: 크기 확대 → LOD 성능 최적화 → 데이터 레이어 → 테마/기간 필터
+
+### 모델
+- v1 모델 retrain 트리거: event_features 행 수가 retrain-state.json의 1.2배 초과 시
+- v2 Three-Tower 모델은 과적합으로 보류 (독립 이벤트 5만+ 쌓이면 재시도)
+- event_features의 6개 proxy 피처(graph, nmi, narrative, truth, conviction, fpr)는 실제값으로 교체 필요
+
+### 코드 품질
+- `data-loader.ts` (4,039줄) — god module 분리 필요
+- `DeckGLMap.ts` (6,796줄) — 레이어 모듈화 필요
+- NAS IP 하드코딩 패턴 잔존 — 환경변수로 통일 권장

@@ -6,7 +6,7 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 
 ## 핵심 구성
 
-- NAS PostgreSQL: 192.168.0.76:5433, DB: lattice
+- NAS PostgreSQL: 192.168.0.2:5433, DB: lattice
 - Ollama: localhost:11434 (nomic-embed-text, gemma3:4b)
 - 환경변수: `.env.local`에 PG_PASSWORD, OLLAMA_API_URL 등
 - 환경 로드: `export $(grep -v '^#' .env.local | xargs)`

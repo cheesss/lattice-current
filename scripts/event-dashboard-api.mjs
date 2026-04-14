@@ -273,6 +273,219 @@ function mapExpectedReactions(rows) {
   });
 }
 
+const MAP_LENS_FILTER_TERMS = {
+  all: [],
+  conflict: ['conflict', 'war', 'defense', 'military', 'drone', 'sanction', 'security', 'iran', 'israel', 'ukraine', 'russia'],
+  macro: ['macro', 'macroeconomics', 'fiscal', 'inflation', 'rates', 'liquidity', 'yield', 'monetary', 'budget', 'trade'],
+  tech: ['technology', 'technology-general', 'ai', 'cloud', 'robotics', 'semiconductor', 'cyber', 'quantum', 'science'],
+  energy: ['energy', 'oil', 'gas', 'lng', 'clean-energy', 'renewable', 'power', 'electricity', 'grid'],
+  climate: ['climate', 'wildfire', 'water', 'agriculture', 'weather', 'heat', 'resilience', 'environment'],
+};
+
+const MAP_LENS_ANCHORS = [
+  { id: 'iran', lat: 35.6892, lon: 51.389, terms: ['iran', 'tehran', 'persian gulf', 'hormuz'], filters: ['conflict', 'energy'] },
+  { id: 'israel', lat: 31.7683, lon: 35.2137, terms: ['israel', 'gaza', 'tel aviv', 'jerusalem'], filters: ['conflict', 'energy'] },
+  { id: 'ukraine', lat: 50.4501, lon: 30.5234, terms: ['ukraine', 'kyiv', 'kiev', 'donbas', 'crimea'], filters: ['conflict', 'energy'] },
+  { id: 'russia', lat: 55.7558, lon: 37.6173, terms: ['russia', 'moscow', 'kremlin'], filters: ['conflict', 'energy'] },
+  { id: 'taiwan', lat: 25.033, lon: 121.5654, terms: ['taiwan', 'tsmc', 'strait', 'taipei'], filters: ['tech', 'conflict'] },
+  { id: 'seoul', lat: 37.5665, lon: 126.978, terms: ['korea', 'seoul', 'semiconductor', 'memory chip'], filters: ['tech'] },
+  { id: 'tokyo', lat: 35.6762, lon: 139.6503, terms: ['japan', 'tokyo'], filters: ['tech', 'macro'] },
+  { id: 'silicon-valley', lat: 37.3875, lon: -122.0575, terms: ['ai', 'cloud', 'data center', 'nvidia', 'silicon valley'], filters: ['tech'] },
+  { id: 'london', lat: 51.5072, lon: -0.1276, terms: ['uk', 'britain', 'london', 'budget', 'gilts'], filters: ['macro'] },
+  { id: 'washington', lat: 38.9072, lon: -77.0369, terms: ['us', 'federal reserve', 'treasury', 'washington', 'congress'], filters: ['macro', 'tech'] },
+  { id: 'dubai', lat: 25.2048, lon: 55.2708, terms: ['shipping', 'suez', 'red sea', 'middle east', 'energy', 'oil'], filters: ['energy', 'conflict'] },
+  { id: 'singapore', lat: 1.3521, lon: 103.8198, terms: ['shipping', 'strait', 'container', 'freight', 'logistics'], filters: ['energy', 'macro', 'tech'] },
+  { id: 'santiago', lat: -33.4489, lon: -70.6693, terms: ['lithium', 'copper', 'critical minerals'], filters: ['energy', 'climate', 'tech'] },
+  { id: 'amazon', lat: -3.4653, lon: -62.2159, terms: ['climate', 'wildfire', 'amazon', 'deforestation'], filters: ['climate'] },
+  { id: 'australia', lat: -35.2809, lon: 149.13, terms: ['weather', 'wildfire', 'heat', 'water stress'], filters: ['climate', 'energy'] },
+];
+
+const TRANSMISSION_TARGETS = {
+  commodity: { lat: 25.2048, lon: 55.2708, label: 'Commodity markets' },
+  equity: { lat: 40.7128, lon: -74.006, label: 'Equity markets' },
+  currency: { lat: 51.5072, lon: -0.1276, label: 'FX markets' },
+  rates: { lat: 38.8951, lon: -77.0364, label: 'Rates markets' },
+  country: { lat: 48.8566, lon: 2.3522, label: 'Country exposure' },
+  'supply-chain': { lat: 1.3521, lon: 103.8198, label: 'Supply-chain hubs' },
+};
+
+function normalizeLensFilter(value) {
+  const normalized = String(value || 'all').trim().toLowerCase();
+  return Object.hasOwn(MAP_LENS_FILTER_TERMS, normalized) ? normalized : 'all';
+}
+
+function normalizeLensText(...values) {
+  return values
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function matchesLensFilter(filter, text) {
+  if (filter === 'all') return true;
+  return MAP_LENS_FILTER_TERMS[filter].some((term) => text.includes(term));
+}
+
+function inferMapLensAnchor(title, theme, filter = 'all') {
+  const text = normalizeLensText(title, theme);
+  const direct = MAP_LENS_ANCHORS.find((anchor) => anchor.terms.some((term) => text.includes(term)));
+  if (direct) return direct;
+  if (filter !== 'all') {
+    return MAP_LENS_ANCHORS.find((anchor) => anchor.filters.includes(filter)) || null;
+  }
+  return MAP_LENS_ANCHORS[0] || null;
+}
+
+function periodToDays(period) {
+  switch (String(period || '').trim().toLowerCase()) {
+    case 'week':
+      return 7;
+    case 'month':
+      return 30;
+    case 'year':
+      return 365;
+    default:
+      return 90;
+  }
+}
+
+async function readPersistentCachePayload(cacheKey) {
+  const filePath = path.join('data', 'persistent-cache', `${encodeURIComponent(cacheKey)}.json`);
+  if (!existsSync(filePath)) return null;
+  try {
+    const payload = JSON.parse(await readFile(filePath, 'utf8'));
+    return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+  } catch {
+    return null;
+  }
+}
+
+async function buildMapLensOverlayPayload(params) {
+  const filter = normalizeLensFilter(params.get('filter'));
+  const theme = String(params.get('theme') || '').trim().toLowerCase();
+  const days = periodToDays(params.get('period'));
+
+  const [eventRows, e2Rows, transmissionCache] = await Promise.all([
+    safeQuery(`
+      SELECT id, theme, representative_title, event_date, COALESCE(article_count, 0)::int AS article_count, COALESCE(source_count, 0)::int AS source_count
+      FROM canonical_events
+      WHERE event_date >= CURRENT_DATE - ($1 * INTERVAL '1 day')
+      ORDER BY event_date DESC, article_count DESC, source_count DESC
+      LIMIT 180
+    `, [days]),
+    safeQuery(`
+      SELECT
+        ce.id AS canonical_event_id,
+        ce.theme,
+        ce.representative_title,
+        ce.event_date,
+        eu.symbol,
+        eu.horizon,
+        eu.uplift,
+        eu.t_stat,
+        eu.evidence_grade
+      FROM event_uplift eu
+      JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+      WHERE eu.evidence_grade = 'E2'
+        AND ce.event_date >= CURRENT_DATE - ($1 * INTERVAL '1 day')
+      ORDER BY ABS(COALESCE(eu.uplift, 0)) DESC, ABS(COALESCE(eu.t_stat, 0)) DESC, ce.event_date DESC
+      LIMIT 80
+    `, [Math.max(days, 30)]),
+    readPersistentCachePayload('event-market-transmission:v1'),
+  ]);
+
+  const eventMarkers = eventRows.rows
+    .map((row) => {
+      const eventTheme = String(row.theme || '').trim().toLowerCase();
+      const title = String(row.representative_title || '').trim();
+      const text = normalizeLensText(eventTheme, title);
+      if (theme && !text.includes(theme)) return null;
+      if (!matchesLensFilter(filter, text)) return null;
+      const anchor = inferMapLensAnchor(title, eventTheme, filter);
+      if (!anchor) return null;
+      return {
+        id: `event-${row.id}`,
+        title,
+        theme: eventTheme || null,
+        lat: anchor.lat,
+        lon: anchor.lon,
+        intensity: Math.max(1, Number(row.article_count || 0) * 0.8 + Number(row.source_count || 0) * 1.2),
+        publishedAt: row.event_date ? new Date(row.event_date).toISOString() : null,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 36);
+
+  const e2Signals = e2Rows.rows
+    .map((row) => {
+      const eventTheme = String(row.theme || '').trim().toLowerCase();
+      const title = String(row.representative_title || '').trim();
+      const text = normalizeLensText(eventTheme, title, row.symbol);
+      if (theme && !text.includes(theme)) return null;
+      if (!matchesLensFilter(filter, text)) return null;
+      const anchor = inferMapLensAnchor(title, eventTheme, filter);
+      if (!anchor) return null;
+      return {
+        id: `e2-${row.canonical_event_id}-${String(row.symbol || '').toLowerCase()}`,
+        title,
+        theme: eventTheme || null,
+        symbol: String(row.symbol || '').trim() || null,
+        horizon: String(row.horizon || '').trim() || null,
+        evidenceGrade: String(row.evidence_grade || '').trim() || null,
+        uplift: Number.isFinite(Number(row.uplift)) ? Number(row.uplift) : null,
+        tStat: Number.isFinite(Number(row.t_stat)) ? Number(row.t_stat) : null,
+        lat: anchor.lat,
+        lon: anchor.lon,
+        publishedAt: row.event_date ? new Date(row.event_date).toISOString() : null,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 24);
+
+  const transmissionSnapshot = transmissionCache?.snapshot && typeof transmissionCache.snapshot === 'object'
+    ? transmissionCache.snapshot
+    : transmissionCache;
+  const transmissionEdges = Array.isArray(transmissionSnapshot?.edges) ? transmissionSnapshot.edges : [];
+  const transmissionArcs = transmissionEdges
+    .map((edge, index) => {
+      const title = String(edge?.eventTitle || '').trim();
+      const relationType = String(edge?.relationType || '').trim().toLowerCase();
+      const text = normalizeLensText(title, edge?.marketSymbol, relationType);
+      if (theme && !text.includes(theme)) return null;
+      if (!matchesLensFilter(filter, text)) return null;
+      const source = inferMapLensAnchor(title, '', filter);
+      const target = TRANSMISSION_TARGETS[relationType] || TRANSMISSION_TARGETS.country;
+      const strength = Number(edge?.strength || 0);
+      if (!source || !target || !Number.isFinite(strength) || strength <= 0) return null;
+      return {
+        id: `transmission-${index}-${relationType}-${String(edge?.marketSymbol || 'edge').toLowerCase()}`,
+        title,
+        relationType,
+        strength,
+        sourceLat: source.lat,
+        sourceLon: source.lon,
+        targetLat: target.lat,
+        targetLon: target.lon,
+        targetLabel: String(edge?.marketSymbol || target.label || 'Transmission'),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 28);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    filter,
+    eventMarkers,
+    e2Signals,
+    transmissionArcs,
+    summary: {
+      events: eventMarkers.length,
+      e2Signals: e2Signals.length,
+      transmissionArcs: transmissionArcs.length,
+    },
+  };
+}
+
 async function buildLiveStatus() {
   const [signalsR, tempsR, pendingR, articlesR, recentThemesR] = await Promise.all([
     safeQuery(`
@@ -1563,6 +1776,18 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       return await resolveWithCache('today', buildTodayEvents);
     }
 
+    if (segments[0] === 'api' && segments[1] === 'map-lens-overlays') {
+      return await resolveWithCache(
+        buildCacheKey(
+          'map-lens-overlays',
+          params.get('period') || 'quarter',
+          params.get('filter') || 'all',
+          params.get('theme') || 'all',
+        ),
+        () => buildMapLensOverlayPayload(params),
+      );
+    }
+
     if (segments[0] === 'api' && segments[1] === 'heatmap') {
       return await resolveWithCache('heatmap', buildHeatmap);
     }
@@ -1625,6 +1850,74 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         channels[name].push({ ts: row.ts, value: Number(row.value || 0) });
       }
       return buildJsonResponse({ channels });
+    }
+
+    // ── /api/event-uplift-grades ──
+    if (segments[0] === 'api' && segments[1] === 'event-uplift-grades') {
+      const r = await safeQuery(`
+        SELECT evidence_grade, uplift FROM event_uplift
+        WHERE evidence_grade IS NOT NULL
+        LIMIT 50000
+      `);
+      return buildJsonResponse(r.rows);
+    }
+
+    // ── /api/alpha-decay ──
+    if (segments[0] === 'api' && segments[1] === 'alpha-decay') {
+      const r = await safeQuery(`
+        SELECT ce.theme, lo.horizon,
+               AVG(lo.abnormal_return) AS alpha,
+               COUNT(*) AS n
+        FROM event_uplift eu
+        JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+        JOIN labeled_outcomes lo ON lo.canonical_event_id = eu.canonical_event_id
+                                 AND lo.symbol = eu.symbol
+        WHERE ce.theme IS NOT NULL AND lo.horizon IN ('1w','2w','1m')
+        GROUP BY ce.theme, lo.horizon
+        HAVING COUNT(*) >= 5
+        ORDER BY ce.theme, lo.horizon
+      `);
+      // Group by theme
+      const byTheme = {};
+      for (const row of r.rows) {
+        if (!byTheme[row.theme]) byTheme[row.theme] = { theme: row.theme, points: [] };
+        byTheme[row.theme].points.push({ horizon: row.horizon, alpha: Number(row.alpha || 0) });
+      }
+      return buildJsonResponse(Object.values(byTheme));
+    }
+
+    // ── /api/signal-correlation ──
+    if (segments[0] === 'api' && segments[1] === 'signal-correlation') {
+      const signals = ['vix', 'yieldSpread', 'oilPrice', 'dollarIndex', 'hy_credit_spread', 'marketStress'];
+      const r = await safeQuery(`
+        SELECT a.signal_name as signal_a, b.signal_name as signal_b,
+               CORR(a.value, b.value) as correlation
+        FROM signal_history a
+        JOIN signal_history b ON DATE(a.ts) = DATE(b.ts)
+        WHERE a.signal_name = ANY($1) AND b.signal_name = ANY($1)
+          AND a.ts >= NOW() - INTERVAL '90 days'
+          AND a.signal_name <= b.signal_name
+        GROUP BY a.signal_name, b.signal_name
+      `, [signals]);
+      const full = [];
+      for (const row of r.rows) {
+        full.push(row);
+        if (row.signal_a !== row.signal_b) {
+          full.push({ signal_a: row.signal_b, signal_b: row.signal_a, correlation: row.correlation });
+        }
+      }
+      return buildJsonResponse(full);
+    }
+
+    // ── /api/hawkes-heatmap — all themes ──
+    if (segments[0] === 'api' && segments[1] === 'hawkes-heatmap') {
+      const r = await safeQuery(`
+        SELECT theme, event_date, hawkes_intensity
+        FROM event_hawkes_intensity
+        WHERE event_date >= NOW() - INTERVAL '6 months'
+        ORDER BY theme, event_date
+      `);
+      return buildJsonResponse(r.rows);
     }
 
     // ── /api/correlation?theme=conflict ──

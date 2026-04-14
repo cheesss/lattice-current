@@ -42,13 +42,68 @@ type SourceStatus = {
   detail: string;
 };
 
+type LensThemeFilter = 'all' | 'conflict' | 'macro' | 'tech' | 'energy' | 'climate';
+
+type MapLensEventMarker = {
+  id: string;
+  title: string;
+  theme: string | null;
+  lat: number;
+  lon: number;
+  intensity: number;
+  publishedAt: string | null;
+};
+
+type MapLensE2SignalMarker = {
+  id: string;
+  title: string;
+  theme: string | null;
+  symbol: string | null;
+  horizon: string | null;
+  evidenceGrade: string | null;
+  uplift: number | null;
+  tStat: number | null;
+  lat: number;
+  lon: number;
+  publishedAt: string | null;
+};
+
+type MapLensTransmissionArc = {
+  id: string;
+  title: string;
+  relationType: string;
+  strength: number;
+  sourceLat: number;
+  sourceLon: number;
+  targetLat: number;
+  targetLon: number;
+  targetLabel: string;
+};
+
+type MapLensOverlayPayload = {
+  generatedAt: string;
+  eventMarkers: MapLensEventMarker[];
+  e2Signals: MapLensE2SignalMarker[];
+  transmissionArcs: MapLensTransmissionArc[];
+};
+
 const API = 'http://localhost:46200/api';
 const REFRESH_MS = 180_000;
+const OVERLAY_COLLAPSE_KEY = 'theme-map-lens:overlay-collapsed';
 const PERIOD_LABELS: Record<LensContext['period'], string> = {
   week: 'Week',
   month: 'Month',
   quarter: 'Quarter',
   year: 'Year',
+};
+const FILTER_PERIODS: LensContext['period'][] = ['week', 'month', 'quarter', 'year'];
+const FILTER_THEME_OVERRIDES: Record<LensThemeFilter, string | null> = {
+  all: null,
+  conflict: 'conflict',
+  macro: 'macroeconomics',
+  tech: 'technology-general',
+  energy: 'energy-transition',
+  climate: 'climate-change',
 };
 const EMPTY_CONTEXT: LensContext = {
   theme: null,
@@ -81,6 +136,10 @@ const map = new DeckGLMap(
 let currentContext: LensContext = { ...EMPTY_CONTEXT };
 let currentPreset = buildCrossDomainPreset();
 let refreshHandle: number | null = null;
+let activeThemeFilter: LensThemeFilter = 'all';
+let relationshipMode = false;
+let localPeriodOverride: LensContext['period'] | null = null;
+let overlayCollapsed = false;
 
 function createEmptyLayers(): MapLayers {
   const next = { ...DEFAULT_MAP_LAYERS } as Record<string, boolean>;
@@ -106,10 +165,40 @@ function sanitizeToken(value: unknown): string {
   return normalized;
 }
 
+function readOverlayCollapsedState(): boolean {
+  try {
+    return window.localStorage.getItem(OVERLAY_COLLAPSE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeOverlayCollapsedState(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(OVERLAY_COLLAPSE_KEY, collapsed ? '1' : '0');
+  } catch {
+    // Ignore storage failures in embedded contexts.
+  }
+}
+
 function periodToTimeRange(period: LensContext['period']): TimeRange {
   if (period === 'week') return '7d';
   if (period === 'month') return '7d';
   return 'all';
+}
+
+function getEffectivePeriod(): LensContext['period'] {
+  return localPeriodOverride ?? currentContext.period;
+}
+
+function getEffectiveContext(context: LensContext): LensContext {
+  const filterOverride = FILTER_THEME_OVERRIDES[activeThemeFilter];
+  const theme = sanitizeToken(filterOverride || context.theme);
+  return {
+    ...context,
+    theme: theme ? theme.toLowerCase() : null,
+    period: getEffectivePeriod(),
+  };
 }
 
 function enableLayers(base: MapLayers, keys: Array<keyof MapLayers>): MapLayers {
@@ -346,6 +435,39 @@ function renderSourceStatuses(statuses: SourceStatus[]): void {
   setText('lens-status-line', `${statuses.length} dynamic source lanes evaluated. Offline ${offline}, stale ${stale}.`);
 }
 
+function renderToolbarState(): void {
+  const root = document.getElementById('lens-root');
+  root?.classList.toggle('overlay-collapsed', overlayCollapsed);
+
+  const collapseButton = document.getElementById('lens-collapse-toggle') as HTMLButtonElement | null;
+  if (collapseButton) {
+    collapseButton.textContent = overlayCollapsed ? '+' : '−';
+    collapseButton.classList.toggle('active', !overlayCollapsed);
+    collapseButton.setAttribute('aria-expanded', String(!overlayCollapsed));
+    collapseButton.setAttribute('aria-label', overlayCollapsed ? 'Expand overlay panels' : 'Collapse overlay panels');
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((button) => {
+    const isActive = button.dataset.filter === activeThemeFilter;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
+
+  const periodSlider = document.getElementById('lens-period-slider') as HTMLInputElement | null;
+  const effectivePeriod = getEffectivePeriod();
+  const periodIndex = FILTER_PERIODS.indexOf(effectivePeriod);
+  if (periodSlider && periodIndex >= 0) {
+    periodSlider.value = String(periodIndex);
+  }
+
+  const relationshipButton = document.getElementById('lens-relationship-toggle') as HTMLButtonElement | null;
+  if (relationshipButton) {
+    relationshipButton.classList.toggle('active', relationshipMode);
+    relationshipButton.textContent = relationshipMode ? 'Relationship mode · On' : 'Relationship mode';
+    relationshipButton.setAttribute('aria-pressed', String(relationshipMode));
+  }
+}
+
 function mapPeriod(period: string | null | undefined): LensContext['period'] {
   const normalized = String(period || '').trim().toLowerCase();
   if (normalized === 'week' || normalized === 'month' || normalized === 'quarter' || normalized === 'year') {
@@ -387,7 +509,34 @@ async function fetchHotspotActivity(theme: string | null): Promise<NewsItem[]> {
     }));
 }
 
+async function fetchMapLensOverlays(context: LensContext): Promise<MapLensOverlayPayload> {
+  const params = new URLSearchParams();
+  params.set('period', context.period);
+  params.set('filter', activeThemeFilter);
+  if (context.theme) {
+    params.set('theme', context.theme);
+  }
+  const response = await fetch(`${API}/map-lens-overlays?${params.toString()}`, {
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Map overlay request failed (${response.status})`);
+  }
+  return response.json() as Promise<MapLensOverlayPayload>;
+}
+
+function toSignalNewsItem(marker: MapLensEventMarker | MapLensE2SignalMarker): NewsItem {
+  return {
+    source: 'map-lens',
+    title: marker.title,
+    link: '',
+    pubDate: marker.publishedAt ? new Date(marker.publishedAt) : new Date(),
+    isAlert: true,
+  };
+}
+
 async function refreshDynamicData(): Promise<void> {
+  const effectiveContext = getEffectiveContext(currentContext);
   const layers = map.getState().layers;
   const statuses: SourceStatus[] = [];
 
@@ -404,10 +553,65 @@ async function refreshDynamicData(): Promise<void> {
 
   if (layers.hotspots) {
     tasks.push(record('hotspots', 'Headline hotspots', async () => {
-      const items = await fetchHotspotActivity(currentContext.theme);
+      const items = await fetchHotspotActivity(effectiveContext.theme);
       map.updateHotspotActivity(items);
     }));
   }
+
+  tasks.push(record('signal-map', 'Event hotspots and E2 markers', async () => {
+    const overlays = await fetchMapLensOverlays(effectiveContext);
+    const signalMarkers = [
+      ...overlays.eventMarkers.map((marker) => ({
+        id: marker.id,
+        kind: 'hotspot' as const,
+        title: marker.title,
+        theme: marker.theme,
+        lat: marker.lat,
+        lon: marker.lon,
+        intensity: marker.intensity,
+        evidenceGrade: null,
+        uplift: null,
+        symbol: null,
+        timestamp: marker.publishedAt,
+      })),
+      ...overlays.e2Signals.map((marker) => ({
+        id: marker.id,
+        kind: 'e2' as const,
+        title: marker.title,
+        theme: marker.theme,
+        lat: marker.lat,
+        lon: marker.lon,
+        intensity: Math.max(1, Math.abs(Number(marker.uplift || 0)) * 12 + Math.abs(Number(marker.tStat || 0)) * 2),
+        evidenceGrade: marker.evidenceGrade,
+        uplift: marker.uplift,
+        symbol: marker.symbol,
+        timestamp: marker.publishedAt,
+      })),
+    ];
+    const newsLocations = [
+      ...overlays.eventMarkers.map((marker) => ({
+        lat: marker.lat,
+        lon: marker.lon,
+        title: marker.title,
+        threatLevel: marker.intensity >= 18 ? 'critical' : marker.intensity >= 10 ? 'high' : 'medium',
+        timestamp: marker.publishedAt ? new Date(marker.publishedAt) : new Date(),
+      })),
+      ...overlays.e2Signals.map((marker) => ({
+        lat: marker.lat,
+        lon: marker.lon,
+        title: `${marker.symbol || 'E2'} · ${marker.title}`,
+        threatLevel: 'critical',
+        timestamp: marker.publishedAt ? new Date(marker.publishedAt) : new Date(),
+      })),
+    ];
+    map.setSignalMarkers(signalMarkers);
+    map.setTransmissionOverlayArcs(overlays.transmissionArcs);
+    map.setNewsLocations(newsLocations);
+    map.updateHotspotActivity([
+      ...overlays.eventMarkers.map((marker) => toSignalNewsItem(marker)),
+      ...overlays.e2Signals.map((marker) => toSignalNewsItem(marker)),
+    ]);
+  }));
 
   if (layers.natural) {
     tasks.push(record('earthquakes', 'Earthquakes', async () => {
@@ -516,11 +720,23 @@ async function refreshDynamicData(): Promise<void> {
 
 function applyContext(context: LensContext): void {
   currentContext = context;
-  currentPreset = resolvePreset(context.theme, context.evolutionParent);
-  map.setLayers(currentPreset.layers);
+  const effectiveContext = getEffectiveContext(context);
+  currentPreset = resolvePreset(effectiveContext.theme, effectiveContext.evolutionParent);
+  const nextLayers = { ...currentPreset.layers };
+  if (relationshipMode) {
+    nextLayers.tradeRoutes = true;
+    nextLayers.waterways = true;
+    nextLayers.economic = true;
+    nextLayers.stockExchanges = true;
+    nextLayers.financialCenters = true;
+    nextLayers.centralBanks = true;
+  }
+  map.setLayers(nextLayers);
   map.setView(currentPreset.view);
-  map.setTimeRange(periodToTimeRange(context.period));
-  renderPresetMeta(currentPreset, currentContext, currentPreset.layers);
+  map.setTimeRange(periodToTimeRange(effectiveContext.period));
+  map.setRelationshipMode(relationshipMode);
+  renderPresetMeta(currentPreset, effectiveContext, nextLayers);
+  renderToolbarState();
   map.render();
   void refreshDynamicData();
 }
@@ -538,13 +754,48 @@ function installBridge(): void {
   }
 }
 
+function installControls(): void {
+  overlayCollapsed = readOverlayCollapsedState();
+
+  const collapseButton = document.getElementById('lens-collapse-toggle');
+  collapseButton?.addEventListener('click', () => {
+    overlayCollapsed = !overlayCollapsed;
+    writeOverlayCollapsedState(overlayCollapsed);
+    renderToolbarState();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextFilter = String(button.dataset.filter || 'all') as LensThemeFilter;
+      activeThemeFilter = nextFilter in FILTER_THEME_OVERRIDES ? nextFilter : 'all';
+      applyContext(currentContext);
+    });
+  });
+
+  const periodSlider = document.getElementById('lens-period-slider') as HTMLInputElement | null;
+  periodSlider?.addEventListener('input', () => {
+    const index = Math.max(0, Math.min(FILTER_PERIODS.length - 1, Number(periodSlider.value) || 0));
+    localPeriodOverride = FILTER_PERIODS[index] ?? currentContext.period;
+    applyContext(currentContext);
+  });
+
+  const relationshipButton = document.getElementById('lens-relationship-toggle');
+  relationshipButton?.addEventListener('click', () => {
+    relationshipMode = !relationshipMode;
+    applyContext(currentContext);
+  });
+
+  renderToolbarState();
+}
+
 function installMapObservers(): void {
   map.setOnLayerChange(() => {
-    renderPresetMeta(currentPreset, currentContext, map.getState().layers);
+    renderPresetMeta(currentPreset, getEffectiveContext(currentContext), map.getState().layers);
   });
   map.setOnStateChange((state) => {
     const view = humanize(state.view);
-    setText('lens-notes', `The 3D globe is intentionally removed here. Current view is ${view}, and the embedded controls remain available for manual layer toggles.`);
+    const relationshipCopy = relationshipMode ? 'Relationship mode is active, so transmission and country-link arcs are emphasized.' : 'Switch relationship mode on to emphasize transmission and country-link arcs.';
+    setText('lens-notes', `The 3D globe is intentionally removed here. Current view is ${view}. ${relationshipCopy}`);
   });
 }
 
@@ -558,6 +809,7 @@ function scheduleRefresh(): void {
 }
 
 installBridge();
+installControls();
 installMapObservers();
 applyContext({ ...EMPTY_CONTEXT });
 scheduleRefresh();
