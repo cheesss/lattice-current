@@ -23,6 +23,14 @@ const SIGNAL_LABELS = {
 
 const RISK_LEVELS = Object.freeze(['watch', 'elevated', 'high', 'critical']);
 const MACRO_VERDICTS = Object.freeze(['watch', 'constructive', 'defensive']);
+const SIGNAL_MAX_AGE_HOURS = Object.freeze({
+  vix: 72,
+  hy_credit_spread: 72,
+  dollarIndex: 72,
+  oilPrice: 120,
+  marketStress: 72,
+  transmissionStrength: 72,
+});
 
 function normalizeString(value, fallback = '') {
   const normalized = String(value ?? '').trim();
@@ -31,6 +39,17 @@ function normalizeString(value, fallback = '') {
 
 function normalizeThemeKey(value) {
   return normalizeString(value).toLowerCase();
+}
+
+function humanizeThemeLabel(value) {
+  return normalizeString(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function isDisplayableTheme(theme) {
+  const normalized = normalizeThemeKey(theme);
+  return Boolean(normalized) && !normalized.startsWith('dt-');
 }
 
 function asNumber(value, fallback = null) {
@@ -55,6 +74,43 @@ function toIso(value) {
   return Number.isNaN(date.valueOf()) ? null : date.toISOString();
 }
 
+function ageHours(value) {
+  const iso = toIso(value);
+  if (!iso) return null;
+  const ageMs = Date.now() - Date.parse(iso);
+  return Number.isFinite(ageMs) ? ageMs / 3_600_000 : null;
+}
+
+const DEFAULT_STRUCTURAL_ALERT_PERIOD = 'week';
+const DEFAULT_TRANSMISSION_FRESHNESS_HOURS = 48;
+
+function computeFreshnessState(generatedAt, {
+  sourceStale = false,
+  maxAgeHours = DEFAULT_TRANSMISSION_FRESHNESS_HOURS,
+} = {}) {
+  const iso = toIso(generatedAt);
+  const rawAgeHours = ageHours(iso);
+  const freshnessHours = round(rawAgeHours, 1);
+  const staleByAge = rawAgeHours === null ? true : rawAgeHours > maxAgeHours;
+  const stale = Boolean(sourceStale) || staleByAge;
+  return {
+    generatedAt: iso,
+    freshnessHours,
+    fresh: rawAgeHours !== null && !stale,
+    stale,
+    maxAgeHours,
+  };
+}
+
+function applyFreshnessToSource(source, freshness) {
+  if (!source || typeof source !== 'object') return source;
+  return {
+    ...source,
+    updatedAt: source.updatedAt || freshness?.generatedAt || null,
+    stale: Boolean(source.stale) || Boolean(freshness?.stale),
+  };
+}
+
 function unique(values = []) {
   return Array.from(new Set(asArray(values).filter(Boolean)));
 }
@@ -63,7 +119,7 @@ function dedupeThemeTemperatures(items = []) {
   const deduped = new Map();
   for (const item of asArray(items)) {
     const theme = normalizeThemeKey(item?.theme);
-    if (!theme) continue;
+    if (!theme || !isDisplayableTheme(theme)) continue;
     const nextIntensity = asNumber(item?.intensity, 0) || 0;
     const previous = deduped.get(theme);
     if (!previous || (asNumber(previous?.intensity, 0) || 0) < nextIntensity) {
@@ -100,7 +156,7 @@ function resolveThemeMeta(theme) {
   const taxonomy = normalized ? resolveThemeTaxonomy(normalized) : null;
   return {
     theme: normalized || null,
-    themeLabel: taxonomy?.themeLabel || normalized || null,
+    themeLabel: taxonomy?.themeLabel || humanizeThemeLabel(normalized) || null,
     category: taxonomy?.category || null,
     categoryLabel: taxonomy?.categoryLabel || null,
     parentTheme: taxonomy?.parentTheme || null,
@@ -143,6 +199,37 @@ function createSource(name, kind, {
 
 function mergeSources(...sourceLists) {
   return sourceLists.flat().filter(Boolean);
+}
+
+// Return the oldest updatedAt among a list of source metadata entries.
+// Used so a fresh wrapper `generatedAt` does not mask stale internals.
+function oldestSourceUpdatedAt(sources) {
+  const times = (sources || [])
+    .map((s) => (s && s.updatedAt ? Date.parse(s.updatedAt) : NaN))
+    .filter((t) => Number.isFinite(t));
+  if (!times.length) return null;
+  return new Date(Math.min(...times)).toISOString();
+}
+
+// Return freshest updatedAt (for contrast with wrapper generatedAt).
+function latestSourceUpdatedAt(sources) {
+  const times = (sources || [])
+    .map((s) => (s && s.updatedAt ? Date.parse(s.updatedAt) : NaN))
+    .filter((t) => Number.isFinite(t));
+  if (!times.length) return null;
+  return new Date(Math.max(...times)).toISOString();
+}
+
+// Build the "effective data freshness" timestamps to attach to every snapshot
+// payload. The UI should display the oldest (so stale internals are not hidden).
+function buildFreshnessFields(sources) {
+  const oldest = oldestSourceUpdatedAt(sources);
+  const latest = latestSourceUpdatedAt(sources);
+  return {
+    updatedAt: oldest || latest || null,  // what the UI should check for stale
+    latestInternalUpdatedAt: latest,
+    oldestInternalUpdatedAt: oldest,
+  };
 }
 
 async function readDashboardCache(cacheKey, options = {}) {
@@ -370,7 +457,7 @@ async function loadStructuralAlertsSummary(options = {}) {
   }
   try {
     const payload = await buildAlerts(safeQuery, new URLSearchParams([
-      ['period', options.period || 'week'],
+      ['period', options.period || DEFAULT_STRUCTURAL_ALERT_PERIOD],
       ['limit', String(Math.max(1, Math.min(20, Number(options.limit || 8))))],
     ]));
     return {
@@ -440,8 +527,10 @@ export async function buildCompactRiskSnapshot(options = {}) {
     Math.round((avgIntensity * 62) + alertPressure + pendingPressure + articlePressure),
   );
 
+  const riskSources = mergeSources(liveStatus.sources, structuralAlerts.sources);
   const payload = {
     generatedAt: new Date().toISOString(),
+    ...buildFreshnessFields(riskSources),
     score,
     level: classifyRiskLevel(score),
     summary: {
@@ -664,19 +753,30 @@ export async function buildCompactMacroSnapshot(options = {}) {
   ]);
   const live = liveStatus.payload || buildEmptyLiveStatus();
   const signalMap = buildSignalMap(live);
-  const vix = asNumber(signalMap.get('vix')?.value, null);
-  const marketStress = asNumber(signalMap.get('marketStress')?.value, null);
-  const hyCredit = asNumber(signalMap.get('hy_credit_spread')?.value, null);
-  const transmission = asNumber(signalMap.get('transmissionStrength')?.value, null);
-
-  const signals = [
+  const rawSignals = [
     signalMap.get('vix'),
     signalMap.get('marketStress'),
     signalMap.get('hy_credit_spread'),
     signalMap.get('dollarIndex'),
     signalMap.get('oilPrice'),
     signalMap.get('transmissionStrength'),
-  ].filter(Boolean).map((item) => ({
+  ].filter(Boolean);
+
+  const freshSignals = rawSignals.filter((item) => {
+    const channel = normalizeString(item.channel);
+    const maxAgeHours = SIGNAL_MAX_AGE_HOURS[channel];
+    if (!Number.isFinite(maxAgeHours)) return true;
+    const updatedAge = ageHours(item.updatedAt);
+    return updatedAge === null || updatedAge <= maxAgeHours;
+  });
+
+  const freshSignalMap = new Map(freshSignals.map((item) => [normalizeString(item.channel), item]));
+  const vix = asNumber(freshSignalMap.get('vix')?.value, null);
+  const marketStress = asNumber(freshSignalMap.get('marketStress')?.value, null);
+  const hyCredit = asNumber(freshSignalMap.get('hy_credit_spread')?.value, null);
+  const transmission = asNumber(freshSignalMap.get('transmissionStrength')?.value, null);
+
+  const signals = freshSignals.map((item) => ({
     channel: normalizeString(item.channel),
     label: normalizeString(item.label || SIGNAL_LABELS[item.channel] || item.channel),
     value: round(item.value, 3) || 0,
@@ -686,16 +786,19 @@ export async function buildCompactMacroSnapshot(options = {}) {
   const topThemes = countThemesFromHeatmap(heatmapPayload.payload);
   const strategies = asArray(strategiesPayload.payload?.strategies);
 
+  const macroSources = mergeSources(liveStatus.sources, strategiesPayload.sources, heatmapPayload.sources);
   const payload = {
     generatedAt: new Date().toISOString(),
+    ...buildFreshnessFields(macroSources),
     verdict: classifyMacroVerdict({ vix, marketStress, hyCredit, transmission }),
     strategyCount: strategies.length,
     signals,
+    staleSignalCount: Math.max(0, rawSignals.length - signals.length),
     topThemes,
     meta: {
       available: signals.length > 0 || topThemes.length > 0 || strategies.length > 0,
-      stale: mergeSources(liveStatus.sources, strategiesPayload.sources, heatmapPayload.sources).some((source) => source.stale),
-      sources: mergeSources(liveStatus.sources, strategiesPayload.sources, heatmapPayload.sources),
+      stale: macroSources.some((source) => source.stale),
+      sources: macroSources,
     },
   };
 
@@ -855,8 +958,17 @@ export async function buildCompactInvestmentSnapshot(options = {}) {
   const reviewCount = investmentCaches.payload.candidateReviews.length;
   const trackedIdeaCount = investmentCaches.payload.trackedIdeas.length;
 
+  const allSources = mergeSources(strategiesPayload.sources, heatmapPayload.sources, investmentCaches.sources);
+  const oldestInternal = oldestSourceUpdatedAt(allSources);
+  const latestInternal = latestSourceUpdatedAt(allSources);
   const payload = {
+    // generatedAt = when this wrapper was built (always now)
     generatedAt: new Date().toISOString(),
+    // updatedAt reflects actual data freshness = oldest internal source.
+    // If internals are stale, the card MUST show stale even if wrapper is fresh.
+    updatedAt: oldestInternal || latestInternal || null,
+    latestInternalUpdatedAt: latestInternal,
+    oldestInternalUpdatedAt: oldestInternal,
     strategyCount: strategies.length,
     trackedIdeaCount,
     reviewCount,
@@ -873,8 +985,8 @@ export async function buildCompactInvestmentSnapshot(options = {}) {
     } : null,
     meta: {
       available: strategies.length > 0 || strongestPairs.length > 0 || trackedIdeas.length > 0 || Boolean(convictionModel) || Boolean(experimentRegistry) || Boolean(signalRuntime),
-      stale: mergeSources(strategiesPayload.sources, heatmapPayload.sources, investmentCaches.sources).some((source) => source.stale),
-      sources: mergeSources(strategiesPayload.sources, heatmapPayload.sources, investmentCaches.sources),
+      stale: allSources.some((source) => source.stale),
+      sources: allSources,
     },
   };
 
@@ -957,8 +1069,12 @@ export async function buildCompactValidationSnapshot(options = {}) {
     const recentRuns = asArray(snapshot.recentRuns).slice(0, 6).map(normalizeValidationRun);
     const workflow = snapshot.workflow || {};
     const coverageLedger = snapshot.coverageLedger || {};
+    const valSources = [replayAdaptation.source];
     return {
-      updatedAt: toIso(snapshot.updatedAt),
+      generatedAt: new Date().toISOString(),
+      ...buildFreshnessFields(valSources),
+      // Also expose the raw snapshot updatedAt for backward compat
+      rawSnapshotUpdatedAt: toIso(snapshot.updatedAt),
       runCount: asNumber(workflow.runCount, recentRuns.length) || 0,
       costAdjustedHitRate: round(workflow.costAdjustedHitRate, 4) || 0,
       avgReturnPct: round(workflow.costAdjustedAvgReturnPct, 4) || 0,
@@ -971,7 +1087,7 @@ export async function buildCompactValidationSnapshot(options = {}) {
       meta: {
         available: recentRuns.length > 0 || Boolean(snapshot.workflow),
         stale: replayAdaptation.source.stale,
-        sources: [replayAdaptation.source],
+        sources: valSources,
       },
     };
   }
@@ -1025,6 +1141,19 @@ function normalizeTransmissionEdge(edge) {
   };
 }
 
+function pickDistinctTransmissionEdges(edges = [], limit = 6) {
+  const seenHeadlines = new Set();
+  const distinct = [];
+  for (const edge of edges) {
+    const headlineKey = normalizeString(edge.headline || edge.eventTitle).toLowerCase();
+    if (!headlineKey || seenHeadlines.has(headlineKey)) continue;
+    seenHeadlines.add(headlineKey);
+    distinct.push(edge);
+    if (distinct.length >= limit) break;
+  }
+  return distinct;
+}
+
 function aggregateTransmissionCountries(edges = []) {
   const bucket = new Map();
   for (const edge of edges) {
@@ -1037,13 +1166,18 @@ function aggregateTransmissionCountries(edges = []) {
       label: country.label,
       edgeCount: 0,
       totalStrength: 0,
+      uniqueEventCount: 0,
+      pressureScore: 0,
       topSymbol: null,
       strongestEdgeHeadline: null,
       strongestEdgeStrength: 0,
+      eventStrengths: new Map(),
     };
     const strength = asNumber(edge.strength, 0) || 0;
     current.edgeCount += 1;
-    current.totalStrength += strength;
+    const headlineKey = normalizeString(edge.headline || edge.eventTitle, 'transmission path').toLowerCase();
+    const previousEventStrength = current.eventStrengths.get(headlineKey) || 0;
+    if (strength > previousEventStrength) current.eventStrengths.set(headlineKey, strength);
     if (strength >= current.strongestEdgeStrength) {
       current.strongestEdgeStrength = strength;
       current.strongestEdgeHeadline = normalizeString(edge.headline || edge.eventTitle, current.strongestEdgeHeadline || 'Transmission path');
@@ -1052,15 +1186,26 @@ function aggregateTransmissionCountries(edges = []) {
     bucket.set(country.code, current);
   }
   return Array.from(bucket.values())
-    .sort((left, right) => (right.totalStrength - left.totalStrength) || (right.edgeCount - left.edgeCount))
-    .slice(0, 6)
-    .map((item) => ({
-      ...item,
-      totalStrength: round(item.totalStrength, 2) || 0,
-      strongestEdgeStrength: round(item.strongestEdgeStrength, 2) || 0,
-      topSymbol: item.topSymbol || null,
-      strongestEdgeHeadline: item.strongestEdgeHeadline || 'Transmission path',
-    }));
+    .map((item) => {
+      const eventStrengths = Array.from(item.eventStrengths.values()).sort((left, right) => right - left);
+      const uniqueEventCount = eventStrengths.length;
+      const totalStrength = eventStrengths.slice(0, 8).reduce((sum, value) => sum + value, 0);
+      const avgEventStrength = uniqueEventCount > 0 ? totalStrength / Math.min(uniqueEventCount, 8) : 0;
+      const pressureScore = Math.min(100, round(avgEventStrength * 0.5 + Math.min(uniqueEventCount, 8) * 4, 1));
+      return {
+        uniqueEventCount,
+        pressureScore,
+        code: item.code,
+        label: item.label,
+        edgeCount: item.edgeCount,
+        totalStrength: round(totalStrength, 2) || 0,
+        strongestEdgeStrength: round(item.strongestEdgeStrength, 2) || 0,
+        topSymbol: item.topSymbol || null,
+        strongestEdgeHeadline: item.strongestEdgeHeadline || 'Transmission path',
+      };
+    })
+    .sort((left, right) => (right.pressureScore - left.pressureScore) || (right.totalStrength - left.totalStrength) || (right.edgeCount - left.edgeCount))
+    .slice(0, 6);
 }
 
 function aggregateTransmissionRelations(edges = []) {
@@ -1142,25 +1287,35 @@ export async function buildCompactGeoPressureSnapshot(options = {}) {
     .sort((left, right) => (right.strength - left.strength) || left.headline.localeCompare(right.headline))
     .slice(0, 4);
 
-  const avgCountryStrength = topCountries.length > 0
-    ? topCountries.reduce((sum, item) => sum + (asNumber(item.totalStrength, 0) || 0), 0) / topCountries.length
+  const avgCountryPressure = topCountries.length > 0
+    ? topCountries.reduce((sum, item) => sum + (asNumber(item.pressureScore, 0) || 0), 0) / topCountries.length
     : 0;
   const score = Math.min(
     100,
-    Math.round(avgCountryStrength * 0.65 + (asNumber(riskSnapshot.score, 0) || 0) * 0.35),
+    Math.round(avgCountryPressure * 0.62 + (asNumber(riskSnapshot.score, 0) || 0) * 0.38),
+  );
+  const freshness = computeFreshnessState(
+    toIso(transmissionSnapshot?.generatedAt) || transmissionCache.source.updatedAt,
+    { sourceStale: transmissionCache.source.stale },
   );
 
+  const geoSources = mergeSources([applyFreshnessToSource(transmissionCache.source, freshness)], asArray(riskSnapshot.meta?.sources));
   const payload = {
-    generatedAt: toIso(transmissionSnapshot?.generatedAt) || new Date().toISOString(),
+    generatedAt: freshness.generatedAt || new Date().toISOString(),
+    ...buildFreshnessFields(geoSources),
     level: classifyRiskLevel(score),
     score,
     topCountries,
-    linkedThemes: asArray(riskSnapshot.hottestThemes).slice(0, 4),
+    transmissionFresh: freshness.fresh,
+    transmissionFreshnessHours: freshness.freshnessHours,
+    linkedThemes: asArray(riskSnapshot.hottestThemes)
+      .filter((item) => isDisplayableTheme(item?.theme))
+      .slice(0, 4),
     hotspots,
     meta: {
       available: topCountries.length > 0 || hotspots.length > 0,
-      stale: transmissionCache.source.stale || Boolean(riskSnapshot.meta?.stale),
-      sources: mergeSources([transmissionCache.source], asArray(riskSnapshot.meta?.sources)),
+      stale: freshness.stale || Boolean(riskSnapshot.meta?.stale),
+      sources: geoSources,
     },
   };
 
@@ -1193,26 +1348,31 @@ export async function buildCompactTransmissionSnapshot(options = {}) {
   const transmission = transmissionCache.payload;
   const snapshot = transmission?.snapshot && typeof transmission.snapshot === 'object' ? transmission.snapshot : null;
   const edges = asArray(snapshot?.edges || transmission?.edges).map(normalizeTransmissionEdge);
-  const strongestEdges = edges
-    .slice()
-    .sort((left, right) => (right.strength - left.strength) || left.headline.localeCompare(right.headline))
-    .slice(0, 6);
+  const strongestEdges = pickDistinctTransmissionEdges(
+    edges
+      .slice()
+      .sort((left, right) => (right.strength - left.strength) || left.headline.localeCompare(right.headline)),
+    6,
+  );
   const topRelations = aggregateTransmissionRelations(edges);
   const topSymbols = aggregateTransmissionSymbols(edges);
   const topCountries = aggregateTransmissionCountries(edges);
-  const generatedAt = toIso(snapshot?.generatedAt) || transmissionCache.source.updatedAt || new Date().toISOString();
-  const freshnessMs = generatedAt ? Date.now() - Date.parse(generatedAt) : NaN;
-  const freshnessHours = Number.isFinite(freshnessMs)
-    ? Math.max(0, Math.round((freshnessMs / 36e5) * 10) / 10)
-    : null;
+  const uniqueEventCount = new Set(edges.map((edge) => normalizeString(edge.headline || edge.eventTitle).toLowerCase()).filter(Boolean)).size;
+  const freshness = computeFreshnessState(
+    toIso(snapshot?.generatedAt) || transmissionCache.source.updatedAt,
+    { sourceStale: transmissionCache.source.stale },
+  );
 
+  const transmissionSources = [applyFreshnessToSource(transmissionCache.source, freshness)];
   const payload = {
-    generatedAt,
+    generatedAt: freshness.generatedAt || new Date().toISOString(),
+    ...buildFreshnessFields(transmissionSources),
     regimeLabel: normalizeString(snapshot?.regime?.label, 'Unavailable'),
     regimeConfidence: asNumber(snapshot?.regime?.confidence, 0) || 0,
-    freshnessHours,
-    fresh: freshnessHours !== null ? freshnessHours <= 24 : false,
+    freshnessHours: freshness.freshnessHours,
+    fresh: freshness.fresh,
     edgeCount: edges.length,
+    uniqueEventCount,
     topRelations,
     topSymbols,
     topCountries,
@@ -1220,8 +1380,8 @@ export async function buildCompactTransmissionSnapshot(options = {}) {
     notes: asArray(snapshot?.regime?.notes || snapshot?.summaryLines || snapshot?.notes).slice(0, 4).map((note) => normalizeString(note)).filter(Boolean),
     meta: {
       available: Boolean(snapshot) || edges.length > 0,
-      stale: transmissionCache.source.stale,
-      sources: [transmissionCache.source],
+      stale: freshness.stale,
+      sources: transmissionSources,
     },
   };
 
@@ -1296,8 +1456,10 @@ export async function buildCompactSourceOpsSnapshot(options = {}) {
   const profiles = asArray(credibilityCache.payload?.profiles);
   const approvedCount = (statusCounts.approved || 0) + (statusCounts.active || 0);
 
+  const opsSources = mergeSources([registryCache.source], [opsLogCache.source], [credibilityCache.source]);
   const payload = {
-    generatedAt: registryCache.source.updatedAt || opsLogCache.source.updatedAt || new Date().toISOString(),
+    generatedAt: new Date().toISOString(),
+    ...buildFreshnessFields(opsSources),
     activeCount: statusCounts.active || 0,
     approvedCount,
     draftCount: statusCounts.draft || 0,
@@ -1308,8 +1470,8 @@ export async function buildCompactSourceOpsSnapshot(options = {}) {
     recentEvents,
     meta: {
       available: allSources.length > 0 || recentEvents.length > 0 || profiles.length > 0,
-      stale: mergeSources([registryCache.source], [opsLogCache.source], [credibilityCache.source]).some((source) => source.stale),
-      sources: mergeSources([registryCache.source], [opsLogCache.source], [credibilityCache.source]),
+      stale: opsSources.some((source) => source.stale),
+      sources: opsSources,
     },
   };
 

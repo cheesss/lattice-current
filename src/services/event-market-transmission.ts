@@ -43,6 +43,8 @@ export interface EventMarketTransmissionSnapshot {
 
 const EVENT_MARKET_TRANSMISSION_KEY = 'event-market-transmission:v1';
 const MAX_EDGES = 120;
+const MAX_EDGES_PER_EVENT = 3;
+const MAX_EDGES_PER_EVENT_RELATION = 2;
 
 const RELATION_RULES: Array<{
   type: EventMarketTransmissionEdge['relationType'];
@@ -197,6 +199,44 @@ function matchRule(eventText: string, marketText: string): {
   return best;
 }
 
+// Build a composite identity for an edge so distinct wire-syndicated articles
+// sharing the same headline are NOT merged. Title alone is too coarse —
+// include the stable URL (or source+title hash fallback) to preserve them.
+function edgeEventIdentity(edge: EventMarketTransmissionEdge): string {
+  // Prefer a stable per-event identifier if the edge carries one.
+  if (edge.id) {
+    // edge.id already includes per-market suffix; strip that for event bucketing.
+    // Pattern used upstream: `${eventId}::${symbol}` or `${url}::${symbol}`.
+    const sep = edge.id.lastIndexOf('::');
+    if (sep > 0) return edge.id.slice(0, sep);
+    return edge.id;
+  }
+  // URL is the best stable identity when present.
+  if (edge.eventUrl) return normalize(edge.eventUrl);
+  // Fallback composite: source + title (prevents pure title collision across
+  // wires while still collapsing true duplicates within the same source).
+  return `${normalize(edge.eventSource || '')}::${normalize(edge.eventTitle || '')}`;
+}
+
+function diversifyEdges(edges: EventMarketTransmissionEdge[]): EventMarketTransmissionEdge[] {
+  const perEvent = new Map<string, number>();
+  const perEventRelation = new Map<string, number>();
+  const diversified: EventMarketTransmissionEdge[] = [];
+  for (const edge of edges) {
+    const eventKey = edgeEventIdentity(edge);
+    const eventCount = perEvent.get(eventKey) || 0;
+    if (eventCount >= MAX_EDGES_PER_EVENT) continue;
+    const relationKey = `${eventKey}::${edge.relationType}`;
+    const relationCount = perEventRelation.get(relationKey) || 0;
+    if (relationCount >= MAX_EDGES_PER_EVENT_RELATION) continue;
+    diversified.push(edge);
+    perEvent.set(eventKey, eventCount + 1);
+    perEventRelation.set(relationKey, relationCount + 1);
+    if (diversified.length >= MAX_EDGES) break;
+  }
+  return diversified;
+}
+
 export async function recomputeEventMarketTransmission(args: {
   news: NewsItem[];
   clusters: ClusteredEvent[];
@@ -326,9 +366,10 @@ export async function recomputeEventMarketTransmission(args: {
     }
   }
 
-  const sorted = Array.from(deduped.values())
-    .sort((a, b) => b.strength - a.strength)
-    .slice(0, MAX_EDGES);
+  const sorted = diversifyEdges(
+    Array.from(deduped.values())
+      .sort((a, b) => b.strength - a.strength),
+  );
 
   currentSnapshot = {
     generatedAt: new Date().toISOString(),
