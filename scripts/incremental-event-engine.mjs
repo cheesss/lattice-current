@@ -205,6 +205,7 @@ async function main() {
   console.log('\n▶ STEP 2: 증분 abnormal_return 계산...');
 
   if (!DRY_RUN) {
+    // Method 1: article_id-based join (original, high precision)
     const marketAdj = await pool.query(`
       UPDATE labeled_outcomes lo
       SET market_return = spy.forward_return_pct,
@@ -216,9 +217,25 @@ async function main() {
         AND lo.symbol != 'SPY'
         AND lo.abnormal_return IS NULL
     `);
-    console.log(`  ${marketAdj.rowCount} rows updated with abnormal_return`);
+    console.log(`  ${marketAdj.rowCount} rows updated (article-based SPY join)`);
 
-    // SPY 자체
+    // Method 2: date-based join from market_returns table (broader coverage)
+    const dateAdj = await pool.query(`
+      UPDATE labeled_outcomes lo
+      SET market_return = mr.forward_return_pct,
+          abnormal_return = lo.forward_return_pct - mr.forward_return_pct
+      FROM articles a
+      JOIN market_returns mr ON mr.trade_date = DATE(a.published_at)
+        AND mr.symbol = 'SPY'
+        AND mr.horizon = lo.horizon
+      WHERE a.id = lo.article_id
+        AND lo.symbol != 'SPY'
+        AND lo.forward_return_pct IS NOT NULL
+        AND lo.abnormal_return IS NULL
+    `);
+    console.log(`  ${dateAdj.rowCount} rows updated (date-based market_returns join)`);
+
+    // SPY itself
     await pool.query(`
       UPDATE labeled_outcomes SET market_return = forward_return_pct, abnormal_return = 0
       WHERE symbol = 'SPY' AND abnormal_return IS NULL

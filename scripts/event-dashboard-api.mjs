@@ -20,6 +20,7 @@ import { computeCalibrationDiagnostic } from './_shared/calibration-diagnostic.m
 import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
 import { getBudgetStatus } from './_shared/automation-budget.mjs';
 import { getRecentAutomationActions } from './_shared/automation-audit.mjs';
+import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
   getPendingApprovals,
   loadApprovalById,
@@ -1397,7 +1398,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'calibration') {
-      return buildJsonResponse(await computeCalibrationDiagnostic(getPool()));
+      return buildJsonResponse(await computeCalibrationDiagnostic(getPool(), { alertFn: sendAlert }));
     }
 
     if (segments[0] === 'api' && segments[1] === 'data-quality') {
