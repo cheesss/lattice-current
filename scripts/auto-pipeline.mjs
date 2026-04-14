@@ -800,7 +800,8 @@ async function step4RefreshAnalysisArtifacts(client, options) {
   let chatConfig = null;
   try {
     chatConfig = resolveOllamaChatConfig();
-  } catch {
+  } catch (err) {
+    console.warn(`[auto-pipeline] Ollama chat config unavailable, skipping explanations: ${err?.message || err}`);
     return summary;
   }
 
@@ -868,8 +869,8 @@ async function step4RefreshAnalysisArtifacts(client, options) {
           AND causal_explanation IS NULL
       `, [explanation, pair.theme, pair.symbol]);
       summary.explanationsGenerated += 1;
-    } catch {
-      // Non-fatal. Trend refresh still succeeded.
+    } catch (err) {
+      console.warn(`[auto-pipeline] Explanation generation failed for ${pair.theme}/${pair.symbol} (non-fatal): ${err?.message || err}`);
     }
   }
 

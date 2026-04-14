@@ -178,6 +178,27 @@ th{color:var(--muted);font-weight:normal}
 .lang-toggle{position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:0;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:var(--surface)}
 .lang-toggle button{padding:4px 10px;font-size:10px;font-weight:600;background:transparent;color:var(--muted);border:none;cursor:pointer;letter-spacing:.05em}
 .lang-toggle button.active{background:var(--accent);color:var(--bg)}
+/* Signal Queue */
+.signal-queue{margin:10px 0 14px}
+.signal-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.signal-card{padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.signal-card:hover{border-color:rgba(126,224,129,.25)}
+.signal-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.signal-dir{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.05em}
+.signal-dir.long{background:rgba(126,224,129,.15);color:#7ee081}
+.signal-dir.short{background:rgba(239,68,68,.15);color:#ef4444}
+.evidence-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.05em}
+.evidence-badge.e0{background:rgba(255,255,255,.06);color:var(--muted)}
+.evidence-badge.e1{background:rgba(250,204,21,.12);color:#facc15}
+.evidence-badge.e2{background:rgba(126,224,129,.15);color:#7ee081}
+.evidence-badge.e3{background:rgba(96,165,250,.15);color:#60a5fa}
+.evidence-badge.e4{background:rgba(168,85,247,.15);color:#a855f7}
+.signal-symbol{font-weight:700;font-size:14px;color:var(--text)}
+.signal-metrics{display:flex;gap:12px;font-size:11px;color:var(--muted)}
+.signal-metrics strong{color:var(--text)}
+.signal-citations{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.signal-cite{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;text-decoration:none;border:1px solid transparent}
+.signal-cite:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -215,6 +236,12 @@ th{color:var(--muted);font-weight:normal}
     <div class="kpi-chip" title="Statistically significant event-asset signals"><span class="kpi-chip-label">E2 Signals</span><span class="kpi-chip-value kpi-accent" id="kpi-e2">0</span></div>
   </div>
   <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals (E2 = matched-control uplift with t &gt; 1.96).</div>
+
+  <!-- E2 Signal Queue — top actionable signals with evidence -->
+  <div id="e2-signal-queue" class="signal-queue" style="display:none">
+    <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span></div>
+    <div id="e2-signal-cards" class="signal-card-grid"></div>
+  </div>
 
   <div class="hero-grid hero-grid-summary">
     <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div class="desc-text" data-i18n="status-desc">System health: API connections, data pipeline status, and collection freshness. Green = all systems operational.</div><div id="system-status" class="loading">Loading system state...</div></div>
@@ -1095,7 +1122,7 @@ async function refreshAll(){
     loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadCodexQuality(),
     loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
-    loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),
+    loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
   ]);
   ensureCurrentTheme();
   renderMyThemes();
@@ -1745,6 +1772,47 @@ async function loadWeeklyDigest(){
   if(digest.summary)html+=`<div class="story-summary">${escapeHtml(digest.summary)}</div>`;
   if(Array.isArray(digest.watchlist)&&digest.watchlist.length)html+=`<div class="pill-row">${renderTags(digest.watchlist,'tag-emerging',8)}</div>`;
   el.innerHTML=html;
+}
+async function loadE2SignalQueue(){
+  try {
+    const r = await fetch(API + '/event-uplift-grades').catch(() => null);
+    if (!r?.ok) return;
+    const data = await r.json();
+    const grades = data.grades || data;
+    // Filter E2+ signals with uplift data
+    const e2signals = (Array.isArray(grades) ? grades : []).filter(g => g.evidence_grade === 'E2' && g.uplift != null);
+    const queue = document.getElementById('e2-signal-queue');
+    const container = document.getElementById('e2-signal-cards');
+    const countBadge = document.getElementById('e2-queue-count');
+    if (!e2signals.length) { queue.style.display = 'none'; return; }
+    queue.style.display = '';
+    countBadge.textContent = e2signals.length;
+    // Show top 6
+    const top = e2signals.sort((a, b) => Math.abs(b.uplift) - Math.abs(a.uplift)).slice(0, 6);
+    container.innerHTML = top.map(s => {
+      const dir = s.uplift > 0 ? 'long' : 'short';
+      const dirLabel = dir.toUpperCase();
+      const symbol = s.symbol || s.theme || '—';
+      const theme = s.theme || '';
+      const uplift = (s.uplift * 100).toFixed(2);
+      const tStat = s.t_stat ? s.t_stat.toFixed(2) : '—';
+      const alphaProb = s.alpha_prob ? (s.alpha_prob * 100).toFixed(0) + '%' : '—';
+      const title = s.title || s.representative_title || '';
+      return `<div class="signal-card">
+        <div class="signal-card-head">
+          <span class="signal-dir ${dir}">${dirLabel}</span>
+          <span class="evidence-badge e2">E2</span>
+          <span class="signal-symbol">${symbol}</span>
+        </div>
+        <div class="signal-metrics">
+          <span>Uplift: <strong>${uplift}%</strong></span>
+          <span>t-stat: <strong>${tStat}</strong></span>
+          <span>P(α>0): <strong>${alphaProb}</strong></span>
+        </div>
+        ${title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${title.slice(0,120)}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (e) { console.warn('E2 signal queue failed', e); }
 }
 async function loadWhatif(){
   const {data,cached,cachedAt}=await f(`${API}/whatif//`,'whatif');

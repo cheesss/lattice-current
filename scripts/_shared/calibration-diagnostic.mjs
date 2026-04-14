@@ -69,7 +69,7 @@ export function summarizeCalibrationRows(rows) {
   };
 }
 
-export async function computeCalibrationDiagnostic(queryable) {
+export async function computeCalibrationDiagnostic(queryable, options = {}) {
   const result = await queryable.query(`
     WITH actual_outcomes AS (
       SELECT
@@ -92,5 +92,21 @@ export async function computeCalibrationDiagnostic(queryable) {
     WHERE s.horizon = '2w'
   `);
 
-  return summarizeCalibrationRows(result?.rows ?? []);
+  const summary = summarizeCalibrationRows(result?.rows ?? []);
+
+  // Emit alert if calibration drift exceeds threshold
+  if (summary.ece > 0.15 && options.alertFn) {
+    const severity = summary.ece > 0.3 ? 'critical' : 'warning';
+    try {
+      await options.alertFn(severity, `Meta-model calibration drift: ECE=${summary.ece} Brier=${summary.brierScore} (threshold: 0.15)`, {
+        type: 'model_drift',
+        ece: summary.ece,
+        brierScore: summary.brierScore,
+        sampleSize: summary.sampleSize,
+        suggestedAction: 'python scripts/train-meta-model.py --epochs 50',
+      });
+    } catch { /* alert delivery failure should not break calibration response */ }
+  }
+
+  return summary;
 }

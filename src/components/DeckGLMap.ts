@@ -5576,16 +5576,24 @@ export class DeckGLMap {
     }
   }
 
+  private _layerUpdatePending = false;
   private updateLayers(): void {
     if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
-    const startTime = performance.now();
-    try {
-      this.deckOverlay?.setProps({ layers: this.buildLayers() });
-    } catch { /* map may be mid-teardown (null.getProjection) */ }
-    const elapsed = performance.now() - startTime;
-    if (import.meta.env.DEV && elapsed > 16) {
-      console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
-    }
+    // Debounce rapid layer updates to avoid >16ms frame budget
+    if (this._layerUpdatePending) return;
+    this._layerUpdatePending = true;
+    requestAnimationFrame(() => {
+      this._layerUpdatePending = false;
+      if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
+      const startTime = performance.now();
+      try {
+        this.deckOverlay?.setProps({ layers: this.buildLayers() });
+      } catch { /* map may be mid-teardown (null.getProjection) */ }
+      const elapsed = performance.now() - startTime;
+      if (import.meta.env.DEV && elapsed > 16) {
+        console.warn(`[DeckGLMap] updateLayers took ${elapsed.toFixed(2)}ms (>16ms budget)`);
+      }
+    });
   }
 
   public setView(view: DeckMapView): void {

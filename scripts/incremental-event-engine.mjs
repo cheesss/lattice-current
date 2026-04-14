@@ -23,6 +23,7 @@
  */
 
 import pg from 'pg';
+import { withLock } from './_shared/pipeline-lock.mjs';
 
 const PG_CONFIG = {
   host: process.env.PG_HOST || '192.168.0.2',
@@ -204,6 +205,7 @@ async function main() {
   console.log('\n▶ STEP 2: 증분 abnormal_return 계산...');
 
   if (!DRY_RUN) {
+    // Method 1: article_id-based join (original, high precision)
     const marketAdj = await pool.query(`
       UPDATE labeled_outcomes lo
       SET market_return = spy.forward_return_pct,
@@ -215,9 +217,25 @@ async function main() {
         AND lo.symbol != 'SPY'
         AND lo.abnormal_return IS NULL
     `);
-    console.log(`  ${marketAdj.rowCount} rows updated with abnormal_return`);
+    console.log(`  ${marketAdj.rowCount} rows updated (article-based SPY join)`);
 
-    // SPY 자체
+    // Method 2: date-based join from market_returns table (broader coverage)
+    const dateAdj = await pool.query(`
+      UPDATE labeled_outcomes lo
+      SET market_return = mr.forward_return_pct,
+          abnormal_return = lo.forward_return_pct - mr.forward_return_pct
+      FROM articles a
+      JOIN market_returns mr ON mr.trade_date = DATE(a.published_at)
+        AND mr.symbol = 'SPY'
+        AND mr.horizon = lo.horizon
+      WHERE a.id = lo.article_id
+        AND lo.symbol != 'SPY'
+        AND lo.forward_return_pct IS NOT NULL
+        AND lo.abnormal_return IS NULL
+    `);
+    console.log(`  ${dateAdj.rowCount} rows updated (date-based market_returns join)`);
+
+    // SPY itself
     await pool.query(`
       UPDATE labeled_outcomes SET market_return = forward_return_pct, abnormal_return = 0
       WHERE symbol = 'SPY' AND abnormal_return IS NULL
@@ -306,6 +324,44 @@ async function main() {
       WHERE ef.canonical_event_id IS NULL
     `);
 
+    // Pre-compute sorted date list for lookback calculations
+    const sortedDates = [...dailySignals.keys()].sort();
+
+    function computeVixFeatures(d, vix) {
+      if (vix == null) return { vixZscore: 0, vixMomentum: 0 };
+      // vix_momentum: 7-day change rate
+      const dt = new Date(d);
+      dt.setDate(dt.getDate() - 7);
+      const d7ago = dt.toISOString().slice(0, 10);
+      const vixPrev = dailySignals.get(d7ago)?.vix;
+      const vixMomentum = vixPrev ? (vix - vixPrev) / Math.max(vixPrev, 1) : 0;
+      // vix_zscore: 90-day rolling z-score
+      const vixHistory = [];
+      for (const dd of sortedDates) {
+        if (dd > d) break;
+        const v = dailySignals.get(dd)?.vix;
+        if (v != null) vixHistory.push(v);
+      }
+      const recent = vixHistory.slice(-90);
+      let vixZscore = 0;
+      if (recent.length >= 10) {
+        const mean = recent.reduce((s, v) => s + v, 0) / recent.length;
+        const std = Math.sqrt(recent.reduce((s, v) => s + (v - mean) ** 2, 0) / recent.length) || 1;
+        vixZscore = (vix - mean) / Math.max(std, 0.01);
+      }
+      return { vixZscore: Math.round(vixZscore * 1e4) / 1e4, vixMomentum: Math.round(vixMomentum * 1e4) / 1e4 };
+    }
+
+    function computeHawkesMomentum(d, ei) {
+      if (!ei) return 0;
+      const dt = new Date(d);
+      dt.setDate(dt.getDate() - 7);
+      const d7ago = dt.toISOString().slice(0, 10);
+      const eiPrev = dailySignals.get(d7ago)?.eventIntensity ?? 0;
+      if (!eiPrev) return 0;
+      return Math.round((ei - eiPrev) / Math.max(eiPrev, 0.01) * 1e4) / 1e4;
+    }
+
     let featureCount = 0;
     for (const event of newEvents.rows) {
       const d = event.event_date.toISOString().slice(0, 10);
@@ -313,6 +369,10 @@ async function main() {
       const vix = sig.vix ?? null;
       const regime = vix != null ? classifyRegime(vix, sig.hy_credit_spread, null, null) : 'balanced';
       const regimeMultMap = { crisis: 2.0, 'risk-off': 1.5, balanced: 1.0, 'risk-on': 0.8, 'risk-on-strong': 0.6 };
+
+      const ei = sig.eventIntensity ?? 0;
+      const { vixZscore, vixMomentum } = computeVixFeatures(d, vix);
+      const hawkesMom = computeHawkesMomentum(d, ei);
 
       await pool.query(`
         INSERT INTO event_features (
@@ -336,8 +396,8 @@ async function main() {
         ) ON CONFLICT (canonical_event_id) DO NOTHING
       `, [
         event.id, event.source_count, event.source_diversity, event.article_count,
-        sig.eventIntensity ?? 0, 0, regime,
-        vix, 0, 0,
+        ei, hawkesMom, regime,
+        vix, vixZscore, vixMomentum,
         sig.yieldSpread ?? null, sig.oilPrice ?? null, sig.dollarIndex ?? null, sig.hy_credit_spread ?? null,
         sig.marketStress ?? null, sig.transmissionStrength ?? null, sig.eventIntensity ?? null,
         regime, regimeMultMap[regime] || 1.0, vix != null ? clamp(45 + (vix - 20) * 2, 4, 100) : 45,
@@ -506,4 +566,4 @@ async function main() {
   await pool.end();
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+withLock('event-engine', main).catch(e => { console.error(e); process.exit(1); });
