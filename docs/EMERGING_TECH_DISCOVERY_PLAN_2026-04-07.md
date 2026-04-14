@@ -1,4 +1,5 @@
 # Emerging Tech Discovery Plan
+> **Status**: shipped (tranches 1-3 complete; durable discovery path live)  
 
 Date: 2026-04-07  
 Status: tranche 3 implemented

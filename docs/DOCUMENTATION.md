@@ -36,6 +36,8 @@ Use these first. They describe the current branch, not historical experiments.
 | Document | Purpose |
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
+| [../CLAUDE.md](../CLAUDE.md) | Project conventions, scripts, NAS tables, code modification principles |
+| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Most recent comprehensive handoff including 2026-04-14 data robustness work |
 | [./ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime, data, and storage architecture |
 | [./USER_GUIDE.md](./USER_GUIDE.md) | Operator-oriented quick start and runtime usage |
 | [./ALGORITHMS.md](./ALGORITHMS.md) | Active signal, evidence, and admission logic |
@@ -50,6 +52,9 @@ Use these first. They describe the current branch, not historical experiments.
 | [./TEMPORAL_FEATURE_UPGRADE_2026-04-05.md](./TEMPORAL_FEATURE_UPGRADE_2026-04-05.md) | Status of retained temporal and external-signal features |
 | [./BACKTEST_SYSTEM_EXPLAINER_2026-04-01.md](./BACKTEST_SYSTEM_EXPLAINER_2026-04-01.md) | Replay system explainer for historical validation |
 | [./BACKTEST_SYSTEM_DEEP_DIVE_2026-04-01.md](./BACKTEST_SYSTEM_DEEP_DIVE_2026-04-01.md) | Technical replay and storage deep dive |
+| [./TROUBLESHOOTING_INDEX.md](./TROUBLESHOOTING_INDEX.md) | Symptom-to-fix quick reference |
+| [./DASHBOARD_DATA_CONTINUITY_AUDIT_2026-04-14.md](./DASHBOARD_DATA_CONTINUITY_AUDIT_2026-04-14.md) | Most recent dashboard data freshness/fallback audit |
+| [./COMPREHENSIVE_REVIEW_PROMPT.md](./COMPREHENSIVE_REVIEW_PROMPT.md) | Master prompt for full-stack project review (used 2026-04-14) |
 
 ## How to read the repo now
 
@@ -61,7 +66,16 @@ Do not infer the current product identity from old plan files, handoff notes, or
 
 ## Archive note
 
-The `docs/` folder still contains dated plans, audits, and handoff notes. Those files are useful as historical context only. When a dated document disagrees with the files listed above, prefer the canonical docs and the current code.
+The `docs/` folder still contains dated plans, audits, and handoff notes. Those files now carry an explicit `> **Status**:` line on the second row indicating one of: `shipped`, `partial`, `active`, `historical`, or `superseded`. When a dated document disagrees with the files listed above, prefer the canonical docs and the current code.
+
+Recently removed (2026-04-14 cleanup):
+
+- `CHANGELOG.md` (root) — World Monitor era changelog
+- `docs/worldmonitor_architecture_handoff_ko.md` — superseded by SESSION_HANDOFF
+- `docs/ADDING_ENDPOINTS.md` — described deprecated sebuf RPC pattern
+- `docs/API_KEY_DEPLOYMENT.md` — referenced obsolete WORLDMONITOR_API_KEY gating
+- `docs/TAURI_VALIDATION_REPORT.md` — environment-specific one-off report
+- `docs/branding/nanobanana-prompt.md` — one-off design brief
 
 ## Current implementation notes
 

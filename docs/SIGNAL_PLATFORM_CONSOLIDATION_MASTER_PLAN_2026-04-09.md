@@ -1,4 +1,5 @@
 # Signal Platform Consolidation Master Plan
+> **Status**: active (event-dashboard.html is the consolidated surface; src/App.ts shell still being deprecated)  
 
 Date: 2026-04-09
 Status: Active restructuring directive

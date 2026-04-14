@@ -1,4 +1,5 @@
 # GDELT, Guardian, And Live News Training Plan
+> **Status**: shipped (both ingest paths active in production pipeline)  
 
 Date: 2026-04-01
 

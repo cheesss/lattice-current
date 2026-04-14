@@ -1,4 +1,5 @@
 # Automation / RAG Implementation Log
+> **Status**: shipped (Phase 1 magic-number externalization, RAG retriever scaffolding complete)  
 
 작성일: 2026-04-01
 

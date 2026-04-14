@@ -1,4 +1,5 @@
 # Automation / LLM / RAG Refactor Plan
+> **Status**: shipped (companion to AUTOMATION_RAG_IMPLEMENTATION_LOG_2026-04-01.md)  
 
 작성일: 2026-04-01
 

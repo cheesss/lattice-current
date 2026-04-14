@@ -1,4 +1,5 @@
 # Code Rigor And Investment-Grade Upgrade Plan
+> **Status**: partial (Phase 1 risk/sizing audits shipped; Phase 2 backtest integrity ongoing)  
 
 Date: 2026-04-02
 

@@ -1,4 +1,5 @@
 # Backtest Signal Engine Roadmap — 2026-03-31
+> **Status**: historical (legacy backtest stack moved to legacy/backtest branch; superseded by event-decision-engine)  
 
 This document turns the current backtest diagnosis into a three-block upgrade plan.
 

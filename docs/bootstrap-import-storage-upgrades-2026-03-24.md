@@ -1,4 +1,5 @@
 # Bootstrap / Import / Storage Upgrades
+> **Status**: shipped (historical implementation record from 2026-03-24)  
 
 Date: 2026-03-24
 
