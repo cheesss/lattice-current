@@ -248,6 +248,16 @@ th{color:var(--muted);font-weight:normal}
 .inbox-result.warning{border-color:rgba(250,204,21,.24);background:rgba(250,204,21,.07)}
 .inbox-result.error{border-color:rgba(239,68,68,.28);background:rgba(239,68,68,.07)}
 .inbox-result.info{border-color:rgba(96,165,250,.25);background:rgba(96,165,250,.07)}
+.runtime-issue-row{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);margin-bottom:6px}
+.runtime-issue-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.runtime-issue-error{font-size:11px;color:var(--muted);margin-top:2px;word-break:break-all}
+.runtime-issue-id{font-size:9px;color:rgba(255,255,255,.2);font-family:monospace;margin-top:4px;cursor:pointer;user-select:all}
+.runtime-issue-id:hover{color:var(--accent)}
+.cls-external{background:rgba(243,181,98,.12);color:var(--amber);border-color:rgba(243,181,98,.25)}
+.cls-api{background:rgba(255,122,107,.12);color:var(--red);border-color:rgba(255,122,107,.25)}
+.cls-ui{background:rgba(96,165,250,.12);color:#60a5fa;border-color:rgba(96,165,250,.25)}
+.cls-action{background:rgba(250,204,21,.12);color:#fbbf24;border-color:rgba(250,204,21,.25)}
+.cls-other{background:rgba(255,255,255,.05);color:var(--muted);border-color:transparent}
 .inbox-result-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px}
 .inbox-result-copy{color:var(--muted);font-size:11px;line-height:1.55}
 .inbox-result-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -620,6 +630,13 @@ th{color:var(--muted);font-weight:normal}
         <div class="card"><div class="card-title">Data Quality</div><div id="operator-data-quality" class="loading">Loading data quality...</div></div>
         <div class="card"><div class="card-title">Codex Quality</div><div id="operator-codex-quality" class="loading">Loading Codex quality...</div></div>
       </div>
+    </section>
+    <section class="section-block secondary-block" style="margin-top:12px">
+      <div class="section-heading">
+        <div><div class="section-kicker">Diagnostics</div><div class="section-title">Runtime Issues <span class="badge" id="runtime-issues-count">...</span></div></div>
+        <div class="section-meta">Captured action failures. Use issue ID with <code>generate-codex-investigation-packet.mjs --issue-id &lt;id&gt; --send</code> for Claude diagnosis.</div>
+      </div>
+      <div id="runtime-issues-list" class="loading">Loading runtime issues...</div>
     </section>
     <section class="section-block secondary-block">
       <div class="section-heading">
@@ -1443,6 +1460,7 @@ function applySurfaceSwitch(name){
   }
   // Lazy-load surface-specific data
   if (name === 'inbox') refreshDecisionInbox();
+  if (name === 'ops') refreshRuntimeIssues();
   if (name === 'geo') {
     // Propagate theme filter to geo lens iframe
     try {
@@ -3005,6 +3023,53 @@ function hideCitationPopover() {
   if (citePopoverEl && citePopoverEl.parentNode) citePopoverEl.parentNode.removeChild(citePopoverEl);
   citePopoverEl = null;
 }
+// ── Runtime Issues panel (Ops surface) ───────────────────────────────────────
+const ISSUE_CLASS_LABELS = {
+  'external-dependency': { label: 'External', cls: 'cls-external' },
+  'api-contract':        { label: 'API',      cls: 'cls-api' },
+  'ui-wiring':           { label: 'UI',       cls: 'cls-ui' },
+  'action-semantics':    { label: 'Action',   cls: 'cls-action' },
+  'freshness-trust':     { label: 'Freshness',cls: 'cls-other' },
+  'data-continuity':     { label: 'Data',     cls: 'cls-other' },
+  'performance':         { label: 'Perf',     cls: 'cls-other' },
+};
+async function refreshRuntimeIssues() {
+  const el = document.getElementById('runtime-issues-list');
+  const badge = document.getElementById('runtime-issues-count');
+  if (!el) return;
+  try {
+    const r = await fetch(`${API}/runtime-issues`).catch(() => null);
+    if (!r?.ok) { el.innerHTML = '<div class="meta-line">Could not load runtime issues.</div>'; return; }
+    const data = await r.json();
+    const issues = data.issues || [];
+    if (badge) badge.textContent = issues.length ? `${issues.length}` : '0';
+    if (!issues.length) {
+      el.innerHTML = '<div class="meta-line" style="padding:8px 0">No runtime issues captured yet. Action failures in Decision Inbox will appear here.</div>';
+      return;
+    }
+    el.innerHTML = issues.map(issue => {
+      const cls = ISSUE_CLASS_LABELS[issue.classification] || { label: issue.classification || '?', cls: 'cls-other' };
+      const age = issue.createdAt ? fmtDate(issue.createdAt) : '—';
+      const surface = escapeHtml(issue.surface || '—');
+      const action = escapeHtml(issue.action || '—');
+      const errMsg = escapeHtml((issue.errorMessage || '').slice(0, 120));
+      const issueId = escapeHtml(issue.id || '');
+      return `<div class="runtime-issue-row">
+        <div class="runtime-issue-head">
+          <span class="trust-chip ${cls.cls}">${cls.label}</span>
+          <span style="font-size:11px;font-weight:600">${surface}</span>
+          <span class="trust-chip trust-chip-nohydrate">${action}</span>
+          <span class="meta-line" style="margin-left:auto">${age}</span>
+        </div>
+        ${errMsg ? `<div class="runtime-issue-error">${errMsg}</div>` : ''}
+        <div class="runtime-issue-id" title="Click to copy issue ID" onclick="navigator.clipboard.writeText('${issueId}').then(()=>this.textContent='Copied!').catch(()=>{});setTimeout(()=>this.textContent='${issueId}',1200)">${issueId}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="meta-line">Failed to load: ${escapeHtml(String(e?.message || e))}</div>`;
+  }
+}
+
 // Selection handler (will be extended for Decision Inbox drilldown)
 function selectReviewItem(id) {
   try {
