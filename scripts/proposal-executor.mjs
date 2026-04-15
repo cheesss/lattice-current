@@ -662,8 +662,8 @@ async function handleAddRss(client, proposal) {
     };
   }
 
-  const { evaluateAndRegisterFeed } = await import('../src/services/server/autonomous-discovery.ts');
-  const registration = await evaluateAndRegisterFeed(url, theme || 'politics', {
+  const { evaluateAndRegisterFeed } = await import('./_shared/discovered-source-registry.mjs');
+  const registration = await evaluateAndRegisterFeed(client, url, theme || 'politics', {
     feedName: name || 'rss',
     lang: 'en',
     topics: [theme].filter(Boolean),

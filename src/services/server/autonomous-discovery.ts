@@ -1,4 +1,4 @@
-import allowedDomains from '../../../shared/rss-allowed-domains.json';
+import { readFileSync } from 'node:fs';
 
 import { addDiscoveredSource, listDiscoveredSources, listSourceRegistrySnapshot, setDiscoveredSourceStatus } from '../source-registry';
 import { adjustKeywordConfidence, extractKeywordCandidatesFromText, listKeywordRegistry, upsertKeywordCandidates } from '../keyword-registry';
@@ -24,6 +24,18 @@ export interface FeedQualityScore {
 }
 
 const PLAYWRIGHT_DOMAIN_LIMIT = 40;
+
+function loadAllowedDomains(): string[] {
+  try {
+    const raw = readFileSync(new URL('../../../shared/rss-allowed-domains.json', import.meta.url), 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+const allowedDomains = loadAllowedDomains();
 
 type PlaywrightModule = typeof import('playwright');
 

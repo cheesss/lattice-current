@@ -621,8 +621,24 @@ async function taskGitHubThemeEvidence() {
 
 async function taskGenerateStructuralAlerts() {
   log('>> generate-structural-alerts: materializing low-noise structural alerts from trend and evolution aggregates');
+  const periods = ['week', 'month', 'quarter', 'year'];
+  const failures = [];
+  for (const period of periods) {
+    const result = run(
+      `node --import tsx scripts/generate-structural-alerts.mjs --period ${period} --limit 60`,
+      900_000,
+    );
+    if (!result.ok) {
+      failures.push(`${period}: ${result.error || 'unknown error'}`);
+    }
+  }
+  return { ok: failures.length === 0, error: failures.join(' | ') };
+}
+
+async function taskRefreshEventMarketTransmission() {
+  log('>> refresh-event-market-transmission: rebuilding event-to-market transmission cache from recent articles and signals');
   const result = run(
-    'node --import tsx scripts/generate-structural-alerts.mjs --period week --limit 60',
+    'node --import tsx scripts/refresh-event-market-transmission.mjs --days 14 --limit 180',
     900_000,
   );
   return { ok: result.ok, error: result.error };
@@ -785,6 +801,7 @@ const TASKS = {
   'sensitivity-refresh': { interval: HOUR_1_MS, fn: taskSensitivityRefresh },
   'master-pipeline': { interval: HOUR_6_MS, fn: taskMasterPipeline },
   'executor': { interval: HOUR_6_MS, fn: taskExecutor },
+  'refresh-event-market-transmission': { interval: HOUR_2_MS, fn: taskRefreshEventMarketTransmission },
   'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync },
   'data-quality': { interval: HOUR_6_MS, fn: taskDataQuality },
   'arxiv-backfill': { interval: HOUR_6_MS, fn: taskArxivBackfill },
@@ -823,7 +840,7 @@ async function main() {
   process.stderr.write('  15min: signal refresh, db health\n');
   process.stderr.write('  30min: article check, dashboard health\n');
   process.stderr.write('  1h:    auto-pipeline-sensitivity, sensitivity refresh\n');
-  process.stderr.write('  2h:    auto-pipeline-labels\n');
+  process.stderr.write('  2h:    auto-pipeline-labels, refresh-event-market-transmission\n');
     process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
     process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
     process.stderr.write('         curated daily news, sec seed universe, openalex theme evidence, followed-theme briefings, weekly digest, coverage-gap-analysis\n');

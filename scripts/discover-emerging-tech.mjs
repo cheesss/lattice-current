@@ -115,7 +115,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     minDiversity: 2,
     minCohesion: 0.65,
     minMomentum: 1.3,
-    sources: ['guardian', 'nyt', 'hackernews', 'arxiv'],
+    sources: ['guardian', 'nyt', 'hackernews', 'arxiv', 'google news'],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -395,6 +395,38 @@ async function loadThemeAnchors(client) {
 }
 
 async function loadCandidateArticles(client, options) {
+  const normalizedSources = Array.isArray(options.sources)
+    ? options.sources.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)
+    : [];
+  const exactSources = [];
+  const likePatterns = [];
+  for (const source of normalizedSources) {
+    if (source === 'google news') {
+      likePatterns.push('google news:%');
+      continue;
+    }
+    if (source.endsWith('*')) {
+      likePatterns.push(`${source.slice(0, -1)}%`);
+      continue;
+    }
+    exactSources.push(source);
+  }
+
+  const params = [];
+  const sourceFilters = [];
+  if (exactSources.length > 0) {
+    params.push(exactSources);
+    sourceFilters.push(`LOWER(source) = ANY($${params.length}::text[])`);
+  }
+  if (likePatterns.length > 0) {
+    params.push(likePatterns);
+    sourceFilters.push(`LOWER(source) LIKE ANY($${params.length}::text[])`);
+  }
+  const sourceClause = sourceFilters.length > 0
+    ? `AND (${sourceFilters.join(' OR ')})`
+    : '';
+  params.push(options.limit);
+
   const { rows } = await client.query(`
     SELECT
       id,
@@ -405,10 +437,10 @@ async function loadCandidateArticles(client, options) {
       embedding::text AS embedding_text
     FROM articles
     WHERE embedding IS NOT NULL
-      AND source = ANY($1::text[])
+      ${sourceClause}
     ORDER BY published_at DESC
-    LIMIT $2
-  `, [options.sources, options.limit]);
+    LIMIT $${params.length}
+  `, params);
 
   return rows
     .map((row) => ({

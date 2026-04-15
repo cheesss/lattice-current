@@ -18,7 +18,7 @@ import { clearProviderCooldown, getProviderCooldownState, setProviderCooldown } 
 import { isFeatureAvailable } from './runtime-config';
 
 // OpenSky API path — route through Vercel so Railway secret never reaches the browser.
-const OPENSKY_PROXY_URL = '/api/opensky';
+const OPENSKY_PROXY_URL = '/api/opensky/states/all';
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
 const DIRECT_OPENSKY_BASE_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/opensky'
