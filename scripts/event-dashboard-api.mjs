@@ -104,6 +104,263 @@ const SIGNAL_LABELS = {
   eventIntensity: 'Event Intensity',
 };
 
+const TOPIC_ARTICLE_GENERIC_TERMS = new Set([
+  'attack',
+  'attacks',
+  'attacked',
+  'killed',
+  'kill',
+  'kills',
+  'strike',
+  'strikes',
+  'war',
+  'wars',
+  'conflict',
+  'military',
+  'forces',
+  'state',
+  'backed',
+  'backing',
+  'global',
+  'latest',
+  'threat',
+  'threats',
+  'world',
+  'policy',
+  'general',
+  'public',
+  'strategic',
+  'activity',
+  'infrastructure',
+  'investment',
+  'debate',
+  'risk',
+  'security',
+  'growth',
+  'industry',
+]);
+
+const TOPIC_ARTICLE_STOPWORDS = new Set([
+  'the',
+  'and',
+  'for',
+  'in',
+  'of',
+  'to',
+  'on',
+  'at',
+  'by',
+  'as',
+  'or',
+  'with',
+  'from',
+  'into',
+  'that',
+  'this',
+  'these',
+  'those',
+  'their',
+  'them',
+  'they',
+  'have',
+  'has',
+  'had',
+  'are',
+  'was',
+  'were',
+  'will',
+  'would',
+  'could',
+  'should',
+  'across',
+  'about',
+  'under',
+  'over',
+  'after',
+  'before',
+  'between',
+  'through',
+  'around',
+  'against',
+  'while',
+  'where',
+  'which',
+  'what',
+  'when',
+  'than',
+  'then',
+  'into',
+  'onto',
+  'also',
+  'still',
+  'more',
+  'most',
+  'less',
+  'only',
+  'very',
+  'much',
+  'such',
+  'because',
+  'centers',
+  'accelerating',
+  'including',
+  'rising',
+  'demand',
+  'software',
+  'systems',
+  'current',
+  'cluster',
+  'topic',
+]);
+
+const GEO_CONTEXT_PATTERNS = [
+  /\bukrain/i,
+  /\brussi/i,
+  /\bisrael/i,
+  /\biran/i,
+  /\bgaza/i,
+  /\bpalestin/i,
+  /\bsyria?/i,
+  /\byemen/i,
+  /\bsudan/i,
+  /\bhouthi/i,
+  /\btaiwan/i,
+  /\bchina/i,
+  /\bodesa\b/i,
+  /\bodessa\b/i,
+  /\bkyiv\b/i,
+  /\bmoscow\b/i,
+  /\bkremlin\b/i,
+  /\bblack sea\b/i,
+];
+
+function sanitizeTopicText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s/-]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitTopicTerms(values, options = {}) {
+  const includeWhole = options.includeWhole !== false;
+  const maxWholeWords = Number(options.maxWholeWords || 4);
+  const terms = new Set();
+  for (const value of values) {
+    const normalized = sanitizeTopicText(value);
+    if (!normalized) continue;
+    if (includeWhole && normalized.split(/\s+/).length <= maxWholeWords) {
+      terms.add(normalized);
+    }
+    for (const token of normalized.split(/[\s/]+/)) {
+      const cleaned = token.replace(/^-+|-+$/g, '');
+      if (!cleaned) continue;
+      terms.add(cleaned);
+    }
+  }
+  return Array.from(terms);
+}
+
+function buildTopicArticleProfile(topic) {
+  const labelTerms = splitTopicTerms([topic.label], { includeWhole: false });
+  const technologyTerms = splitTopicTerms(Array.isArray(topic.key_technologies) ? topic.key_technologies : [], { includeWhole: true, maxWholeWords: 4 });
+  const companyTerms = splitTopicTerms(Array.isArray(topic.key_companies) ? topic.key_companies : [], { includeWhole: true, maxWholeWords: 3 });
+  const descriptionTerms = splitTopicTerms([topic.description], { includeWhole: false });
+  const keywordTerms = splitTopicTerms(Array.isArray(topic.keywords) ? topic.keywords : [], { includeWhole: false });
+
+  const strongTerms = new Set();
+  const supportTerms = new Set();
+
+  for (const term of [...technologyTerms, ...companyTerms, ...labelTerms]) {
+    const compact = term.replace(/\s+/g, ' ').trim();
+    if (!compact || compact.length < 3) continue;
+    if (TOPIC_ARTICLE_STOPWORDS.has(compact) || TOPIC_ARTICLE_GENERIC_TERMS.has(compact)) continue;
+    strongTerms.add(compact);
+  }
+
+  for (const term of [...keywordTerms, ...descriptionTerms]) {
+    const compact = term.replace(/\s+/g, ' ').trim();
+    if (!compact || compact.length < 4) continue;
+    if (TOPIC_ARTICLE_STOPWORDS.has(compact)) continue;
+    if (TOPIC_ARTICLE_GENERIC_TERMS.has(compact)) continue;
+    if (strongTerms.has(compact)) continue;
+    supportTerms.add(compact);
+  }
+
+  if (String(topic.parent_theme || '') === 'geopolitics') {
+    for (const term of ['ukraine', 'ukrainian', 'russia', 'russian']) {
+      supportTerms.add(term);
+    }
+  }
+
+  const geoContext = Array.from(new Set([...labelTerms, ...keywordTerms, ...descriptionTerms]
+    .filter((term) => GEO_CONTEXT_PATTERNS.some((pattern) => pattern.test(term)))))
+    .slice(0, 8);
+
+  const focusTerms = Array.from(new Set([...technologyTerms, ...labelTerms]
+    .filter((term) => !geoContext.includes(term))
+    .filter((term) => !TOPIC_ARTICLE_GENERIC_TERMS.has(term))
+    .filter((term) => !TOPIC_ARTICLE_STOPWORDS.has(term))))
+    .slice(0, 12);
+
+  const strong = Array.from(strongTerms).slice(0, 16);
+  const support = Array.from(supportTerms).slice(0, 24);
+  return { strong, support, geoContext, focusTerms };
+}
+
+function buildTopicRecentArticleScore(article, topicId, parentTheme, profile) {
+  const text = sanitizeTopicText([article.title, article.summary, article.source].filter(Boolean).join(' '));
+  const matchedStrong = [];
+  const matchedSupport = [];
+  const matchedGeo = [];
+  const matchedFocus = [];
+
+  for (const term of profile.strong) {
+    if (text.includes(term)) matchedStrong.push(term);
+  }
+  for (const term of profile.support) {
+    if (text.includes(term)) matchedSupport.push(term);
+  }
+  for (const term of profile.geoContext || []) {
+    if (text.includes(term)) matchedGeo.push(term);
+  }
+  for (const term of profile.focusTerms || []) {
+    if (text.includes(term)) matchedFocus.push(term);
+  }
+
+  const strongHitCount = matchedStrong.length;
+  const supportHitCount = matchedSupport.length;
+  const geoHitCount = matchedGeo.length;
+  const focusHitCount = matchedFocus.length;
+
+  let score = strongHitCount * 8 + supportHitCount * 2;
+  score += geoHitCount * 4 + focusHitCount * 5;
+  if (article.legacy_theme && String(article.legacy_theme) === String(topicId)) score += 6;
+  if (article.theme && String(article.theme) === String(parentTheme || '')) score += 2;
+  if (article.legacy_theme && String(article.legacy_theme) === String(parentTheme || '')) score += 1;
+
+  const publishedAt = article.published_at ? new Date(article.published_at).getTime() : 0;
+  const ageHours = publishedAt > 0 ? Math.max(0, (Date.now() - publishedAt) / 36e5) : 99999;
+  if (ageHours <= 72) score += 4;
+  else if (ageHours <= 24 * 14) score += 3;
+  else if (ageHours <= 24 * 30) score += 2;
+  else if (ageHours <= 24 * 90) score += 1;
+
+  return {
+    score,
+    matchedStrong,
+    matchedSupport,
+    matchedGeo,
+    matchedFocus,
+    strongHitCount,
+    supportHitCount,
+    geoHitCount,
+    focusHitCount,
+  };
+}
+
+export { buildTopicArticleProfile, buildTopicRecentArticleScore };
+
 function buildJsonResponse(data, status = 200) {
   return {
     status,
@@ -1011,38 +1268,38 @@ async function buildEmergingTechDetail(topicId) {
   `, [topicId]);
   const topic = topicResponse.rows[0];
   if (!topic) {
-    return { topic: null, report: null, symbols: [], articles: [] };
+    return { topic: null, report: null, symbols: [], articles: [], latestLinkedArticles: [], articleMeta: null };
   }
 
-  // Build keyword filter for fallback article search
-  const topicKeywords = Array.isArray(topic.keywords) ? topic.keywords.filter(k => k && k.length > 3) : [];
-  const keywordIlike = topicKeywords.slice(0, 5).map((_, i) => `a.title ILIKE $${i + 2}`).join(' OR ');
+  const articleProfile = buildTopicArticleProfile(topic);
+  const allQueryTerms = [...articleProfile.strong, ...articleProfile.support, ...(articleProfile.geoContext || []), ...(articleProfile.focusTerms || [])];
+  const candidateTermCount = Math.min(allQueryTerms.length, 16);
+  const candidateWhere = allQueryTerms
+    .slice(0, candidateTermCount)
+    .map((_, index) => `(a.title ILIKE $${index + 1} OR COALESCE(a.summary, '') ILIKE $${index + 1})`)
+    .join(' OR ');
+  const excludeArxiv = String(topic.parent_theme || '') === 'geopolitics' || String(topic.category || '') === 'geopolitics';
 
-  const [articlesResponse, reportResponse, symbolsResponse] = await Promise.all([
-    // Two-source article query: junction table + keyword fallback, deduplicated, newest first
+  const [linkedArticlesResponse, candidateArticlesResponse, reportResponse, symbolsResponse] = await Promise.all([
     safeQuery(`
-        WITH linked AS (
-          SELECT a.id, a.title, a.source, a.published_at, a.url, 'linked' AS match_type
-          FROM discovery_topic_articles dta
-          JOIN articles a ON a.id = dta.article_id
-          WHERE dta.topic_id = $1
-        ),
-        keyword_recent AS (
-          SELECT a.id, a.title, a.source, a.published_at, a.url, 'keyword' AS match_type
-          FROM articles a
-          WHERE (${keywordIlike || 'FALSE'})
-            AND a.published_at >= NOW() - INTERVAL '90 days'
-            AND a.id NOT IN (SELECT id FROM linked)
-        ),
-        combined AS (
-          SELECT * FROM linked
-          UNION ALL
-          SELECT * FROM keyword_recent
-        )
-        SELECT DISTINCT ON (id) id, title, source, published_at, url, match_type
-        FROM combined
-        ORDER BY id, published_at DESC
-      `, [topicId, ...topicKeywords.slice(0, 5).map(k => `%${k}%`)]),
+      SELECT a.id, a.title, a.summary, a.source, a.published_at, a.url, a.theme, a.legacy_theme
+      FROM discovery_topic_articles dta
+      JOIN articles a ON a.id = dta.article_id
+      WHERE dta.topic_id = $1
+      ORDER BY a.published_at DESC
+      LIMIT 300
+    `, [topicId]),
+    safeQuery(`
+      SELECT a.id, a.title, a.summary, a.source, a.published_at, a.url, a.theme, a.legacy_theme
+      FROM articles a
+      WHERE a.published_at >= NOW() - INTERVAL '90 days'
+        ${excludeArxiv ? "AND COALESCE(a.source, '') NOT ILIKE 'arxiv%'" : ''}
+        AND (${candidateWhere || 'FALSE'})
+      ORDER BY a.published_at DESC
+      LIMIT 300
+    `, allQueryTerms.slice(0, candidateTermCount).map((term) => `%${term}%`).length
+      ? allQueryTerms.slice(0, candidateTermCount).map((term) => `%${term}%`)
+      : []),
     safeQuery(`
       SELECT *
       FROM tech_reports
@@ -1058,6 +1315,112 @@ async function buildEmergingTechDetail(topicId) {
       LIMIT 12
     `, [topicId, String(topic.parent_theme || 'emerging-tech')]),
   ]);
+
+  const linkedArticles = linkedArticlesResponse.rows.map((row) => ({
+    id: Number(row.id || 0),
+    title: String(row.title || ''),
+    source: String(row.source || ''),
+    publishedAt: row.published_at,
+    url: String(row.url || ''),
+    summary: String(row.summary || ''),
+    theme: String(row.theme || ''),
+    legacyTheme: String(row.legacy_theme || ''),
+    matchType: 'linked',
+  }));
+
+  const linkedById = new Map(linkedArticles.map((article) => [article.id, article]));
+  const recentCandidates = [];
+  for (const row of candidateArticlesResponse.rows) {
+    const candidate = {
+      id: Number(row.id || 0),
+      title: String(row.title || ''),
+      source: String(row.source || ''),
+      publishedAt: row.published_at,
+      url: String(row.url || ''),
+      summary: String(row.summary || ''),
+      theme: String(row.theme || ''),
+      legacyTheme: String(row.legacy_theme || ''),
+      matchType: linkedById.has(Number(row.id || 0)) ? 'linked' : 'derived',
+    };
+    const scoring = buildTopicRecentArticleScore({
+      title: candidate.title,
+      summary: candidate.summary,
+      source: candidate.source,
+      theme: candidate.theme,
+      legacy_theme: candidate.legacyTheme,
+      published_at: candidate.publishedAt,
+    }, topicId, topic.parent_theme, articleProfile);
+    const isLinked = linkedById.has(candidate.id);
+    if (!isLinked && scoring.strongHitCount < 1 && scoring.focusHitCount < 1) continue;
+    if (excludeArxiv && (scoring.geoHitCount < 1 || scoring.focusHitCount < 1)) continue;
+    if (scoring.score < (isLinked ? 4 : 8)) continue;
+    recentCandidates.push({
+      ...candidate,
+      score: scoring.score,
+      matchedStrong: scoring.matchedStrong,
+      matchedSupport: scoring.matchedSupport,
+      matchedGeo: scoring.matchedGeo,
+      matchedFocus: scoring.matchedFocus,
+    });
+  }
+
+  for (const article of linkedArticles) {
+    const publishedAt = article.publishedAt ? new Date(article.publishedAt).getTime() : 0;
+    if (!(publishedAt > 0) || (Date.now() - publishedAt) > 90 * 24 * 36e5) continue;
+    const scoring = buildTopicRecentArticleScore({
+      title: article.title,
+      summary: article.summary,
+      source: article.source,
+      theme: article.theme,
+      legacy_theme: article.legacyTheme,
+      published_at: article.publishedAt,
+    }, topicId, topic.parent_theme, articleProfile);
+    if (excludeArxiv && (scoring.geoHitCount < 1 || scoring.focusHitCount < 1)) continue;
+    if (scoring.score < 4) continue;
+    recentCandidates.push({
+      ...article,
+      score: scoring.score,
+      matchedStrong: scoring.matchedStrong,
+      matchedSupport: scoring.matchedSupport,
+      matchedGeo: scoring.matchedGeo,
+      matchedFocus: scoring.matchedFocus,
+    });
+  }
+
+  const dedupedRecentArticles = [];
+  const seenRecentIds = new Set();
+  for (const article of recentCandidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return new Date(b.publishedAt) - new Date(a.publishedAt);
+  })) {
+    if (seenRecentIds.has(article.id)) continue;
+    seenRecentIds.add(article.id);
+    dedupedRecentArticles.push(article);
+    if (dedupedRecentArticles.length >= 20) break;
+  }
+
+  const latestLinkedArticles = linkedArticles
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+    .slice(0, 20);
+
+  const latestLinkedPublishedAt = latestLinkedArticles[0]?.publishedAt || null;
+  const derivedRecentCount = dedupedRecentArticles.filter((article) => article.matchType === 'derived').length;
+  const linkedRecentCount = dedupedRecentArticles.filter((article) => article.matchType === 'linked').length;
+  const effectiveReport = reportResponse.rows[0]
+    ? {
+        ...reportResponse.rows[0],
+        top_articles: dedupedRecentArticles.length
+          ? dedupedRecentArticles.slice(0, 10).map((article) => ({
+              id: article.id,
+              title: article.title,
+              source: article.source,
+              published_at: article.publishedAt,
+              url: article.url,
+              match_type: article.matchType,
+            }))
+          : reportResponse.rows[0].top_articles,
+      }
+    : null;
 
   return {
     topic: {
@@ -1082,24 +1445,42 @@ async function buildEmergingTechDetail(topicId) {
       codexMetadata: topic.codex_metadata || {},
       updatedAt: topic.updated_at,
     },
-    report: reportResponse.rows[0] || null,
+    report: effectiveReport,
     symbols: symbolsResponse.rows.map((row) => ({
       symbol: String(row.symbol || ''),
       avgReturn: Number(row.avg_return || 0),
       hitRate: Number(row.hit_rate || 0),
       sampleSize: Number(row.sample_size || 0),
     })),
-    articles: articlesResponse.rows
-      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
-      .slice(0, 20)
-      .map((row) => ({
-        id: Number(row.id || 0),
-        title: String(row.title || ''),
-        source: String(row.source || ''),
-        publishedAt: row.published_at,
-        url: String(row.url || ''),
-        matchType: String(row.match_type || 'linked'),
-      })),
+    articles: dedupedRecentArticles.map((article) => ({
+      id: article.id,
+      title: article.title,
+      source: article.source,
+      publishedAt: article.publishedAt,
+      url: article.url,
+      matchType: article.matchType,
+      matchedStrong: article.matchedStrong,
+      matchedSupport: article.matchedSupport,
+      matchedGeo: article.matchedGeo,
+      matchedFocus: article.matchedFocus,
+    })),
+    latestLinkedArticles: latestLinkedArticles.map((article) => ({
+      id: article.id,
+      title: article.title,
+      source: article.source,
+      publishedAt: article.publishedAt,
+      url: article.url,
+      matchType: article.matchType,
+    })),
+    articleMeta: {
+      windowDays: 90,
+      recentCount: dedupedRecentArticles.length,
+      linkedRecentCount,
+      derivedRecentCount,
+      latestLinkedPublishedAt,
+      usingFallback: derivedRecentCount > 0,
+      status: dedupedRecentArticles.length > 0 ? 'recent-available' : 'linked-only',
+    },
   };
 }
 
@@ -1436,10 +1817,11 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
   }
 }
 
-async function buildRiskSnapshot() {
+async function buildRiskSnapshot(params = new URLSearchParams()) {
   return buildCompactRiskSnapshot({
     safeQuery,
     buildStructuralAlerts: buildStructuralAlertsPayload,
+    period: resolveDashboardPeriod(params),
   });
 }
 
@@ -1455,10 +1837,16 @@ async function buildValidationSnapshot() {
   return buildCompactValidationSnapshot();
 }
 
-async function buildThemeShellSnapshots() {
+function resolveDashboardPeriod(params, fallback = 'quarter') {
+  const value = String(params?.get?.('period') || fallback).trim().toLowerCase();
+  return ['week', 'month', 'quarter', 'year'].includes(value) ? value : fallback;
+}
+
+async function buildThemeShellSnapshots(params = new URLSearchParams()) {
   return buildThemeShellSnapshotPayloads({
     safeQuery,
     buildStructuralAlerts: buildStructuralAlertsPayload,
+    period: resolveDashboardPeriod(params),
   });
 }
 
@@ -1517,8 +1905,50 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       return buildJsonResponse(await buildApprovalQueuePayload());
     }
 
+    if (segments[0] === 'api' && segments[1] === 'runtime-issues' && !segments[2] && method === 'POST') {
+      try {
+        const { captureRuntimeIssue, classifyIssue } = await import('./_shared/runtime-issue-writer.mjs');
+        const classification = String(body.classification || '').trim() || classifyIssue(body.surface, body.action, body.responseStatus, body.errorMessage);
+        const result = captureRuntimeIssue({ ...body, classification });
+        return buildJsonResponse({ ok: true, id: result.id, path: result.path });
+      } catch (err) {
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) });
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'runtime-issues' && !segments[2] && method === 'GET') {
+      try {
+        const { readdirSync, readFileSync, existsSync } = await import('node:fs');
+        const issuesDir = path.resolve('data', 'runtime-issues');
+        if (!existsSync(issuesDir)) return buildJsonResponse({ issues: [], total: 0 });
+        const files = [];
+        for (const dateDir of readdirSync(issuesDir).sort().reverse()) {
+          const full = path.join(issuesDir, dateDir);
+          try {
+            for (const f of readdirSync(full).filter(n => n.endsWith('.json') && !n.startsWith('investigation-')).sort().reverse()) {
+              files.push(path.join(full, f));
+              if (files.length >= 50) break;
+            }
+          } catch {}
+          if (files.length >= 50) break;
+        }
+        const issues = files.map(fp => {
+          try {
+            const issue = JSON.parse(readFileSync(fp, 'utf8'));
+            if (issue.responseBody && String(issue.responseBody).length > 500) {
+              issue.responseBody = String(issue.responseBody).slice(0, 500) + '…';
+            }
+            return issue;
+          } catch { return null; }
+        }).filter(Boolean);
+        return buildJsonResponse({ issues, total: issues.length });
+      } catch (err) {
+        return buildJsonResponse({ issues: [], total: 0, error: String(err?.message || err) });
+      }
+    }
+
     if (segments[0] === 'api' && segments[1] === 'risk-snapshot') {
-      return buildJsonResponse(await buildRiskSnapshot());
+      return buildJsonResponse(await buildRiskSnapshot(params));
     }
 
     if (segments[0] === 'api' && segments[1] === 'macro-snapshot') {
@@ -1534,7 +1964,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'theme-shell-snapshots') {
-      return buildJsonResponse(await buildThemeShellSnapshots());
+      return buildJsonResponse(await buildThemeShellSnapshots(params));
     }
 
     if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments.length === 2) {
@@ -1948,6 +2378,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             eu.t_stat,
             ce.theme,
             ce.representative_title AS title,
+            ce.event_date AS updated_at,
             lo.symbol,
             lo.forward_return_pct,
             lo.abnormal_return,
@@ -1970,7 +2401,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
           ) lo ON true
           WHERE eu.evidence_grade IS NOT NULL
         )
-        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, symbol, forward_return_pct, abnormal_return
+        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, updated_at, symbol, forward_return_pct, abnormal_return
         FROM ranked_uplift
         WHERE event_rank = 1
         ORDER BY evidence_grade DESC, ABS(uplift) DESC
@@ -1988,11 +2419,17 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       for (const s of Object.values(summary)) {
         s.avgUplift = s.count > 0 ? Number((s.totalUplift / s.count).toFixed(4)) : 0;
       }
+      const liveSignalWindowDays = 30;
+      const recentCutoff = Date.now() - (liveSignalWindowDays * 24 * 60 * 60 * 1000);
       const symbolCounts = new Map();
       const seenTitles = new Set();
       const actionableSignals = [];
       for (const row of grades
-        .filter((item) => String(item.evidence_grade || '').toUpperCase() === 'E2')
+        .filter((item) => {
+          if (String(item.evidence_grade || '').toUpperCase() !== 'E2') return false;
+          const updatedAt = item.updated_at ? Date.parse(item.updated_at) : NaN;
+          return Number.isFinite(updatedAt) && updatedAt >= recentCutoff;
+        })
         .sort((a, b) => {
           const aScore = Math.abs(Number(a.uplift || 0)) * 0.6 + Math.abs(Number(a.t_stat || 0)) * 0.4;
           const bScore = Math.abs(Number(b.uplift || 0)) * 0.6 + Math.abs(Number(b.t_stat || 0)) * 0.4;
@@ -2007,12 +2444,12 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         actionableSignals.push(row);
         if (actionableSignals.length >= 20) break;
       }
-      const fallbackSignals = actionableSignals.length
-        ? actionableSignals
-        : grades.filter((item) => String(item.evidence_grade || '').toUpperCase() === 'E2').slice(0, 20);
       return buildJsonResponse({
         grades: Object.values(summary),
-        signals: fallbackSignals,
+        signals: actionableSignals,
+        meta: {
+          liveSignalWindowDays,
+        },
       });
     }
 

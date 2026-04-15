@@ -1,0 +1,13 @@
+{
+  "id": "runtime-issue-1776230942312-01wuzy",
+  "createdAt": "2026-04-15T05:29:02.316Z",
+  "surface": "decision-inbox",
+  "action": "inbox.accept",
+  "itemType": "approval",
+  "itemSubtype": "add-rss",
+  "itemId": "test-123",
+  "apiRoute": "/api/approval-queue/test-123/review",
+  "responseStatus": 403,
+  "errorMessage": "RSS fetch 403 Forbidden",
+  "classification": "external-dependency"
+}
