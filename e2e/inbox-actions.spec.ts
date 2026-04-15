@@ -1,7 +1,7 @@
 /**
  * Smoke tests for event-dashboard.html — Decision Inbox actions.
  *
- * These tests run against event-dashboard.html served at http://127.0.0.1:46200.
+ * These tests run against event-dashboard.html served at http://127.0.0.1:4173.
  * All API calls are intercepted with page.route() so no live DB is required.
  *
  * Run: npx playwright test e2e/inbox-actions.spec.ts
@@ -10,7 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-const DASHBOARD_URL = 'http://127.0.0.1:46200/event-dashboard.html';
+const DASHBOARD_URL = 'http://127.0.0.1:4173/event-dashboard.html';
 const API_BASE = 'http://localhost:46200/api';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ const MOCK_APPROVAL_ITEM = {
   freshness: 'fresh',
   freshnessLabel: 'Fresh (3h ago)',
   payload: {
+    label: 'Flightradar24 Eastern Mediterranean feed',
     url: 'https://www.flightradar24.com/',
     name: 'Flightradar24',
     theme: 'defense',
@@ -43,7 +44,7 @@ const MOCK_PROPOSAL_ITEM = {
   theme: 'biotech',
   freshness: 'fresh',
   freshnessLabel: 'Fresh (1h ago)',
-  payload: { targetTheme: 'biotech-ai', proposalType: 'add-theme' },
+  payload: { label: 'Add biotech-ai theme', targetTheme: 'biotech-ai', proposalType: 'add-theme' },
 };
 
 const MOCK_TRIAGE_ITEM = {
@@ -62,27 +63,80 @@ const MOCK_TRIAGE_ITEM = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function mockAllApis(page: Page) {
-  // Suppress noisy unmatched API calls
-  await page.route(`${API_BASE}/**`, route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data: null }) }));
-
-  // Inbox payload — approval + proposal + triage
-  await page.route(`${API_BASE}/approval-inbox-payload`, route =>
-    route.fulfill({
+  await page.route('**/api/**', route => {
+    const request = route.request();
+    const url = request.url();
+    if (url.includes('/api/proposal-inbox')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          proposals: [{
+            id: MOCK_PROPOSAL_ITEM.rawId,
+            proposal_type: MOCK_PROPOSAL_ITEM.subtype,
+            status: 'pending',
+            source: MOCK_PROPOSAL_ITEM.source,
+            payload: MOCK_PROPOSAL_ITEM.payload,
+            reasoning: 'Codex proposal smoke fixture',
+            created_at: new Date().toISOString(),
+          }],
+          approvals: [{
+            id: MOCK_APPROVAL_ITEM.rawId,
+            action_type: MOCK_APPROVAL_ITEM.subtype,
+            status: 'pending',
+            payload: MOCK_APPROVAL_ITEM.payload,
+            reasoning: 'Human review required smoke fixture',
+            created_at: new Date().toISOString(),
+          }],
+          summary: {
+            pendingProposals: 1,
+            pendingApprovals: 1,
+            actionableCount: 2,
+          },
+        }),
+      });
+    }
+    if (url.includes('/api/discovery-triage')) {
+      if (request.method() === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, decision: 'canonical', topicId: MOCK_TRIAGE_ITEM.rawId }),
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [{
+            id: MOCK_TRIAGE_ITEM.rawId,
+            label: MOCK_TRIAGE_ITEM.title,
+            category: 'technology',
+            parentTheme: MOCK_TRIAGE_ITEM.theme,
+            normalizedTheme: MOCK_TRIAGE_ITEM.payload.normalizedTheme,
+            promotionState: 'watch',
+            structuralScore: 0.62,
+            momentum: 1.4,
+            articleCount: 12,
+            keywords: ['ai', 'chips', 'exports'],
+            updatedAt: new Date().toISOString(),
+          }],
+          summary: { total: 1 },
+        }),
+      });
+    }
+    if (url.includes('/api/approval-queue/')
+      || url.includes('/api/codex-proposals/')
+      || url.includes('/api/theme-shell-snapshots')
+      || url.includes('/api/risk-snapshot')) {
+      return route.fallback();
+    }
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        items: [MOCK_APPROVAL_ITEM, MOCK_PROPOSAL_ITEM, MOCK_TRIAGE_ITEM],
-        total: 3,
-      }),
-    }),
-  );
-
-  // KPI / snapshots — minimal stubs so page doesn't hang
-  for (const endpoint of ['risk-snapshot', 'macro-snapshot', 'validation-snapshot', 'investment-snapshot', 'geo-pressure-snapshot', 'source-ops-snapshot', 'transmission-snapshot', 'event-uplift-grades', 'structural-alerts', 'live-signals', 'today', 'runtime-issues']) {
-    await page.route(`${API_BASE}/${endpoint}`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }),
-    );
-  }
+      body: JSON.stringify({ ok: true, data: null }),
+    });
+  });
 }
 
 async function goToDashboard(page: Page) {
@@ -93,7 +147,7 @@ async function goToDashboard(page: Page) {
 }
 
 async function switchToInbox(page: Page) {
-  await page.click('[data-surface="inbox"]');
+  await page.click('.surface-nav-btn[data-surface="inbox"]');
   await page.waitForSelector('.surface[data-surface="inbox"].active', { timeout: 5_000 });
 }
 
@@ -106,9 +160,9 @@ test.describe('surface navigation', () => {
     const surfaces = ['home', 'inbox', 'investigate', 'geo', 'ops'] as const;
 
     for (const surface of surfaces) {
-      await page.click(`[data-surface="${surface}"]`);
+      await page.click(`.surface-nav-btn[data-surface="${surface}"]`);
       // Active button matches
-      await expect(page.locator(`[data-surface="${surface}"].active`)).toBeVisible();
+      await expect(page.locator(`.surface-nav-btn[data-surface="${surface}"].active`)).toBeVisible();
       // Corresponding surface panel is visible
       await expect(page.locator(`.surface[data-surface="${surface}"].active`)).toBeVisible();
       // Other surfaces are hidden
@@ -121,10 +175,10 @@ test.describe('surface navigation', () => {
 
   test('URL hash updates on surface switch', async ({ page }) => {
     await goToDashboard(page);
-    await page.click('[data-surface="inbox"]');
-    expect(page.url()).toContain('#inbox');
-    await page.click('[data-surface="ops"]');
-    expect(page.url()).toContain('#ops');
+    await page.click('.surface-nav-btn[data-surface="inbox"]');
+    await expect(page).toHaveURL(/#inbox/);
+    await page.click('.surface-nav-btn[data-surface="ops"]');
+    await expect(page).toHaveURL(/#ops/);
   });
 });
 
@@ -291,6 +345,29 @@ test.describe('Decision Inbox — action result banners', () => {
 
     await expect(page.locator('.inbox-result.error .trust-chip-critical', { hasText: 'FAILED' })).toBeVisible({ timeout: 5_000 });
   });
+
+  test('Canonical posts triage decisions to the review endpoint', async ({ page }) => {
+    let triageReviewRequest: { url: string; body: any } | null = null;
+    page.on('request', request => {
+      if (request.method() !== 'POST') return;
+      if (!request.url().includes('/api/discovery-triage/review')) return;
+      triageReviewRequest = { url: request.url(), body: request.postDataJSON() };
+    });
+
+    await goToDashboard(page);
+    await switchToInbox(page);
+    await page.waitForTimeout(1_000);
+
+    const triageItem = page.locator('.inbox-item').filter({ hasText: 'AI chip export controls' }).first();
+    await triageItem.click();
+    await page.locator('.inbox-actions button', { hasText: 'Canonical' }).click();
+
+    await expect.poll(() => triageReviewRequest?.url || '').toContain('/api/discovery-triage/review');
+    expect(triageReviewRequest?.body).toMatchObject({
+      topicId: MOCK_TRIAGE_ITEM.rawId,
+      decision: 'canonical',
+    });
+  });
 });
 
 test.describe('Decision Inbox — bulk action guards', () => {
@@ -328,17 +405,23 @@ test.describe('Decision Inbox — bulk action guards', () => {
 
 test.describe('Decision Inbox — stale/fallback badge', () => {
   test('stale badge appears when snapshot data is old', async ({ page }) => {
-    // Override risk-snapshot with stale internal timestamp
-    await page.route(`${API_BASE}/risk-snapshot`, route =>
+    const oldTimestamp = new Date(Date.now() - 60 * 60 * 60 * 1000).toISOString();
+
+    // The dashboard renders the combined theme-shell snapshot, not the legacy
+    // standalone risk endpoint.
+    await page.route(`${API_BASE}/theme-shell-snapshots**`, route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          generatedAt: new Date().toISOString(),
-          oldestInternalUpdatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5h ago
-          updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-          ok: true,
-          data: {},
+          risk: {
+            generatedAt: new Date().toISOString(),
+            oldestInternalUpdatedAt: oldTimestamp,
+            updatedAt: oldTimestamp,
+            level: 'watch',
+            score: 0,
+            summary: {},
+          },
         }),
       }),
     );
@@ -349,8 +432,6 @@ test.describe('Decision Inbox — stale/fallback badge', () => {
 
     // Some stale-indicating element should appear (trust-chip-stale or trust-chip-critical)
     // depending on freshness classification
-    const staleBadges = page.locator('.trust-chip-stale, .trust-chip-critical');
-    // At least one stale or critical badge should be present somewhere on the page
-    await expect(staleBadges.first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('#risk-snapshot .trust-chip-stale')).toBeVisible({ timeout: 8_000 });
   });
 });

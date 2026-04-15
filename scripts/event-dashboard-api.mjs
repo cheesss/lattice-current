@@ -1795,6 +1795,15 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       humanApproved: true,
     });
 
+    if (body.dryRun === true) {
+      return buildJsonResponse({
+        approval,
+        execution,
+        dryRun: true,
+        alreadyFinal: false,
+      });
+    }
+
     const note = execution?.summary
       || execution?.reason
       || `Executed ${String(approval.action_type || 'approval action')}`;

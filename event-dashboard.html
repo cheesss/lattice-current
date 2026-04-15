@@ -1579,7 +1579,9 @@ function resolveInboxDecision(item, decision) {
 }
 function canBulkApplyDecision(decision) {
   const selectedItems = [...inboxSelection].map((id) => inboxItems.find((x) => x.id === id)).filter(Boolean);
-  return selectedItems.length > 0 && selectedItems.every((item) => !!resolveInboxDecision(item, decision));
+  if (!selectedItems.length) return false;
+  const actionFamily = selectedItems[0].type;
+  return selectedItems.every((item) => item.type === actionFamily && !!resolveInboxDecision(item, decision));
 }
 function setInboxCountsLoading() {
   ['all', 'e2-signal', 'proposal', 'approval', 'triage'].forEach((t) => {
@@ -1917,7 +1919,8 @@ async function inboxAction(decision, id) {
       response = await postJson(`${API}/approval-queue/${encodeURIComponent(item.rawId)}/review`, { decision: resolvedDecision, reviewer: 'theme-dashboard' });
     } else if (item.type === 'triage') {
       const p = item.payload || {};
-      response = await postJson(`${API}/discovery-triage/${encodeURIComponent(item.rawId)}/decision`, {
+      response = await postJson(`${API}/discovery-triage/review`, {
+        topicId: item.rawId,
         decision: resolvedDecision,
         normalizedTheme: p.normalizedTheme || '',
         parentTheme: p.parentTheme || p.normalizedParentTheme || '',
@@ -3089,6 +3092,7 @@ function renderRiskSnapshot(snapshot={},cachedAt=null,cached=false){
   const hottest=Array.isArray(snapshot.hottestThemes)?snapshot.hottestThemes:[];
   const highlights=Array.isArray(snapshot.highlights)?snapshot.highlights:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>Risk posture ${escapeHtml(String(snapshot.level||'watch').toUpperCase())}</strong><div class="meta-line">Score ${fmtWhole(snapshot.score||0)} | alerts ${fmtWhole(snapshot.summary?.alertCount||0)} | pending validation ${fmtWhole(snapshot.summary?.pendingValidation||0)} | articles 24h ${fmtWhole(snapshot.summary?.articleCount24h||0)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
   if(hottest.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(hottest.map((item)=>`${item.themeLabel||humanizeTheme(item.theme)} ${item.temperature||''}`),'tag-neutral',6)}</div>`;
   html+=highlights.length
