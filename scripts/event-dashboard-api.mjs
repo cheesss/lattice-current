@@ -2408,9 +2408,28 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             ORDER BY ABS(lo2.abnormal_return) DESC
             LIMIT 1
           ) lo ON true
+          LEFT JOIN LATERAL (
+            SELECT json_agg(
+              json_build_object(
+                'title', sub.title,
+                'url', sub.url,
+                'source', sub.source,
+                'publishedAt', sub.published_at
+              ) ORDER BY sub.published_at DESC
+            ) AS sources
+            FROM (
+              SELECT a.title, a.url, a.source, a.published_at
+              FROM article_event_map aem
+              JOIN articles a ON a.id = aem.article_id
+              WHERE aem.canonical_event_id = eu.canonical_event_id
+                AND a.title IS NOT NULL
+              ORDER BY a.published_at DESC
+              LIMIT 3
+            ) sub
+          ) art ON true
           WHERE eu.evidence_grade IS NOT NULL
         )
-        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, updated_at, symbol, forward_return_pct, abnormal_return
+        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, updated_at, symbol, forward_return_pct, abnormal_return, sources
         FROM ranked_uplift
         WHERE event_rank = 1
         ORDER BY evidence_grade DESC, ABS(uplift) DESC

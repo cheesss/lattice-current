@@ -627,7 +627,7 @@ th{color:var(--muted);font-weight:normal}
         <div class="section-meta">Useful context for ops monitoring, not the primary decision surface.</div>
       </div>
       <div class="grid3">
-        <div class="card"><div class="card-title">Today's Key Events</div><div id="today-events" class="loading">Loading recent events...</div></div>
+        <div class="card"><div class="card-title"><span id="today-events-title">Today's Key Events</span></div><div id="today-events" class="loading">Loading recent events...</div></div>
         <div class="card"><div class="card-title">Issue Temperature</div><div id="temperatures" class="loading">Loading issue temperatures...</div></div>
         <div class="card"><div class="card-title">Technology Trends</div><div id="trends" class="loading">Loading technology trends...</div></div>
       </div>
@@ -2252,6 +2252,9 @@ async function loadCuratedItems(){
     return;
   }
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  if(digestSource.includes('fallback')){
+    html+=`<div class="stale-badge" style="margin-bottom:8px">Source: ${escapeHtml(digestSource)}${digestWindow?` (${escapeHtml(digestWindow)})`:''}  — digest is in fallback mode</div>`;
+  }
   if(headline||summary||asOf){
     html+='<div class="info-note" style="margin-bottom:12px">';
     if(headline)html+=`<div style="margin-bottom:4px"><strong>${escapeHtml(headline)}</strong></div>`;
@@ -2584,9 +2587,12 @@ async function loadToday(){
     return;
   }
   const meta=data?.meta||{};
+  const isFallback=meta.window&&meta.window!=='24h';
+  const titleEl=document.getElementById('today-events-title');
+  if(titleEl)titleEl.textContent=isFallback?`Recent Events (${escapeHtml(meta.window)} fallback)`:'Today\'s Key Events';
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
-  if(meta.window&&meta.window!=='24h'){
-    html+=`<div class="stale-badge">Operating in ${escapeHtml(meta.window)} fallback mode</div>`;
+  if(isFallback){
+    html+=`<div class="stale-badge">Operating in ${escapeHtml(meta.window)} fallback mode — not the primary 24h live feed</div>`;
   }
   items.slice(0,8).forEach((item)=>{
     const sourceLabel=escapeHtml(item.source||'unknown');
@@ -2879,6 +2885,7 @@ function normalizeSignalToReviewItem(s, idx = 0) {
     updatedAt: s.updated_at || s.computed_at || null,
     decisionState: s.decision_state || 'pending',
     whyVisible: tStat ? `t-stat ${tStat.toFixed(2)} exceeds E2 threshold (1.96)` : 'E2 evidence grade',
+    sources: Array.isArray(s.sources) ? s.sources : [],
     raw: s,
   };
 }
@@ -2895,6 +2902,12 @@ function renderReviewItemCard(item) {
     whyVisible: item.whyVisible,
     slaHours: 72,
   });
+  const citationsHtml = (item.sources || []).length > 0
+    ? `<div class="signal-citations">${(item.sources).map((src, i) => {
+        const safeData = escapeHtml(JSON.stringify(src));
+        return `<span class="signal-cite" onclick="event.stopPropagation();showSignalCitePopover(event,'${safeData}',${i+1})">[${i+1}]</span>`;
+      }).join('')}</div>`
+    : '';
   return `<div class="signal-card" data-item-id="${escapeHtml(item.id)}" onclick="selectReviewItem('${escapeHtml(item.id)}')">
     <div class="signal-card-head">
       <span class="signal-dir ${item.direction}">${dirLabel}</span>
@@ -2909,6 +2922,7 @@ function renderReviewItemCard(item) {
       <span>Controls: <strong>${item.matchedControls}</strong></span>
     </div>
     ${item.title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${escapeHtml(item.title.slice(0,140))}</div>` : ''}
+    ${citationsHtml}
   </div>`;
 }
 async function loadE2SignalQueue(){
@@ -2957,6 +2971,28 @@ function showCitationPopover(ev, num) {
     <div class="cite-popover-meta">${escapeHtml(cite.source || 'source')} | ${escapeHtml(cite.kind)} ${freshChip}</div>
     ${cite.date ? `<div class="cite-popover-meta" style="margin-top:4px">${escapeHtml(fmtDate(cite.date))}</div>` : ''}
     ${cite.url ? `<div style="margin-top:6px"><a href="${escapeHtml(cite.url)}" target="_blank" rel="noreferrer" style="color:var(--accent);font-size:11px">Open source</a></div>` : ''}
+  `;
+  document.body.appendChild(pop);
+  const rect = ev.target.getBoundingClientRect();
+  pop.style.left = Math.min(window.innerWidth - 360, rect.left) + 'px';
+  pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  citePopoverEl = pop;
+  setTimeout(() => document.addEventListener('click', hideCitationPopover, { once: true }), 0);
+}
+// Signal card source article popover (per-card, not global cite registry)
+function showSignalCitePopover(ev, sourceJson, num) {
+  let src;
+  try { src = JSON.parse(sourceJson); } catch { return; }
+  hideCitationPopover();
+  const pop = document.createElement('div');
+  pop.className = 'cite-popover';
+  const fresh = src.publishedAt ? classifyFreshness(src.publishedAt, 30 * 24) : null;
+  const freshChip = fresh ? `<span class="trust-chip trust-chip-${fresh.level}" style="font-size:9px;margin-left:4px">${fresh.label}</span>` : '';
+  pop.innerHTML = `
+    <div class="cite-popover-title">[${num}] ${escapeHtml(src.title || 'Article')}</div>
+    <div class="cite-popover-meta">${escapeHtml(src.source || 'unknown')}${freshChip}</div>
+    ${src.publishedAt ? `<div class="cite-popover-meta" style="margin-top:4px">${escapeHtml(fmtDate(src.publishedAt))}</div>` : ''}
+    ${src.url ? `<div style="margin-top:6px"><a href="${escapeHtml(src.url)}" target="_blank" rel="noreferrer" style="color:var(--accent);font-size:11px">Open article</a></div>` : ''}
   `;
   document.body.appendChild(pop);
   const rect = ev.target.getBoundingClientRect();
