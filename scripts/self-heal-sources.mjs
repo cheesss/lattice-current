@@ -174,6 +174,41 @@ export async function runSourceSelfHeal(options = {}) {
       }
 
       if (!isTrustedFeedUrl(candidate.url)) {
+        // Phase 1 gate: probe before queuing
+        // eslint-disable-next-line no-await-in-loop
+        const { probeSource } = await import('./_shared/source-probe.mjs');
+        // eslint-disable-next-line no-await-in-loop
+        const probe = await probeSource(candidate.url, { theme: candidate.category });
+
+        const passGate = (probe.nextAction === 'register' || probe.nextAction === 'review')
+          && probe.qualityBreakdown.recentItemCount >= 3;
+
+        if (!passGate) {
+          // rejected before queue
+          // eslint-disable-next-line no-await-in-loop
+          await logAutomationAction(client, {
+            type: 'self-heal-source',
+            params: {
+              url: candidate.url,
+              feedName: candidate.feedName,
+              probeStatus: probe.status,
+              probeNextAction: probe.nextAction,
+              qualityScore: probe.qualityScore,
+              probeTraceId: probe.traceId,
+            },
+            result: probe.nextAction === 'manual-adapter' ? 'needs-adapter' : 'rejected',
+            reason: `probe gate: ${probe.nextAction}, quality=${probe.qualityScore.toFixed(2)}, errors=${probe.errors.map((e) => e.message).join('; ') || 'none'}`,
+          });
+          results.push({
+            url: candidate.url,
+            action: probe.nextAction === 'manual-adapter' ? 'needs-adapter' : 'rejected',
+            reason: `probe gate: quality=${probe.qualityScore.toFixed(2)}, nextAction=${probe.nextAction}`,
+            probeTraceId: probe.traceId,
+          });
+          continue;
+        }
+
+        // probe passed — queue with evidence
         // eslint-disable-next-line no-await-in-loop
         const queued = await queueForApproval(client, {
           type: 'add-rss',
@@ -182,8 +217,17 @@ export async function runSourceSelfHeal(options = {}) {
             name: candidate.feedName,
             theme: candidate.category,
             reason: candidate.reason,
+            // probe evidence
+            inputUrl: probe.inputUrl,
+            resolvedUrl: probe.resolvedUrl,
+            connectorKind: probe.connectorKind,
+            qualityScore: probe.qualityScore,
+            recentItemCount: probe.qualityBreakdown.recentItemCount,
+            sampleItems: probe.sampleItems.slice(0, 3),
+            warnings: probe.warnings,
+            probeTraceId: probe.traceId,
           },
-          reason: `untrusted feed domain queued by self-heal: ${candidate.url}`,
+          reason: `untrusted feed queued by self-heal after probe: ${candidate.url} (quality=${probe.qualityScore.toFixed(2)}, connector=${probe.connectorKind})`,
         });
         // eslint-disable-next-line no-await-in-loop
         await logAutomationAction(client, {
@@ -192,14 +236,22 @@ export async function runSourceSelfHeal(options = {}) {
             url: candidate.url,
             feedName: candidate.feedName,
             approvalId: queued.id,
+            resolvedUrl: probe.resolvedUrl,
+            connectorKind: probe.connectorKind,
+            qualityScore: probe.qualityScore,
+            probeTraceId: probe.traceId,
           },
           result: 'queued',
-          reason: 'untrusted feed domain awaiting approval',
+          reason: `probe passed (quality=${probe.qualityScore.toFixed(2)}, connector=${probe.connectorKind}), awaiting approval`,
         });
         results.push({
           url: candidate.url,
           action: 'approval',
           approvalId: queued.id,
+          resolvedUrl: probe.resolvedUrl,
+          connectorKind: probe.connectorKind,
+          qualityScore: probe.qualityScore,
+          probeTraceId: probe.traceId,
         });
         continue;
       }
@@ -278,6 +330,7 @@ export async function runSourceSelfHeal(options = {}) {
       activated: results.filter((item) => item.action === 'activated').length,
       queuedForApproval: results.filter((item) => item.action === 'approval').length,
       rejected: results.filter((item) => item.action === 'rejected').length,
+      needsAdapter: results.filter((item) => item.action === 'needs-adapter').length,
       results,
     };
   } finally {

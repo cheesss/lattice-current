@@ -60,6 +60,7 @@ loadOptionalEnvFile();
 const { Pool } = pg;
 const PORT = Number(process.env.DASHBOARD_PORT || 46200);
 const CACHE_DIR = path.resolve('data', 'event-dashboard-cache');
+const AUDIT_DIR = path.resolve('data', 'audits');
 const logger = createLogger('event-dashboard-api');
 let pool = null;
 let poolConfig = null;
@@ -103,6 +104,26 @@ const SIGNAL_LABELS = {
   transmissionStrength: 'Transmission',
   eventIntensity: 'Event Intensity',
 };
+
+const KPI_SIGNAL_CHANNELS = new Set([
+  'vix',
+  'yieldSpread',
+  'hy_credit_spread',
+  'dollarIndex',
+  'oilPrice',
+  'marketStress',
+  'transmissionStrength',
+]);
+
+const SIGNAL_STALE_THRESHOLD_HOURS = Object.freeze({
+  vix: 36,
+  yieldSpread: 48,
+  hy_credit_spread: 48,
+  dollarIndex: 48,
+  oilPrice: 120,
+  marketStress: 48,
+  transmissionStrength: 48,
+});
 
 const TOPIC_ARTICLE_GENERIC_TERMS = new Set([
   'attack',
@@ -416,14 +437,317 @@ async function writeJsonCache(name, payload) {
   await writeFile(path.join(CACHE_DIR, `${name}.json`), JSON.stringify(payload, null, 2));
 }
 
-function withMeta(payload, extra = {}) {
+const DATA_TIMESTAMP_KEYS = new Set([
+  'createdAt',
+  'created_at',
+  'updatedAt',
+  'updated_at',
+  'dataUpdatedAt',
+  'data_updated_at',
+  'oldestInternalUpdatedAt',
+  'oldest_internal_updated_at',
+  'latestInternalUpdatedAt',
+  'latest_internal_updated_at',
+  'publishedAt',
+  'published_at',
+  'completedAt',
+  'completed_at',
+  'recordedAt',
+  'recorded_at',
+  'capturedAt',
+  'captured_at',
+  'signalCapturedAt',
+  'signal_captured_at',
+  'rawSnapshotUpdatedAt',
+  'raw_snapshot_updated_at',
+  'eventDate',
+  'event_date',
+  'ts',
+]);
+
+const MODE_STALE_THRESHOLD_HOURS = Object.freeze({
+  live: 24,
+  cache: 24,
+  delayed: 72,
+  fallback: 0,
+});
+
+function toIsoTimestamp(value) {
+  if (value == null || value === '') return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date.toISOString();
+}
+
+function collectPayloadTimestamps(value, timestamps = [], depth = 0) {
+  if (!value || depth > 8) return timestamps;
+  if (Array.isArray(value)) {
+    for (const item of value) collectPayloadTimestamps(item, timestamps, depth + 1);
+    return timestamps;
+  }
+  if (typeof value !== 'object') return timestamps;
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'generatedAt' || key === 'generated_at') continue;
+    if (DATA_TIMESTAMP_KEYS.has(key)) {
+      const iso = toIsoTimestamp(child);
+      if (iso) timestamps.push(Date.parse(iso));
+      continue;
+    }
+    if (child && typeof child === 'object') {
+      collectPayloadTimestamps(child, timestamps, depth + 1);
+    }
+  }
+  return timestamps;
+}
+
+function latestInternalTimestamp(payload) {
+  const timestamps = collectPayloadTimestamps(payload).filter((value) => Number.isFinite(value));
+  if (!timestamps.length) return null;
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function firstTimestamp(...values) {
+  for (const value of values) {
+    const iso = toIsoTimestamp(value);
+    if (iso) return iso;
+  }
+  return null;
+}
+
+function inferResponseMode(payload, extra) {
+  const payloadMeta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+  if (extra.mode) return String(extra.mode);
+  if (payloadMeta.mode) return String(payloadMeta.mode);
+  if (extra.cacheHit || payloadMeta.cacheHit) return 'cache';
+  const text = [
+    extra.window,
+    payloadMeta.window,
+    payload?.window,
+    extra.source,
+    payloadMeta.source,
+    payload?.source,
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (text.includes('fallback')) return 'fallback';
+  return 'live';
+}
+
+function signalAgeHours(ts) {
+  const iso = toIsoTimestamp(ts);
+  if (!iso) return null;
+  const age = (Date.now() - Date.parse(iso)) / 3_600_000;
+  return Number.isFinite(age) ? age : null;
+}
+
+export function classifySignalQuality(channel, latestRow = {}, samples = []) {
+  const normalizedChannel = String(channel || latestRow.signal_name || latestRow.channel || '').trim();
+  const maxAgeHours = SIGNAL_STALE_THRESHOLD_HOURS[normalizedChannel] ?? 48;
+  const updatedAt = toIsoTimestamp(latestRow.ts || latestRow.updatedAt);
+  const ageHours = signalAgeHours(updatedAt);
+  const normalizedSamples = samples
+    .map((sample) => ({
+      ts: toIsoTimestamp(sample.ts || sample.updatedAt),
+      value: Number(sample.value),
+    }))
+    .filter((sample) => sample.ts && Number.isFinite(sample.value))
+    .sort((left, right) => Date.parse(right.ts) - Date.parse(left.ts));
+
+  const latestValue = Number(latestRow.value);
+  let repeatedCount = 0;
+  if (Number.isFinite(latestValue)) {
+    const latestRounded = latestValue.toFixed(6);
+    for (const sample of normalizedSamples) {
+      if (Number(sample.value).toFixed(6) !== latestRounded) break;
+      repeatedCount += 1;
+    }
+  }
+  const mirrored = normalizedSamples.length >= 6 && repeatedCount >= 6;
+  const stale = ageHours == null || ageHours > maxAgeHours;
+  const status = mirrored ? 'mirrored' : stale ? 'stale' : 'observed';
+  const reason = mirrored
+    ? `latest ${repeatedCount} samples repeat the same value`
+    : stale
+      ? (ageHours == null ? 'missing signal timestamp' : `signal age ${Math.round(ageHours)}h exceeds ${maxAgeHours}h threshold`)
+      : null;
+
+  return {
+    status,
+    mirrored,
+    stale,
+    repeatedCount,
+    ageHours: Number.isFinite(ageHours) ? Math.round(ageHours * 10) / 10 : null,
+    maxAgeHours,
+    reason,
+  };
+}
+
+async function loadLatestSignalsWithQuality() {
+  const [latestSignalsR, signalSamplesR] = await Promise.all([
+    safeQuery(`
+      SELECT DISTINCT ON (signal_name) signal_name, ts, value
+      FROM signal_history
+      ORDER BY signal_name, ts DESC
+    `),
+    safeQuery(`
+      WITH ranked AS (
+        SELECT
+          signal_name,
+          ts,
+          value,
+          ROW_NUMBER() OVER (PARTITION BY signal_name ORDER BY ts DESC) AS rn
+        FROM signal_history
+      )
+      SELECT signal_name, ts, value
+      FROM ranked
+      WHERE rn <= 12
+      ORDER BY signal_name, ts DESC
+    `),
+  ]);
+  const samplesBySignal = new Map();
+  for (const row of signalSamplesR.rows) {
+    const key = String(row.signal_name || '');
+    if (!samplesBySignal.has(key)) samplesBySignal.set(key, []);
+    samplesBySignal.get(key).push(row);
+  }
+  const rows = latestSignalsR.rows.map((row) => {
+    const signalName = String(row.signal_name || '');
+    return {
+      signal_name: signalName,
+      ts: row.ts,
+      value: Number(row.value || 0),
+      quality: classifySignalQuality(signalName, row, samplesBySignal.get(signalName) || []),
+    };
+  });
+  const qualityBySignal = Object.fromEntries(rows.map((row) => [row.signal_name, row.quality]));
+  const criticalRows = rows.filter((row) => KPI_SIGNAL_CHANNELS.has(row.signal_name));
+  const degradedRows = criticalRows.filter((row) => row.quality.status !== 'observed');
+  const mirroredRows = degradedRows.filter((row) => row.quality.status === 'mirrored');
+  const staleRows = degradedRows.filter((row) => row.quality.status === 'stale');
+  const mode = mirroredRows.length > 0 ? 'delayed' : 'live';
+  const stale = staleRows.length > 0 || mirroredRows.length > 0;
+  const staleReason = mirroredRows.length > 0
+    ? `${mirroredRows.map((row) => SIGNAL_LABELS[row.signal_name] || row.signal_name).join(', ')} signal history appears mirrored`
+    : staleRows.length > 0
+      ? `${staleRows.map((row) => SIGNAL_LABELS[row.signal_name] || row.signal_name).join(', ')} signal history is stale`
+      : null;
+  return {
+    rows,
+    qualityBySignal,
+    mode,
+    stale,
+    staleReason,
+  };
+}
+
+async function detectLiveQuoteFeed() {
+  const tableCheck = await safeQuery(`SELECT to_regclass('market_quotes') AS table_name`);
+  const configured = Boolean(tableCheck.rows?.[0]?.table_name);
+  if (!configured) {
+    return {
+      configured: false,
+      status: 'unavailable',
+      table: 'market_quotes',
+      reason: 'market_quotes table not found; KPI strip is using signal_history, not a live quote feed',
+    };
+  }
+  const quote = await safeQuery(`
+    SELECT symbol, provider, observed_at, fetched_at, last_price
+    FROM market_quotes
+    WHERE symbol = '^VIX'
+    ORDER BY fetched_at DESC
+    LIMIT 1
+  `);
+  const latest = quote.rows?.[0] || null;
+  if (!latest) {
+    return {
+      configured: true,
+      status: 'empty',
+      table: 'market_quotes',
+      reason: 'market_quotes exists but has no ^VIX rows',
+    };
+  }
+  const fetchedAt = toIsoTimestamp(latest.fetched_at);
+  const observedAt = toIsoTimestamp(latest.observed_at);
+  const fetchedAgeHours = signalAgeHours(fetchedAt);
+  const observedAgeHours = signalAgeHours(observedAt);
+  const stale = fetchedAgeHours == null || fetchedAgeHours > 4 || observedAgeHours == null || observedAgeHours > 36;
+  return {
+    configured: true,
+    status: stale ? 'stale' : 'configured',
+    table: 'market_quotes',
+    symbol: String(latest.symbol || '^VIX'),
+    provider: String(latest.provider || 'unknown'),
+    fetchedAt,
+    observedAt,
+    lastPrice: Number(latest.last_price),
+    fetchedAgeHours: Number.isFinite(fetchedAgeHours) ? Math.round(fetchedAgeHours * 10) / 10 : null,
+    observedAgeHours: Number.isFinite(observedAgeHours) ? Math.round(observedAgeHours * 10) / 10 : null,
+    reason: stale ? 'market_quotes ^VIX row is stale or missing observed time' : null,
+  };
+}
+
+export function deriveResponseMeta(payload = {}, extra = {}) {
+  const payloadMeta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+  const generatedAt = firstTimestamp(extra.generatedAt) || new Date().toISOString();
+  const latestInternalUpdatedAt = firstTimestamp(
+    extra.latestInternalUpdatedAt,
+    payloadMeta.latestInternalUpdatedAt,
+    payload.latestInternalUpdatedAt,
+  ) || latestInternalTimestamp(payload);
+  const dataUpdatedAt = firstTimestamp(
+    extra.dataUpdatedAt,
+    payloadMeta.dataUpdatedAt,
+    payload.dataUpdatedAt,
+    payloadMeta.updatedAt,
+    payload.updatedAt,
+    latestInternalUpdatedAt,
+  );
+  const windowLabel = extra.window ?? payloadMeta.window ?? payload.window ?? null;
+  const source = extra.source ?? payloadMeta.source ?? payload.source ?? null;
+  const mode = inferResponseMode(payload, extra);
+  const staleThresholdHours = extra.maxAgeHours
+    ?? payloadMeta.maxAgeHours
+    ?? MODE_STALE_THRESHOLD_HOURS[mode]
+    ?? null;
+
+  let stale = Boolean(payloadMeta.stale) || Boolean(extra.stale);
+  let staleReason = extra.staleReason || payloadMeta.staleReason || null;
+  if (mode === 'fallback') {
+    stale = true;
+    staleReason ||= `fallback data window${windowLabel ? `: ${windowLabel}` : ''}`;
+  }
+  if (extra.cacheHit || payloadMeta.cacheHit) {
+    stale = true;
+    staleReason ||= extra.cacheReason || payloadMeta.cacheReason || 'served from cache after refresh failure';
+  }
+  if (dataUpdatedAt && Number.isFinite(Number(staleThresholdHours)) && staleThresholdHours > 0) {
+    const ageHours = (Date.now() - Date.parse(dataUpdatedAt)) / 3_600_000;
+    if (Number.isFinite(ageHours) && ageHours > staleThresholdHours) {
+      stale = true;
+      staleReason ||= `data age ${Math.round(ageHours)}h exceeds ${staleThresholdHours}h ${mode} threshold`;
+    }
+  }
+
+  return {
+    generatedAt,
+    updatedAt: dataUpdatedAt,
+    dataUpdatedAt,
+    latestInternalUpdatedAt,
+    mode,
+    window: windowLabel,
+    source,
+    stale,
+    staleReason,
+  };
+}
+
+export function withMeta(payload, extra = {}) {
+  const payloadMeta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+  const derived = deriveResponseMeta(payload, extra);
   return {
     ...payload,
     meta: {
-      updatedAt: new Date().toISOString(),
-      stale: false,
-      ...payload.meta,
+      ...payloadMeta,
       ...extra,
+      ...derived,
     },
   };
 }
@@ -453,6 +777,8 @@ async function resolveWithCache(cacheKey, buildPayload) {
     if (cached) {
       logger.metric('api.cache_hit', 1, { cacheKey });
       return buildJsonResponse(withMeta(cached, {
+        cacheHit: true,
+        mode: 'cache',
         stale: true,
         cacheReason: String(error?.message || error || 'cache fallback'),
       }));
@@ -752,12 +1078,9 @@ async function buildMapLensOverlayPayload(params) {
 }
 
 async function buildLiveStatus() {
-  const [signalsR, tempsR, pendingR, articlesR, recentThemesR] = await Promise.all([
-    safeQuery(`
-      SELECT DISTINCT ON (signal_name) signal_name, ts, value
-      FROM signal_history
-      ORDER BY signal_name, ts DESC
-    `),
+  const [signalState, quoteFeed, tempsR, pendingR, articlesR, recentThemesR] = await Promise.all([
+    loadLatestSignalsWithQuality(),
+    detectLiveQuoteFeed(),
     safeQuery(`
       SELECT DISTINCT ON (theme) theme, normalized_temperature
       FROM event_hawkes_intensity
@@ -795,31 +1118,36 @@ async function buildLiveStatus() {
     };
   });
 
-  const signals = signalsR.rows.map((row) => {
+  const signals = signalState.rows.map((row) => {
     const channel = String(row.signal_name || '');
     return {
       channel,
       value: Number(row.value || 0),
       label: SIGNAL_LABELS[channel] || channel,
       updatedAt: row.ts,
+      quality: row.quality,
     };
   });
 
   return {
     temperatures,
     signals,
+    signalQuality: signalState.qualityBySignal,
     pending: Number(pendingR.rows[0]?.count || 0),
     todayArticles: Number(articlesR.rows[0]?.count || 0),
+    meta: {
+      mode: signalState.mode,
+      stale: signalState.stale || quoteFeed.status !== 'configured',
+      staleReason: [signalState.staleReason, quoteFeed.status === 'configured' ? null : quoteFeed.reason].filter(Boolean).join('; ') || null,
+      quoteFeed,
+    },
   };
 }
 
 async function buildSignalSummary() {
-  const [latestSignalsR, vixHistoryR] = await Promise.all([
-    safeQuery(`
-      SELECT DISTINCT ON (signal_name) signal_name, ts, value
-      FROM signal_history
-      ORDER BY signal_name, ts DESC
-    `),
+  const [signalState, quoteFeed, vixHistoryR] = await Promise.all([
+    loadLatestSignalsWithQuality(),
+    detectLiveQuoteFeed(),
     safeQuery(`
       SELECT ts, value
       FROM signal_history
@@ -830,11 +1158,7 @@ async function buildSignalSummary() {
     `),
   ]);
 
-  const rows = latestSignalsR.rows.map((row) => ({
-    signal_name: String(row.signal_name || ''),
-    ts: row.ts,
-    value: Number(row.value || 0),
-  }));
+  const rows = signalState.rows;
   const lookup = Object.fromEntries(rows.map((row) => [row.signal_name, row.value]));
   const vix = Number(lookup.vix);
   const riskGauge = Number.isFinite(vix)
@@ -855,6 +1179,13 @@ async function buildSignalSummary() {
     riskState,
     vixHistory: vixHistoryR.rows.map((row) => Number(row.value || 0)).filter((value) => Number.isFinite(value)),
     rows,
+    signalQuality: signalState.qualityBySignal,
+    meta: {
+      mode: signalState.mode,
+      stale: signalState.stale || quoteFeed.status !== 'configured',
+      staleReason: [signalState.staleReason, quoteFeed.status === 'configured' ? null : quoteFeed.reason].filter(Boolean).join('; ') || null,
+      quoteFeed,
+    },
   };
 }
 
@@ -1130,6 +1461,47 @@ async function buildHealth() {
 
 async function buildDataQuality() {
   return computeDataQualityMetrics(getPool());
+}
+
+async function loadLatestDataFreshnessAudit() {
+  if (!existsSync(AUDIT_DIR)) {
+    return {
+      ok: false,
+      error: 'No data freshness audit directory found',
+      auditPath: null,
+      summary: null,
+      findings: [],
+    };
+  }
+  const files = (await readdir(AUDIT_DIR))
+    .filter((name) => /^data-freshness-\d{4}-\d{2}-\d{2}\.json$/.test(name))
+    .sort()
+    .reverse();
+  if (!files.length) {
+    return {
+      ok: false,
+      error: 'No data freshness audit artifact found',
+      auditPath: null,
+      summary: null,
+      findings: [],
+    };
+  }
+  const file = files[0];
+  const auditPath = path.join(AUDIT_DIR, file);
+  const payload = JSON.parse(await readFile(auditPath, 'utf8'));
+  return {
+    ok: true,
+    auditPath: path.relative(process.cwd(), auditPath).replace(/\\/g, '/'),
+    generatedAt: payload.generatedAt || null,
+    summary: payload.summary || null,
+    findings: Array.isArray(payload.findings) ? payload.findings : [],
+    nas: payload.nas || null,
+    backfill: payload.backfill || null,
+    cache: {
+      checkedFiles: payload.cache?.checkedFiles || 0,
+      issues: Array.isArray(payload.cache?.issues) ? payload.cache.issues.slice(0, 20) : [],
+    },
+  };
 }
 
 async function buildCodexQuality() {
@@ -1804,6 +2176,22 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       });
     }
 
+    if (execution?.skipped === true) {
+      const skipNote = `skipped: ${execution.reason || execution.summary || 'execution skipped without registration'}`;
+      const reviewed = await markApprovalReviewed(getPool(), queueId, {
+        decision: 'needs-fix',
+        reviewer,
+        note: skipNote,
+      });
+      return buildJsonResponse({
+        approval: reviewed,
+        execution,
+        alreadyFinal: false,
+        skipped: true,
+        needsFix: true,
+      });
+    }
+
     const note = execution?.summary
       || execution?.reason
       || `Executed ${String(approval.action_type || 'approval action')}`;
@@ -1875,15 +2263,19 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'kpi-summary') {
-      return buildJsonResponse(await buildSignalSummary());
+      return buildJsonResponse(withMeta(await buildSignalSummary()));
     }
 
     if (segments[0] === 'api' && segments[1] === 'signals' && segments.length === 2) {
-      return buildJsonResponse(await buildSignalSummary());
+      return buildJsonResponse(withMeta(await buildSignalSummary()));
     }
 
     if (segments[0] === 'api' && segments[1] === 'data-quality') {
       return buildJsonResponse(await buildDataQuality());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'data-freshness-audit') {
+      return buildJsonResponse(await loadLatestDataFreshnessAudit());
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-quality') {

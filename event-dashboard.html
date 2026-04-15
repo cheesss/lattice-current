@@ -4,16 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lattice Signal Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0d09;--surface:#171f16;--surface2:#202a1f;--border:#2f3d2e;--text:#edf3e7;--muted:#8fa286;--accent:#c5ff6d;--accent2:#7ee081;--amber:#f3b562;--red:#ff7a6b;--teal:#67d1c5;--blue:#7ca9ff}
+:root{
+  --bg-void:#07080a;--bg-base:#0d0f13;--bg-surface:#13161d;--bg-elevated:#1c2028;--bg-overlay:rgba(13,15,19,.92);
+  --border-dim:rgba(255,255,255,.04);--border-base:rgba(255,255,255,.08);--border-focus:rgba(255,255,255,.18);
+  --signal-green:#16c784;--amber-risk:#f59e0b;--red-critical:#ef4444;--blue-info:#3b82f6;--graphite:#4b5563;
+  --text-loud:rgba(255,255,255,.95);--text-base:rgba(255,255,255,.75);--text-soft:rgba(255,255,255,.45);--text-muted:rgba(255,255,255,.25);
+  --font-sans:'Geist',Inter,system-ui,sans-serif;--font-mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --bg:var(--bg-void);--surface:var(--bg-surface);--surface2:var(--bg-elevated);--border:var(--border-base);--text:var(--text-loud);--muted:var(--text-soft);
+  --accent:#d8f99d;--accent2:var(--signal-green);--amber:var(--amber-risk);--red:var(--red-critical);--teal:#67d1c5;--blue:var(--blue-info)
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(circle at top left,rgba(197,255,109,.08),transparent 28%),radial-gradient(circle at top right,rgba(243,181,98,.08),transparent 24%),linear-gradient(180deg,#090c08 0%,#0d120c 40%,#0a0d09 100%);color:var(--text);font-family:SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;font-size:12px;line-height:1.55}
+body{background:radial-gradient(circle at top left,rgba(22,199,132,.1),transparent 26%),radial-gradient(circle at top right,rgba(59,130,246,.08),transparent 24%),linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 48%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:12px;line-height:1.55;font-feature-settings:"tnum" 1,"ss01" 1}
 a{color:var(--text)}
 .container{max-width:1680px;margin:0 auto;padding:18px}
 .hero,.section-block,.surface-drawer{border:1px solid rgba(255,255,255,.05);border-radius:18px;background:rgba(17,23,15,.8)}
-.hero{display:flex;justify-content:space-between;gap:18px;padding:20px}
+.hero{display:flex;justify-content:space-between;gap:18px;padding:20px;background:linear-gradient(135deg,rgba(19,22,29,.94),rgba(7,8,10,.86));box-shadow:0 24px 80px rgba(0,0,0,.26)}
 .eyebrow{color:var(--amber);text-transform:uppercase;letter-spacing:.22em;font-size:10px;margin-bottom:8px}
-h1{font-size:28px;line-height:1.1;letter-spacing:.04em;color:var(--accent);margin-bottom:10px}
+h1{font-size:28px;line-height:1.1;letter-spacing:.02em;color:var(--text-loud);margin-bottom:10px;font-weight:600}
 .subtitle{max-width:860px;color:var(--muted);font-size:13px}
 .hero-actions{min-width:380px;display:flex;flex-direction:column;gap:12px;align-items:flex-end}
 .tabs,.toolbar,.inline-toolbar,.pill-row,.legend,.event-reactions{display:flex;gap:8px;flex-wrap:wrap}
@@ -39,9 +50,9 @@ select{padding:7px 12px;min-width:168px}
 .section-kicker{color:var(--amber);text-transform:uppercase;letter-spacing:.18em;font-size:10px;margin-bottom:4px}
 .section-title{color:var(--accent);font-size:17px}
 .section-meta{text-align:right}
-.card,.subcard,.stage-column,.category-card,.insight-card,.interactive-row,.story-card,.stage-item,.kpi,.info-note{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:14px}
+.card,.subcard,.stage-column,.category-card,.insight-card,.interactive-row,.story-card,.stage-item,.kpi,.info-note{background:rgba(255,255,255,.025);border:1px solid var(--border-dim);border-radius:14px}
 .card{padding:14px}
-.accent-card{border-color:rgba(197,255,109,.18);background:linear-gradient(155deg,rgba(32,43,22,.95),rgba(20,26,17,.97))}
+.accent-card{border-color:rgba(22,199,132,.26);background:linear-gradient(155deg,rgba(22,199,132,.12),rgba(19,22,29,.97))}
 .sticky-card{position:sticky;top:12px}
 .subcard,.category-card,.insight-card,.interactive-row,.story-card,.stage-item,.kpi,.info-note{padding:12px}
 .interactive-row[onclick]{cursor:pointer;transition:border-color .15s ease,background .15s ease}
@@ -140,10 +151,10 @@ th{color:var(--muted);font-weight:normal}
 @media (max-width:1320px){.hero,.section-heading{flex-direction:column;align-items:flex-start}.hero-actions{min-width:0;align-items:flex-start}.hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.snapshot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3,.mini-grid,.pyramid-grid,.category-grid,.grid2,.reference-grid,.primary-grid,.kpi-grid,.map-grid{grid-template-columns:1fr}.span-5,.span-7,.span-2{grid-column:span 1}}
 @media (max-width:760px){.container{padding:12px}.hero{padding:16px}h1{font-size:22px}.hero-grid,.snapshot-grid{grid-template-columns:1fr}.story-card{grid-template-columns:1fr}.story-rank{width:34px;height:34px}.embed-frame{height:clamp(520px,66vh,760px)}}
 /* KPI Strip */
-.kpi-strip{display:flex;gap:12px;padding:12px 0;overflow-x:auto;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
-.kpi-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:999px}
+.kpi-strip{display:flex;gap:8px;padding:0;overflow-x:auto;margin:0;flex-wrap:wrap;flex:1}
+.kpi-chip{display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(255,255,255,.035);border:1px solid var(--border-dim);border-radius:999px}
 .kpi-chip-label{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-.kpi-chip-value{font-size:14px;font-weight:700;color:var(--text)}
+.kpi-chip-value{font-size:13px;font-weight:700;color:var(--text);font-family:var(--font-mono)}
 .kpi-chip-value.kpi-accent{color:var(--accent)}
 .kpi-chip-value.kpi-negative{color:var(--red)}
 .kpi-chip-value.kpi-positive{color:var(--accent2)}
@@ -181,10 +192,31 @@ th{color:var(--muted);font-weight:normal}
 .lang-toggle button{padding:4px 10px;font-size:10px;font-weight:600;background:transparent;color:var(--muted);border:none;cursor:pointer;letter-spacing:.05em}
 .lang-toggle button.active{background:var(--accent);color:var(--bg)}
 /* Signal Queue */
-.signal-queue{margin:10px 0 14px}
-.signal-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
-.signal-card{padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
-.signal-card:hover{border-color:rgba(126,224,129,.25)}
+.decision-cockpit{position:relative;margin:14px 0 18px;padding:14px;border:1px solid var(--border-base);border-radius:22px;background:linear-gradient(145deg,rgba(19,22,29,.9),rgba(7,8,10,.78));box-shadow:0 30px 120px rgba(0,0,0,.22);overflow:hidden}
+.decision-cockpit::before{content:"";position:absolute;inset:-1px;background:radial-gradient(circle at 82% 10%,rgba(22,199,132,.14),transparent 28%),radial-gradient(circle at 12% 78%,rgba(59,130,246,.1),transparent 28%);pointer-events:none}
+.decision-cockpit>*{position:relative}
+.regime-strip{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--border-dim);border-radius:16px;background:rgba(255,255,255,.025);backdrop-filter:blur(16px)}
+.regime-strip-title{min-width:132px;color:var(--text-soft);font-size:10px;text-transform:uppercase;letter-spacing:.18em}
+.kpi-freshness{min-width:180px;display:flex;align-items:center}
+.kpi-freshness .trust-row{margin:0}
+.kpi-detail-drawer{margin-top:8px}
+.kpi-detail-drawer>summary{cursor:pointer;color:var(--text-soft);font-size:10px;letter-spacing:.12em;text-transform:uppercase;list-style:none}
+.kpi-detail-drawer>summary::-webkit-details-marker{display:none}
+.cockpit-grid{display:grid;grid-template-columns:minmax(280px,.86fr) minmax(420px,1.45fr);grid-template-areas:"decision signals" "proof proof";gap:12px;margin-top:12px}
+.cockpit-panel{min-height:160px;padding:14px;border:1px solid var(--border-dim);border-radius:18px;background:rgba(255,255,255,.025);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.priority-decision-card{grid-area:decision;border-left:3px solid var(--amber-risk)}
+.action-signal-panel{grid-area:signals}
+.selected-proof-panel{grid-area:proof;min-height:118px}
+.cockpit-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.cockpit-kicker{color:var(--text-soft);font-size:10px;text-transform:uppercase;letter-spacing:.16em}
+.top-decision-title,.proof-title{font-size:15px;font-weight:600;color:var(--text-loud);line-height:1.25}
+.top-decision-meta,.proof-meta{margin-top:6px;color:var(--text-soft);font-size:11px}
+.top-decision-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.signal-queue{margin:0}
+.signal-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;max-height:390px;overflow:auto;padding-right:4px}
+.signal-card{padding:14px;border-radius:14px;background:linear-gradient(145deg,rgba(28,32,40,.72),rgba(13,15,19,.92));border:1px solid var(--border-base);display:flex;flex-direction:column;gap:8px;transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.signal-card:hover{border-color:rgba(22,199,132,.35);transform:translateY(-1px)}
+.signal-card.selected{border-color:rgba(22,199,132,.7);box-shadow:0 0 0 1px rgba(22,199,132,.24),0 18px 40px rgba(0,0,0,.2)}
 .signal-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .signal-dir{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.05em}
 .signal-dir.long{background:rgba(126,224,129,.15);color:#7ee081}
@@ -201,6 +233,12 @@ th{color:var(--muted);font-weight:normal}
 .signal-citations{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
 .signal-cite{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;text-decoration:none;border:1px solid transparent}
 .signal-cite:hover{border-color:var(--accent);color:var(--accent)}
+.proof-chain{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.proof-step{padding:10px;border-radius:12px;border:1px solid var(--border-dim);background:rgba(255,255,255,.025)}
+.proof-step-label{font-size:9px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.14em}
+.proof-step-value{margin-top:4px;color:var(--text-loud);font-size:12px;font-weight:600}
+@media (max-width:1100px){.regime-strip{align-items:flex-start;flex-direction:column}.cockpit-grid{grid-template-columns:1fr;grid-template-areas:"decision" "signals" "proof"}.proof-chain{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.decision-cockpit{padding:10px}.proof-chain{grid-template-columns:1fr}.signal-card-grid{grid-template-columns:1fr;max-height:none}}
 /* Stale/Fallback badges (legacy) */
 .stale-badge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(250,204,21,.12);color:#facc15;border:1px solid rgba(250,204,21,.2);margin-bottom:8px;letter-spacing:.02em}
 .stale-badge.critical{background:rgba(239,68,68,.12);color:#ef4444;border-color:rgba(239,68,68,.2)}
@@ -230,10 +268,14 @@ th{color:var(--muted);font-weight:normal}
 .inbox-container{display:grid;grid-template-columns:minmax(320px,400px) 1fr;gap:14px;margin:14px 0}
 @media (max-width:1024px){.inbox-container{grid-template-columns:1fr}}
 .inbox-list{display:flex;flex-direction:column;gap:6px;max-height:720px;overflow-y:auto;padding-right:4px}
-.inbox-item{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:.15s ease;display:flex;flex-direction:column;gap:4px}
+.inbox-item{padding:10px 12px;border-radius:10px;border:1px solid var(--border);border-left:3px solid var(--amber-risk);background:var(--surface);cursor:pointer;transition:opacity .2s ease,transform .2s ease,border-color .15s ease,background .15s ease;display:flex;flex-direction:column;gap:4px}
 .inbox-item:hover{border-color:rgba(126,224,129,.25);background:rgba(255,255,255,.03)}
 .inbox-item.selected{border-color:var(--accent);background:rgba(126,224,129,.06)}
 .inbox-item.snoozed{opacity:.5}
+.inbox-item.accepted{border-left-color:var(--signal-green);opacity:0;transform:translateX(12px);pointer-events:none}
+.inbox-item.rejected{border-left-color:var(--red-critical);opacity:0;transform:translateX(-12px);pointer-events:none}
+.inbox-item.simulated{border-left-color:var(--blue-info)}
+.inbox-item.failed{border-left-color:var(--red-critical);background:rgba(239,68,68,.08)}
 .inbox-item-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
 .inbox-item-title{font-weight:600;font-size:12px;color:var(--text);line-height:1.3}
 .inbox-item-meta{font-size:10px;color:var(--muted)}
@@ -248,6 +290,11 @@ th{color:var(--muted);font-weight:normal}
 .inbox-result.warning{border-color:rgba(250,204,21,.24);background:rgba(250,204,21,.07)}
 .inbox-result.error{border-color:rgba(239,68,68,.28);background:rgba(239,68,68,.07)}
 .inbox-result.info{border-color:rgba(96,165,250,.25);background:rgba(96,165,250,.07)}
+.inbox-status-banner{margin:0 0 10px;padding:9px 11px;border-radius:10px;border:1px solid var(--border-base);font-size:11px;color:var(--text-base)}
+.inbox-status-banner.pending{border-color:rgba(245,158,11,.2);background:rgba(245,158,11,.08)}
+.inbox-status-banner.simulated{border-color:rgba(59,130,246,.25);background:rgba(59,130,246,.09)}
+.inbox-status-banner.accepted{border-color:rgba(22,199,132,.25);background:rgba(22,199,132,.09)}
+.inbox-status-banner.rejected,.inbox-status-banner.failed{border-color:rgba(239,68,68,.25);background:rgba(239,68,68,.09)}
 .runtime-issue-row{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);margin-bottom:6px}
 .runtime-issue-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .runtime-issue-error{font-size:11px;color:var(--muted);margin-top:2px;word-break:break-all}
@@ -261,6 +308,11 @@ th{color:var(--muted);font-weight:normal}
 .inbox-result-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px}
 .inbox-result-copy{color:var(--muted);font-size:11px;line-height:1.55}
 .inbox-result-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.probe-samples{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+.probe-sample-item{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.probe-meta-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.probe-meta-tag{font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,.06);color:var(--muted);font-weight:500}
+.needs-fix-banner{border-color:rgba(250,204,21,.35)!important;background:rgba(250,204,21,.08)!important}
 .inbox-actions{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .inbox-btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid transparent;cursor:pointer;transition:.15s ease;letter-spacing:.02em}
 .inbox-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.6)}
@@ -311,6 +363,7 @@ th{color:var(--muted);font-weight:normal}
       <div class="toolbar">
         <label class="select-label">Evolution lens <select id="evolution-parent-select"></select></label>
         <button class="btn" onclick="refreshAll()">Refresh</button>
+        <a class="btn" href="/showcase.html" target="_blank" rel="noreferrer">Showcase</a>
         <span id="last-update"></span>
       </div>
     </div>
@@ -325,24 +378,51 @@ th{color:var(--muted);font-weight:normal}
     <button class="surface-nav-btn" data-surface="ops" onclick="switchSurface('ops')">Ops</button>
   </nav>
 
-  <!-- Global bar: KPI + E2 queue visible on all surfaces (monitoring context) -->
-  <!-- KPI Summary Bar -->
-  <div class="kpi-strip" id="kpi-strip">
-    <div class="kpi-chip" title="CBOE Volatility Index"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
-    <div class="kpi-chip" title="Composite risk gauge (4-100)"><span class="kpi-chip-label">Risk</span><span class="kpi-chip-value" id="kpi-risk">--</span><div class="kpi-gauge-bar"><div class="kpi-gauge-fill" id="kpi-risk-fill"></div></div></div>
-    <div class="kpi-chip" title="Current market regime classification"><span class="kpi-chip-label">Regime</span><span class="kpi-regime-badge" id="kpi-regime">--</span></div>
-    <div class="kpi-chip" title="10Y-2Y Treasury yield spread"><span class="kpi-chip-label">Spread</span><span class="kpi-chip-value" id="kpi-spread">--</span></div>
-    <div class="kpi-chip" title="WTI Crude Oil price (USD)"><span class="kpi-chip-label">Oil</span><span class="kpi-chip-value" id="kpi-oil">--</span></div>
-    <div class="kpi-chip" title="US Dollar Index"><span class="kpi-chip-label">Dollar</span><span class="kpi-chip-value" id="kpi-dollar">--</span></div>
-    <div class="kpi-chip" title="Statistically significant event-asset signals"><span class="kpi-chip-label">E2 Signals</span><span class="kpi-chip-value kpi-accent" id="kpi-e2">0</span></div>
-  </div>
-  <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals (E2 = matched-control uplift with t &gt; 1.96).</div>
-
-  <!-- E2 Signal Queue ??top actionable signals with evidence (visible on all surfaces as top priority) -->
-  <div id="e2-signal-queue" class="signal-queue" style="display:none">
-    <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span> <span style="float:right;font-size:10px;color:var(--muted);font-weight:normal">Click a card for details | <a href="#inbox" onclick="switchSurface('inbox');return false;" style="color:var(--accent)">Open Decision Inbox</a></span></div>
-    <div id="e2-signal-cards" class="signal-card-grid"></div>
-  </div>
+  <section class="decision-cockpit" aria-label="Alert proof action cockpit">
+    <div class="regime-strip">
+      <div class="regime-strip-title">Regime Strip</div>
+      <div class="kpi-strip" id="kpi-strip">
+        <div class="kpi-chip" title="CBOE Volatility Index"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
+        <div class="kpi-chip" title="Composite risk gauge (4-100)"><span class="kpi-chip-label">Risk</span><span class="kpi-chip-value" id="kpi-risk">--</span><div class="kpi-gauge-bar"><div class="kpi-gauge-fill" id="kpi-risk-fill"></div></div></div>
+        <div class="kpi-chip" title="Current market regime classification"><span class="kpi-chip-label">Regime</span><span class="kpi-regime-badge" id="kpi-regime">--</span></div>
+        <div class="kpi-chip" title="10Y-2Y Treasury yield spread"><span class="kpi-chip-label">Spread</span><span class="kpi-chip-value" id="kpi-spread">--</span></div>
+        <div class="kpi-chip" title="WTI Crude Oil price (USD)"><span class="kpi-chip-label">Oil</span><span class="kpi-chip-value" id="kpi-oil">--</span></div>
+        <div class="kpi-chip" title="US Dollar Index"><span class="kpi-chip-label">Dollar</span><span class="kpi-chip-value" id="kpi-dollar">--</span></div>
+        <div class="kpi-chip" title="Statistically significant event-asset signals"><span class="kpi-chip-label">E2 Signals</span><span class="kpi-chip-value kpi-accent" id="kpi-e2">0</span></div>
+      </div>
+      <div id="kpi-freshness" class="kpi-freshness"></div>
+    </div>
+    <details class="kpi-detail-drawer">
+      <summary>How to read this strip</summary>
+      <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX, composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals. E2 means matched-control uplift with t &gt; 1.96.</div>
+    </details>
+    <div class="cockpit-grid">
+      <div class="cockpit-panel priority-decision-card">
+        <div class="cockpit-title-row">
+          <div class="cockpit-kicker">Pending Decision</div>
+          <span class="badge" id="top-decision-badge">waiting</span>
+        </div>
+        <div id="top-decision-card">
+          <div class="top-decision-title">Loading review queue...</div>
+          <div class="top-decision-meta">The highest urgency approval, proposal, or discovery item will appear here.</div>
+        </div>
+      </div>
+      <div class="cockpit-panel action-signal-panel">
+        <div id="e2-signal-queue" class="signal-queue">
+          <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span> <span style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:normal">Click a card for proof | <a href="#inbox" onclick="switchSurface('inbox');return false;" style="color:var(--accent)">Open Decision Inbox</a></span></div>
+          <div id="e2-signal-cards" class="signal-card-grid"><div class="meta-line">Loading E2 signal queue...</div></div>
+        </div>
+      </div>
+      <div class="cockpit-panel selected-proof-panel" id="selected-proof-card">
+        <div class="cockpit-title-row">
+          <div class="cockpit-kicker">Selected Proof</div>
+          <span class="badge">evidence chain</span>
+        </div>
+        <div class="proof-title">Select an actionable signal or inbox item.</div>
+        <div class="proof-meta">This panel summarizes direction, uplift, t-stat, controls, citations, and freshness without opening the full dossier.</div>
+      </div>
+    </div>
+  </section>
 
   <!-- ??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??-->
   <!-- SURFACE 1: HOME ??situational awareness, monitor-first layout       -->
@@ -382,7 +462,7 @@ th{color:var(--muted);font-weight:normal}
         <div class="card map-primary-card">
           <div class="card-title">2D Geo Lens <span class="badge" id="map-lens-badge">Flat map</span></div>
           <div class="meta-line lens-note">Legacy risk regions, infrastructure, country interaction, and event markers stay available here without the globe surface.</div>
-          <iframe id="theme-map-lens" class="embed-frame" src="/event-map-lens.html?embed=1" title="2D Geo Lens"></iframe>
+          <iframe id="theme-map-lens" class="embed-frame" src="about:blank" data-live-src="/event-map-lens.html?embed=1" loading="lazy" title="2D Geo Lens"></iframe>
         </div>
         <div class="card map-secondary-card">
           <div class="card-title">Proposal Inbox <span class="badge" id="proposal-inbox-badge">0 pending</span></div>
@@ -466,7 +546,7 @@ th{color:var(--muted);font-weight:normal}
       <button class="inbox-filter-chip" data-filter="proposal" onclick="inboxFilter('proposal')">Proposals <span id="inbox-count-proposal">...</span></button>
       <button class="inbox-filter-chip" data-filter="approval" onclick="inboxFilter('approval')">Approvals <span id="inbox-count-approval">...</span></button>
       <button class="inbox-filter-chip" data-filter="triage" onclick="inboxFilter('triage')">Discovery <span id="inbox-count-triage">...</span></button>
-      <span style="font-size:10px;color:var(--muted);margin-left:auto">J/K navigate | 1/2/3 act | Ctrl/Cmd+Click multi-select | Shift+Click range | Esc deselect</span>
+      <span style="font-size:10px;color:var(--muted);margin-left:auto">J/K navigate | A accept | R reject | S simulate/snooze | Space preview | Esc clear</span>
     </div>
     <div class="inbox-container">
       <div>
@@ -476,7 +556,7 @@ th{color:var(--muted);font-weight:normal}
       </div>
       <div class="inbox-preview" id="inbox-preview">
         <div id="inbox-preview-content">
-          <div class="inbox-preview-empty">Select an item from the list to preview and take action.<br/><br/>Use <strong>J/K</strong> to navigate, <strong>1</strong> to accept, <strong>2</strong> to snooze, <strong>3</strong> to reject.</div>
+          <div class="inbox-preview-empty">Select an item from the list to preview and take action.<br/><br/>Use <strong>J/K</strong> to navigate, <strong>A</strong> to accept, <strong>R</strong> to reject, <strong>S</strong> to simulate or snooze.</div>
         </div>
       </div>
     </div>
@@ -606,7 +686,7 @@ th{color:var(--muted);font-weight:normal}
         <div class="section-meta">Event hotspots, transmission paths, country/corridor pressure, theme-filtered overlays.</div>
       </div>
       <div class="card map-primary-card">
-        <iframe class="embed-frame" id="geo-lens-frame" src="event-map-lens.html" title="Geo Lens" loading="lazy"></iframe>
+        <iframe class="embed-frame" id="geo-lens-frame" src="about:blank" data-live-src="event-map-lens.html" title="Geo Lens" loading="lazy"></iframe>
         <div class="desc-text" style="margin-top:10px">Use the toolbar inside the map to filter by theme, adjust time window, or collapse overlays. Selected themes from other surfaces propagate here automatically.</div>
       </div>
     </section>
@@ -628,6 +708,7 @@ th{color:var(--muted);font-weight:normal}
       <div class="grid3" style="margin-top:12px">
         <div class="card"><div class="card-title">System Health</div><div id="operator-health" class="loading">Loading system health...</div></div>
         <div class="card"><div class="card-title">Data Quality</div><div id="operator-data-quality" class="loading">Loading data quality...</div></div>
+        <div class="card"><div class="card-title">Freshness Audit</div><div id="operator-freshness-audit" class="loading">Loading freshness audit...</div></div>
         <div class="card"><div class="card-title">Codex Quality</div><div id="operator-codex-quality" class="loading">Loading Codex quality...</div></div>
       </div>
     </section>
@@ -709,17 +790,49 @@ function postEmbedMessage(type,payload={}){if(!EMBED_MODE||window.parent===windo
 function getLensContext(){return{theme:state.currentTheme||null,period:getCurrentPeriod(),evolutionParent:state.evolutionParent||null,followedThemes:state.myThemes.slice(0,20)};}
 function getMapLensFrame(){return document.getElementById('theme-map-lens');}
 function getGeoLensFrame(){return document.getElementById('geo-lens-frame');}
+let homeMapLensObserver=null;
+function getHomeMapLensLiveSrc(frame){
+  const liveSrc=frame.dataset.liveSrc||'/event-map-lens.html?embed=1';
+  frame.dataset.liveSrc=liveSrc;
+  return liveSrc;
+}
+function loadHomeMapLens(){
+  const frame=getMapLensFrame();
+  if(!(frame instanceof HTMLIFrameElement))return;
+  const liveSrc=getHomeMapLensLiveSrc(frame);
+  if(frame.getAttribute('src')===liveSrc)return;
+  frame.addEventListener('load',()=>{pushMapLensContext();syncEmbeddedMapVisibility(currentSurface);},{once:true});
+  frame.setAttribute('src',liveSrc);
+}
+function installHomeMapLazyLoad(){
+  const frame=getMapLensFrame();
+  if(!(frame instanceof HTMLIFrameElement))return;
+  if(frame.getAttribute('src')!=='about:blank')return;
+  if(homeMapLensObserver){
+    homeMapLensObserver.disconnect();
+    homeMapLensObserver=null;
+  }
+  if(!('IntersectionObserver' in window))return;
+  homeMapLensObserver=new IntersectionObserver(entries=>{
+    if(entries.some(entry=>entry.isIntersecting)){
+      loadHomeMapLens();
+      homeMapLensObserver?.disconnect();
+      homeMapLensObserver=null;
+    }
+  },{rootMargin:'360px 0px'});
+  homeMapLensObserver.observe(frame);
+}
 function ensureHomeMapLens(activeSurface){
   const frame=getMapLensFrame();
   if(!(frame instanceof HTMLIFrameElement))return;
-  const liveSrc=frame.dataset.liveSrc||frame.getAttribute('src')||'/event-map-lens.html?embed=1';
-  frame.dataset.liveSrc=liveSrc;
+  getHomeMapLensLiveSrc(frame);
   if(activeSurface==='home'){
-    if(frame.getAttribute('src')!==liveSrc){
-      frame.addEventListener('load',()=>{pushMapLensContext();syncEmbeddedMapVisibility('home');},{once:true});
-      frame.setAttribute('src',liveSrc);
-    }
+    installHomeMapLazyLoad();
     return;
+  }
+  if(homeMapLensObserver){
+    homeMapLensObserver.disconnect();
+    homeMapLensObserver=null;
   }
   if(frame.getAttribute('src')!=='about:blank'){
     frame.setAttribute('src','about:blank');
@@ -871,7 +984,16 @@ function renderTrustRow(opts = {}) {
   // Freshness
   if (opts.updatedAt !== undefined) {
     const fresh = classifyFreshness(opts.updatedAt, opts.slaHours || 48);
-    chips.push(trustChip(fresh.level, fresh.label, `Data last updated ${fmtDateTime(opts.updatedAt)}`));
+    let level = fresh.level;
+    let label = fresh.label;
+    let title = `Data last updated ${fmtDateTime(opts.updatedAt)}`;
+    if (opts.stale && (level === 'fresh' || level === 'recent')) {
+      const staleLabel = opts.staleLabel || (opts.mode === 'delayed' ? 'Delayed' : 'Stale');
+      level = opts.staleLevel || 'stale';
+      label = Number.isFinite(fresh.ageH) ? `${staleLabel} (${Math.round(fresh.ageH)}h old)` : staleLabel;
+      title = opts.staleReason || opts.degraded || title;
+    }
+    chips.push(trustChip(level, label, title));
   }
   // Fallback mode
   if (opts.fallback) {
@@ -920,7 +1042,9 @@ function snapshotStaleBadge(snapshot) {
   return renderTrustRow({
     updatedAt: dataTs || wrapperTs,
     fallback: snapshot.fallbackMode || snapshot.inFallback,
-    degraded: usingWrapperOnly ? 'Wrapper time only' : undefined,
+    stale: snapshot.stale,
+    staleReason: snapshot.staleReason,
+    degraded: usingWrapperOnly ? 'Wrapper time only' : snapshot.staleReason,
   });
 }
 function isDisplayableLiveTheme(theme){const normalized=String(theme||'').trim().toLowerCase();return Boolean(normalized)&&!normalized.startsWith('dt-');}
@@ -1498,6 +1622,7 @@ window.addEventListener('popstate', (ev) => {
   if (VALID_SURFACES.includes(name) && name !== currentSurface) switchSurface(name);
 });
 window.addEventListener('DOMContentLoaded', () => {
+  installHomeMapLazyLoad();
   syncEmbeddedMapVisibility(currentSurface);
   const hash = String(window.location.hash || '').slice(1);
   if (VALID_SURFACES.includes(hash) && hash !== 'home') {
@@ -1653,6 +1778,9 @@ async function refreshDecisionInbox() {
     });
     renderInboxList();
     updateInboxCounts();
+    if (!inboxSelectedId) {
+      renderSelectedProofCard(sortedInboxItemsForDecision()[0] || null);
+    }
   } catch (e) {
     console.warn('Decision Inbox load failed:', e);
     listEl.innerHTML = '<div class="meta-line" style="padding:20px;text-align:center;color:var(--muted)">Failed to load inbox. Check API server.</div>';
@@ -1672,6 +1800,53 @@ function updateInboxCounts() {
   const total = document.getElementById('inbox-total-count');
   if (total) total.textContent = counts.all;
   updateInboxBulkState();
+  renderTopDecisionCard();
+}
+function sortedInboxItemsForDecision() {
+  const urgencyOrder = { high: 0, medium: 1, low: 2 };
+  return inboxItems
+    .filter((item) => !item.snoozed)
+    .slice()
+    .sort((a, b) => {
+      const u = (urgencyOrder[a.urgency] || 1) - (urgencyOrder[b.urgency] || 1);
+      if (u !== 0) return u;
+      return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+    });
+}
+function renderTopDecisionCard() {
+  const el = document.getElementById('top-decision-card');
+  const badge = document.getElementById('top-decision-badge');
+  if (!el) return;
+  const item = sortedInboxItemsForDecision()[0];
+  if (!item) {
+    if (badge) badge.textContent = 'clear';
+    el.innerHTML = `
+      <div class="top-decision-title">No pending decisions</div>
+      <div class="top-decision-meta">Decision Inbox is clear for the current data window.</div>
+      <div class="top-decision-actions"><button class="inbox-btn" onclick="switchSurface('inbox')">Open Inbox</button></div>`;
+    return;
+  }
+  const fresh = item.updatedAt ? classifyFreshness(item.updatedAt, 48) : null;
+  if (badge) badge.textContent = item.type;
+  const simulate = item.type === 'approval'
+    ? `<button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>`
+    : '';
+  const acceptDecision = item.type === 'triage' ? 'canonical' : 'accept';
+  const rejectDecision = item.type === 'triage' ? 'suppress' : 'reject';
+  el.innerHTML = `
+    <div class="top-decision-title">${escapeHtml(truncate(item.title || 'Review item', 92))}</div>
+    <div class="top-decision-meta">${escapeHtml(item.theme || item.source || 'workspace')} | ${escapeHtml(item.whyVisible || 'Review required')}</div>
+    <div class="trust-row">
+      <span class="trust-chip trust-chip-sources">${escapeHtml(item.subtype || item.type)}</span>
+      ${fresh ? trustChip(fresh.level, fresh.label) : ''}
+      ${item.proofLevel ? proofChip(item.proofLevel) : ''}
+    </div>
+    <div class="top-decision-actions">
+      ${simulate}
+      ${resolveInboxDecision(item, acceptDecision) ? `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('${acceptDecision}','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>` : ''}
+      ${resolveInboxDecision(item, rejectDecision) ? `<button class="inbox-btn inbox-btn-reject" onclick="inboxAction('${rejectDecision}','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>` : ''}
+      <button class="inbox-btn" onclick="switchSurface('inbox');setTimeout(()=>selectInboxItem(null,'${escapeHtml(item.id)}'),50)">Preview</button>
+    </div>`;
 }
 function renderInboxList() {
   const listEl = document.getElementById('inbox-list');
@@ -1690,7 +1865,8 @@ function renderInboxList() {
     const urgencyChip = it.urgency === 'high' ? '<span class="trust-chip trust-chip-critical" style="font-size:9px">HI</span>' : '';
     const fresh = it.updatedAt ? classifyFreshness(it.updatedAt, 48) : null;
     const freshChip = fresh && fresh.level !== 'nohydrate' ? `<span class="trust-chip trust-chip-${fresh.level}" style="font-size:9px">${fresh.level}</span>` : '';
-    return `<div class="inbox-item${selected}${multiSelected}" data-id="${escapeHtml(it.id)}" data-idx="${i}" onclick="selectInboxItem(event,'${escapeHtml(it.id)}')">
+    const actionState = it.actionState ? ` ${escapeHtml(it.actionState)}` : '';
+    return `<div class="inbox-item${selected}${multiSelected}${actionState}" data-id="${escapeHtml(it.id)}" data-idx="${i}" onclick="selectInboxItem(event,'${escapeHtml(it.id)}')">
       <div class="inbox-item-head">
         <span class="trust-chip trust-chip-sources" style="font-size:9px">${typeBadge}</span>
         ${urgencyChip}
@@ -1734,6 +1910,7 @@ function selectInboxItem(ev, id) {
 function renderInboxPreview(item) {
   const preview = document.getElementById('inbox-preview-content');
   if (!preview) return;
+  renderSelectedProofCard(item);
   const trust = renderTrustRow({
     updatedAt: item.updatedAt,
     proofLevel: item.proofLevel,
@@ -1744,6 +1921,9 @@ function renderInboxPreview(item) {
   let body = '';
   if (item.type === 'e2-signal') {
     const upliftStr = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '--';
+    const sourceList = Array.isArray(item.sources) && item.sources.length
+      ? `<div class="brief-list" style="margin-top:10px">${item.sources.slice(0, 5).map((src, i) => `<div class="brief-item"><strong>[${i+1}] ${escapeHtml(src.title || 'Source article')}</strong><div class="meta-line">${escapeHtml(src.source || 'unknown')} | ${escapeHtml(fmtDate(src.publishedAt))}</div></div>`).join('')}</div>`
+      : '';
     body = `<div class="signal-metrics" style="margin:8px 0">
       <span>Direction: <strong>${item.direction.toUpperCase()}</strong></span>
       <span>Symbol: <strong>${escapeHtml(item.symbol || '--')}</strong></span>
@@ -1751,9 +1931,12 @@ function renderInboxPreview(item) {
       <span>t-stat: <strong>${item.tStat != null ? item.tStat.toFixed(2) : '--'}</strong></span>
       <span>Controls: <strong>${item.matchedControls || '--'}</strong></span>
     </div>
-    ${item.title ? `<div class="desc-text">${escapeHtml(item.title)}</div>` : ''}`;
+    ${item.title ? `<div class="desc-text">${escapeHtml(item.title)}</div>` : ''}
+    ${sourceList}`;
   } else if (item.type === 'proposal' || item.type === 'approval') {
+    const payloadUrl = item.payload?.url ? `<div class="trust-row"><span class="trust-chip trust-chip-sources">URL</span><span class="meta-line">${escapeHtml(String(item.payload.url))}</span></div>` : '';
     body = `${item.detail ? `<div class="desc-text" style="margin-bottom:10px">${escapeHtml(item.detail)}</div>` : ''}
+    ${payloadUrl}
     <div class="payload-preview">${escapeHtml(truncate(JSON.stringify(item.payload, null, 2), 600))}</div>`;
   } else if (item.type === 'triage') {
     const kw = Array.isArray(item.payload.keywords) ? item.payload.keywords : [];
@@ -1761,7 +1944,9 @@ function renderInboxPreview(item) {
     ${kw.length ? `<div class="pill-row" style="margin-top:8px">${renderTags(kw, 'tag-neutral', 10)}</div>` : ''}`;
   }
   const actions = buildInboxActions(item);
+  const status = item.actionState || 'pending';
   preview.innerHTML = `
+    <div class="inbox-status-banner ${escapeHtml(status)}">${status === 'pending' ? 'Pending review' : status === 'simulated' ? 'Dry run complete. No backend state was changed.' : `State: ${escapeHtml(status)}`}</div>
     <div class="card-title" style="margin-bottom:6px">${escapeHtml(item.title || '--')}</div>
     <div class="meta-line" style="margin-bottom:8px">${escapeHtml(item.type)} | ${escapeHtml(item.subtype || '')} | ${escapeHtml(item.source || '')}</div>
     ${trust}
@@ -1769,31 +1954,72 @@ function renderInboxPreview(item) {
     <div class="inbox-actions">${actions}</div>
   `;
 }
+function renderSelectedProofCard(item) {
+  const el = document.getElementById('selected-proof-card');
+  if (!el) return;
+  if (!item) {
+    el.innerHTML = `
+      <div class="cockpit-title-row">
+        <div class="cockpit-kicker">Selected Proof</div>
+        <span class="badge">evidence chain</span>
+      </div>
+      <div class="proof-title">Select an actionable signal or inbox item.</div>
+      <div class="proof-meta">This panel summarizes direction, uplift, t-stat, controls, citations, and freshness without opening the full dossier.</div>`;
+    return;
+  }
+  const fresh = item.updatedAt ? classifyFreshness(item.updatedAt, 48) : null;
+  const uplift = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '--';
+  const tStat = item.tStat != null && Number.isFinite(Number(item.tStat)) ? Number(item.tStat).toFixed(2) : '--';
+  const controls = item.matchedControls != null ? fmtWhole(item.matchedControls) : '--';
+  const direction = item.direction ? String(item.direction).toUpperCase() : item.type.toUpperCase();
+  const citations = Array.isArray(item.sources) && item.sources.length
+    ? item.sources.slice(0, 4).map((src, i) => {
+      const safeData = escapeHtml(JSON.stringify(src));
+      return `<span class="signal-cite" onclick="event.stopPropagation();showSignalCitePopover(event,'${safeData}',${i+1})">[${i+1}]</span>`;
+    }).join('')
+    : '<span class="meta-line">No source citations attached to this item.</span>';
+  el.innerHTML = `
+    <div class="cockpit-title-row">
+      <div class="cockpit-kicker">Selected Proof</div>
+      <span class="badge">${escapeHtml(item.proofLevel || item.type || 'review')}</span>
+    </div>
+    <div class="proof-title">${escapeHtml(truncate(item.title || item.symbol || item.theme || 'Selected item', 120))}</div>
+    <div class="proof-meta">${escapeHtml(item.theme || item.source || 'workspace')} ${fresh ? '| ' + escapeHtml(fresh.label) : ''}</div>
+    <div class="proof-chain">
+      <div class="proof-step"><div class="proof-step-label">Direction</div><div class="proof-step-value">${escapeHtml(direction)}</div></div>
+      <div class="proof-step"><div class="proof-step-label">Uplift</div><div class="proof-step-value">${escapeHtml(uplift)}</div></div>
+      <div class="proof-step"><div class="proof-step-label">t-stat</div><div class="proof-step-value">${escapeHtml(tStat)}</div></div>
+      <div class="proof-step"><div class="proof-step-label">Controls</div><div class="proof-step-value">${escapeHtml(controls)}</div></div>
+    </div>
+    <div class="signal-citations" style="margin-top:10px">${citations}</div>`;
+}
 function buildInboxActions(item) {
   if (item.type === 'proposal') {
     return `
-      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">1</span></button>
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">2</span></button>
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">3</span></button>
+      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
       ${item.payload?.targetTheme ? `<button class="inbox-btn" onclick="openThemeBrief('${normalizeTheme(item.payload.targetTheme)}')">Open brief</button>` : ''}`;
   }
   if (item.type === 'approval') {
+    const probeBlocked = !!(item._lastResult?.needsFix || item._lastResult?.execution?.skipped);
+    const acceptDisabled = probeBlocked ? 'disabled title="소스 probe 실패 — URL을 수정하거나 Reject하세요"' : '';
     return `
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate</button>
-      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">1</span></button>
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">3</span></button>`;
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-accept" ${acceptDisabled} onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>`;
   }
   if (item.type === 'triage') {
     return `
-      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('canonical','${escapeHtml(item.id)}')">Canonical <span class="inbox-shortcut">1</span></button>
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('watch','${escapeHtml(item.id)}')">Watch <span class="inbox-shortcut">2</span></button>
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('suppress','${escapeHtml(item.id)}')">Suppress <span class="inbox-shortcut">3</span></button>`;
+      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('canonical','${escapeHtml(item.id)}')">Canonical <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('watch','${escapeHtml(item.id)}')">Watch <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('suppress','${escapeHtml(item.id)}')">Suppress <span class="inbox-shortcut">R</span></button>`;
   }
   if (item.type === 'e2-signal') {
     const themeParam = item.theme ? `'${normalizeTheme(item.theme)}'` : 'null';
     return `
       <button class="inbox-btn" onclick="openThemeBrief(${themeParam})">Open evidence</button>
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">2</span></button>`;
+      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>`;
   }
   return '';
 }
@@ -1833,13 +2059,33 @@ function renderInboxActionResult(item, decision, response, errorMessage = '') {
     else if (approval?.status) dryRunCopy += `Would result in: ${approval.status}.`;
     if (execution?.feedName) dryRunMeta.push({ label: 'Feed', value: execution.feedName });
     if (execution?.articleCount != null) dryRunMeta.push({ label: 'Would seed', value: execution.articleCount });
-    if (formatQuality(execution?.quality?.score ?? execution?.quality) != null) dryRunMeta.push({ label: 'Quality', value: formatQuality(execution?.quality?.score ?? execution?.quality) });
+    // qualityScore (probe) takes priority over legacy quality field
+    const qualityVal = execution?.qualityScore != null
+      ? Number(execution.qualityScore).toFixed(0) + '%'
+      : formatQuality(execution?.quality?.score ?? execution?.quality);
+    if (qualityVal != null) dryRunMeta.push({ label: 'Quality', value: qualityVal });
     if (execution?.url) dryRunMeta.push({ label: 'URL', value: execution.url });
+    if (execution?.resolvedUrl && execution.resolvedUrl !== execution.url) dryRunMeta.push({ label: 'Resolved', value: execution.resolvedUrl });
+    if (execution?.connectorKind) dryRunMeta.push({ label: 'Connector', value: execution.connectorKind });
+    if (execution?.recentItemCount != null) dryRunMeta.push({ label: 'Recent items', value: execution.recentItemCount });
+    // Sample headlines
+    const sampleItemsHtml = Array.isArray(execution?.sampleItems) && execution.sampleItems.length
+      ? `<div class="probe-samples">${execution.sampleItems.slice(0, 3).map(s => `<div class="probe-sample-item">📰 ${escapeHtml(String(s?.title || s || ''))}</div>`).join('')}</div>`
+      : '';
+    // Warnings
+    const warningsHtml = Array.isArray(execution?.warnings) && execution.warnings.length
+      ? `<div class="inbox-result-copy" style="margin-top:6px;color:#fbbf24">${execution.warnings.map(w => escapeHtml(String(w))).join(' · ')}</div>`
+      : '';
+    const dryTone = execution?.skipped ? 'warning' : 'info';
+    const dryLabel = execution?.skipped ? 'SKIPPED — 등록되지 않음' : 'DRY RUN';
+    const dryChipClass = execution?.skipped ? 'trust-chip-stale' : 'trust-chip-recent';
     return `
-      <div class="inbox-result info">
-        <div class="inbox-result-title"><span class="trust-chip trust-chip-recent">DRY RUN</span><span>${escapeHtml(item.title || 'Simulation')}</span></div>
+      <div class="inbox-result ${dryTone}">
+        <div class="inbox-result-title"><span class="trust-chip ${dryChipClass}">${dryLabel}</span><span>${escapeHtml(item.title || 'Simulation')}</span></div>
         <div class="inbox-result-copy">${escapeHtml(dryRunCopy)}</div>
         ${dryRunMeta.length ? `<div class="inbox-result-meta">${buildInboxActionMetaChips(dryRunMeta)}</div>` : ''}
+        ${sampleItemsHtml}
+        ${warningsHtml}
       </div>
     `;
   }
@@ -1858,6 +2104,10 @@ function renderInboxActionResult(item, decision, response, errorMessage = '') {
       tone = 'warning';
       label = 'REJECTED';
       copy = String(approval?.reasoning || 'This approval item was rejected.');
+    } else if (response?.needsFix) {
+      tone = 'warning';
+      label = 'NEEDS FIX';
+      copy = String(response?.message || execution?.reason || execution?.summary || '소스가 등록되지 않았습니다.');
     } else if (execution?.skipped) {
       tone = 'warning';
       label = 'SKIPPED';
@@ -1919,9 +2169,15 @@ async function inboxAction(decision, id) {
   if (decision === 'simulate' && item.type === 'approval') {
     try {
       const response = await postJson(`${API}/approval-queue/${encodeURIComponent(item.rawId)}/review`, { decision: 'accept', reviewer: 'theme-dashboard', dryRun: true });
+      item.actionState = 'simulated';
+      item._lastResult = response;
+      renderInboxList();
+      renderTopDecisionCard();
       const preview = document.getElementById('inbox-preview-content');
       if (preview) preview.innerHTML = renderInboxActionResult(item, 'simulate', response);
     } catch (e) {
+      item.actionState = 'failed';
+      renderInboxList();
       const preview = document.getElementById('inbox-preview-content');
       if (preview) preview.innerHTML = renderInboxActionResult(item, 'simulate', null, String(e?.message || e || 'Simulation failed'));
     }
@@ -1951,23 +2207,45 @@ async function inboxAction(decision, id) {
       inboxSelection.delete(id);
       updateInboxCounts();
       renderInboxList();
+      renderTopDecisionCard();
       const preview = document.getElementById('inbox-preview-content');
       if (preview) preview.innerHTML = renderInboxActionResult(item, resolvedDecision, { execution: { skipped: true } });
       updateInboxBulkState();
       return;
     }
+    // Store last result for button-state checks (e.g. Accept disable)
+    item._lastResult = response;
+    // needs-fix / skipped: keep item in queue, show warning banner
+    if (response?.needsFix || response?.execution?.skipped) {
+      item.actionState = 'needs-fix';
+      renderInboxList();
+      const preview = document.getElementById('inbox-preview-content');
+      if (preview) preview.innerHTML = renderInboxActionResult(item, resolvedDecision, response);
+      updateInboxBulkState();
+      return;
+    }
     // Remove from list and advance
-    inboxItems = inboxItems.filter(x => x.id !== id);
-    inboxSelection.delete(id);
-    updateInboxCounts();
+    const finalState = (resolvedDecision === 'reject' || resolvedDecision === 'suppress') ? 'rejected' : 'accepted';
+    item.actionState = finalState;
     renderInboxList();
     const preview = document.getElementById('inbox-preview-content');
     if (preview) preview.innerHTML = renderInboxActionResult(item, resolvedDecision, response);
-    inboxSelectedId = null;
     updateInboxBulkState();
+    window.setTimeout(() => {
+      inboxItems = inboxItems.filter(x => x.id !== id);
+      inboxSelection.delete(id);
+      if (inboxSelectedId === id) inboxSelectedId = null;
+      updateInboxCounts();
+      renderInboxList();
+      renderTopDecisionCard();
+      renderSelectedProofCard(sortedInboxItemsForDecision()[0] || null);
+      updateInboxBulkState();
+    }, 220);
   } catch (e) {
     const errorMsg = String(e?.message || e || 'Action failed');
     console.warn('[InboxAction] failed:', { decision, id, error: errorMsg });
+    item.actionState = 'failed';
+    renderInboxList();
     postJson(`${API}/runtime-issues`, {
       surface: 'decision-inbox',
       action: `inbox.${resolvedDecision || decision}`,
@@ -1979,7 +2257,9 @@ async function inboxAction(decision, id) {
         ? `/api/approval-queue/${item?.rawId || id}/review`
         : item?.type === 'proposal'
           ? `/api/codex-proposals/${item?.rawId || id}/review`
-          : `/api/unknown/${item?.rawId || id}`,
+          : item?.type === 'triage'
+            ? '/api/discovery-triage/review'
+            : `/api/unknown/${item?.rawId || id}`,
       requestBody: { decision: resolvedDecision || decision, reviewer: 'theme-dashboard' },
       errorMessage: errorMsg,
       classification: 'api-contract',
@@ -2022,9 +2302,22 @@ async function inboxBulkAction(decision) {
 document.addEventListener('keydown', (ev) => {
   if (currentSurface !== 'inbox') return;
   if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable)) return;
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if (!inboxItems.length) return;
   const filtered = inboxFilterType === 'all' ? inboxItems : inboxItems.filter(x => x.type === inboxFilterType);
   const currentIdx = filtered.findIndex(x => x.id === inboxSelectedId);
+  const selectedItem = inboxItems.find(x => x.id === inboxSelectedId);
+  const runSelected = (decision) => {
+    if (!selectedItem) return;
+    if (inboxSelection.size > 1 && canBulkApplyDecision(decision)) {
+      void inboxBulkAction(decision);
+      return;
+    }
+    const resolved = resolveInboxDecision(selectedItem, decision);
+    if (resolved || (decision === 'simulate' && selectedItem.type === 'approval')) {
+      void inboxAction(decision, selectedItem.id);
+    }
+  };
   if (ev.key === 'j' || ev.key === 'ArrowDown') {
     ev.preventDefault();
     const next = filtered[Math.min(filtered.length - 1, currentIdx + 1)] || filtered[0];
@@ -2048,8 +2341,25 @@ document.addEventListener('keydown', (ev) => {
     const item = inboxItems.find(x => x.id === inboxSelectedId);
     const action = item ? resolveInboxDecision(item, item.type === 'triage' ? 'suppress' : 'reject') : null;
     if (action) inboxAction(action, inboxSelectedId);
+  } else if ((ev.key === 'a' || ev.key === 'A') && inboxSelectedId) {
+    ev.preventDefault();
+    const decision = selectedItem?.type === 'triage' ? 'canonical' : 'accept';
+    runSelected(decision);
+  } else if ((ev.key === 'r' || ev.key === 'R') && inboxSelectedId) {
+    ev.preventDefault();
+    const decision = selectedItem?.type === 'triage' ? 'suppress' : 'reject';
+    runSelected(decision);
+  } else if ((ev.key === 's' || ev.key === 'S') && inboxSelectedId) {
+    ev.preventDefault();
+    runSelected(selectedItem?.type === 'approval' ? 'simulate' : 'snooze');
+  } else if (ev.key === ' ' && inboxSelectedId) {
+    ev.preventDefault();
+    if (selectedItem) renderInboxPreview(selectedItem);
   } else if (ev.key === 'Escape') {
     inboxSelectedId = null;
+    inboxSelection.clear();
+    inboxSelectionAnchorId = null;
+    updateInboxBulkState();
     renderInboxList();
     const preview = document.getElementById('inbox-preview-content');
     if (preview) preview.innerHTML = '<div class="inbox-preview-empty">Select an item to preview.</div>';
@@ -2063,8 +2373,10 @@ async function refreshAll(){
   setInboxCountsLoading();
   updateInboxBulkState();
   document.getElementById('last-update').textContent='Updating...';
+  const decisionInboxReady=refreshDecisionInbox();
   await Promise.all([
-    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadCodexQuality(),
+    decisionInboxReady,
+    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadDataFreshnessAudit(),loadCodexQuality(),
     loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
@@ -2073,7 +2385,6 @@ async function refreshAll(){
   renderMyThemes();
   await loadThemeBrief();
   await loadFollowedThemeBriefing();
-  await refreshDecisionInbox();
   document.getElementById('last-update').textContent=`Updated ${fmtTime(new Date())}`;
 }
 async function loadStatus(){
@@ -2226,6 +2537,36 @@ async function loadDataQuality(){
   `;
   el.innerHTML=html;
 }
+async function loadDataFreshnessAudit(){
+  const {data,cached,cachedAt}=await f(`${API}/data-freshness-audit`,'data-freshness-audit');
+  const el=document.getElementById('operator-freshness-audit');
+  if(!el)return;
+  if(!data||!data.ok){
+    el.innerHTML=`<div class="meta-line">Freshness audit unavailable.${data?.error?` ${escapeHtml(data.error)}`:''}</div><div class="meta-line" style="margin-top:6px">Run <code>npm run audit:freshness</code> to generate the audit artifact.</div>`;
+    return;
+  }
+  const summary=data.summary||{};
+  const findings=asArray(data.findings).slice(0,5);
+  const mirrored=asArray(summary.mirroredSignals);
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=renderTrustRow({
+    updatedAt:data.generatedAt,
+    degraded:Number(summary.findings||0)>0?`${fmtWhole(summary.findings||0)} audit finding${Number(summary.findings||0)===1?'':'s'}`:undefined,
+    whyVisible:data.auditPath?`artifact ${data.auditPath}`:'latest audit artifact',
+  });
+  html+=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${fmtWhole(summary.findings||0)}</div><div class="meta-line">Findings</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(mirrored.length)}</div><div class="meta-line">Mirrored signals</div></div>
+      <div class="kpi"><div class="kpi-value">${fmtWhole(summary.cacheIssues||0)}</div><div class="meta-line">Cache issues</div></div>
+    </div>
+  `;
+  html+=`<div class="detail-block"><div><strong>Live/backfill boundary checks</strong></div><div class="pill-row" style="margin-top:8px"><span class="tag ${summary.articleCount24h>0?'tag-growing':'tag-declining'}">Articles 24h ${fmtWhole(summary.articleCount24h||0)}</span><span class="tag ${summary.articleCount72h>0?'tag-growing':'tag-declining'}">Articles 72h ${fmtWhole(summary.articleCount72h||0)}</span>${mirrored.slice(0,5).map((name)=>`<span class="tag tag-nascent">${escapeHtml(name)} mirrored</span>`).join('')}</div></div>`;
+  if(findings.length){
+    html+=`<div class="snapshot-list">${findings.map((finding)=>`<div class="snapshot-row"><div class="entity-card-head"><strong>${escapeHtml(finding.area||'audit')}</strong><span class="tag ${finding.priority==='P0'?'tag-declining':'tag-nascent'}">${escapeHtml(finding.priority||'P?')}</span></div><div class="meta-line" style="margin-top:4px">${escapeHtml(finding.issue||'No issue text')}</div></div>`).join('')}</div>`;
+  }
+  el.innerHTML=html;
+}
 async function loadCodexQuality(){
   const {data,cached,cachedAt}=await f(`${API}/codex-quality`,'codex-quality');
   const el=document.getElementById('operator-codex-quality');
@@ -2263,6 +2604,7 @@ async function loadCuratedItems(){
   const asOf=data?.generatedAt||data?.digestDate||data?.curatedDate||data?.asOf||data?.digest?.generatedAt;
   const digestSource=data?.source||'';
   const digestWindow=data?.window||'';
+  const digestMeta=data?.meta||{};
   if(!items.length){
     let emptyMsg='No curated digest items available for the selected horizon yet.';
     if(digestSource.includes('fallback'))emptyMsg=`Digest in fallback mode (${escapeHtml(digestWindow||digestSource)}). No items passed curation filters.`;
@@ -2270,6 +2612,13 @@ async function loadCuratedItems(){
     return;
   }
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=renderTrustRow({
+    updatedAt:digestMeta.dataUpdatedAt||digestMeta.updatedAt||asOf,
+    fallback:digestMeta.mode==='fallback'||digestSource.includes('fallback')?(digestWindow||digestSource||'fallback'):false,
+    degraded:digestMeta.staleReason,
+    slaHours:24,
+    whyVisible:digestMeta.mode?`mode ${digestMeta.mode}`:'',
+  });
   if(digestSource.includes('fallback')){
     html+=`<div class="stale-badge" style="margin-bottom:8px">Source: ${escapeHtml(digestSource)}${digestWindow?` (${escapeHtml(digestWindow)})`:''}  — digest is in fallback mode</div>`;
   }
@@ -2609,6 +2958,13 @@ async function loadToday(){
   const titleEl=document.getElementById('today-events-title');
   if(titleEl)titleEl.textContent=isFallback?`Recent Events (${escapeHtml(meta.window)} fallback)`:'Today\'s Key Events';
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=renderTrustRow({
+    updatedAt:meta.dataUpdatedAt||meta.updatedAt,
+    fallback:isFallback?meta.window:false,
+    degraded:meta.staleReason,
+    slaHours:24,
+    whyVisible:meta.mode?`mode ${meta.mode}`:'',
+  });
   if(isFallback){
     html+=`<div class="stale-badge">Operating in ${escapeHtml(meta.window)} fallback mode — not the primary 24h live feed</div>`;
   }
@@ -2941,6 +3297,19 @@ function renderReviewItemCard(item) {
     </div>
     ${item.title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${escapeHtml(item.title.slice(0,140))}</div>` : ''}
     ${citationsHtml}
+    ${(() => {
+      const p = item.payload || {};
+      const probeTags = [];
+      if (p.resolvedUrl) probeTags.push(`<span class="probe-meta-tag">Resolved: ${escapeHtml(String(p.resolvedUrl))}</span>`);
+      if (p.connectorKind) probeTags.push(`<span class="probe-meta-tag">Connector: ${escapeHtml(String(p.connectorKind))}</span>`);
+      if (p.qualityScore != null) probeTags.push(`<span class="probe-meta-tag">Quality: ${Number(p.qualityScore).toFixed(0)}%</span>`);
+      if (p.recentItemCount != null) probeTags.push(`<span class="probe-meta-tag">최근 기사: ${p.recentItemCount}</span>`);
+      const metaHtml = probeTags.length ? `<div class="probe-meta-grid">${probeTags.join('')}</div>` : '';
+      const sampleHtml = Array.isArray(p.sampleItems) && p.sampleItems.length
+        ? `<div class="probe-samples">${p.sampleItems.slice(0, 3).map(s => `<div class="probe-sample-item">📰 ${escapeHtml(String(s?.title || s || ''))}</div>`).join('')}</div>`
+        : '';
+      return metaHtml + sampleHtml;
+    })()}
   </div>`;
 }
 async function loadE2SignalQueue(){
@@ -2952,7 +3321,13 @@ async function loadE2SignalQueue(){
     const queue = document.getElementById('e2-signal-queue');
     const container = document.getElementById('e2-signal-cards');
     const countBadge = document.getElementById('e2-queue-count');
-    if (!signals.length) { queue.style.display = 'none'; return; }
+    if (!signals.length) {
+      window.__lastE2Items = [];
+      if (queue) queue.style.display = '';
+      if (countBadge) countBadge.textContent = '0';
+      if (container) container.innerHTML = '<div class="meta-line">No statistically validated E2 signals in the current payload.</div>';
+      return;
+    }
     // Prefer actionable picker if defined, else use uplift magnitude
     let topSignals = [];
     if (typeof pickActionableSignals === 'function') {
@@ -2970,6 +3345,7 @@ async function loadE2SignalQueue(){
     queue.style.display = '';
     countBadge.textContent = items.length;
     container.innerHTML = items.map(renderReviewItemCard).join('');
+    if (items[0]) renderSelectedProofCard(items[0]);
   } catch (e) { console.warn('E2 signal queue failed', e); }
 }
 // Citation popover for Theme Brief dossier (P2)
@@ -3049,9 +3425,14 @@ async function refreshRuntimeIssues() {
     }
     el.innerHTML = issues.map(issue => {
       const cls = ISSUE_CLASS_LABELS[issue.classification] || { label: issue.classification || '?', cls: 'cls-other' };
+      const age = issue.createdAt ? fmtDate(issue.createdAt) : '--';
+      const surface = escapeHtml(issue.surface || '--');
+      const action = escapeHtml(issue.action || '--');
+      /*
       const age = issue.createdAt ? fmtDate(issue.createdAt) : '—';
       const surface = escapeHtml(issue.surface || '—');
       const action = escapeHtml(issue.action || '—');
+      */
       const errMsg = escapeHtml((issue.errorMessage || '').slice(0, 120));
       const issueId = escapeHtml(issue.id || '');
       return `<div class="runtime-issue-row">
@@ -3133,7 +3514,7 @@ async function loadCodex(){
 }
 function summarizePayloadFocus(payload={},fallbackType='proposal'){
   if(!payload||typeof payload!=='object')return fallbackType;
-  const label=payload.label||payload.theme||payload.targetTheme||payload.source||payload.query||payload.symbol||payload.url;
+  const label=payload.name||payload.title||payload.label||payload.url||payload.targetTheme||payload.theme||payload.source||payload.query||payload.symbol;
   if(typeof label==='string'&&label.trim())return label.trim();
   return fallbackType;
 }
@@ -3174,6 +3555,7 @@ function renderGeoPressureSnapshot(snapshot={},cachedAt=null,cached=false){
   const hotspots=Array.isArray(snapshot.hotspots)?snapshot.hotspots:[];
   const linkedThemes=Array.isArray(snapshot.linkedThemes)?snapshot.linkedThemes:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>Country and corridor pressure</strong><div class="meta-line">Countries ${fmtWhole(countries.length)} | hotspots ${fmtWhole(hotspots.length)} | linked themes ${fmtWhole(linkedThemes.length)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
   if(snapshot.generatedAt||snapshot.transmissionFreshnessHours!=null){
     html+=`<div class="meta-line" style="margin-top:8px">Transmission ${snapshot.transmissionFresh?'fresh':'stale'}${snapshot.transmissionFreshnessHours!=null?` | age ${fmt(snapshot.transmissionFreshnessHours,1)}h`:''}${snapshot.generatedAt?` | updated ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
@@ -3210,6 +3592,7 @@ function renderMacroSnapshot(snapshot={},cachedAt=null,cached=false){
   const signals=Array.isArray(snapshot.signals)?snapshot.signals:[];
   const topThemes=Array.isArray(snapshot.topThemes)?snapshot.topThemes:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(humanizeTheme(snapshot.verdict||'watch'))} macro regime</strong><div class="meta-line">Strategies ${fmtWhole(snapshot.strategyCount||0)} | signals ${fmtWhole(signals.length)}</div></div><span class="tag ${snapshotLevelClass(snapshot.verdict)}">${escapeHtml(snapshot.verdict||'watch')}</span></div>`;
   if(snapshot.staleSignalCount)html+=`<div class="meta-line" style="margin-top:8px">${fmtWhole(snapshot.staleSignalCount)} stale signal${snapshot.staleSignalCount===1?'':'s'} hidden from this card.</div>`;
   html+=signals.length
@@ -3270,6 +3653,7 @@ function renderTransmissionSnapshot(snapshot={},cachedAt=null,cached=false){
   const topCountries=Array.isArray(snapshot.topCountries)?snapshot.topCountries:[];
   const topSymbols=Array.isArray(snapshot.topSymbols)?snapshot.topSymbols:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=snapshotStaleBadge(snapshot);
   html+=`<div class="review-card-head"><div class="review-card-title"><strong>${escapeHtml(snapshot.regimeLabel||'Transmission')}</strong><div class="meta-line">Confidence ${fmtWhole(snapshot.regimeConfidence||0)} | links ${fmtWhole(snapshot.edgeCount||0)} | events ${fmtWhole(snapshot.uniqueEventCount||0)} | countries ${fmtWhole(topCountries.length)}</div></div><span class="badge">${fmtWhole(snapshot.edgeCount||0)} links</span></div>`;
   if(snapshot.generatedAt||snapshot.freshnessHours!=null){
     html+=`<div class="meta-line" style="margin-top:8px">Transmission ${snapshot.fresh?'fresh':'stale'}${snapshot.freshnessHours!=null?` | age ${fmt(snapshot.freshnessHours,1)}h`:''}${snapshot.generatedAt?` | updated ${escapeHtml(fmtDateTime(snapshot.generatedAt))}`:''}</div>`;
@@ -3562,6 +3946,42 @@ async function refreshKPI() {
     if (spread != null) el('kpi-spread').textContent = Number(spread).toFixed(2);
     if (oil != null) el('kpi-oil').textContent = Number(oil).toFixed(1);
     if (dollar != null) el('kpi-dollar').textContent = Number(dollar).toFixed(1);
+    const meta=signals.meta||{};
+    const signalQuality=signals.signalQuality||{};
+    const setKpiQualityTitle=(valueId,baseTitle,channel)=>{
+      const chip=el(valueId)?.closest?.('.kpi-chip');
+      const quality=signalQuality[channel]||signals.rows?.find?.((row)=>row.signal_name===channel)?.quality;
+      if(!chip||!quality)return;
+      const parts=[baseTitle,`Quality: ${String(quality.status||'observed').toUpperCase()}`];
+      if(quality.ageHours!=null)parts.push(`age ${fmt(quality.ageHours,1)}h`);
+      if(quality.repeatedCount)parts.push(`repeated samples ${fmtWhole(quality.repeatedCount)}`);
+      if(quality.reason)parts.push(quality.reason);
+      chip.title=parts.join(' | ');
+    };
+    setKpiQualityTitle('kpi-vix','CBOE Volatility Index','vix');
+    setKpiQualityTitle('kpi-spread','10Y-2Y Treasury yield spread','yieldSpread');
+    setKpiQualityTitle('kpi-oil','WTI Crude Oil price (USD)','oilPrice');
+    setKpiQualityTitle('kpi-dollar','US Dollar Index','dollarIndex');
+    const latestSignalTs=Array.isArray(signals.rows)
+      ? signals.rows.map((row)=>Date.parse(row.ts||row.updatedAt)).filter(Number.isFinite).sort((a,b)=>b-a)[0]
+      : null;
+    const dataUpdatedAt=meta.dataUpdatedAt||meta.updatedAt||(Number.isFinite(latestSignalTs)?new Date(latestSignalTs).toISOString():null);
+    const kpiFreshness=el('kpi-freshness');
+    if(kpiFreshness){
+      const degraded=!dataUpdatedAt&&meta.generatedAt?'Wrapper time only':(meta.stale&&meta.staleReason?meta.staleReason:undefined);
+      const fallback=meta.mode==='fallback'||String(meta.window||'').includes('fallback')?(meta.window||'Fallback mode'):false;
+      kpiFreshness.innerHTML=renderTrustRow({
+        updatedAt:dataUpdatedAt||meta.generatedAt,
+        fallback,
+        stale:meta.stale,
+        staleReason:meta.staleReason,
+        mode:meta.mode,
+        staleLabel:meta.mode==='delayed'?'Delayed':'Stale',
+        degraded,
+        slaHours:meta.mode==='delayed'?72:24,
+        whyVisible:meta.mode?`mode ${meta.mode}${meta.generatedAt?` | generated ${fmtDateTime(meta.generatedAt)}`:''}`:'',
+      });
+    }
 
     // VIX sparkline
     const history = signals.vixHistory || [];

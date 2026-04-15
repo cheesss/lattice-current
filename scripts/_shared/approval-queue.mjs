@@ -41,7 +41,7 @@ export async function getPendingApprovals(client, limit = 100) {
     `
       SELECT id, action_type, payload, status, reasoning, created_at, reviewed_at, reviewer
       FROM approval_queue
-      WHERE status = 'pending'
+      WHERE status IN ('pending', 'needs-fix')
       ORDER BY created_at DESC
       LIMIT $1
     `,
@@ -71,6 +71,7 @@ export function normalizeApprovalReviewDecision(decision) {
   if (['accept', 'approve', 'approved'].includes(normalized)) return 'approved';
   if (['reject', 'rejected', 'deny', 'denied'].includes(normalized)) return 'rejected';
   if (['execute', 'executed'].includes(normalized)) return 'executed';
+  if (['needs-fix', 'needsfix', 'needs_fix'].includes(normalized)) return 'needs-fix';
   return null;
 }
 
@@ -84,7 +85,7 @@ export async function markApprovalReviewed(client, approvalId, {
     throw new Error('Invalid approval id');
   }
   const normalizedDecision = String(decision || '').trim().toLowerCase();
-  if (!['approved', 'rejected', 'executed'].includes(normalizedDecision)) {
+  if (!['approved', 'rejected', 'executed', 'needs-fix'].includes(normalizedDecision)) {
     throw new Error(`Unsupported approval decision: ${decision}`);
   }
   const result = await client.query(
@@ -113,7 +114,8 @@ export async function reviewApprovalQueueItemById(client, approvalId, decision, 
   }
 
   const currentStatus = String(approval.status || '').trim().toLowerCase();
-  if (FINAL_APPROVAL_STATUSES.has(currentStatus)) {
+  const isReviewable = currentStatus === 'pending' || currentStatus === 'needs-fix';
+  if (!isReviewable && FINAL_APPROVAL_STATUSES.has(currentStatus)) {
     return {
       approval,
       status: currentStatus,

@@ -361,8 +361,60 @@ export async function reviewCodexProposalById(client, proposalId, decision, opti
   }
 }
 
+async function handleAddRssDryRun(proposal, options) {
+  const { url, name, theme } = proposal;
+  if (!url) return { dryRun: true, skipped: true, reason: 'missing URL', summary: 'dry-run add-rss: missing URL' };
+
+  try {
+    const { probeSource } = await import('./_shared/source-probe.mjs');
+    const probe = await probeSource(url, { theme });
+
+    const wouldRegister = probe.nextAction === 'register' || probe.nextAction === 'review';
+    const wouldSeedCount = probe.sampleItems.length;
+
+    return {
+      dryRun: true,
+      skipped: !wouldRegister,
+      reason: wouldRegister ? null : `quality ${probe.qualityScore.toFixed(2)} below threshold or feed not found`,
+      summary: wouldRegister
+        ? `DRY RUN: would register ${name || probe.domain} via ${probe.connectorKind}`
+        : `DRY RUN: would skip — ${probe.nextAction}`,
+      // probe results
+      resolvedUrl: probe.resolvedUrl,
+      connectorKind: probe.connectorKind,
+      qualityScore: probe.qualityScore,
+      qualityBreakdown: probe.qualityBreakdown,
+      recentItemCount: probe.qualityBreakdown.recentItemCount,
+      sampleItems: probe.sampleItems,
+      wouldRegister,
+      wouldSeedCount,
+      warnings: probe.warnings,
+      errors: probe.errors,
+      nextAction: probe.nextAction,
+      probeStatus: probe.status,
+      probeTraceId: probe.traceId,
+      // legacy fields for UI compat
+      url,
+      feedName: name,
+      quality: { score: probe.qualityScore, ...probe.qualityBreakdown },
+    };
+  } catch (err) {
+    return {
+      dryRun: true,
+      skipped: true,
+      reason: String(err?.message || err),
+      summary: `dry-run add-rss: probe failed`,
+      url,
+    };
+  }
+}
+
 export async function executeProposal(client, proposal, options = {}) {
   if (options.dryRun && proposal.type !== 'backfill-source') {
+    // add-rss는 dryRun이어도 실제 Source Probe 수행
+    if (proposal.type === 'add-rss') {
+      return handleAddRssDryRun(proposal, options);
+    }
     return {
       dryRun: true,
       reason: `would execute ${proposal.type}`,
@@ -644,7 +696,7 @@ async function handleAddSymbol(client, proposal) {
   };
 }
 
-async function handleAddRss(client, proposal) {
+async function handleAddRss(client, proposal, options = {}) {
   const { url, name, theme } = proposal;
   if (!url) throw new Error('Missing RSS url');
 
@@ -662,8 +714,23 @@ async function handleAddRss(client, proposal) {
     };
   }
 
+  const { probeSource } = await import('./_shared/source-probe.mjs');
+  const probe = await probeSource(url, { theme });
+  const effectiveUrl = probe.resolvedUrl || url;
+
+  if (probe.nextAction === 'reject') {
+    return {
+      skipped: true,
+      reason: `probe rejected: quality ${probe.qualityScore.toFixed(2)} — ${probe.nextAction}`,
+      url,
+      resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      probeTraceId: probe.traceId,
+    };
+  }
+
   const { evaluateAndRegisterFeed } = await import('./_shared/discovered-source-registry.mjs');
-  const registration = await evaluateAndRegisterFeed(client, url, theme || 'politics', {
+  const registration = await evaluateAndRegisterFeed(client, effectiveUrl, theme || 'politics', {
     feedName: name || 'rss',
     lang: 'en',
     topics: [theme].filter(Boolean),
@@ -675,27 +742,38 @@ async function handleAddRss(client, proposal) {
       reason: registration.reason || 'feed quality below threshold',
       quality: registration.quality,
       url,
+      resolvedUrl: effectiveUrl,
     };
   }
 
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`RSS fetch ${response.status}`);
-  const text = await response.text();
+  let items = [];
+  if (probe.sampleItems && probe.sampleItems.length >= 3) {
+    // probe에서 이미 파싱된 sampleItems 사용 — 추가 fetch 없이
+    items = probe.sampleItems.map((si) => ({
+      title: String(si.title || '').slice(0, 500),
+      url: String(si.url || si.link || ''),
+      date: si.date || si.publishedAt || new Date().toISOString(),
+    }));
+  } else {
+    // fallback: 직접 fetch + XML 파싱
+    const response = await fetch(effectiveUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`RSS fetch ${response.status}`);
+    const text = await response.text();
 
-  const items = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>|<entry>([\s\S]*?)<\/entry>/gi;
-  let match;
-  while ((match = itemRegex.exec(text)) !== null) {
-    const content = match[1] || match[2] || '';
-    const title = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
-    const link = content.match(/<link[^>]*href="([^"]*)"[^>]*\/?>|<link[^>]*>([\s\S]*?)<\/link>/i);
-    const pubDate = content.match(/<pubDate>([\s\S]*?)<\/pubDate>|<published>([\s\S]*?)<\/published>|<updated>([\s\S]*?)<\/updated>/i);
-    if (title) {
-      items.push({
-        title: title.slice(0, 500),
-        url: (link?.[1] || link?.[2] || '').trim(),
-        date: pubDate ? new Date(pubDate[1] || pubDate[2] || pubDate[3]).toISOString() : new Date().toISOString(),
-      });
+    const itemRegex = /<item>([\s\S]*?)<\/item>|<entry>([\s\S]*?)<\/entry>/gi;
+    let match;
+    while ((match = itemRegex.exec(text)) !== null) {
+      const content = match[1] || match[2] || '';
+      const title = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
+      const link = content.match(/<link[^>]*href="([^"]*)"[^>]*\/?>|<link[^>]*>([\s\S]*?)<\/link>/i);
+      const pubDate = content.match(/<pubDate>([\s\S]*?)<\/pubDate>|<published>([\s\S]*?)<\/published>|<updated>([\s\S]*?)<\/updated>/i);
+      if (title) {
+        items.push({
+          title: title.slice(0, 500),
+          url: (link?.[1] || link?.[2] || '').trim(),
+          date: pubDate ? new Date(pubDate[1] || pubDate[2] || pubDate[3]).toISOString() : new Date().toISOString(),
+        });
+      }
     }
   }
 
@@ -725,6 +803,9 @@ async function handleAddRss(client, proposal) {
     summary: `RSS ${name}: registered and seeded ${inserted} articles`,
     feedName: name,
     url,
+    resolvedUrl: effectiveUrl,
+    connectorKind: probe.connectorKind,
+    probeTraceId: probe.traceId,
     articleCount: inserted,
     quality: registration.quality,
   };
