@@ -118,6 +118,24 @@ function structuralDeltaNarrative(value, periodType) {
   return `${round(numeric, 1)}% versus the previous ${periodType} window`;
 }
 
+function resolveBaselineContext(snapshot = {}) {
+  const baselineCount = Number(snapshot.previousCount ?? snapshot.priorCount ?? snapshot.baselineCount);
+  const hasExplicitSmallBase = Number.isFinite(baselineCount) && baselineCount > 0 && baselineCount < 5;
+  const magnitude = Math.max(
+    Math.abs(Number(snapshot.vsPreviousPct || 0)),
+    Math.abs(Number(snapshot.vsYearAgoPct || 0)),
+    Math.abs(Number(snapshot.acceleration || 0)),
+  );
+  const hasNearZeroProfile = magnitude >= 1000;
+  return {
+    baselineCount: Number.isFinite(baselineCount) ? baselineCount : null,
+    context: Number.isFinite(baselineCount) ? { baselineCount } : {},
+    hasExplicitSmallBase,
+    hasNearZeroProfile,
+    isLowBaselineSignal: hasExplicitSmallBase || hasNearZeroProfile,
+  };
+}
+
 export function parseArgs(argv = process.argv.slice(2)) {
   const parsed = {
     period: DEFAULT_PERIOD,
@@ -142,7 +160,27 @@ export function parseArgs(argv = process.argv.slice(2)) {
 function buildLifecycleAlert(snapshot) {
   if (!snapshot.prevLifecycleStage || snapshot.prevLifecycleStage === snapshot.lifecycleStage) return null;
   const label = snapshot.label || snapshot.theme;
-  const severity = ['nascent', 'emerging'].includes(String(snapshot.lifecycleStage || '')) ? 'high' : 'medium';
+  const vsYearAgo = Math.abs(Number(snapshot.vsYearAgoPct || 0));
+  const acceleration = Math.abs(Number(snapshot.acceleration || 0));
+  const baseline = resolveBaselineContext(snapshot);
+  const stage = safeTrim(snapshot.lifecycleStage || '').toLowerCase();
+  const stageBonus = stage === 'emerging' ? 12
+    : stage === 'nascent' ? 10
+      : stage === 'growing' ? 8
+        : stage === 'mainstream' ? 6
+          : 4;
+  const magnitudeScore = boundedMomentumScore(vsYearAgo, 0.24, baseline.context)
+    + boundedAccelerationScore(acceleration, 0.18, baseline.context);
+  const lowBaselineCap = baseline.hasExplicitSmallBase ? 46 : baseline.hasNearZeroProfile ? 52 : 72;
+  const alertScore = round(Math.min(lowBaselineCap, 24 + stageBonus + magnitudeScore), 2);
+  const severity = baseline.isLowBaselineSignal
+    ? 'medium'
+    : ['nascent', 'emerging'].includes(stage) ? 'high' : 'medium';
+  const baselineNote = baseline.hasExplicitSmallBase
+    ? ` [low baseline: ${baseline.baselineCount}]`
+    : baseline.hasNearZeroProfile
+      ? ' [near-zero baseline profile]'
+      : '';
   return {
     theme: snapshot.theme,
     label,
@@ -152,8 +190,8 @@ function buildLifecycleAlert(snapshot) {
     alertType: 'lifecycle-transition',
     severity,
     headline: `${label} shifted from ${snapshot.prevLifecycleStage} to ${snapshot.lifecycleStage}`,
-    detail: `${label} changed lifecycle state on the latest ${snapshot.periodType} aggregate. YoY is ${round(snapshot.vsYearAgoPct, 1)}% and acceleration is ${round(snapshot.acceleration, 1)}%.`,
-    alertScore: round(Math.abs(Number(snapshot.vsYearAgoPct || 0)) * 0.35 + Math.abs(Number(snapshot.acceleration || 0)) * 0.25 + 30, 2),
+    detail: `${label} changed lifecycle state on the latest ${snapshot.periodType} aggregate. YoY is ${round(snapshot.vsYearAgoPct, 1)}% and acceleration is ${round(snapshot.acceleration, 1)}%.${baselineNote}`,
+    alertScore,
     evidenceClasses: [{ evidenceClass: 'trend_snapshot', label: 'Trend aggregate', count: 1 }],
     provenance: [{
       evidenceClass: 'trend_snapshot',
@@ -176,13 +214,14 @@ function buildMomentumAlert(snapshot) {
   const acceleration = Number(snapshot.acceleration || 0);
   if (!(vsPrevious >= 45 && acceleration >= 12)) return null;
   const label = snapshot.label || snapshot.theme;
-  // Baseline count from snapshot (if available) for damping small-base artifacts
-  const baselineCount = Number(snapshot.previousCount ?? snapshot.priorCount ?? snapshot.baselineCount);
-  const ctx = Number.isFinite(baselineCount) ? { baselineCount } : {};
-  // Require stronger absolute base for "critical" when coming off a tiny baseline
-  const isSmallBase = Number.isFinite(baselineCount) && baselineCount < 5;
-  const severity = (!isSmallBase && (vsPrevious >= 90 || acceleration >= 25)) ? 'critical'
-    : isSmallBase ? 'medium' : 'high';
+  const baseline = resolveBaselineContext(snapshot);
+  const severity = (!baseline.isLowBaselineSignal && (vsPrevious >= 90 || acceleration >= 25)) ? 'critical'
+    : baseline.isLowBaselineSignal ? 'medium' : 'high';
+  const baselineNote = baseline.hasExplicitSmallBase
+    ? ` [low baseline: ${baseline.baselineCount}]`
+    : baseline.hasNearZeroProfile
+      ? ' [near-zero baseline profile]'
+      : '';
   return {
     theme: snapshot.theme,
     label,
@@ -192,9 +231,9 @@ function buildMomentumAlert(snapshot) {
     alertType: 'acceleration-breakout',
     severity,
     headline: `${label} is breaking out on structural momentum`,
-    detail: `${label} rose ${structuralDeltaNarrative(vsPrevious, snapshot.periodType)} with acceleration at ${round(acceleration, 1)}%.${isSmallBase ? ` [low baseline: ${baselineCount}]` : ''}`,
+    detail: `${label} rose ${structuralDeltaNarrative(vsPrevious, snapshot.periodType)} with acceleration at ${round(acceleration, 1)}%.${baselineNote}`,
     alertScore: round(
-      boundedMomentumScore(vsPrevious, 0.55, ctx) + boundedAccelerationScore(acceleration, 0.45, ctx),
+      boundedMomentumScore(vsPrevious, 0.55, baseline.context) + boundedAccelerationScore(acceleration, 0.45, baseline.context),
       2,
     ),
     evidenceClasses: [{ evidenceClass: 'trend_snapshot', label: 'Trend aggregate', count: 1 }],
@@ -435,6 +474,7 @@ async function loadLatestSnapshots(client, periodType) {
       cur.lifecycle_stage,
       cur.source_diversity,
       cur.geographic_spread,
+      prev.article_count AS previous_count,
       prev.lifecycle_stage AS prev_lifecycle_stage
     FROM ranked cur
     LEFT JOIN ranked prev
@@ -461,6 +501,7 @@ async function loadLatestSnapshots(client, periodType) {
         acceleration: Number(row.acceleration || 0),
         lifecycleStage: safeTrim(row.lifecycle_stage || ''),
         prevLifecycleStage: safeTrim(row.prev_lifecycle_stage || ''),
+        previousCount: Number(row.previous_count || 0),
         sourceDiversity: Number(row.source_diversity || 0),
         geographicSpread: Number(row.geographic_spread || 0),
       };

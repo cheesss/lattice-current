@@ -89,6 +89,43 @@ test('generate-structural-alerts emits lifecycle, share, evidence delta, and adj
   assert.ok(alertTypes.includes('adjacent_pathway'));
 });
 
+test('generate-structural-alerts dampens near-zero baseline alerts across breakout and lifecycle paths', () => {
+  const alerts = buildStructuralAlertCandidates({
+    snapshots: [
+      {
+        theme: 'conflict',
+        label: 'Conflict',
+        parentTheme: 'geopolitics',
+        category: 'geopolitics',
+        periodType: 'quarter',
+        periodEnd: '2026-04-11',
+        articleCount: 19,
+        vsPreviousPct: 19000,
+        vsYearAgoPct: 1200,
+        acceleration: 19099.4,
+        lifecycleStage: 'growing',
+        prevLifecycleStage: 'emerging',
+      },
+    ],
+    shareJumps: [],
+    evidenceDeltas: [],
+    attachments: [],
+    limit: 5,
+  });
+
+  const breakout = alerts.find((item) => item.alertType === 'acceleration-breakout');
+  const lifecycle = alerts.find((item) => item.alertType === 'lifecycle-transition');
+
+  assert.ok(breakout);
+  assert.ok(lifecycle);
+  assert.ok(breakout.alertScore <= 20);
+  assert.ok(lifecycle.alertScore <= 55);
+  assert.equal(breakout.severity, 'medium');
+  assert.equal(lifecycle.severity, 'medium');
+  assert.match(breakout.detail, /near-zero baseline/i);
+  assert.match(lifecycle.detail, /near-zero baseline/i);
+});
+
 test('generate-structural-alerts job persists alerts when not dry-run', async () => {
   const persisted = [];
   const summary = await runStructuralAlertGenerationJob({

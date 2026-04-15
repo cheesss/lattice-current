@@ -11,6 +11,7 @@ import {
   runKMeans,
   tokenizeDiscoveryText,
 } from '../scripts/_shared/emerging-tech-discovery.mjs';
+import { parseArgs as parseDiscoveryArgs } from '../scripts/discover-emerging-tech.mjs';
 
 test('emerging-tech tokenization removes stopwords and keeps meaningful keywords', () => {
   const tokens = tokenizeDiscoveryText('The new silicon photonics platform for data-center optics');
@@ -65,4 +66,9 @@ test('emerging-tech source quality rewards multi-type coverage over single-sourc
   assert.ok(mixed.sourceQualityScore > concentrated.sourceQualityScore);
   assert.equal(mixed.distinctSourceCount, 4);
   assert.ok(mixed.effectiveSourceCount > concentrated.effectiveSourceCount);
+});
+
+test('emerging-tech discovery defaults include google news family sources', () => {
+  const parsed = parseDiscoveryArgs([]);
+  assert.equal(parsed.sources.includes('google news'), true);
 });

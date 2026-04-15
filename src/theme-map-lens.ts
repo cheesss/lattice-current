@@ -140,6 +140,7 @@ let activeThemeFilter: LensThemeFilter = 'all';
 let relationshipMode = false;
 let localPeriodOverride: LensContext['period'] | null = null;
 let overlayCollapsed = false;
+let renderPausedByHost = false;
 
 function createEmptyLayers(): MapLayers {
   const next = { ...DEFAULT_MAP_LAYERS } as Record<string, boolean>;
@@ -234,7 +235,6 @@ function buildCrossDomainPreset(): LensPreset {
       'outages',
       'cyberThreats',
       'protests',
-      'military',
       'natural',
       'ucdpEvents',
       'climate',
@@ -328,7 +328,6 @@ function buildGeopoliticalPreset(): LensPreset {
       'outages',
       'cyberThreats',
       'protests',
-      'military',
       'natural',
       'ucdpEvents',
       'displacement',
@@ -536,6 +535,7 @@ function toSignalNewsItem(marker: MapLensEventMarker | MapLensE2SignalMarker): N
 }
 
 async function refreshDynamicData(): Promise<void> {
+  if (renderPausedByHost) return;
   const effectiveContext = getEffectiveContext(currentContext);
   const layers = map.getState().layers;
   const statuses: SourceStatus[] = [];
@@ -715,6 +715,7 @@ async function refreshDynamicData(): Promise<void> {
 
   await Promise.all(tasks);
   renderSourceStatuses(statuses);
+  if (renderPausedByHost) return;
   map.render();
 }
 
@@ -737,6 +738,7 @@ function applyContext(context: LensContext): void {
   map.setRelationshipMode(relationshipMode);
   renderPresetMeta(currentPreset, effectiveContext, nextLayers);
   renderToolbarState();
+  if (renderPausedByHost) return;
   map.render();
   void refreshDynamicData();
 }
@@ -745,8 +747,21 @@ function installBridge(): void {
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin) return;
     const message = event.data as { source?: string; type?: string; payload?: unknown } | null;
-    if (!message || message.source !== 'theme-workspace' || message.type !== 'wm-map-lens-context') return;
-    applyContext(normalizeContext(message.payload));
+    if (!message || message.source !== 'theme-workspace') return;
+    if (message.type === 'wm-map-lens-context') {
+      applyContext(normalizeContext(message.payload));
+      return;
+    }
+    if (message.type === 'wm-map-lens-visibility') {
+      const payload = message.payload as { paused?: unknown } | null;
+      const nextPaused = Boolean(payload?.paused);
+      const changed = renderPausedByHost !== nextPaused;
+      renderPausedByHost = nextPaused;
+      map.setRenderPaused(nextPaused);
+      if (!nextPaused && changed) {
+        applyContext(currentContext);
+      }
+    }
   });
 
   if (window.parent !== window) {
