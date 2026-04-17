@@ -25,56 +25,75 @@ const TOTAL_LIMIT = LIMIT_ARG >= 0 && process.argv[LIMIT_ARG + 1]
   ? Number(process.argv[LIMIT_ARG + 1])
   : Infinity;
 
-const BATCH_SIZE = 500;
+const UPDATE_BATCH_SIZE = 5000;
 
 async function main() {
   const client = new Client(resolveNasPgConfig());
   await client.connect();
   try {
-    let offset = 0;
-    let processed = 0;
-    let wireDominatedTotal = 0;
+    console.log('loading article-event pairs...');
+    const { rows: pairs } = await client.query(`
+      SELECT aem.canonical_event_id AS event_id,
+             a.publisher_group, a.source, a.wire_source
+      FROM article_event_map aem
+      JOIN articles a ON a.id = aem.article_id
+      ORDER BY aem.canonical_event_id
+    `);
+    console.log(`loaded ${pairs.length} pairs`);
 
-    while (processed < TOTAL_LIMIT) {
-      const { rows: events } = await client.query(`
-        SELECT id
-        FROM canonical_events
-        ORDER BY id
-        LIMIT $1 OFFSET $2
-      `, [BATCH_SIZE, offset]);
-      if (!events.length) break;
-
-      for (const ev of events) {
-        const { rows: articles } = await client.query(`
-          SELECT a.publisher_group, a.source, a.wire_source
-          FROM article_event_map aem
-          JOIN articles a ON a.id = aem.article_id
-          WHERE aem.canonical_event_id = $1
-        `, [ev.id]);
-
-        if (!articles.length) continue;
-        const c = computeSourceConcentration(articles);
-        const legacyDiv = computeLegacyDiversity(articles);
-
-        await client.query(`
-          UPDATE canonical_events
-          SET source_hhi = $1,
-              effective_source_count = $2,
-              wire_dominated = $3,
-              top_source_share = $4,
-              source_diversity = $5
-          WHERE id = $6
-        `, [c.hhi, c.effectiveSourceCount, c.wireDominated, c.topShare, legacyDiv, ev.id]);
-
-        processed += 1;
-        if (c.wireDominated) wireDominatedTotal += 1;
-        if (processed >= TOTAL_LIMIT) break;
-      }
-      console.log(`offset=${offset} processed=${processed} wireDominated=${wireDominatedTotal}`);
-      offset += events.length;
+    const byEvent = new Map();
+    for (const p of pairs) {
+      if (!byEvent.has(p.event_id)) byEvent.set(p.event_id, []);
+      byEvent.get(p.event_id).push(p);
     }
 
-    console.log(`\nFinal tally: processed=${processed}, wireDominated=${wireDominatedTotal}`);
+    const eventIds = [];
+    const hhis = [];
+    const eclts = [];
+    const wireDoms = [];
+    const topShares = [];
+    const legacyDivs = [];
+    let wireDominatedTotal = 0;
+
+    for (const [eventId, articles] of byEvent) {
+      if (eventIds.length >= TOTAL_LIMIT) break;
+      const c = computeSourceConcentration(articles);
+      const legacyDiv = computeLegacyDiversity(articles);
+      eventIds.push(eventId);
+      hhis.push(c.hhi);
+      eclts.push(c.effectiveSourceCount);
+      wireDoms.push(c.wireDominated);
+      topShares.push(c.topShare);
+      legacyDivs.push(legacyDiv);
+      if (c.wireDominated) wireDominatedTotal += 1;
+    }
+    console.log(`computed metrics for ${eventIds.length} events (wireDominated=${wireDominatedTotal})`);
+
+    for (let i = 0; i < eventIds.length; i += UPDATE_BATCH_SIZE) {
+      const end = Math.min(i + UPDATE_BATCH_SIZE, eventIds.length);
+      await client.query(`
+        UPDATE canonical_events a
+        SET source_hhi = v.hhi,
+            effective_source_count = v.esc,
+            wire_dominated = v.wd,
+            top_source_share = v.ts,
+            source_diversity = v.sd
+        FROM UNNEST($1::bigint[], $2::double precision[], $3::double precision[],
+                    $4::bool[], $5::double precision[], $6::double precision[])
+             AS v(id, hhi, esc, wd, ts, sd)
+        WHERE a.id = v.id
+      `, [
+        eventIds.slice(i, end),
+        hhis.slice(i, end),
+        eclts.slice(i, end),
+        wireDoms.slice(i, end),
+        topShares.slice(i, end),
+        legacyDivs.slice(i, end),
+      ]);
+      console.log(`updated ${end}/${eventIds.length}`);
+    }
+
+    console.log(`\nFinal: processed=${eventIds.length}, wireDominated=${wireDominatedTotal}`);
   } finally {
     await client.end();
   }

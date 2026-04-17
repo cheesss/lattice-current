@@ -26,11 +26,11 @@ const TOTAL_LIMIT = LIMIT_ARG >= 0 && process.argv[LIMIT_ARG + 1]
   ? Number(process.argv[LIMIT_ARG + 1])
   : Infinity;
 
-const BATCH_SIZE = 2000;
+const BATCH_SIZE = 5000;
 
-async function fetchBatch(client, offset) {
-  // Pull URL + source + title (body/content column may or may not exist — keep optional).
-  // We purposely do NOT filter published_at, we backfill the entire history.
+async function fetchBatch(client) {
+  // WHERE filters already-populated rows, so next call returns the next window
+  // of still-NULL rows without needing OFFSET.
   const { rows } = await client.query(`
     SELECT id, url, source, title
     FROM articles
@@ -38,28 +38,48 @@ async function fetchBatch(client, offset) {
       AND market_relevance IS NULL
       AND wire_source IS NULL
     ORDER BY id
-    LIMIT $1 OFFSET $2
-  `, [BATCH_SIZE, offset]);
+    LIMIT $1
+  `, [BATCH_SIZE]);
   return rows;
 }
 
-async function updateRow(client, row) {
-  const { publisherGroup, marketRelevance, wireSource } = classifyArticleSource({
-    url: row.url,
-    source: row.source,
-    title: row.title,
-  });
-  if (DRY_RUN) {
-    return { publisherGroup, marketRelevance, wireSource };
+async function processBatch(client, batch) {
+  const ids = [];
+  const pgs = [];
+  const mrs = [];
+  const wss = [];
+  let classified = 0;
+  let withWire = 0;
+  const relevanceCounts = { high: 0, medium: 0, low: 0 };
+
+  for (const row of batch) {
+    const { publisherGroup, marketRelevance, wireSource } = classifyArticleSource({
+      url: row.url,
+      source: row.source,
+      title: row.title,
+    });
+    ids.push(row.id);
+    pgs.push(publisherGroup);
+    mrs.push(marketRelevance);
+    wss.push(wireSource);
+    if (publisherGroup) classified += 1;
+    if (wireSource) withWire += 1;
+    if (marketRelevance) relevanceCounts[marketRelevance] = (relevanceCounts[marketRelevance] || 0) + 1;
   }
-  await client.query(`
-    UPDATE articles
-    SET publisher_group = COALESCE(publisher_group, $1),
-        market_relevance = COALESCE(market_relevance, $2),
-        wire_source = COALESCE(wire_source, $3)
-    WHERE id = $4
-  `, [publisherGroup, marketRelevance, wireSource, row.id]);
-  return { publisherGroup, marketRelevance, wireSource };
+
+  if (!DRY_RUN) {
+    await client.query(`
+      UPDATE articles a
+      SET publisher_group = COALESCE(a.publisher_group, v.pg),
+          market_relevance = COALESCE(a.market_relevance, v.mr),
+          wire_source = COALESCE(a.wire_source, v.ws)
+      FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::text[])
+           AS v(id, pg, mr, ws)
+      WHERE a.id = v.id
+    `, [ids, pgs, mrs, wss]);
+  }
+
+  return { classified, withWire, relevanceCounts };
 }
 
 async function main() {
@@ -70,22 +90,22 @@ async function main() {
     let classified = 0;
     let withWire = 0;
     const relevanceCounts = { high: 0, medium: 0, low: 0 };
-    let offset = 0;
 
     while (processed < TOTAL_LIMIT) {
-      const batch = await fetchBatch(client, offset);
+      const batch = await fetchBatch(client);
       if (!batch.length) break;
-      for (const row of batch) {
-        const result = await updateRow(client, row);
-        processed += 1;
-        if (result.publisherGroup) classified += 1;
-        if (result.wireSource) withWire += 1;
-        if (result.marketRelevance) relevanceCounts[result.marketRelevance] = (relevanceCounts[result.marketRelevance] || 0) + 1;
-        if (processed >= TOTAL_LIMIT) break;
+      const slice = processed + batch.length > TOTAL_LIMIT
+        ? batch.slice(0, TOTAL_LIMIT - processed)
+        : batch;
+      const result = await processBatch(client, slice);
+      processed += slice.length;
+      classified += result.classified;
+      withWire += result.withWire;
+      for (const [k, v] of Object.entries(result.relevanceCounts)) {
+        relevanceCounts[k] = (relevanceCounts[k] || 0) + v;
       }
-      console.log(`batch offset=${offset} processed=${processed} classified=${classified} wire=${withWire}`);
-      offset += batch.length;
-      if (DRY_RUN) break; // one batch is enough for a dry-run preview
+      console.log(`batch processed=${processed} classified=${classified} wire=${withWire}`);
+      if (DRY_RUN) break;
     }
 
     console.log('\nFinal tally:');
