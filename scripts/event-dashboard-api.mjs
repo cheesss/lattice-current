@@ -1272,15 +1272,25 @@ async function loadLatestNowcastsForSignals(signalNames) {
   // estimated_signal_nowcasts may not exist yet (Phase 1 migration pending)
   const tableCheck = await safeQuery(`SELECT to_regclass('estimated_signal_nowcasts') AS t`);
   if (!tableCheck.rows?.[0]?.t) return {};
+  // Also ensure model_registry exists — we filter fused nowcasts to only
+  // models whose promotion_state ∈ ('shadow','active'). Without that gate
+  // a gate-failing candidate model would silently leak to the dashboard.
+  const registryCheck = await safeQuery(`SELECT to_regclass('model_registry') AS t`);
+  if (!registryCheck.rows?.[0]?.t) return {};
   const { rows } = await safeQuery(`
-    SELECT DISTINCT ON (signal_name)
-      signal_name, target_ts, estimated_value, estimate_method,
-      estimate_confidence, interval_low, interval_high,
-      feature_vintage_at, derived_from_sources, last_observed_at, created_at
-    FROM estimated_signal_nowcasts
-    WHERE signal_name = ANY($1)
-      AND last_observed_at IS NULL
-    ORDER BY signal_name, created_at DESC
+    SELECT DISTINCT ON (est.signal_name)
+      est.signal_name, est.target_ts, est.estimated_value, est.estimate_method,
+      est.estimate_confidence, est.interval_low, est.interval_high,
+      est.feature_vintage_at, est.derived_from_sources, est.last_observed_at, est.created_at,
+      est.model_version, mr.promotion_state
+    FROM estimated_signal_nowcasts est
+    JOIN model_registry mr
+      ON mr.target_signal = est.signal_name
+     AND mr.model_version = est.model_version
+    WHERE est.signal_name = ANY($1)
+      AND est.last_observed_at IS NULL
+      AND mr.promotion_state IN ('shadow','active')
+    ORDER BY est.signal_name, est.created_at DESC
   `, [signalNames]);
   return Object.fromEntries(rows.map((row) => [String(row.signal_name), row]));
 }

@@ -161,7 +161,9 @@ def train_and_validate(df, spec, alpha=1.0):
 
     residuals = train_y - model.predict(train_X)
     resid_std = float(np.std(residuals))
-    halfwidth = 1.645 * resid_std
+    # Empirical 90th-percentile of |train residuals| — see train-rates-nowcast.py
+    # for rationale. Keeps resid_std exposed for inference compatibility.
+    halfwidth = float(np.percentile(np.abs(residuals), 90))
 
     naive = holdout_y.copy(); naive[1:] = holdout_y[:-1]; naive[0] = train_y[-1]
     baseline_mae = mean_absolute_error(holdout_y, naive)
@@ -246,8 +248,18 @@ def main():
         print(f"{args.target}: MAE {bundle['holdout_mae']:.4f} vs baseline {bundle['baseline_mae']:.4f} "
               f"(improvement {bundle['mae_improvement']*100:.1f}%), coverage90 {bundle['coverage_90']:.2f}")
 
+        from nowcast_acceptance_gate import evaluate_gate  # noqa: E402
+        verdict = evaluate_gate(bundle)
+        print(f"gate: {'PASS' if verdict.passed else 'FAIL'}" + (
+            '' if not verdict.reasons else ' (' + '; '.join(verdict.reasons) + ')'))
+
         if args.validate:
             return
+
+        if not verdict.passed:
+            print('[gate fail — refusing to save .pkl; target stays untrained]',
+                  file=sys.stderr)
+            sys.exit(3)
 
         version = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
         save_model(args.target, version, bundle, spec)

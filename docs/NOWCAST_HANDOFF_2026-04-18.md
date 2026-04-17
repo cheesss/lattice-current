@@ -152,9 +152,32 @@ python scripts/train-commodity-fx-nowcast.py --target oilPrice
 python scripts/train-commodity-fx-nowcast.py --target dollarIndex
 ```
 
-Use `--validate` first to see MAE / coverage without writing `.pkl`. Acceptance gate: holdout MAE < baseline × 0.85 AND coverage90 ≥ 0.80 AND total rows ≥ 120. Failing targets stay as `candidate` in model_registry and are not used for inference.
+Use `--validate` first to see MAE / coverage without writing `.pkl`.
+Acceptance gate: holdout MAE < baseline × 0.85 AND coverage90 ≥ 0.80 AND
+total rows ≥ 120 — evaluated by `_shared/nowcast_acceptance_gate.py`.
+As of 2026-04-18 the trainers **refuse to save `.pkl`** when the gate fails
+(exit 3). This is enforced, not advisory.
 
 `data/models/<target>-nowcast-latest.pkl` is the pointer used at inference.
+Even with a saved model, `event-dashboard-api.mjs` now only fuses nowcasts
+whose `model_registry.promotion_state ∈ ('shadow','active')` — training
+alone is not enough to reach the dashboard; you also need to run
+`promote-nowcast-model.mjs`.
+
+#### Phase C outcome (2026-04-18 first run)
+
+All 6 targets validated, **0/6 cleared the gate**. Ridge on ETF proxies
+cannot beat naive carry-forward on slow-moving FRED rate series (1–3 bp/day
+moves; model adds 10×–360× more error). oilPrice had the only positive MAE
+improvement (+51%) but its holdout variance exceeds train variance, so no
+in-sample residual calibration (Gaussian 1.645σ, empirical p90) meets
+cov90 ≥ 0.80; N also fell to 112 at --window 180. yieldSpread fails both
+MAE and coverage; dollarIndex and the credit spreads fail on MAE.
+
+Structural rework (feature engineering, non-linear model, or longer history
+with regime splits) is required before any of these targets save. The gate
+guard keeps the pipeline honest in the meantime — compute-rates will return
+`no trained model` abstain for all 4 rates until real models exist.
 
 ### 5.3 First-run inference + reconciliation smoke test
 
@@ -202,10 +225,12 @@ Until then, models stay as `shadow` (if they pass the candidate gate) or `candid
 | 3 | Asian-native news sources still absent | HIGH | Not a code fix — business decision (paid feeds / partnerships). Tracked in issues doc §5.7 |
 | 4 | Oil weekend abstain logic untested | MEDIUM | Requires Sunday manual run + eyeballing `data/alerts.json` |
 | 5 | ~~master-daemon `rates-nowcast` --all handling~~ | — | RESOLVED 2026-04-18: wrapper `compute-rates-nowcast.mjs:47` passes `--all` when no target specified; verified by reading code |
-| 6 | No active model in registry → shadow models silently run | LOW | buildSignalSummary fuses whatever is in estimated_signal_nowcasts regardless of promotion_state. Add a `WHERE promotion_state IN ('shadow','active')` gate when live UI users become a concern |
+| 6 | ~~No active model in registry → shadow models silently run~~ | — | RESOLVED 2026-04-18: `loadLatestNowcastsForSignals` now JOINs `model_registry` and filters `promotion_state IN ('shadow','active')`. Candidate/unregistered models never reach the dashboard |
 | 7 | Twitter/X sentiment absent from regime detector | LOW | Can extend `detectRegime()` to check article spike + VIX; tracked in plan doc |
 | 8 | ~~market_quotes had no history bootstrap path~~ | — | RESOLVED 2026-04-18: new `scripts/bootstrap-market-quotes-history.mjs` + `_shared/market-quote-symbols.json` SoT + coverage audit in trainers/inference. See §5.0 |
 | 9 | `refresh-market-quotes-to-nas.mjs` hardcoded 8 symbols didn't match trainer feature set | — | RESOLVED 2026-04-18: default symbol list now sourced from `_shared/market-quote-symbols.json` (coreSnapshots ∪ nowcastFeatures) |
+| 10 | Ridge + ETF proxy features cannot beat naive carry-forward on slow-moving FRED rate targets | HIGH | Phase C validate 2026-04-18: 5/5 rates models MAE failed gate by 2×–360×. Rework required (non-linear model, richer features, or regime-split training) |
+| 11 | oilPrice holdout variance exceeds train variance → interval calibration unsolvable from train alone | MEDIUM | In-sample p90 (0.44 cov) and Gaussian 1.645σ (0.62 cov) both miss the 0.80 target. Options: conformal prediction with separate calibration split, or longer train window once rate models are reworked |
 
 ## 7. File Map Quick Reference
 

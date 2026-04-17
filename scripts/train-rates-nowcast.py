@@ -227,10 +227,13 @@ def train_and_validate(df: pd.DataFrame, spec: TargetSpec, alpha: float = 1.0) -
     pred_holdout = model.predict(holdout_X)
     mae = mean_absolute_error(holdout_y, pred_holdout)
 
-    # Residual-based interval (90%) from train residuals.
+    # Residual-based interval (90%). Empirical 90th-percentile of |train residuals|
+    # is more robust than a Gaussian 1.645*σ when residuals are heavy-tailed or
+    # when holdout variance exceeds train variance. We keep resid_std for
+    # compatibility with inference code that exposes it in train_meta.
     train_residuals = train_y - model.predict(train_X)
     resid_std = float(np.std(train_residuals))
-    interval_halfwidth = 1.645 * resid_std
+    interval_halfwidth = float(np.percentile(np.abs(train_residuals), 90))
 
     # Naive baseline: predict today = yesterday.
     naive_baseline = holdout_y.copy()
@@ -335,9 +338,21 @@ def main():
         print(f"  interval ±       {bundle['interval_halfwidth_90']:.6f}")
         print(f"  train/holdout    {bundle['n_train']}/{bundle['n_holdout']}")
 
+        from nowcast_acceptance_gate import evaluate_gate  # noqa: E402
+        verdict = evaluate_gate(bundle)
+        print(f"\nAcceptance gate: {'PASS' if verdict.passed else 'FAIL'}")
+        if verdict.reasons:
+            for r in verdict.reasons:
+                print(f'  - {r}')
+
         if args.validate:
             print('\n[validate mode — not saving]')
             return
+
+        if not verdict.passed:
+            print('\n[gate fail — refusing to save .pkl; target stays untrained]',
+                  file=sys.stderr)
+            sys.exit(3)
 
         version = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
         path = save_model(args.target, version, bundle, spec)
