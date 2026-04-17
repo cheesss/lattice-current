@@ -27,7 +27,12 @@ from joblib import load
 # Import gate — scripts/_shared/ on sys.path
 sys.path.insert(0, str(Path(__file__).parent / '_shared'))
 from nowcast_source_gate import check_eligible_sources, GateDecision  # noqa: E402
+from market_quote_coverage import check_coverage as check_market_coverage  # noqa: E402
 
+_SYMBOLS_JSON = json.loads(
+    (Path(__file__).parent / '_shared' / 'market-quote-symbols.json').read_text(encoding='utf-8')
+)
+_FEATURE_SYMBOLS_BY_TARGET = _SYMBOLS_JSON['nowcastFeatures']
 
 TARGETS = ['hy_credit_spread', 'treasury10y', 'yieldSpread', 'ig_credit_spread']
 
@@ -152,6 +157,17 @@ def predict_and_write(conn, target: str):
     model_path = models_dir / f'{target}-nowcast-latest.pkl'
     if not model_path.exists():
         return {'target': target, 'ok': False, 'reason': 'no trained model', 'abstain': True}
+
+    required = _FEATURE_SYMBOLS_BY_TARGET.get(target, [])
+    if required:
+        cov = check_market_coverage(conn, required)
+        if not cov.ok:
+            gaps = ', '.join(f"{m['symbol']}({m['days']})" for m in cov.missing)
+            return {
+                'target': target, 'ok': True, 'abstain': True,
+                'reason': f'market_quotes coverage insufficient: {gaps}',
+            }
+
     bundle = load(model_path)
 
     with conn.cursor() as cur:

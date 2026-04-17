@@ -1,0 +1,27 @@
+{
+  "comment": "Single source of truth for market_quotes symbols. Consumed by refresh-market-quotes-to-nas.mjs, train-rates-nowcast.py, train-commodity-fx-nowcast.py, bootstrap-market-quotes-history.mjs, and coverage audit. Keep TargetSpec.proxy_market_symbols in each trainer aligned with nowcastFeatures below.",
+  "coreSnapshots": [
+    "^VIX",
+    "^GSPC",
+    "^IXIC",
+    "^DJI",
+    "CL=F",
+    "GC=F",
+    "DX-Y.NYB",
+    "^TNX"
+  ],
+  "nowcastFeatures": {
+    "hy_credit_spread": ["HYG"],
+    "treasury10y": ["^TNX", "TLT"],
+    "yieldSpread": ["^TNX", "^IRX", "TLT"],
+    "ig_credit_spread": ["LQD"],
+    "oilPrice": ["XLE", "USO", "XOM", "CVX"],
+    "dollarIndex": ["UUP", "FXE"]
+  },
+  "signalMappings": {
+    "^VIX": "vix",
+    "CL=F": "oilPrice",
+    "DX-Y.NYB": "dollarIndex",
+    "^TNX": "treasury10y"
+  }
+}

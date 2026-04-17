@@ -60,25 +60,37 @@ class TargetSpec:
     horizon_days: int = 1             # T+1 FRED release
 
 
+_SYMBOLS_JSON = json.loads(
+    (Path(__file__).parent / '_shared' / 'market-quote-symbols.json').read_text(encoding='utf-8')
+)
+_NOWCAST_FEATURES = _SYMBOLS_JSON['nowcastFeatures']
+
+
+def _feature_symbols(target: str) -> list[str]:
+    if target not in _NOWCAST_FEATURES:
+        raise KeyError(f'{target} missing from market-quote-symbols.json nowcastFeatures')
+    return list(_NOWCAST_FEATURES[target])
+
+
 TARGETS: dict[str, TargetSpec] = {
     'hy_credit_spread': TargetSpec(
         target_signal='hy_credit_spread',
-        proxy_market_symbols=['HYG'],
+        proxy_market_symbols=_feature_symbols('hy_credit_spread'),
         extra_signal_features=['vix'],
     ),
     'treasury10y': TargetSpec(
         target_signal='treasury10y',
-        proxy_market_symbols=['^TNX', 'TLT'],
+        proxy_market_symbols=_feature_symbols('treasury10y'),
         extra_signal_features=[],
     ),
     'yieldSpread': TargetSpec(
         target_signal='yieldSpread',
-        proxy_market_symbols=['^TNX', '^IRX', 'TLT'],
+        proxy_market_symbols=_feature_symbols('yieldSpread'),
         extra_signal_features=[],
     ),
     'ig_credit_spread': TargetSpec(
         target_signal='ig_credit_spread',
-        proxy_market_symbols=['LQD'],
+        proxy_market_symbols=_feature_symbols('ig_credit_spread'),
         extra_signal_features=['vix'],
     ),
 }
@@ -302,6 +314,12 @@ def main():
     conn = connect_nas()
 
     try:
+        sys.path.insert(0, str(Path(__file__).parent / '_shared'))
+        from market_quote_coverage import abort_if_missing  # noqa: E402
+        cov = abort_if_missing(conn, spec.proxy_market_symbols,
+                               window_days=args.window)
+        print(f'coverage OK: {cov.row_count_by_symbol}')
+
         df = build_training_frame(conn, spec, args.window)
         if df.empty:
             print(f'ERROR: empty training frame for {args.target}', file=sys.stderr)

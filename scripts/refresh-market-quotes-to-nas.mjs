@@ -6,26 +6,19 @@ import pg from 'pg';
 import { CHROME_UA, sleep } from './_seed-utils.mjs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { writeSignalHistoryRow, SIGNAL_ORIGIN } from './_shared/signal-history-writer.mjs';
+import {
+  getAllRequiredSymbols,
+  getSignalMappings,
+} from './_shared/market-quote-symbols.mjs';
 
 const { Pool } = pg;
 
-export const DEFAULT_MARKET_QUOTE_SYMBOLS = [
-  '^VIX',
-  '^GSPC',
-  '^IXIC',
-  '^DJI',
-  'CL=F',
-  'GC=F',
-  'DX-Y.NYB',
-  '^TNX',
-];
+// Core snapshots + every nowcast feature symbol. Kept as a single source of
+// truth in scripts/_shared/market-quote-symbols.json so daemon refresh,
+// trainers, bootstrap, and coverage audit all agree.
+export const DEFAULT_MARKET_QUOTE_SYMBOLS = getAllRequiredSymbols();
 
-const SIGNAL_MAPPINGS = new Map([
-  ['^VIX', 'vix'],
-  ['CL=F', 'oilPrice'],
-  ['DX-Y.NYB', 'dollarIndex'],
-  ['^TNX', 'treasury10y'],
-]);
+const SIGNAL_MAPPINGS = new Map(Object.entries(getSignalMappings()));
 
 function parseArgs(argv) {
   const args = {};

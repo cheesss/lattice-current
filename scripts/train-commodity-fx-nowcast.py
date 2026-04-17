@@ -41,15 +41,27 @@ class TargetSpec:
     extra_signal_features: list[str]
 
 
+_SYMBOLS_JSON = json.loads(
+    (Path(__file__).parent / '_shared' / 'market-quote-symbols.json').read_text(encoding='utf-8')
+)
+_NOWCAST_FEATURES = _SYMBOLS_JSON['nowcastFeatures']
+
+
+def _feature_symbols(target: str) -> list[str]:
+    if target not in _NOWCAST_FEATURES:
+        raise KeyError(f'{target} missing from market-quote-symbols.json nowcastFeatures')
+    return list(_NOWCAST_FEATURES[target])
+
+
 TARGETS: dict[str, TargetSpec] = {
     'oilPrice': TargetSpec(
         target_signal='oilPrice',
-        proxy_market_symbols=['XLE', 'USO', 'XOM', 'CVX'],
+        proxy_market_symbols=_feature_symbols('oilPrice'),
         extra_signal_features=[],
     ),
     'dollarIndex': TargetSpec(
         target_signal='dollarIndex',
-        proxy_market_symbols=['UUP', 'FXE'],
+        proxy_market_symbols=_feature_symbols('dollarIndex'),
         extra_signal_features=[],
     ),
 }
@@ -220,6 +232,12 @@ def main():
     spec = TARGETS[args.target]
     conn = connect_nas()
     try:
+        sys.path.insert(0, str(Path(__file__).parent / '_shared'))
+        from market_quote_coverage import abort_if_missing  # noqa: E402
+        cov = abort_if_missing(conn, spec.proxy_market_symbols,
+                               window_days=args.window)
+        print(f'coverage OK: {cov.row_count_by_symbol}')
+
         df = build_frame(conn, spec, args.window)
         if df.empty:
             print(f'ERROR: empty training frame for {args.target}', file=sys.stderr)
