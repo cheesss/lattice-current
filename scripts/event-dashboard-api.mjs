@@ -1230,6 +1230,24 @@ async function buildLiveStatus() {
   };
 }
 
+async function loadLatestNowcastsForSignals(signalNames) {
+  if (!Array.isArray(signalNames) || !signalNames.length) return {};
+  // estimated_signal_nowcasts may not exist yet (Phase 1 migration pending)
+  const tableCheck = await safeQuery(`SELECT to_regclass('estimated_signal_nowcasts') AS t`);
+  if (!tableCheck.rows?.[0]?.t) return {};
+  const { rows } = await safeQuery(`
+    SELECT DISTINCT ON (signal_name)
+      signal_name, target_ts, estimated_value, estimate_method,
+      estimate_confidence, interval_low, interval_high,
+      feature_vintage_at, derived_from_sources, last_observed_at, created_at
+    FROM estimated_signal_nowcasts
+    WHERE signal_name = ANY($1)
+      AND last_observed_at IS NULL
+    ORDER BY signal_name, created_at DESC
+  `, [signalNames]);
+  return Object.fromEntries(rows.map((row) => [String(row.signal_name), row]));
+}
+
 async function buildSignalSummary() {
   const [signalState, quoteFeed, vixHistoryR] = await Promise.all([
     loadLatestSignalsWithQuality(),
@@ -1246,6 +1264,40 @@ async function buildSignalSummary() {
 
   const rows = signalState.rows;
   const lookup = Object.fromEntries(rows.map((row) => [row.signal_name, row.value]));
+  const originMap = signalState.originBySignal || {};
+
+  // Fuse in nowcasts for signals where the observed value is missing or
+  // non-observed (proxy/composite). Never overwrite observed values.
+  const nowcastCandidates = new Set();
+  for (const key of ['vix', 'yieldSpread', 'hy_credit_spread', 'treasury10y', 'ig_credit_spread', 'oilPrice', 'dollarIndex', 'marketStress', 'transmissionStrength']) {
+    const origin = originMap[key]?.valueOrigin;
+    if (origin !== 'observed') nowcastCandidates.add(key);
+    if (lookup[key] == null || !Number.isFinite(Number(lookup[key]))) nowcastCandidates.add(key);
+  }
+  const nowcasts = await loadLatestNowcastsForSignals(Array.from(nowcastCandidates));
+  const nowcastSummary = {};
+  for (const [signal, row] of Object.entries(nowcasts)) {
+    const estimated = Number(row.estimated_value);
+    if (!Number.isFinite(estimated)) continue;
+    // Only replace if observed is worse (absent or non-observed origin).
+    const observedOrigin = originMap[signal]?.valueOrigin;
+    if (observedOrigin === 'observed') continue;
+    lookup[signal] = estimated;
+    nowcastSummary[signal] = {
+      value: estimated,
+      method: row.estimate_method,
+      confidence: row.estimate_confidence != null ? Number(row.estimate_confidence) : null,
+      intervalLow: row.interval_low != null ? Number(row.interval_low) : null,
+      intervalHigh: row.interval_high != null ? Number(row.interval_high) : null,
+      featureVintageAt: row.feature_vintage_at,
+      derivedFromSources: row.derived_from_sources,
+      asOf: row.target_ts,
+      generatedAt: row.created_at,
+    };
+    // Signal-level origin is now 'estimated'.
+    originMap[signal] = { valueOrigin: 'estimated', writerId: row.estimate_method };
+  }
+
   const vix = Number(lookup.vix);
   const riskGauge = Number.isFinite(vix)
     ? Number(clamp(45 + (vix - 20) * 2, 4, 100).toFixed(1))
@@ -1253,6 +1305,11 @@ async function buildSignalSummary() {
   const riskState = Number.isFinite(vix)
     ? (vix > 25 ? 'risk-off' : vix < 18 ? 'risk-on' : 'balanced')
     : null;
+
+  // Response-level mode: if any critical KPI now reports as estimated,
+  // bubble that up so clients can render the NOWCAST badge.
+  const anyEstimated = Object.values(originMap).some((info) => info?.valueOrigin === 'estimated');
+  const responseMode = anyEstimated ? 'nowcast' : signalState.mode;
 
   return {
     vix: Number.isFinite(vix) ? vix : null,
@@ -1266,9 +1323,10 @@ async function buildSignalSummary() {
     vixHistory: vixHistoryR.rows.map((row) => Number(row.value || 0)).filter((value) => Number.isFinite(value)),
     rows,
     signalQuality: signalState.qualityBySignal,
-    signalOrigin: signalState.originBySignal,
+    signalOrigin: originMap,
+    nowcasts: nowcastSummary,
     meta: {
-      mode: signalState.mode,
+      mode: responseMode,
       stale: signalState.stale || quoteFeed.status !== 'configured',
       staleReason: [signalState.staleReason, quoteFeed.status === 'configured' ? null : quoteFeed.reason].filter(Boolean).join('; ') || null,
       quoteFeed,

@@ -267,86 +267,39 @@ async function runTask(state, taskName, intervalMs, handler) {
 }
 
 async function taskSignalRefresh() {
-  log('>> signal-refresh: updating VIX/FRED in signal_history');
-  const client = new Client(getPgConfig());
-  await client.connect();
-  try {
-    const fallbackSignalNames = [
-      'vix',
-      'treasury10y',
-      'yieldSpread',
-      'dollarIndex',
-      'hy_credit_spread',
-      'ig_credit_spread',
-      'bdi',
-    ];
-    const tableInfo = await client.query(`
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name IN ('market_quotes', 'fred_observations')
-    `);
-    const availableTables = new Set(tableInfo.rows.map((row) => String(row.table_name || '').trim()));
+  log('>> signal-refresh: refreshing FRED macro signals without copy-forward mirroring');
+  const result = run('node scripts/refresh-fred-signals-to-nas.mjs', 300_000);
+  return { ok: result.ok, error: result.error };
+}
 
-    if (availableTables.has('market_quotes')) {
-      await client.query(`
-        INSERT INTO signal_history (signal_name, ts, value)
-        SELECT 'vix', NOW(), last_price
-        FROM market_quotes
-        WHERE symbol = '^VIX'
-        ORDER BY fetched_at DESC
-        LIMIT 1
-        ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-      `).catch(() => log('  VIX refresh skipped: market_quotes exists but latest quote was unavailable'));
-    } else {
-      const { rows } = await client.query(`
-        SELECT MAX(ts) AS latest_vix_ts
-        FROM signal_history
-        WHERE signal_name = 'vix'
-      `);
-      const latestVixTs = rows[0]?.latest_vix_ts ? Date.parse(String(rows[0].latest_vix_ts)) : 0;
-      const vixAgeMs = latestVixTs > 0 ? (Date.now() - latestVixTs) : Number.POSITIVE_INFINITY;
-      if (!Number.isFinite(vixAgeMs) || vixAgeMs > 18 * HOUR_1_MS) {
-        log('  VIX refresh fallback: market_quotes missing, backfilling recent FRED series into signal_history');
-        const fromDate = new Date(Date.now() - (45 * 24 * HOUR_1_MS)).toISOString().slice(0, 10);
-        const result = run(`node --import tsx scripts/backfill-new-sources.mjs --source fred --from ${fromDate}`, 900_000);
-        if (!result.ok) {
-          return { ok: false, error: result.error || 'FRED fallback refresh failed' };
-        }
-      } else {
-        log('  VIX refresh fallback skipped: existing signal_history is still fresh enough');
-      }
-    }
+async function taskMarketQuoteRefresh() {
+  log('>> market-quote-refresh: fetching delayed market quotes into NAS market_quotes');
+  const result = run('node scripts/refresh-market-quotes-to-nas.mjs', 300_000);
+  return { ok: result.ok, error: result.error };
+}
 
-    if (availableTables.has('fred_observations')) {
-      await client.query(`
-        INSERT INTO signal_history (signal_name, ts, value)
-        SELECT 'fred_' || series_id, NOW(), value
-        FROM fred_observations
-        WHERE observation_date = (SELECT MAX(observation_date) FROM fred_observations)
-        ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-      `).catch(() => log('  FRED refresh skipped: fred_observations exists but latest observations were unavailable'));
-    } else {
-      log('  FRED refresh uses signal_history/backfill-new-sources fallback because fred_observations table is absent');
-    }
+async function taskRatesNowcast() {
+  log('>> rates-nowcast: computing nowcasts for hy_credit_spread, treasury10y, yieldSpread, ig_credit_spread');
+  const result = run('node scripts/compute-rates-nowcast.mjs', 180_000);
+  return { ok: result.ok, error: result.error };
+}
 
-    await client.query(`
-      INSERT INTO signal_history (signal_name, ts, value)
-      SELECT signal_name, date_trunc('hour', NOW()), value
-      FROM (
-        SELECT DISTINCT ON (signal_name) signal_name, value
-        FROM signal_history
-        WHERE signal_name = ANY($1::text[])
-        ORDER BY signal_name, ts DESC
-      ) latest_signals
-      ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
-    `, [fallbackSignalNames]).catch(() => log('  signal freshness mirror skipped: latest fallback signals unavailable'));
+async function taskCompositeNowcasts() {
+  log('>> composite-nowcasts: computing marketStress from nowcasted inputs');
+  const result = run('node scripts/compute-composite-nowcasts.mjs', 60_000);
+  return { ok: result.ok, error: result.error };
+}
 
-    log('>> signal-refresh: done');
-    return { ok: true };
-  } finally {
-    await client.end();
-  }
+async function taskEventIntensityNowcast() {
+  log('>> event-intensity-nowcast: clean market-relevant event rate');
+  const result = run('node scripts/compute-event-intensity-nowcast.mjs', 60_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskReconcileNowcasts() {
+  log('>> reconcile-nowcasts: pairing estimates with observed FRED values');
+  const result = run('node scripts/reconcile-nowcasts.mjs', 180_000);
+  return { ok: result.ok, error: result.error };
 }
 
 async function taskArticleCheck() {
@@ -524,6 +477,12 @@ async function taskDataQuality(state) {
   } finally {
     await client.end().catch(() => {});
   }
+}
+
+async function taskDataFreshnessAudit() {
+  log('>> data-freshness-audit: auditing live/backfill freshness boundaries');
+  const result = run('node scripts/audit-data-freshness.mjs', 300_000);
+  return { ok: result.ok, error: result.error };
 }
 
 async function taskDiscoverEmergingTech() {
@@ -792,7 +751,12 @@ async function taskDailyReport(state) {
 }
 
 const TASKS = {
-  'signal-refresh': { interval: MIN_15_MS, fn: taskSignalRefresh },
+  'market-quote-refresh': { interval: MIN_15_MS, fn: taskMarketQuoteRefresh },
+  'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast },
+  'composite-nowcasts': { interval: MIN_30_MS, fn: taskCompositeNowcasts },
+  'event-intensity-nowcast': { interval: MIN_30_MS, fn: taskEventIntensityNowcast },
+  'reconcile-nowcasts': { interval: MIN_15_MS, fn: taskReconcileNowcasts },
+  'signal-refresh': { interval: HOUR_6_MS, fn: taskSignalRefresh },
   'article-check': { interval: MIN_30_MS, fn: taskArticleCheck },
   'dashboard-health': { interval: MIN_30_MS, fn: taskDashboardHealth },
   'db-health': { interval: MIN_15_MS, fn: taskDbHealth },
@@ -804,6 +768,7 @@ const TASKS = {
   'refresh-event-market-transmission': { interval: HOUR_2_MS, fn: taskRefreshEventMarketTransmission },
   'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync },
   'data-quality': { interval: HOUR_6_MS, fn: taskDataQuality },
+  'data-freshness-audit': { interval: HOUR_6_MS, fn: taskDataFreshnessAudit },
   'arxiv-backfill': { interval: HOUR_6_MS, fn: taskArxivBackfill },
   'hackernews-backfill': { interval: HOUR_6_MS, fn: taskHackerNewsBackfill },
   'discover-emerging-tech': { interval: HOUR_6_MS, fn: taskDiscoverEmergingTech },
@@ -837,14 +802,14 @@ async function runAllTasks(state) {
 
 async function main() {
   process.stderr.write('\nMaster Daemon Started\n');
-  process.stderr.write('  15min: signal refresh, db health\n');
+  process.stderr.write('  15min: market quote refresh, db health\n');
   process.stderr.write('  30min: article check, dashboard health\n');
   process.stderr.write('  1h:    auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    auto-pipeline-labels, refresh-event-market-transmission\n');
-    process.stderr.write('  6h:    master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
+    process.stderr.write('  6h:    signal refresh, master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
     process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
     process.stderr.write('         curated daily news, sec seed universe, openalex theme evidence, followed-theme briefings, weekly digest, coverage-gap-analysis\n');
-  process.stderr.write('  6h+:   codex theme proposals from discovery topics\n');
+  process.stderr.write('  6h+:   data freshness audit, codex theme proposals from discovery topics\n');
   process.stderr.write('  weekly:auto-curate\n\n');
 
   const state = loadState();

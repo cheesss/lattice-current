@@ -250,6 +250,7 @@ th{color:var(--muted);font-weight:normal}
 .trust-chip-stale{background:rgba(250,204,21,.1);color:#facc15;border-color:rgba(250,204,21,.18)}
 .trust-chip-critical{background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.18)}
 .trust-chip-fallback{background:rgba(168,85,247,.1);color:#a855f7;border-color:rgba(168,85,247,.18)}
+.trust-chip-nowcast{background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.22);font-weight:600}
 .trust-chip-degraded{background:rgba(148,163,184,.1);color:#94a3b8;border-color:rgba(148,163,184,.18)}
 .trust-chip-nohydrate{background:rgba(148,163,184,.05);color:#64748b;border-color:rgba(148,163,184,.1)}
 .trust-chip-sources{background:rgba(255,255,255,.04);color:var(--muted);border-color:rgba(255,255,255,.08)}
@@ -275,6 +276,7 @@ th{color:var(--muted);font-weight:normal}
 .inbox-item.accepted{border-left-color:var(--signal-green);opacity:0;transform:translateX(12px);pointer-events:none}
 .inbox-item.rejected{border-left-color:var(--red-critical);opacity:0;transform:translateX(-12px);pointer-events:none}
 .inbox-item.simulated{border-left-color:var(--blue-info)}
+.inbox-item.needs-fix{border-left-color:#fbbf24;background:rgba(250,204,21,.06)}
 .inbox-item.failed{border-left-color:var(--red-critical);background:rgba(239,68,68,.08)}
 .inbox-item-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
 .inbox-item-title{font-weight:600;font-size:12px;color:var(--text);line-height:1.3}
@@ -293,6 +295,7 @@ th{color:var(--muted);font-weight:normal}
 .inbox-status-banner{margin:0 0 10px;padding:9px 11px;border-radius:10px;border:1px solid var(--border-base);font-size:11px;color:var(--text-base)}
 .inbox-status-banner.pending{border-color:rgba(245,158,11,.2);background:rgba(245,158,11,.08)}
 .inbox-status-banner.simulated{border-color:rgba(59,130,246,.25);background:rgba(59,130,246,.09)}
+.inbox-status-banner.needs-fix{border-color:rgba(250,204,21,.24);background:rgba(250,204,21,.08)}
 .inbox-status-banner.accepted{border-color:rgba(22,199,132,.25);background:rgba(22,199,132,.09)}
 .inbox-status-banner.rejected,.inbox-status-banner.failed{border-color:rgba(239,68,68,.25);background:rgba(239,68,68,.09)}
 .runtime-issue-row{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);margin-bottom:6px}
@@ -540,12 +543,16 @@ th{color:var(--muted);font-weight:normal}
       <button class="inbox-btn" id="inbox-bulk-clear" style="margin-left:auto" onclick="inboxClearSelection()" disabled>Clear</button>
     </div>
     <div class="inbox-filter-bar" id="inbox-filter-bar">
-      <span style="font-size:11px;color:var(--muted);margin-right:4px">Filter:</span>
-      <button class="inbox-filter-chip active" data-filter="all" onclick="inboxFilter('all')">All <span id="inbox-count-all">...</span></button>
-      <button class="inbox-filter-chip" data-filter="e2-signal" onclick="inboxFilter('e2-signal')">E2 Signals <span id="inbox-count-e2-signal">...</span></button>
-      <button class="inbox-filter-chip" data-filter="proposal" onclick="inboxFilter('proposal')">Proposals <span id="inbox-count-proposal">...</span></button>
-      <button class="inbox-filter-chip" data-filter="approval" onclick="inboxFilter('approval')">Approvals <span id="inbox-count-approval">...</span></button>
-      <button class="inbox-filter-chip" data-filter="triage" onclick="inboxFilter('triage')">Discovery <span id="inbox-count-triage">...</span></button>
+      <span style="font-size:11px;color:var(--muted);margin-right:4px">State:</span>
+      <button class="inbox-filter-chip active" data-status-filter="actionable" onclick="inboxFilter('actionable')">Actionable <span id="inbox-count-status-actionable">...</span></button>
+      <button class="inbox-filter-chip" data-status-filter="needs-fix" onclick="inboxFilter('needs-fix')">Needs Fix <span id="inbox-count-status-needs-fix">...</span></button>
+      <button class="inbox-filter-chip" data-status-filter="all" onclick="inboxFilter('all')">All <span id="inbox-count-status-all">...</span></button>
+      <span style="font-size:11px;color:var(--muted);margin-left:12px;margin-right:4px">Type:</span>
+      <button class="inbox-filter-chip active" data-type-filter="all" onclick="inboxTypeFilterSelect('all')">All types <span id="inbox-count-type-all">...</span></button>
+      <button class="inbox-filter-chip" data-type-filter="e2-signal" onclick="inboxTypeFilterSelect('e2-signal')">E2 <span id="inbox-count-type-e2-signal">...</span></button>
+      <button class="inbox-filter-chip" data-type-filter="proposal" onclick="inboxTypeFilterSelect('proposal')">Proposals <span id="inbox-count-type-proposal">...</span></button>
+      <button class="inbox-filter-chip" data-type-filter="approval" onclick="inboxTypeFilterSelect('approval')">Approvals <span id="inbox-count-type-approval">...</span></button>
+      <button class="inbox-filter-chip" data-type-filter="triage" onclick="inboxTypeFilterSelect('triage')">Discovery <span id="inbox-count-type-triage">...</span></button>
       <span style="font-size:10px;color:var(--muted);margin-left:auto">J/K navigate | A accept | R reject | S simulate/snooze | Space preview | Esc clear</span>
     </div>
     <div class="inbox-container">
@@ -981,6 +988,23 @@ function proofChip(level, extra = '') {
 function renderTrustRow(opts = {}) {
   if (!opts || typeof opts !== 'object') return '';
   const chips = [];
+  // Nowcast / estimated — takes priority over generic freshness chip
+  if (opts.valueOrigin === 'estimated' || opts.mode === 'nowcast') {
+    const confidencePct = Number.isFinite(Number(opts.estimateConfidence))
+      ? `${Math.round(Number(opts.estimateConfidence) * 100)}%`
+      : '—';
+    const intervalLabel = Number.isFinite(Number(opts.intervalLow)) && Number.isFinite(Number(opts.intervalHigh))
+      ? `±${((Number(opts.intervalHigh) - Number(opts.intervalLow)) / 2).toFixed(2)}`
+      : '';
+    const sessionLabel = opts.marketSession
+      ? ` · ${String(opts.marketSession).toUpperCase()}`
+      : '';
+    const chipLabel = `NOWCAST ${intervalLabel}`.trim();
+    const title = opts.estimateMethod
+      ? `${opts.estimateMethod} · confidence ${confidencePct}${sessionLabel}`
+      : `Estimated value, confidence ${confidencePct}${sessionLabel}`;
+    chips.push(trustChip('nowcast', chipLabel, title));
+  }
   // Freshness
   if (opts.updatedAt !== undefined) {
     const fresh = classifyFreshness(opts.updatedAt, opts.slaHours || 48);
@@ -1632,12 +1656,28 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ?????? Decision Inbox (P1) ??????????????????????????????????????????????????????????????????????????????????????????????
 let inboxItems = [];
-let inboxFilterType = 'all';
+let inboxStatusFilter = 'actionable';
+let inboxTypeFilter = 'all';
 let inboxSelectedId = null;
 const inboxSelection = new Set();
 let inboxSelectionAnchorId = null;
 let inboxLoading = false;
 let inboxBulkBusy = false;
+function dedupeReasoningText(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const seen = new Set();
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (!line) return false;
+      if (seen.has(line)) return false;
+      seen.add(line);
+      return true;
+    })
+    .join('\n');
+}
 function normalizeProposalToReviewItem(proposal) {
   const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : {};
   const proposalType = proposal.proposal_type || proposal.proposalType || 'proposal';
@@ -1648,7 +1688,7 @@ function normalizeProposalToReviewItem(proposal) {
     subtype: proposalType,
     theme: payload.targetTheme || payload.theme || '',
     title: summarizePayloadFocus(payload, proposalType) || 'Proposal',
-    detail: proposal.reasoning || '',
+    detail: dedupeReasoningText(proposal.reasoning || ''),
     payload,
     urgency: 'medium',
     updatedAt: proposal.created_at || proposal.createdAt || null,
@@ -1667,10 +1707,10 @@ function normalizeApprovalToReviewItem(approval) {
     subtype: actionType,
     theme: payload.theme || '',
     title: summarizePayloadFocus(payload, actionType) || 'Approval request',
-    detail: approval.reasoning || '',
+    detail: dedupeReasoningText(approval.reasoning || ''),
     payload,
     urgency: 'high',
-    updatedAt: approval.created_at || null,
+    updatedAt: approval.reviewed_at || approval.created_at || null,
     source: 'human review',
     decisionState: approval.status || 'pending',
     whyVisible: `Human review required: ${actionType}`,
@@ -1693,8 +1733,30 @@ function normalizeTriageToReviewItem(triage) {
     whyVisible: `Discovery topic | momentum ${Number(triage.momentum || 0).toFixed(2)} | ${Number(triage.articleCount || 0)} articles`,
   };
 }
+function hasApprovalProbeMeta(item) {
+  if (!item || item.type !== 'approval') return false;
+  const payload = item.payload || {};
+  const execution = item._lastResult?.execution || {};
+  const nextAction = String(execution.nextAction || payload.nextAction || payload.probeNextAction || '').trim();
+  const quality = execution.qualityScore ?? payload.qualityScore;
+  const recent = execution.recentItemCount ?? payload.recentItemCount;
+  return !!nextAction || Number.isFinite(Number(quality)) || Number.isFinite(Number(recent)) || !!execution.skipped || !!item._lastResult?.needsFix;
+}
+function isNeedsFixInboxItem(item) {
+  if (!item) return false;
+  if (String(item.actionState || '').trim().toLowerCase() === 'needs-fix') return true;
+  if (String(item.decisionState || '').trim().toLowerCase() === 'needs-fix') return true;
+  if (item.type !== 'approval') return false;
+  return hasApprovalProbeMeta(item) && getApprovalProbeState(item).blocked;
+}
+function getInboxStatusBucket(item) {
+  return isNeedsFixInboxItem(item) ? 'needs-fix' : 'actionable';
+}
 function getFilteredInboxItems() {
-  const filtered = inboxFilterType === 'all' ? inboxItems.slice() : inboxItems.filter(x => x.type === inboxFilterType);
+  const statusFiltered = inboxStatusFilter === 'all'
+    ? inboxItems.slice()
+    : inboxItems.filter((item) => inboxStatusFilter === 'needs-fix' ? isNeedsFixInboxItem(item) : !isNeedsFixInboxItem(item));
+  const filtered = inboxTypeFilter === 'all' ? statusFiltered : statusFiltered.filter((item) => item.type === inboxTypeFilter);
   const urgencyOrder = { high: 0, medium: 1, low: 2 };
   filtered.sort((a, b) => {
     const u = (urgencyOrder[a.urgency] || 1) - (urgencyOrder[b.urgency] || 1);
@@ -1705,6 +1767,7 @@ function getFilteredInboxItems() {
 }
 function resolveInboxDecision(item, decision) {
   if (!item) return null;
+  if (item.type === 'approval' && decision === 'accept' && getApprovalProbeState(item).blocked) return null;
   const direct = {
     proposal: ['accept', 'reject', 'snooze'],
     approval: ['accept', 'reject'],
@@ -1727,8 +1790,12 @@ function canBulkApplyDecision(decision) {
   return selectedItems.every((item) => item.type === actionFamily && !!resolveInboxDecision(item, decision));
 }
 function setInboxCountsLoading() {
+  ['actionable', 'needs-fix', 'all'].forEach((t) => {
+    const el = document.getElementById('inbox-count-status-' + t);
+    if (el) el.textContent = '...';
+  });
   ['all', 'e2-signal', 'proposal', 'approval', 'triage'].forEach((t) => {
-    const el = document.getElementById('inbox-count-' + t);
+    const el = document.getElementById('inbox-count-type-' + t);
     if (el) el.textContent = '...';
   });
   const total = document.getElementById('inbox-total-count');
@@ -1791,20 +1858,29 @@ async function refreshDecisionInbox() {
   }
 }
 function updateInboxCounts() {
-  const counts = { all: inboxItems.length };
-  inboxItems.forEach(it => { counts[it.type] = (counts[it.type] || 0) + 1; });
-  ['all', 'e2-signal', 'proposal', 'approval', 'triage'].forEach(t => {
-    const el = document.getElementById('inbox-count-' + t);
-    if (el) el.textContent = counts[t] || 0;
+  const statusCounts = { actionable: 0, 'needs-fix': 0, all: inboxItems.length };
+  const typeCounts = { all: inboxItems.length };
+  inboxItems.forEach((it) => {
+    statusCounts[getInboxStatusBucket(it)] += 1;
+    typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
+  });
+  ['actionable', 'needs-fix', 'all'].forEach((t) => {
+    const el = document.getElementById('inbox-count-status-' + t);
+    if (el) el.textContent = statusCounts[t] || 0;
+  });
+  ['all', 'e2-signal', 'proposal', 'approval', 'triage'].forEach((t) => {
+    const el = document.getElementById('inbox-count-type-' + t);
+    if (el) el.textContent = typeCounts[t] || 0;
   });
   const total = document.getElementById('inbox-total-count');
-  if (total) total.textContent = counts.all;
+  if (total) total.textContent = statusCounts.all;
   updateInboxBulkState();
   renderTopDecisionCard();
 }
 function sortedInboxItemsForDecision() {
   const urgencyOrder = { high: 0, medium: 1, low: 2 };
   return inboxItems
+    .filter((item) => !isNeedsFixInboxItem(item))
     .filter((item) => !item.snoozed)
     .slice()
     .sort((a, b) => {
@@ -1821,8 +1897,8 @@ function renderTopDecisionCard() {
   if (!item) {
     if (badge) badge.textContent = 'clear';
     el.innerHTML = `
-      <div class="top-decision-title">No pending decisions</div>
-      <div class="top-decision-meta">Decision Inbox is clear for the current data window.</div>
+      <div class="top-decision-title">No actionable decisions</div>
+      <div class="top-decision-meta">Actionable review items are clear for the current filter. Check Needs Fix for rejected probes.</div>
       <div class="top-decision-actions"><button class="inbox-btn" onclick="switchSurface('inbox')">Open Inbox</button></div>`;
     return;
   }
@@ -1861,16 +1937,19 @@ function renderInboxList() {
   listEl.innerHTML = filtered.map((it, i) => {
     const selected = inboxSelectedId === it.id ? ' selected' : '';
     const multiSelected = inboxSelection.has(it.id) ? ' multi-selected' : '';
+    const statusBucket = getInboxStatusBucket(it);
     const typeBadge = { 'e2-signal': 'E2', 'proposal': 'Prop', 'approval': 'Appr', 'triage': 'Disc' }[it.type] || it.type;
     const urgencyChip = it.urgency === 'high' ? '<span class="trust-chip trust-chip-critical" style="font-size:9px">HI</span>' : '';
     const fresh = it.updatedAt ? classifyFreshness(it.updatedAt, 48) : null;
     const freshChip = fresh && fresh.level !== 'nohydrate' ? `<span class="trust-chip trust-chip-${fresh.level}" style="font-size:9px">${fresh.level}</span>` : '';
+    const statusChip = statusBucket === 'needs-fix' ? '<span class="trust-chip trust-chip-stale" style="font-size:9px">FIX</span>' : '';
     const actionState = it.actionState ? ` ${escapeHtml(it.actionState)}` : '';
-    return `<div class="inbox-item${selected}${multiSelected}${actionState}" data-id="${escapeHtml(it.id)}" data-idx="${i}" onclick="selectInboxItem(event,'${escapeHtml(it.id)}')">
+    return `<div class="inbox-item${selected}${multiSelected}${actionState} ${statusBucket === 'needs-fix' ? 'needs-fix' : ''}" data-id="${escapeHtml(it.id)}" data-idx="${i}" onclick="selectInboxItem(event,'${escapeHtml(it.id)}')">
       <div class="inbox-item-head">
         <span class="trust-chip trust-chip-sources" style="font-size:9px">${typeBadge}</span>
         ${urgencyChip}
         ${freshChip}
+        ${statusChip}
         ${it.proofLevel ? proofChip(it.proofLevel) : ''}
       </div>
       <div class="inbox-item-title">${escapeHtml(truncate(it.title || '', 80))}</div>
@@ -1944,9 +2023,20 @@ function renderInboxPreview(item) {
     ${kw.length ? `<div class="pill-row" style="margin-top:8px">${renderTags(kw, 'tag-neutral', 10)}</div>` : ''}`;
   }
   const actions = buildInboxActions(item);
-  const status = item.actionState || 'pending';
+  const status = item.actionState === 'simulated'
+    ? 'simulated'
+    : isNeedsFixInboxItem(item)
+      ? 'needs-fix'
+      : item.actionState || 'pending';
+  const statusCopy = status === 'pending'
+    ? 'Pending review'
+    : status === 'simulated'
+      ? 'Dry run complete. No backend state was changed.'
+      : status === 'needs-fix'
+        ? 'Repair required. Probe or registration failed, so this item is not currently actionable.'
+        : `State: ${escapeHtml(status)}`;
   preview.innerHTML = `
-    <div class="inbox-status-banner ${escapeHtml(status)}">${status === 'pending' ? 'Pending review' : status === 'simulated' ? 'Dry run complete. No backend state was changed.' : `State: ${escapeHtml(status)}`}</div>
+    <div class="inbox-status-banner ${escapeHtml(status)}">${statusCopy}</div>
     <div class="card-title" style="margin-bottom:6px">${escapeHtml(item.title || '--')}</div>
     <div class="meta-line" style="margin-bottom:8px">${escapeHtml(item.type)} | ${escapeHtml(item.subtype || '')} | ${escapeHtml(item.source || '')}</div>
     ${trust}
@@ -2002,12 +2092,18 @@ function buildInboxActions(item) {
       ${item.payload?.targetTheme ? `<button class="inbox-btn" onclick="openThemeBrief('${normalizeTheme(item.payload.targetTheme)}')">Open brief</button>` : ''}`;
   }
   if (item.type === 'approval') {
-    const probeBlocked = !!(item._lastResult?.needsFix || item._lastResult?.execution?.skipped);
-    const acceptDisabled = probeBlocked ? 'disabled title="소스 probe 실패 — URL을 수정하거나 Reject하세요"' : '';
+    const probeState = getApprovalProbeState(item);
+    const acceptButton = probeState.blocked
+      ? ''
+      : `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>`;
+    const repairHint = probeState.blocked
+      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)}</span>`
+      : '';
     return `
       <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>
-      <button class="inbox-btn inbox-btn-accept" ${acceptDisabled} onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>`;
+      ${acceptButton}
+      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
+      ${repairHint}`;
   }
   if (item.type === 'triage') {
     return `
@@ -2025,7 +2121,32 @@ function buildInboxActions(item) {
 }
 function formatQuality(value) {
   if (!Number.isFinite(Number(value))) return null;
-  return Number(value).toFixed(2);
+  const numeric = Number(value);
+  if (numeric >= 0 && numeric <= 1) return `${Math.round(numeric * 100)}%`;
+  if (numeric >= 0 && numeric <= 100) return `${Math.round(numeric)}%`;
+  return numeric.toFixed(2);
+}
+function getApprovalProbeState(item) {
+  if (!item || item.type !== 'approval') return { blocked: false, reason: '' };
+  if (String(item.decisionState || '').trim().toLowerCase() === 'needs-fix') {
+    return { blocked: true, reason: 'This source already failed validation. Simulate again or reject it.' };
+  }
+  const payload = item.payload || {};
+  const execution = item._lastResult?.execution || {};
+  const subtype = String(item.subtype || payload.action_type || payload.type || '').toLowerCase();
+  if (subtype !== 'add-rss') return { blocked: false, reason: '' };
+  const nextAction = String(execution.nextAction || payload.nextAction || payload.probeNextAction || '').toLowerCase();
+  const qualityRaw = execution.qualityScore ?? payload.qualityScore;
+  const recentRaw = execution.recentItemCount ?? payload.recentItemCount;
+  const quality = Number(qualityRaw);
+  const recent = Number(recentRaw);
+  const hasProbe = nextAction || Number.isFinite(quality) || Number.isFinite(recent) || execution.skipped || item._lastResult?.needsFix;
+  if (!hasProbe) return { blocked: false, reason: '' };
+  if (item._lastResult?.needsFix || execution.skipped) return { blocked: true, reason: 'Source probe failed. Fix the URL or reject this item.' };
+  if (nextAction === 'reject' || nextAction === 'manual-adapter') return { blocked: true, reason: `Source probe returned ${nextAction}. Fix the URL or reject this item.` };
+  if (Number.isFinite(quality) && quality < 0.65) return { blocked: true, reason: `Source quality is below gate (${formatQuality(quality)}). Simulate or reject this item.` };
+  if (Number.isFinite(recent) && recent < 3) return { blocked: true, reason: `Source has only ${recent} recent item(s). Simulate or reject this item.` };
+  return { blocked: false, reason: '' };
 }
 function buildInboxActionMetaChips(meta = []) {
   return meta
@@ -2061,7 +2182,7 @@ function renderInboxActionResult(item, decision, response, errorMessage = '') {
     if (execution?.articleCount != null) dryRunMeta.push({ label: 'Would seed', value: execution.articleCount });
     // qualityScore (probe) takes priority over legacy quality field
     const qualityVal = execution?.qualityScore != null
-      ? Number(execution.qualityScore).toFixed(0) + '%'
+      ? (Number(execution.qualityScore) * 100).toFixed(0) + '%'
       : formatQuality(execution?.quality?.score ?? execution?.quality);
     if (qualityVal != null) dryRunMeta.push({ label: 'Quality', value: qualityVal });
     if (execution?.url) dryRunMeta.push({ label: 'URL', value: execution.url });
@@ -2171,7 +2292,9 @@ async function inboxAction(decision, id) {
       const response = await postJson(`${API}/approval-queue/${encodeURIComponent(item.rawId)}/review`, { decision: 'accept', reviewer: 'theme-dashboard', dryRun: true });
       item.actionState = 'simulated';
       item._lastResult = response;
+      if (response?.approval?.status) item.decisionState = response.approval.status;
       renderInboxList();
+      updateInboxCounts();
       renderTopDecisionCard();
       const preview = document.getElementById('inbox-preview-content');
       if (preview) preview.innerHTML = renderInboxActionResult(item, 'simulate', response);
@@ -2215,10 +2338,14 @@ async function inboxAction(decision, id) {
     }
     // Store last result for button-state checks (e.g. Accept disable)
     item._lastResult = response;
+    if (item.type === 'approval' && response?.approval?.status) item.decisionState = response.approval.status;
+    if (item.type === 'proposal' && response?.proposal?.status) item.decisionState = response.proposal.status;
+    if (item.type === 'triage' && response?.review?.decision) item.decisionState = response.review.decision;
     // needs-fix / skipped: keep item in queue, show warning banner
     if (response?.needsFix || response?.execution?.skipped) {
       item.actionState = 'needs-fix';
       renderInboxList();
+      updateInboxCounts();
       const preview = document.getElementById('inbox-preview-content');
       if (preview) preview.innerHTML = renderInboxActionResult(item, resolvedDecision, response);
       updateInboxBulkState();
@@ -2270,9 +2397,19 @@ async function inboxAction(decision, id) {
   }
 }
 function inboxFilter(type) {
-  inboxFilterType = type;
-  document.querySelectorAll('.inbox-filter-chip').forEach(el => {
-    el.classList.toggle('active', el.dataset.filter === type);
+  inboxStatusFilter = type;
+  document.querySelectorAll('.inbox-filter-chip[data-status-filter]').forEach(el => {
+    el.classList.toggle('active', el.dataset.statusFilter === type);
+  });
+  inboxSelection.clear();
+  inboxSelectionAnchorId = null;
+  updateInboxBulkState();
+  renderInboxList();
+}
+function inboxTypeFilterSelect(type) {
+  inboxTypeFilter = type;
+  document.querySelectorAll('.inbox-filter-chip[data-type-filter]').forEach(el => {
+    el.classList.toggle('active', el.dataset.typeFilter === type);
   });
   inboxSelection.clear();
   inboxSelectionAnchorId = null;
@@ -2304,7 +2441,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable)) return;
   if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if (!inboxItems.length) return;
-  const filtered = inboxFilterType === 'all' ? inboxItems : inboxItems.filter(x => x.type === inboxFilterType);
+  const filtered = getFilteredInboxItems();
   const currentIdx = filtered.findIndex(x => x.id === inboxSelectedId);
   const selectedItem = inboxItems.find(x => x.id === inboxSelectedId);
   const runSelected = (decision) => {
@@ -3302,7 +3439,7 @@ function renderReviewItemCard(item) {
       const probeTags = [];
       if (p.resolvedUrl) probeTags.push(`<span class="probe-meta-tag">Resolved: ${escapeHtml(String(p.resolvedUrl))}</span>`);
       if (p.connectorKind) probeTags.push(`<span class="probe-meta-tag">Connector: ${escapeHtml(String(p.connectorKind))}</span>`);
-      if (p.qualityScore != null) probeTags.push(`<span class="probe-meta-tag">Quality: ${Number(p.qualityScore).toFixed(0)}%</span>`);
+      if (p.qualityScore != null) probeTags.push(`<span class="probe-meta-tag">Quality: ${formatQuality(p.qualityScore)}</span>`);
       if (p.recentItemCount != null) probeTags.push(`<span class="probe-meta-tag">최근 기사: ${p.recentItemCount}</span>`);
       const metaHtml = probeTags.length ? `<div class="probe-meta-grid">${probeTags.join('')}</div>` : '';
       const sampleHtml = Array.isArray(p.sampleItems) && p.sampleItems.length
@@ -3970,12 +4107,19 @@ async function refreshKPI() {
     if(kpiFreshness){
       const degraded=!dataUpdatedAt&&meta.generatedAt?'Wrapper time only':(meta.stale&&meta.staleReason?meta.staleReason:undefined);
       const fallback=meta.mode==='fallback'||String(meta.window||'').includes('fallback')?(meta.window||'Fallback mode'):false;
+      const isNowcast=meta.mode==='nowcast'||meta.valueOrigin==='estimated';
+      const firstNowcast=signals.nowcasts && Object.values(signals.nowcasts)[0];
       kpiFreshness.innerHTML=renderTrustRow({
         updatedAt:dataUpdatedAt||meta.generatedAt,
         fallback,
         stale:meta.stale,
         staleReason:meta.staleReason,
         mode:meta.mode,
+        valueOrigin:meta.valueOrigin,
+        estimateConfidence:isNowcast&&firstNowcast?firstNowcast.confidence:undefined,
+        estimateMethod:isNowcast&&firstNowcast?firstNowcast.method:undefined,
+        intervalLow:isNowcast&&firstNowcast?firstNowcast.intervalLow:undefined,
+        intervalHigh:isNowcast&&firstNowcast?firstNowcast.intervalHigh:undefined,
         staleLabel:meta.mode==='delayed'?'Delayed':'Stale',
         degraded,
         slaHours:meta.mode==='delayed'?72:24,
