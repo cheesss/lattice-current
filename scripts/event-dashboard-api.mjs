@@ -1230,6 +1230,43 @@ async function buildLiveStatus() {
   };
 }
 
+/**
+ * Pure: merge nowcast rows into the observed lookup/originMap so that KPI
+ * payloads show estimated values when observed is missing or non-observed.
+ * Extracted for testability (buildSignalSummary wires the pg calls).
+ *
+ * @param {{lookup: Record<string, unknown>, originMap: Record<string, any>,
+ *          nowcasts: Record<string, any>}} args
+ * @returns {{lookup: Record<string, unknown>, originMap: Record<string, any>,
+ *            nowcastSummary: Record<string, any>, anyEstimated: boolean}}
+ */
+export function fuseNowcastsIntoLookup({ lookup, originMap, nowcasts }) {
+  const nextLookup = { ...(lookup || {}) };
+  const nextOrigin = { ...(originMap || {}) };
+  const summary = {};
+  for (const [signal, row] of Object.entries(nowcasts || {})) {
+    const estimated = Number(row.estimated_value);
+    if (!Number.isFinite(estimated)) continue;
+    const observedOrigin = nextOrigin[signal]?.valueOrigin;
+    if (observedOrigin === 'observed') continue; // never override observed
+    nextLookup[signal] = estimated;
+    summary[signal] = {
+      value: estimated,
+      method: row.estimate_method,
+      confidence: row.estimate_confidence != null ? Number(row.estimate_confidence) : null,
+      intervalLow: row.interval_low != null ? Number(row.interval_low) : null,
+      intervalHigh: row.interval_high != null ? Number(row.interval_high) : null,
+      featureVintageAt: row.feature_vintage_at,
+      derivedFromSources: row.derived_from_sources,
+      asOf: row.target_ts,
+      generatedAt: row.created_at,
+    };
+    nextOrigin[signal] = { valueOrigin: 'estimated', writerId: row.estimate_method };
+  }
+  const anyEstimated = Object.values(nextOrigin).some((info) => info?.valueOrigin === 'estimated');
+  return { lookup: nextLookup, originMap: nextOrigin, nowcastSummary: summary, anyEstimated };
+}
+
 async function loadLatestNowcastsForSignals(signalNames) {
   if (!Array.isArray(signalNames) || !signalNames.length) return {};
   // estimated_signal_nowcasts may not exist yet (Phase 1 migration pending)
@@ -1275,30 +1312,13 @@ async function buildSignalSummary() {
     if (lookup[key] == null || !Number.isFinite(Number(lookup[key]))) nowcastCandidates.add(key);
   }
   const nowcasts = await loadLatestNowcastsForSignals(Array.from(nowcastCandidates));
-  const nowcastSummary = {};
-  for (const [signal, row] of Object.entries(nowcasts)) {
-    const estimated = Number(row.estimated_value);
-    if (!Number.isFinite(estimated)) continue;
-    // Only replace if observed is worse (absent or non-observed origin).
-    const observedOrigin = originMap[signal]?.valueOrigin;
-    if (observedOrigin === 'observed') continue;
-    lookup[signal] = estimated;
-    nowcastSummary[signal] = {
-      value: estimated,
-      method: row.estimate_method,
-      confidence: row.estimate_confidence != null ? Number(row.estimate_confidence) : null,
-      intervalLow: row.interval_low != null ? Number(row.interval_low) : null,
-      intervalHigh: row.interval_high != null ? Number(row.interval_high) : null,
-      featureVintageAt: row.feature_vintage_at,
-      derivedFromSources: row.derived_from_sources,
-      asOf: row.target_ts,
-      generatedAt: row.created_at,
-    };
-    // Signal-level origin is now 'estimated'.
-    originMap[signal] = { valueOrigin: 'estimated', writerId: row.estimate_method };
-  }
+  const fused = fuseNowcastsIntoLookup({ lookup, originMap, nowcasts });
+  const fusedLookup = fused.lookup;
+  const fusedOriginMap = fused.originMap;
+  const nowcastSummary = fused.nowcastSummary;
+  const anyEstimated = fused.anyEstimated;
 
-  const vix = Number(lookup.vix);
+  const vix = Number(fusedLookup.vix);
   const riskGauge = Number.isFinite(vix)
     ? Number(clamp(45 + (vix - 20) * 2, 4, 100).toFixed(1))
     : null;
@@ -1306,24 +1326,21 @@ async function buildSignalSummary() {
     ? (vix > 25 ? 'risk-off' : vix < 18 ? 'risk-on' : 'balanced')
     : null;
 
-  // Response-level mode: if any critical KPI now reports as estimated,
-  // bubble that up so clients can render the NOWCAST badge.
-  const anyEstimated = Object.values(originMap).some((info) => info?.valueOrigin === 'estimated');
   const responseMode = anyEstimated ? 'nowcast' : signalState.mode;
 
   return {
     vix: Number.isFinite(vix) ? vix : null,
-    yieldSpread: Number.isFinite(Number(lookup.yieldSpread)) ? Number(lookup.yieldSpread) : null,
-    oilPrice: Number.isFinite(Number(lookup.oilPrice)) ? Number(lookup.oilPrice) : null,
-    dollarIndex: Number.isFinite(Number(lookup.dollarIndex)) ? Number(lookup.dollarIndex) : null,
-    hyCreditSpread: Number.isFinite(Number(lookup.hy_credit_spread)) ? Number(lookup.hy_credit_spread) : null,
-    marketStress: Number.isFinite(Number(lookup.marketStress)) ? Number(lookup.marketStress) : null,
+    yieldSpread: Number.isFinite(Number(fusedLookup.yieldSpread)) ? Number(fusedLookup.yieldSpread) : null,
+    oilPrice: Number.isFinite(Number(fusedLookup.oilPrice)) ? Number(fusedLookup.oilPrice) : null,
+    dollarIndex: Number.isFinite(Number(fusedLookup.dollarIndex)) ? Number(fusedLookup.dollarIndex) : null,
+    hyCreditSpread: Number.isFinite(Number(fusedLookup.hy_credit_spread)) ? Number(fusedLookup.hy_credit_spread) : null,
+    marketStress: Number.isFinite(Number(fusedLookup.marketStress)) ? Number(fusedLookup.marketStress) : null,
     riskGauge,
     riskState,
     vixHistory: vixHistoryR.rows.map((row) => Number(row.value || 0)).filter((value) => Number.isFinite(value)),
     rows,
     signalQuality: signalState.qualityBySignal,
-    signalOrigin: originMap,
+    signalOrigin: fusedOriginMap,
     nowcasts: nowcastSummary,
     meta: {
       mode: responseMode,

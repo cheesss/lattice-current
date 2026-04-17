@@ -38,20 +38,52 @@ function parseArgs() {
   return args;
 }
 
-async function evaluateCandidate(client, target, version, evalSummary) {
+/**
+ * Pure: decide whether a candidate model meets shadow-promotion gates.
+ * Extracted for test coverage.
+ *
+ * Gates:
+ *   holdoutMae < baselineMae * 0.85 AND coverage_90 >= 0.80 AND rows >= 120
+ */
+export function evaluateCandidateGate(evalSummary) {
   const holdoutMae = Number(evalSummary.holdout_mae);
   const baselineMae = Number(evalSummary.baseline_mae);
   const coverage = Number(evalSummary.coverage_90);
   const rows = Number(evalSummary.n_train) + Number(evalSummary.n_holdout);
-
   const improvement = baselineMae > 0 ? (baselineMae - holdoutMae) / baselineMae : 0;
-  const passed = holdoutMae < baselineMae * 0.85 && coverage >= 0.80 && rows >= 120;
+  const passed = Number.isFinite(holdoutMae) && Number.isFinite(baselineMae)
+    && holdoutMae < baselineMae * 0.85
+    && coverage >= 0.80
+    && rows >= 120;
   return {
     passed,
-    reason: passed ? 'candidate gates satisfied'
-      : `holdout MAE ${holdoutMae} vs baseline ${baselineMae} (improvement ${(improvement*100).toFixed(1)}%), coverage ${coverage}, rows ${rows}`,
     improvement,
+    reason: passed
+      ? 'candidate gates satisfied'
+      : `holdout MAE ${holdoutMae} vs baseline ${baselineMae} (improvement ${(improvement*100).toFixed(1)}%), coverage ${coverage}, rows ${rows}`,
   };
+}
+
+/**
+ * Pure: decide whether live reconciliation justifies shadow→active promotion.
+ * Gates:
+ *   live_mae <= holdout_mae * 1.2 AND coverage >= 0.80 AND samples >= 10
+ */
+export function evaluateShadowGate({ liveMae, coverage, samples, holdoutMae }) {
+  if (!Number.isFinite(Number(samples)) || Number(samples) < 10) {
+    return { passed: false, reason: `insufficient reconciliation samples (${samples || 0})` };
+  }
+  const passed = Number(liveMae) <= Number(holdoutMae) * 1.2 && Number(coverage) >= 0.80;
+  return {
+    passed,
+    reason: passed
+      ? 'shadow passed live calibration'
+      : `live MAE ${Number(liveMae).toFixed(4)} vs holdout ${Number(holdoutMae).toFixed(4)}, coverage ${Number(coverage).toFixed(2)} (samples ${samples})`,
+  };
+}
+
+async function evaluateCandidate(client, target, version, evalSummary) {
+  return evaluateCandidateGate(evalSummary);
 }
 
 async function evaluateShadow(client, target, version, evalSummary) {
@@ -65,16 +97,12 @@ async function evaluateShadow(client, target, version, evalSummary) {
       AND reconciled_at > NOW() - INTERVAL '30 days'
   `, [target, version]);
   const live = rows[0];
-  if (!live || live.samples < 10) {
-    return { passed: false, reason: `insufficient reconciliation samples (${live?.samples || 0})` };
-  }
-  const holdoutMae = Number(evalSummary.holdout_mae);
-  const passed = live.live_mae <= holdoutMae * 1.2 && live.coverage >= 0.80;
-  return {
-    passed,
-    reason: passed ? 'shadow passed live calibration'
-      : `live MAE ${live.live_mae.toFixed(4)} vs holdout ${holdoutMae.toFixed(4)}, coverage ${live.coverage.toFixed(2)} (samples ${live.samples})`,
-  };
+  return evaluateShadowGate({
+    liveMae: live?.live_mae,
+    coverage: live?.coverage,
+    samples: live?.samples,
+    holdoutMae: evalSummary.holdout_mae,
+  });
 }
 
 async function main() {

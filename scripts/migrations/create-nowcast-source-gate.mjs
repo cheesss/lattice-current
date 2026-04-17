@@ -69,6 +69,17 @@ const SEED_RULES = [
   // dollarIndex nowcast
   { target: 'dollarIndex', source: 'UUP', family: 'cross', lag: 6, maeMax: 0.6 },
   { target: 'dollarIndex', source: 'FXE', family: 'cross', lag: 6, maeMax: 0.8 },
+
+  // marketStress composite — uses three component signals as sources.
+  // Composite abstains in shock regime because the additive blend breaks
+  // down when VIX jumps overtake spread movement.
+  { target: 'marketStress', source: 'vix',              family: 'same',  lag: 6,  maeMax: 0.1, regimeMask: { normal: true, shock: false } },
+  { target: 'marketStress', source: 'hy_credit_spread', family: 'cross', lag: 30, maeMax: 0.2, regimeMask: { normal: true, shock: false } },
+  { target: 'marketStress', source: 'yieldSpread',      family: 'cross', lag: 30, maeMax: 0.2, regimeMask: { normal: true, shock: false } },
+
+  // eventIntensity — only enforces minimal rules; treats article rate + GDELT as sources.
+  { target: 'eventIntensity', source: 'article_count_hourly', family: 'proxy', lag: 2, maeMax: 2.0 },
+  { target: 'eventIntensity', source: 'gdelt_event_count',    family: 'proxy', lag: 6, maeMax: 3.0 },
 ];
 
 async function main() {

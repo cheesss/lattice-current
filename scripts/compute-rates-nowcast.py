@@ -24,6 +24,10 @@ import numpy as np
 import psycopg2
 from joblib import load
 
+# Import gate — scripts/_shared/ on sys.path
+sys.path.insert(0, str(Path(__file__).parent / '_shared'))
+from nowcast_source_gate import check_eligible_sources, GateDecision  # noqa: E402
+
 
 TARGETS = ['hy_credit_spread', 'treasury10y', 'yieldSpread', 'ig_credit_spread']
 
@@ -121,6 +125,28 @@ def build_feature_vector(cur, feature_columns: list[str]):
     return np.array(values, dtype=float), sources
 
 
+def _feature_to_source_name(feature_column: str) -> str:
+    """Map a feature column like 'HYG_lag1' or 'hy_credit_spread_lag1' to the
+    source signal name that appears in nowcast_source_eligibility."""
+    if feature_column.endswith('_lag1'):
+        return feature_column[:-5]
+    return feature_column
+
+
+def _lag_hours_for(feature_column: str, observed_at_iso: str | None) -> float | None:
+    """Approximate observation lag (hours) from the latest-available ts."""
+    if not observed_at_iso:
+        return None
+    try:
+        observed_at = datetime.fromisoformat(observed_at_iso.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if observed_at.tzinfo is None:
+        observed_at = observed_at.replace(tzinfo=timezone.utc)
+    delta = (datetime.now(timezone.utc) - observed_at).total_seconds() / 3600.0
+    return max(0.0, delta)
+
+
 def predict_and_write(conn, target: str):
     models_dir = Path(__file__).parent.parent / 'data' / 'models'
     model_path = models_dir / f'{target}-nowcast-latest.pkl'
@@ -132,6 +158,34 @@ def predict_and_write(conn, target: str):
         features, sources_or_reason = build_feature_vector(cur, bundle['feature_columns'])
         if features is None:
             return {'target': target, 'ok': False, 'reason': sources_or_reason, 'abstain': True}
+
+    # ── Source gate: abstain before writing if the available sources are weak ──
+    available_sources: list[dict] = []
+    seen_source_names: set[str] = set()
+    for s in sources_or_reason:
+        name = _feature_to_source_name(s['feature'])
+        if name in seen_source_names:
+            continue
+        seen_source_names.add(name)
+        available_sources.append({
+            'name': name,
+            'lagHours': _lag_hours_for(s['feature'], s.get('observed_at')),
+        })
+    gate: GateDecision = check_eligible_sources(
+        conn, target, model_version='v1', available_sources=available_sources,
+    )
+    if gate.abstain:
+        return {
+            'target': target,
+            'ok': True,
+            'abstain': True,
+            'reason': f'source gate abstained: {gate.reason}',
+            'regime': gate.regime,
+            'eligible': gate.eligible,
+            'rejected': gate.rejected,
+        }
+
+    with conn.cursor() as cur:
         pred = float(bundle['model'].predict(features.reshape(1, -1))[0])
         interval = float(bundle['train_meta']['interval_halfwidth_90'])
         resid_std = float(bundle['train_meta']['residual_std'])
@@ -180,6 +234,8 @@ def predict_and_write(conn, target: str):
         'interval': [pred - interval, pred + interval],
         'confidence': raw_confidence,
         'model_version': bundle['version'],
+        'regime': gate.regime,
+        'eligible': gate.eligible,
     }
 
 

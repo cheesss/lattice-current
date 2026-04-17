@@ -19,6 +19,7 @@ import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { withLock } from './_shared/pipeline-lock.mjs';
 import { createLogger } from './_shared/structured-logger.mjs';
+import { checkEligibleSources } from './_shared/nowcast-source-gate.mjs';
 
 const { Client } = pg;
 loadOptionalEnvFile();
@@ -103,6 +104,25 @@ export async function runEventIntensityNowcast() {
         cleanEventCountLastHour(client),
         expectedCountForHour(client, hour),
       ]);
+
+      // Source gate — we use two pseudo-sources (article rate + GDELT event
+      // count) to justify running the nowcast; gating here prevents writing
+      // estimates when articles have stopped arriving or coverage is thin.
+      const gateCheck = await checkEligibleSources(client, {
+        targetSignal: 'eventIntensity',
+        modelVersion: 'v1',
+        availableSources: [
+          { name: 'article_count_hourly', lagHours: 0 },
+          { name: 'gdelt_event_count', lagHours: 0 },
+        ],
+      });
+      if (gateCheck.abstain) {
+        logger.info('event intensity nowcast abstained by gate', {
+          reason: gateCheck.reason,
+          regime: gateCheck.regime,
+        });
+        return { ok: true, skipped: true, reason: `gate abstain: ${gateCheck.reason}` };
+      }
 
       const expectedCount = Math.max(expected.expected, 1);
       const normalized = observed.clean_event_count / expectedCount;

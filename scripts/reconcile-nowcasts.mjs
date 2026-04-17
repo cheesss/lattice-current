@@ -28,6 +28,49 @@ loadOptionalEnvFile();
 
 const logger = createLogger('reconcile-nowcasts');
 
+/**
+ * Pure: classify a single prediction/observation pair into a calibration
+ * bucket + error metrics. Extracted for testability.
+ */
+export function classifyReconciliation({ predicted, observed, intervalLow, intervalHigh }) {
+  const absError = Math.abs(Number(predicted) - Number(observed));
+  const pctError = Number(observed) !== 0
+    ? absError / Math.abs(Number(observed))
+    : null;
+  const boundsPresent = intervalLow != null && intervalHigh != null
+    && Number.isFinite(Number(intervalLow)) && Number.isFinite(Number(intervalHigh));
+  const withinInterval = boundsPresent
+    ? (Number(observed) >= Number(intervalLow) && Number(observed) <= Number(intervalHigh))
+    : null;
+  const calibrationBucket = absError < 0.05 ? 'good'
+    : absError < 0.15 ? 'fair'
+    : absError < 0.30 ? 'poor'
+    : 'bad';
+  return { absError, pctError, withinInterval, calibrationBucket };
+}
+
+/**
+ * Pure: decide whether coverage reading should trigger an alert, and at
+ * what severity. Extracted from checkCalibrationDrift for testability.
+ */
+export function classifyDriftAlert({ coverage, samples, coverageTarget = 0.80, hardFloor = 0.70, criticalFloor = 0.50 }) {
+  if (coverage == null || !Number.isFinite(Number(coverage))) {
+    return { alert: false, reason: 'coverage missing' };
+  }
+  if (samples == null || !Number.isFinite(Number(samples)) || Number(samples) < 5) {
+    return { alert: false, reason: 'too few samples' };
+  }
+  if (Number(coverage) >= hardFloor) {
+    return { alert: false, reason: `coverage ${coverage} >= ${hardFloor} hard floor` };
+  }
+  const severity = Number(coverage) < criticalFloor ? 'critical' : 'warning';
+  return {
+    alert: true,
+    severity,
+    reason: `coverage ${Number(coverage).toFixed(2)} below ${hardFloor} (target ${coverageTarget})`,
+  };
+}
+
 async function reconcileSignal(client, signalName) {
   const { rows: unreconciled } = await client.query(
     `SELECT signal_name, target_ts, model_version, estimated_value,
@@ -59,15 +102,12 @@ async function reconcileSignal(client, signalName) {
     const obs = observed[0];
     const predicted = Number(row.estimated_value);
     const observedValue = Number(obs.value);
-    const absError = Math.abs(predicted - observedValue);
-    const pctError = observedValue !== 0 ? absError / Math.abs(observedValue) : null;
-    const withinInterval = row.interval_low != null && row.interval_high != null
-      ? (observedValue >= Number(row.interval_low) && observedValue <= Number(row.interval_high))
-      : null;
-    const calibrationBucket = absError < 0.05 ? 'good'
-      : absError < 0.15 ? 'fair'
-      : absError < 0.30 ? 'poor'
-      : 'bad';
+    const { absError, pctError, withinInterval, calibrationBucket } = classifyReconciliation({
+      predicted,
+      observed: observedValue,
+      intervalLow: row.interval_low,
+      intervalHigh: row.interval_high,
+    });
 
     await client.query(
       `INSERT INTO nowcast_reconciliation (
@@ -113,14 +153,14 @@ async function checkCalibrationDrift(client) {
     HAVING COUNT(*) >= 5
   `);
   for (const row of rows) {
-    if (row.coverage != null && row.coverage < 0.70) {
-      await sendAlert({
-        type: 'nowcast_calibration_drift',
-        severity: row.coverage < 0.50 ? 'critical' : 'warning',
-        message: `Nowcast coverage for ${row.signal_name} is ${(row.coverage * 100).toFixed(0)}% over last 24h (target ≥80%)`,
-        metric: { signal: row.signal_name, coverage: row.coverage, mae: row.mean_abs_error, samples: row.samples },
-      });
-    }
+    const decision = classifyDriftAlert({ coverage: row.coverage, samples: row.samples });
+    if (!decision.alert) continue;
+    await sendAlert({
+      type: 'nowcast_calibration_drift',
+      severity: decision.severity,
+      message: `Nowcast coverage for ${row.signal_name} is ${(row.coverage * 100).toFixed(0)}% over last 24h (target ≥80%)`,
+      metric: { signal: row.signal_name, coverage: row.coverage, mae: row.mean_abs_error, samples: row.samples },
+    });
   }
 }
 

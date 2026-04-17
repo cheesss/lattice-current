@@ -16,6 +16,7 @@ import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.m
 import { withLock } from './_shared/pipeline-lock.mjs';
 import { createLogger } from './_shared/structured-logger.mjs';
 import { adjustConfidenceForSession } from './_shared/market-calendar.mjs';
+import { checkEligibleSources } from './_shared/nowcast-source-gate.mjs';
 
 const { Client } = pg;
 loadOptionalEnvFile();
@@ -160,6 +161,14 @@ async function writeComposite(client, {
   };
 }
 
+function _inputLagHours(input) {
+  const ref = input?.observedAt || input?.targetTs;
+  if (!ref) return null;
+  const ts = Date.parse(ref);
+  if (!Number.isFinite(ts)) return null;
+  return Math.max(0, (Date.now() - ts) / 3_600_000);
+}
+
 async function computeMarketStress(client) {
   const vix = await fetchLatestValue(client, 'vix');
   const hy = await fetchLatestValue(client, 'hy_credit_spread');
@@ -172,6 +181,22 @@ async function computeMarketStress(client) {
   if (inputs.length < 2) {
     logger.info('marketStress: insufficient inputs', { available: inputs.length });
     return { signalName: 'marketStress', skipped: true, reason: 'insufficient inputs' };
+  }
+
+  // Source gate: marketStress has its own eligibility rules derived from
+  // the composite's component signals. If the gate table hasn't been seeded
+  // with marketStress rules yet the check passes in open mode.
+  const gateCheck = await checkEligibleSources(client, {
+    targetSignal: 'marketStress',
+    modelVersion: 'v1',
+    availableSources: inputs.map((i) => ({
+      name: i.signal,
+      lagHours: _inputLagHours(i),
+    })),
+  });
+  if (gateCheck.abstain) {
+    logger.info('marketStress: source gate abstained', { reason: gateCheck.reason, regime: gateCheck.regime });
+    return { signalName: 'marketStress', skipped: true, reason: `gate abstain: ${gateCheck.reason}`, regime: gateCheck.regime };
   }
 
   // Composite formula mirrors refresh-fred-signals-to-nas deriveAndWriteMarketStress:
