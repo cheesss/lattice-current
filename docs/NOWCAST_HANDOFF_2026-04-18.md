@@ -194,16 +194,34 @@ Expected after migrations + ≥1 training run:
 - `meta.mode` returns `'nowcast'` when any KPI signal is estimated
 - Dashboard (event-dashboard.html) renders the sky-blue `NOWCAST` chip above the freshness chip
 
-### 5.4 Master-daemon restart
+### 5.4 Master-daemon restart (partial activation)
 
 ```bash
 # Stop the running daemon (however the ops pattern is today)
 # Then:
 node scripts/master-daemon.mjs
-# Verify the four new tasks appear in the startup banner:
-#   rates-nowcast (30m), composite-nowcasts (30m),
-#   event-intensity-nowcast (30m), reconcile-nowcasts (15m)
+
+# Verify the startup banner prints:
+#   [disabled] rates-nowcast (NOWCAST_RATES_ENABLED != true)
+# and the following three tasks are scheduled:
+#   composite-nowcasts (30m), event-intensity-nowcast (30m),
+#   reconcile-nowcasts (15m)
 ```
+
+As of 2026-04-18, `rates-nowcast` is **opt-in** via the
+`NOWCAST_RATES_ENABLED=true` env var. Default off. Rationale: all 4 rates
+targets currently fail the acceptance gate (Phase C outcome, §5.2), so
+running the cron produces only "no trained model" abstains every 30 min —
+noise, no value. Re-enable after the rates redesign track produces models
+that clear the gate.
+
+Phase D smoke test (2026-04-18) verified the four writers are
+production-safe even without trained rates models:
+- compute-rates → clean abstain ×4
+- compute-composite → gate abstain on stale inputs (expected; inputs
+  freshen once the daemon polls them regularly)
+- compute-event-intensity → writes a row (eventIntensity) per run
+- reconcile-nowcasts → no-op when estimated_signal_nowcasts is empty
 
 ### 5.5 First promotion
 

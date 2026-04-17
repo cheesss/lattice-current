@@ -750,9 +750,18 @@ async function taskDailyReport(state) {
   }
 }
 
+// rates-nowcast is opt-in: all 4 targets currently fail the acceptance gate
+// (see docs/NOWCAST_HANDOFF_2026-04-18.md §5.2 Phase C outcome). Running the
+// cron with no trained .pkl just logs "no trained model" abstain ×4 every
+// 30 min — noise, no value. Keep disabled until the rates redesign track
+// produces models that clear the gate.
+const RATES_NOWCAST_ENABLED = process.env.NOWCAST_RATES_ENABLED === 'true';
+
 const TASKS = {
   'market-quote-refresh': { interval: MIN_15_MS, fn: taskMarketQuoteRefresh },
-  'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast },
+  ...(RATES_NOWCAST_ENABLED
+    ? { 'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast } }
+    : {}),
   'composite-nowcasts': { interval: MIN_30_MS, fn: taskCompositeNowcasts },
   'event-intensity-nowcast': { interval: MIN_30_MS, fn: taskEventIntensityNowcast },
   'reconcile-nowcasts': { interval: MIN_15_MS, fn: taskReconcileNowcasts },
@@ -802,6 +811,9 @@ async function runAllTasks(state) {
 
 async function main() {
   process.stderr.write('\nMaster Daemon Started\n');
+  if (!RATES_NOWCAST_ENABLED) {
+    process.stderr.write('  [disabled] rates-nowcast (NOWCAST_RATES_ENABLED != true) — see NOWCAST_HANDOFF §5.2\n');
+  }
   process.stderr.write('  15min: market quote refresh, db health\n');
   process.stderr.write('  30min: article check, dashboard health\n');
   process.stderr.write('  1h:    auto-pipeline-sensitivity, sensitivity refresh\n');
