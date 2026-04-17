@@ -470,7 +470,21 @@ const MODE_STALE_THRESHOLD_HOURS = Object.freeze({
   cache: 24,
   delayed: 72,
   fallback: 0,
+  nowcast: 6,
+  imputed: 12,
+  composite: 12,
+  mirrored: 0,
+  backfill: null,
+  replay: null,
 });
+
+const ALLOWED_RESPONSE_MODES = new Set([
+  'live', 'delayed', 'nowcast', 'imputed', 'composite',
+  'mirrored', 'backfill', 'replay', 'fallback', 'cache',
+]);
+
+const OBSERVED_MODES = new Set(['live', 'delayed']);
+const ESTIMATED_MODES = new Set(['nowcast', 'imputed', 'composite']);
 
 function toIsoTimestamp(value) {
   if (value == null || value === '') return null;
@@ -515,8 +529,11 @@ function firstTimestamp(...values) {
 
 function inferResponseMode(payload, extra) {
   const payloadMeta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
-  if (extra.mode) return String(extra.mode);
-  if (payloadMeta.mode) return String(payloadMeta.mode);
+  const explicitMode = extra.mode || payloadMeta.mode;
+  if (explicitMode) {
+    const normalized = String(explicitMode);
+    if (ALLOWED_RESPONSE_MODES.has(normalized)) return normalized;
+  }
   if (extra.cacheHit || payloadMeta.cacheHit) return 'cache';
   const text = [
     extra.window,
@@ -528,6 +545,12 @@ function inferResponseMode(payload, extra) {
   ].filter(Boolean).join(' ').toLowerCase();
   if (text.includes('fallback')) return 'fallback';
   return 'live';
+}
+
+function deriveValueOrigin(mode) {
+  if (OBSERVED_MODES.has(mode)) return 'observed';
+  if (ESTIMATED_MODES.has(mode)) return 'estimated';
+  return 'research';
 }
 
 function signalAgeHours(ts) {
@@ -561,12 +584,35 @@ export function classifySignalQuality(channel, latestRow = {}, samples = []) {
   }
   const mirrored = normalizedSamples.length >= 6 && repeatedCount >= 6;
   const stale = ageHours == null || ageHours > maxAgeHours;
-  const status = mirrored ? 'mirrored' : stale ? 'stale' : 'observed';
-  const reason = mirrored
-    ? `latest ${repeatedCount} samples repeat the same value`
-    : stale
-      ? (ageHours == null ? 'missing signal timestamp' : `signal age ${Math.round(ageHours)}h exceeds ${maxAgeHours}h threshold`)
-      : null;
+  const valueOrigin = String(latestRow.value_origin || 'observed');
+  const writerId = latestRow.writer_id ? String(latestRow.writer_id) : null;
+
+  let status;
+  let reason = null;
+  if (valueOrigin === 'proxy') {
+    status = 'proxy';
+    reason = writerId
+      ? `value is a proxy (writer=${writerId})`
+      : 'value is a proxy, not a direct observation';
+  } else if (valueOrigin === 'composite') {
+    status = 'composite';
+    reason = writerId
+      ? `value is composite/derived (writer=${writerId})`
+      : 'value is composite/derived from other signals';
+  } else if (valueOrigin === 'imputed') {
+    status = 'imputed';
+    reason = 'value is imputed/nowcast';
+  } else if (mirrored) {
+    status = 'mirrored';
+    reason = `latest ${repeatedCount} samples repeat the same value`;
+  } else if (stale) {
+    status = 'stale';
+    reason = ageHours == null
+      ? 'missing signal timestamp'
+      : `signal age ${Math.round(ageHours)}h exceeds ${maxAgeHours}h threshold`;
+  } else {
+    status = 'observed';
+  }
 
   return {
     status,
@@ -575,14 +621,33 @@ export function classifySignalQuality(channel, latestRow = {}, samples = []) {
     repeatedCount,
     ageHours: Number.isFinite(ageHours) ? Math.round(ageHours * 10) / 10 : null,
     maxAgeHours,
+    valueOrigin,
+    writerId,
     reason,
   };
 }
 
 async function loadLatestSignalsWithQuality() {
+  // signal_history may or may not have value_origin/writer_id columns depending
+  // on whether scripts/migrations/add-signal-history-origin.mjs has been run.
+  // Use COALESCE-to-default via a detection step so the API keeps working
+  // on pre-migration databases.
+  const columnsR = await safeQuery(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'signal_history'
+  `);
+  const availableColumns = new Set(columnsR.rows.map((row) => String(row.column_name)));
+  const originExpr = availableColumns.has('value_origin')
+    ? 'value_origin'
+    : `'observed'::text AS value_origin`;
+  const writerExpr = availableColumns.has('writer_id')
+    ? 'writer_id'
+    : 'NULL::text AS writer_id';
+  const selectList = ['signal_name', 'ts', 'value', originExpr, writerExpr].join(', ');
+
   const [latestSignalsR, signalSamplesR] = await Promise.all([
     safeQuery(`
-      SELECT DISTINCT ON (signal_name) signal_name, ts, value
+      SELECT DISTINCT ON (signal_name) ${selectList}
       FROM signal_history
       ORDER BY signal_name, ts DESC
     `),
@@ -613,10 +678,16 @@ async function loadLatestSignalsWithQuality() {
       signal_name: signalName,
       ts: row.ts,
       value: Number(row.value || 0),
+      value_origin: row.value_origin || 'observed',
+      writer_id: row.writer_id || null,
       quality: classifySignalQuality(signalName, row, samplesBySignal.get(signalName) || []),
     };
   });
   const qualityBySignal = Object.fromEntries(rows.map((row) => [row.signal_name, row.quality]));
+  const originBySignal = Object.fromEntries(rows.map((row) => [row.signal_name, {
+    valueOrigin: row.value_origin,
+    writerId: row.writer_id,
+  }]));
   const criticalRows = rows.filter((row) => KPI_SIGNAL_CHANNELS.has(row.signal_name));
   const degradedRows = criticalRows.filter((row) => row.quality.status !== 'observed');
   const mirroredRows = degradedRows.filter((row) => row.quality.status === 'mirrored');
@@ -631,6 +702,7 @@ async function loadLatestSignalsWithQuality() {
   return {
     rows,
     qualityBySignal,
+    originBySignal,
     mode,
     stale,
     staleReason,
@@ -714,6 +786,10 @@ export function deriveResponseMeta(payload = {}, extra = {}) {
     stale = true;
     staleReason ||= `fallback data window${windowLabel ? `: ${windowLabel}` : ''}`;
   }
+  if (mode === 'mirrored') {
+    stale = true;
+    staleReason ||= 'data is mirrored from earlier timestamp, not a new observation';
+  }
   if (extra.cacheHit || payloadMeta.cacheHit) {
     stale = true;
     staleReason ||= extra.cacheReason || payloadMeta.cacheReason || 'served from cache after refresh failure';
@@ -726,12 +802,22 @@ export function deriveResponseMeta(payload = {}, extra = {}) {
     }
   }
 
+  const valueOrigin = deriveValueOrigin(mode);
+  const validAsOf = firstTimestamp(
+    extra.validAsOf,
+    payloadMeta.validAsOf,
+    payload?.validAsOf,
+    dataUpdatedAt,
+  );
+
   return {
     generatedAt,
     updatedAt: dataUpdatedAt,
     dataUpdatedAt,
     latestInternalUpdatedAt,
     mode,
+    valueOrigin,
+    validAsOf,
     window: windowLabel,
     source,
     stale,
@@ -1180,6 +1266,7 @@ async function buildSignalSummary() {
     vixHistory: vixHistoryR.rows.map((row) => Number(row.value || 0)).filter((value) => Number.isFinite(value)),
     rows,
     signalQuality: signalState.qualityBySignal,
+    signalOrigin: signalState.originBySignal,
     meta: {
       mode: signalState.mode,
       stale: signalState.stale || quoteFeed.status !== 'configured',
