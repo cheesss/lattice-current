@@ -247,7 +247,7 @@ Until then, models stay as `shadow` (if they pass the candidate gate) or `candid
 | 7 | Twitter/X sentiment absent from regime detector | LOW | Can extend `detectRegime()` to check article spike + VIX; tracked in plan doc |
 | 8 | ~~market_quotes had no history bootstrap path~~ | — | RESOLVED 2026-04-18: new `scripts/bootstrap-market-quotes-history.mjs` + `_shared/market-quote-symbols.json` SoT + coverage audit in trainers/inference. See §5.0 |
 | 9 | `refresh-market-quotes-to-nas.mjs` hardcoded 8 symbols didn't match trainer feature set | — | RESOLVED 2026-04-18: default symbol list now sourced from `_shared/market-quote-symbols.json` (coreSnapshots ∪ nowcastFeatures) |
-| 10 | Ridge + ETF proxy features cannot beat naive carry-forward on slow-moving FRED rate targets | HIGH | Phase C validate 2026-04-18: 5/5 rates models MAE failed gate by 2×–360×. Rework required (non-linear model, richer features, or regime-split training) |
+| 10 | Ridge + ETF proxy features cannot beat naive carry-forward on slow-moving FRED rate targets | HIGH | Phase C validate 2026-04-18: 5/5 rates models MAE failed gate by 2×–360×. Separate redesign track opened — see [NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md](./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md) |
 | 11 | oilPrice holdout variance exceeds train variance → interval calibration unsolvable from train alone | MEDIUM | In-sample p90 (0.44 cov) and Gaussian 1.645σ (0.62 cov) both miss the 0.80 target. Options: conformal prediction with separate calibration split, or longer train window once rate models are reworked |
 
 ## 7. File Map Quick Reference
