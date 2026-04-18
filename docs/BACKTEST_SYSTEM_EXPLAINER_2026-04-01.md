@@ -1,5 +1,7 @@
 # Backtest System Explainer
 
+> **Status**: reference (replay-system educational doc; supporting tool, not primary product surface)
+
 작성일: 2026-04-01
 대상 저장소: `lattice-current-fix`
 

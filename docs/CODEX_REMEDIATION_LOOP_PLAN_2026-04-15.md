@@ -1,7 +1,8 @@
 # Codex Remediation Loop — 구현 계획
 
+> **Status**: active (runtime feedback loop implementation in progress; core wiring shipped in commit `19dd486a`)
+
 Date: 2026-04-15  
-Status: Active  
 Prerequisite: Decision Inbox 결과 배너(EXECUTED/SKIPPED/FAILED) 구현 완료
 
 ---

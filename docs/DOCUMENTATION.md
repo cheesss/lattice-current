@@ -43,6 +43,9 @@ Use these first. They describe the current branch, not historical experiments.
 | [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md) | End-to-end workflow narrative — layer-by-layer explanation: source-add path, keyword/theme-add path, observed/estimated split, operationally-important routes |
 | [./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md) | High-level visual walk-through of the detailed workflow |
 | [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.html](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.html) / [.svg](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.svg) / [.png](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.png) / [.mmd](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.mmd) | Zoomable HTML / SVG / PNG renders + Mermaid source for the detailed workflow diagram (companions to the EXPLAINED doc above) |
+| [./WORKFLOW_SOURCE_ADD_PATH_2026-04-18.md](./WORKFLOW_SOURCE_ADD_PATH_2026-04-18.md) | Code-level deep-dive of the source-add path — detectors, quality gate, review, executor, self-heal loop |
+| [./WORKFLOW_KEYWORD_THEME_ADD_PATH_2026-04-18.md](./WORKFLOW_KEYWORD_THEME_ADD_PATH_2026-04-18.md) | Code-level deep-dive of the keyword + theme-add path — LLM proposal generation, evidence enrichment, bulk executor, downstream propagation |
+| [./WORKFLOW_OPENCLAW_INTEGRATION_PATH_2026-04-18.md](./WORKFLOW_OPENCLAW_INTEGRATION_PATH_2026-04-18.md) | Code-level deep-dive of the OpenClaw integration path — channels, TaskFlow, source repair delivery, scheduler retry escalation, briefing |
 | [./ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime, data, and storage architecture |
 | [./USER_GUIDE.md](./USER_GUIDE.md) | Operator-oriented quick start and runtime usage |
 | [./ALGORITHMS.md](./ALGORITHMS.md) | Active signal, evidence, and admission logic |

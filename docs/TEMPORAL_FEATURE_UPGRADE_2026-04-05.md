@@ -1,5 +1,7 @@
 # Temporal Feature Upgrade Status
 
+> **Status**: shipped (temporal features retained in current pipeline; kept as a status-of-work record for the 2026-04-05 upgrade)
+
 Date: 2026-04-05
 
 ## Purpose

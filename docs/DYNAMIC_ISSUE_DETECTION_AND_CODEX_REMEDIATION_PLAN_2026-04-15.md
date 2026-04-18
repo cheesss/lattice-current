@@ -1,7 +1,8 @@
 # Dynamic Issue Detection And Codex Remediation Plan
 
+> **Status**: proposed (companion to CODEX_REMEDIATION_LOOP_PLAN_2026-04-15.md; detection-surface wiring ongoing)
+
 Date: 2026-04-15  
-Status: Proposed  
 Scope: Theme shell, Decision Inbox, approval actions, UI/API runtime failures, data freshness failures, Codex-assisted diagnosis
 
 ## 1. Why This Document Exists

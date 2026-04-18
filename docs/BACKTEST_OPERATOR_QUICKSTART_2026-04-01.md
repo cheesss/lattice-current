@@ -1,5 +1,7 @@
 # Backtest Operator Quickstart
 
+> **Status**: historical (backtest system now secondary to the signal-first shell; kept as an operator reference for replay validation)
+
 작성일: 2026-04-01
 대상: 운영자, 리서처, PM
 
