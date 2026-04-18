@@ -931,14 +931,20 @@ async function handleAddTheme(client, proposal) {
   const triggerCondition = triggers.map((_, index) => `title ILIKE $${index + 1}`).join(' OR ');
   const matched = await client.query(`SELECT id FROM articles WHERE ${triggerCondition}`, triggers.map((term) => `%${term}%`));
 
-  for (const row of matched.rows) {
+  if (matched.rows.length) {
     await client.query(`
       INSERT INTO auto_article_themes (article_id, auto_theme, confidence, method)
-      VALUES ($1, $2, 0.7, 'codex-theme-proposal')
+      SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::double precision[], $4::text[])
+        AS t(article_id, auto_theme, confidence, method)
       ON CONFLICT (article_id) DO UPDATE
       SET auto_theme = EXCLUDED.auto_theme
       WHERE auto_article_themes.confidence < 0.7
-    `, [row.id, id]);
+    `, [
+      matched.rows.map((r) => r.id),
+      matched.rows.map(() => id),
+      matched.rows.map(() => 0.7),
+      matched.rows.map(() => 'codex-theme-proposal'),
+    ]);
   }
 
   const resolvedSymbols = [
@@ -949,14 +955,22 @@ async function handleAddTheme(client, proposal) {
     .filter(Boolean);
 
   if (resolvedSymbols.length) {
-    for (const symbol of resolvedSymbols) {
-      if (!symbol) continue;
-      await client.query(`
-          INSERT INTO auto_theme_symbols (theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
-          VALUES ($1, $2, 0, 0, 1.0, 'codex-theme-proposal')
-          ON CONFLICT (theme, symbol) DO NOTHING
-      `, [id, symbol]);
-    }
+    await client.query(`
+      INSERT INTO auto_theme_symbols
+        (theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
+      SELECT * FROM UNNEST(
+        $1::text[], $2::text[], $3::double precision[], $4::int[],
+        $5::double precision[], $6::text[]
+      ) AS t(theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
+      ON CONFLICT (theme, symbol) DO NOTHING
+    `, [
+      resolvedSymbols.map(() => id),
+      resolvedSymbols,
+      resolvedSymbols.map(() => 0),
+      resolvedSymbols.map(() => 0),
+      resolvedSymbols.map(() => 1.0),
+      resolvedSymbols.map(() => 'codex-theme-proposal'),
+    ]);
   }
 
   // --- Backfill labeled_outcomes for every matched article × symbol × horizon ---

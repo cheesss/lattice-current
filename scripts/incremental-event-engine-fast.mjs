@@ -298,14 +298,31 @@ async function runStep2to5(pool) {
     WHERE ef.canonical_event_id IS NULL
   `);
 
-  let fc = 0;
+  const rm = { crisis: 2.0, 'risk-off': 1.5, balanced: 1.0, 'risk-on': 0.8, 'risk-on-strong': 0.6 };
+  const rows = [];
   for (const evt of newEvts.rows) {
     const d = evt.event_date.toISOString().slice(0, 10);
     const sig = dailySig.get(d) || {};
     const vix = sig.vix ?? null;
     const regime = vix != null ? classifyRegime(vix) : 'balanced';
-    const rm = { crisis: 2.0, 'risk-off': 1.5, balanced: 1.0, 'risk-on': 0.8, 'risk-on-strong': 0.6 };
+    rows.push({
+      id: evt.id, sc: evt.source_count, sd: evt.source_diversity, ac: evt.article_count,
+      hi: sig.eventIntensity ?? 0, hm: 0, regime, vix, vz: 0, vm: 0,
+      ys: sig.yieldSpread ?? null, op: sig.oilPrice ?? null, di: sig.dollarIndex ?? null, cs: sig.hy_credit_spread ?? null,
+      ms: sig.marketStress ?? null, ts: sig.transmissionStrength ?? null, ei: sig.eventIntensity ?? null,
+      rmul: rm[regime] || 1.0,
+      rg: vix != null ? clamp(45 + (vix - 20) * 2, 4, 100) : 45,
+      gss: clamp(evt.source_count * 12 + evt.source_diversity * 40, 0, 100),
+      nmi: clamp((sig.transmissionStrength ?? 0) * 0.6 + (sig.marketStress ?? 0) * 0.4, 0, 1),
+      na: clamp(40 + evt.source_count * 8, 0, 100),
+      tds: clamp(evt.source_diversity * 0.7 + 0.3, 0.3, 1),
+      lc: clamp(Math.round(24 + evt.source_count * 7 + (sig.eventIntensity ?? 0) * 14), 20, 98),
+      lf: clamp(Math.round(82 - evt.source_count * 6 - (sig.eventIntensity ?? 0) * 12), 6, 78),
+    });
+  }
 
+  let fc = 0;
+  if (rows.length) {
     await pool.query(`
       INSERT INTO event_features (canonical_event_id, source_count, source_diversity, article_count,
         hawkes_intensity, hawkes_momentum, hmm_regime, vix_value, vix_zscore, vix_momentum,
@@ -314,20 +331,28 @@ async function runStep2to5(pool) {
         regime_label, regime_multiplier, risk_gauge,
         graph_signal_score, nmi_score, narrative_alignment,
         truth_discovery_score, legacy_conviction, legacy_fpr)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+      SELECT * FROM UNNEST(
+        $1::bigint[], $2::int[], $3::double precision[], $4::int[],
+        $5::double precision[], $6::double precision[], $7::text[],
+        $8::double precision[], $9::double precision[], $10::double precision[],
+        $11::double precision[], $12::double precision[], $13::double precision[], $14::double precision[],
+        $15::double precision[], $16::double precision[], $17::double precision[],
+        $18::text[], $19::double precision[], $20::double precision[],
+        $21::double precision[], $22::double precision[], $23::double precision[],
+        $24::double precision[], $25::double precision[], $26::double precision[]
+      )
       ON CONFLICT DO NOTHING
-    `, [evt.id, evt.source_count, evt.source_diversity, evt.article_count,
-        sig.eventIntensity ?? 0, 0, regime, vix, 0, 0,
-        sig.yieldSpread ?? null, sig.oilPrice ?? null, sig.dollarIndex ?? null, sig.hy_credit_spread ?? null,
-        sig.marketStress ?? null, sig.transmissionStrength ?? null, sig.eventIntensity ?? null,
-        regime, rm[regime] || 1.0, vix != null ? clamp(45 + (vix - 20) * 2, 4, 100) : 45,
-        clamp(evt.source_count * 12 + evt.source_diversity * 40, 0, 100),
-        clamp((sig.transmissionStrength ?? 0) * 0.6 + (sig.marketStress ?? 0) * 0.4, 0, 1),
-        clamp(40 + evt.source_count * 8, 0, 100),
-        clamp(evt.source_diversity * 0.7 + 0.3, 0.3, 1),
-        clamp(Math.round(24 + evt.source_count * 7 + (sig.eventIntensity ?? 0) * 14), 20, 98),
-        clamp(Math.round(82 - evt.source_count * 6 - (sig.eventIntensity ?? 0) * 12), 6, 78)]);
-    fc++;
+    `, [
+      rows.map((r) => r.id), rows.map((r) => r.sc), rows.map((r) => r.sd), rows.map((r) => r.ac),
+      rows.map((r) => r.hi), rows.map((r) => r.hm), rows.map((r) => r.regime),
+      rows.map((r) => r.vix), rows.map((r) => r.vz), rows.map((r) => r.vm),
+      rows.map((r) => r.ys), rows.map((r) => r.op), rows.map((r) => r.di), rows.map((r) => r.cs),
+      rows.map((r) => r.ms), rows.map((r) => r.ts), rows.map((r) => r.ei),
+      rows.map((r) => r.regime), rows.map((r) => r.rmul), rows.map((r) => r.rg),
+      rows.map((r) => r.gss), rows.map((r) => r.nmi), rows.map((r) => r.na),
+      rows.map((r) => r.tds), rows.map((r) => r.lc), rows.map((r) => r.lf),
+    ]);
+    fc = rows.length;
   }
   console.log(`  ${fc} features inserted`);
 
