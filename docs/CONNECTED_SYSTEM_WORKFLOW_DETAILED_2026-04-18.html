@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Connected System Workflow Detailed</title>
+  <style>
+    :root {
+      --bg: #eef4fb;
+      --panel: rgba(255,255,255,0.92);
+      --panel-strong: rgba(255,255,255,0.98);
+      --ink: #0f172a;
+      --muted: #475569;
+      --border: rgba(148,163,184,0.28);
+      --shadow: 0 22px 60px rgba(15,23,42,0.12);
+      --ext: #94a3b8;
+      --collect: #06b6d4;
+      --store: #10b981;
+      --compute: #f59e0b;
+      --serve: #3b82f6;
+      --ui: #22c55e;
+      --human: #fb7185;
+      --focus: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,0.12), transparent 26%),
+        radial-gradient(circle at top right, rgba(139,92,246,0.12), transparent 24%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      min-height: 100%;
+    }
+    .wrap {
+      max-width: 2400px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 24px 26px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+      max-width: 1300px;
+    }
+    .toolbar {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel-strong);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.06);
+    }
+    .btn:hover {
+      background: #ffffff;
+    }
+    .zoom-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: 2px;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin-top: 14px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.75);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+    .viewport-shell {
+      margin-top: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .viewport {
+      position: relative;
+      height: 78vh;
+      min-height: 780px;
+      overflow: hidden;
+      border-radius: 20px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.94), rgba(248,250,252,0.96)),
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 23px,
+          rgba(148,163,184,0.06) 24px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 23px,
+          rgba(148,163,184,0.06) 24px
+        );
+      cursor: grab;
+    }
+    .viewport.dragging {
+      cursor: grabbing;
+    }
+    .stage {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+      user-select: none;
+    }
+    .diagram {
+      padding: 24px;
+      min-width: 1800px;
+    }
+    .footer-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .note-card {
+      background: rgba(255,255,255,0.72);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .note-card b {
+      color: var(--ink);
+    }
+    @media (max-width: 1200px) {
+      .footer-grid {
+        grid-template-columns: 1fr;
+      }
+      .viewport {
+        height: 70vh;
+        min-height: 620px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Connected System Workflow, Detailed</h1>
+      <div class="sub">
+        이 버전은 요약판이 아니라 상세판이다. 각 박스 안에 역할 설명을 한글로 넣었고,
+        수집, 저장, 계산, 서빙, 클릭, 인간 승인, OpenClaw 후속조치까지 하나의 흐름으로 묶었다.
+        마우스 휠로 확대/축소할 수 있고, 마우스로 드래그해서 이동할 수 있다.
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" id="zoom-in">확대 +</button>
+        <button class="btn" id="zoom-out">축소 -</button>
+        <button class="btn" id="zoom-reset">원래 크기</button>
+        <button class="btn" id="fit-screen">화면 맞춤</button>
+        <span class="zoom-label" id="zoom-label">배율 100%</span>
+      </div>
+
+      <div class="legend">
+        <span class="pill"><span class="swatch" style="background: var(--ext)"></span>입력 / 외부 공급원</span>
+        <span class="pill"><span class="swatch" style="background: var(--collect)"></span>수집 / 인입</span>
+        <span class="pill"><span class="swatch" style="background: var(--store)"></span>저장 / 정규화</span>
+        <span class="pill"><span class="swatch" style="background: var(--compute)"></span>계산 / nowcast / orchestration</span>
+        <span class="pill"><span class="swatch" style="background: var(--serve)"></span>API / 도구면</span>
+        <span class="pill"><span class="swatch" style="background: var(--ui)"></span>대시보드 / 사용자 표면</span>
+        <span class="pill"><span class="swatch" style="background: var(--human)"></span>인간 승인 / 실행 / 후속조치</span>
+        <span class="pill"><span class="swatch" style="background: var(--focus)"></span>대표 클릭 시퀀스</span>
+      </div>
+    </section>
+
+    <section class="viewport-shell">
+      <div class="viewport" id="viewport">
+        <div class="stage" id="stage">
+          <div class="diagram mermaid" id="diagram">
+%%{init: {
+  "theme": "base",
+  "flowchart": {
+    "curve": "linear",
+    "nodeSpacing": 36,
+    "rankSpacing": 56,
+    "padding": 10,
+    "htmlLabels": true,
+    "useMaxWidth": true
+  },
+  "themeVariables": {
+    "background": "#f8fafc",
+    "primaryColor": "#ffffff",
+    "primaryTextColor": "#0f172a",
+    "primaryBorderColor": "#cbd5e1",
+    "lineColor": "#64748b",
+    "secondaryColor": "#ffffff",
+    "tertiaryColor": "#ffffff",
+    "clusterBkg": "#ffffff",
+    "clusterBorder": "#cbd5e1",
+    "fontFamily": "Segoe UI, Arial, sans-serif",
+    "fontSize": "16px",
+    "edgeLabelBackground": "#ffffff"
+  }
+}}%%
+flowchart TB
+
+  subgraph INPUTS["01 입력 계층"]
+    direction LR
+    RSS["<b>뉴스/피드 입력</b><br/>RSS, 뉴스 사이트, OSINT 문서를 수집한다"]
+    MKTIN["<b>시장/매크로 입력</b><br/>FRED, Yahoo, 시세 데이터를 받아온다"]
+    HIST["<b>히스토리 입력</b><br/>백필, warm store, replay 데이터를 공급한다"]
+    HUMANREQ["<b>운영자 요청</b><br/>질문, 승인, 재시도, 수리 요청이 들어온다"]
+  end
+
+  subgraph COLLECT["02 수집/인입"]
+    direction LR
+    FEEDING["<b>피드 수집기</b><br/>기사 본문과 메타데이터를 파싱해 article 후보를 만든다"]
+    FREDREF["<b>관측 신호 리프레시</b><br/>FRED 계열 observed 시계열을 NAS에 적재한다"]
+    QUOTEREF["<b>시장 시세 리프레시</b><br/>market_quotes와 일부 signal_history를 갱신한다"]
+    SOURCEAUTO["<b>소스 자동화</b><br/>self-heal, source probe, approval 후보를 만든다"]
+    LOCALHOOK["<b>로컬 훅</b><br/>sidecar, desktop, runtime 메타데이터를 제공한다"]
+  end
+
+  subgraph STORE["03 저장/정규화"]
+    direction LR
+    CONTENT["<b>콘텐츠 저장소</b><br/>articles, canonical events, source hygiene 결과를 저장한다"]
+    SIGNALS["<b>신호 저장소</b><br/>fred_observations, market_quotes, signal_history를 유지한다"]
+    REVIEWS["<b>리뷰 저장소</b><br/>approval_queue, discovery_triage, codex proposal 상태를 유지한다"]
+    ESTS["<b>추정 저장소</b><br/>estimated_signal_nowcasts, reconciliation, model_registry를 유지한다"]
+    NAS["<b>NAS 상태면</b><br/>Postgres, cache, manifest, artifact의 system of record다"]
+  end
+
+  subgraph COMPUTE["04 계산/판단"]
+    direction LR
+    THEMES["<b>테마/전파 계산</b><br/>canonical pathway, structural signal, theme 후보를 계산한다"]
+    SNAP["<b>스냅샷 빌더</b><br/>KPI, live status, theme brief, ops snapshot을 조립한다"]
+    NOWCAST["<b>나우캐스트 계산</b><br/>composite, event-intensity, opt-in rates nowcast를 계산한다"]
+    MODEL["<b>모델/검증 루프</b><br/>train, validate, gate, replay, abstain 기준을 적용한다"]
+    ORCH["<b>스케줄러/데몬</b><br/>자동화 주기를 돌리고 refresh/compute/reconcile task를 실행한다"]
+    CLAW["<b>OpenClaw 오케스트레이터</b><br/>도구 호출, 브리핑, webhook 흐름을 제어한다"]
+  end
+
+  subgraph SERVE["05 서빙/API"]
+    direction LR
+    API["<b>Dashboard API</b><br/>JSON endpoint로 state를 fuse해서 제품에 제공한다"]
+    TOOLS["<b>OpenClaw 도구면</b><br/>같은 API를 tool-call 형태로 재노출한다"]
+  end
+
+  subgraph UI["06 사용자 표면"]
+    direction LR
+    HOME["<b>Home</b><br/>KPI strip, digest, actionable signal로 시작하는 첫 화면"]
+    INBOX["<b>Decision Inbox</b><br/>proposal, approval, triage를 한곳에서 리뷰하는 실행 화면"]
+    INVEST["<b>Investigate</b><br/>Theme Brief, evidence, citation을 읽는 근거 화면"]
+    GEO["<b>Geo Lens</b><br/>공간 맥락과 지도 기반 힌트를 보는 보조 화면"]
+    OPS["<b>Ops</b><br/>freshness, health, source ops, runtime 이슈를 보는 운영 화면"]
+    CHAT["<b>OpenClaw Chat</b><br/>현재 상태 브리핑, 큐 요약, 후속조치 질의 화면"]
+  end
+
+  subgraph ACTIONS["07 클릭/리뷰/실행 루프"]
+    direction LR
+    STEP1["<b>① 인박스 열기</b><br/>Home에서 Decision Inbox로 이동한다"]
+    STEP2["<b>② 미리보기 후 결정</b><br/>Simulate, Accept, Reject, Canonical, Watch를 누른다"]
+    STEP3["<b>③ 풀 브리프 열기</b><br/>Theme chip이나 Open full brief로 근거를 읽는다"]
+    STEP4["<b>④ Geo/Ops 확인</b><br/>공간 맥락과 운영 상태를 추가로 본다"]
+    STEP5["<b>⑤ OpenClaw 질의</b><br/>상태 브리프, 큐 현황, 위험 요약을 받는다"]
+    REVIEW["<b>인간 리뷰</b><br/>accept, reject, canonical, watch, suppress를 결정한다"]
+    EXEC["<b>실행/수리</b><br/>proposal executor, source repair, queue state 갱신을 수행한다"]
+    FOLLOW["<b>후속조치</b><br/>retry, incident follow-up, rerun 판단을 다시 시스템에 넣는다"]
+  end
+
+  GLOSS["<b>해석 규칙</b><br/>observed는 signal_history 계층, estimated는 estimated_signal_nowcasts 계층이다.<br/>rates nowcast는 opt-in이며 기본 운영은 composite/event-intensity/reconcile 중심이다."]
+
+  RSS -->|기사 수집| FEEDING
+  MKTIN -->|관측값 갱신| FREDREF
+  MKTIN -->|시세 갱신| QUOTEREF
+  HIST -->|bootstrap| MODEL
+  HIST -->|replay 근거| SNAP
+  HUMANREQ -->|질문/명령| CLAW
+
+  FEEDING -->|기사 적재| CONTENT
+  FREDREF -->|observed 기록| SIGNALS
+  QUOTEREF -->|quote 기록| SIGNALS
+  SOURCEAUTO -->|리뷰 후보 생성| REVIEWS
+  LOCALHOOK -->|runtime 메타 저장| NAS
+
+  CONTENT -->|정규화| THEMES
+  SIGNALS -->|스냅샷 입력| SNAP
+  SIGNALS -->|feature 입력| NOWCAST
+  SIGNALS -->|train target| MODEL
+  REVIEWS -->|리뷰 상태 제공| API
+  THEMES -->|테마/전파 계산| SNAP
+  THEMES -->|derived signal 쓰기| SIGNALS
+  MODEL -->|모델 등록| ESTS
+  MODEL -->|gate 결과 전달| NOWCAST
+  NOWCAST -->|estimate 쓰기| ESTS
+  ESTS -->|calibration 반영| SNAP
+  ESTS -->|reconcile 결과 제공| API
+
+  CONTENT -->|영속화| NAS
+  SIGNALS -->|영속화| NAS
+  REVIEWS -->|영속화| NAS
+  ESTS -->|영속화| NAS
+
+  ORCH -->|refresh 실행| FREDREF
+  ORCH -->|refresh 실행| QUOTEREF
+  ORCH -->|compute 실행| NOWCAST
+  ORCH -->|snapshot 실행| SNAP
+  ORCH -->|이벤트 발행| CLAW
+
+  NAS -->|상태 읽기| API
+  SNAP -->|응답 조립| API
+  API -->|tool backend| TOOLS
+  CLAW -->|tool invoke| TOOLS
+
+  API -->|화면 제공| HOME
+  API -->|화면 제공| INBOX
+  API -->|화면 제공| INVEST
+  API -->|화면 제공| GEO
+  API -->|화면 제공| OPS
+  TOOLS -->|답변 생성| CHAT
+
+  HOME -->|step 1| STEP1
+  STEP1 -->|switchSurface| INBOX
+
+  INBOX -->|step 2| STEP2
+  STEP2 -->|리뷰 액션| REVIEW
+  REVIEW -->|POST review| API
+  API -->|실행 지시| EXEC
+  EXEC -->|source/proposal 갱신| SOURCEAUTO
+  EXEC -->|queue 새로고침| INBOX
+
+  HOME -->|step 3| STEP3
+  STEP3 -->|openThemeBrief| INVEST
+
+  HOME -->|step 4| STEP4
+  STEP4 -->|보조 판단| GEO
+  STEP4 -->|보조 판단| OPS
+
+  CHAT -->|step 5| STEP5
+  STEP5 -->|tool query| TOOLS
+  TOOLS -->|brief/status 응답| CHAT
+  CHAT -->|운영 후속조치| FOLLOW
+  OPS -->|운영 후속조치| FOLLOW
+  FOLLOW -->|retry / rerun| CLAW
+  FOLLOW -->|rerun trigger| ORCH
+
+  INVEST -->|근거 기반 판단| REVIEW
+  GEO -->|공간 맥락 제공| REVIEW
+  OPS -->|운영 맥락 제공| REVIEW
+
+  GLOSS --- API
+
+  classDef ext fill:#eef2ff,stroke:#94a3b8,color:#0f172a,stroke-width:1.6px;
+  classDef collect fill:#ecfeff,stroke:#06b6d4,color:#083344,stroke-width:1.7px;
+  classDef store fill:#ecfdf5,stroke:#10b981,color:#065f46,stroke-width:1.7px;
+  classDef compute fill:#fffbeb,stroke:#f59e0b,color:#78350f,stroke-width:1.7px;
+  classDef serve fill:#eff6ff,stroke:#3b82f6,color:#1d4ed8,stroke-width:1.7px;
+  classDef ui fill:#f0fdf4,stroke:#22c55e,color:#166534,stroke-width:1.7px;
+  classDef human fill:#fff1f2,stroke:#fb7185,color:#9f1239,stroke-width:1.9px;
+  classDef focus fill:#fef3c7,stroke:#f59e0b,color:#92400e,stroke-width:3px;
+  classDef note fill:#ffffff,stroke:#cbd5e1,color:#334155,stroke-dasharray: 5 3;
+
+  class RSS,MKTIN,HIST,HUMANREQ ext;
+  class FEEDING,FREDREF,QUOTEREF,SOURCEAUTO,LOCALHOOK collect;
+  class CONTENT,SIGNALS,REVIEWS,ESTS,NAS store;
+  class THEMES,SNAP,NOWCAST,MODEL,ORCH,CLAW compute;
+  class API,TOOLS serve;
+  class HOME,INBOX,INVEST,GEO,OPS,CHAT ui;
+  class REVIEW,EXEC,FOLLOW human;
+  class STEP1,STEP2,STEP3,STEP4,STEP5 focus;
+  class GLOSS note;
+
+  style INPUTS fill:#ffffff,stroke:#cbd5e1,stroke-width:1.4px
+  style COLLECT fill:#ffffff,stroke:#bae6fd,stroke-width:1.4px
+  style STORE fill:#ffffff,stroke:#bbf7d0,stroke-width:1.4px
+  style COMPUTE fill:#ffffff,stroke:#fde68a,stroke-width:1.4px
+  style SERVE fill:#ffffff,stroke:#bfdbfe,stroke-width:1.4px
+  style UI fill:#ffffff,stroke:#bbf7d0,stroke-width:1.4px
+  style ACTIONS fill:#fffdf4,stroke:#fde68a,stroke-width:1.4px
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="footer-grid">
+      <div class="note-card">
+        <b>조작법</b><br/>
+        마우스 휠로 확대/축소하고, 빈 공간을 드래그해서 이동할 수 있다. `원래 크기`는 100%로 되돌리고, `화면 맞춤`은 현재 뷰포트에 맞는 배율과 위치를 다시 계산한다.
+      </div>
+      <div class="note-card">
+        <b>구조 해석</b><br/>
+        이 다이어그램은 코드 파일 단위보다 시스템 역할 단위로 묶었다. 상세 파일명은 각 박스에 직접 쓰지 않고, 기능 계층과 흐름을 먼저 읽게 설계했다.
+      </div>
+      <div class="note-card">
+        <b>운영 의미</b><br/>
+        현재 실운영 중심 task는 `composite nowcasts`, `event-intensity nowcast`, `reconcile-nowcasts`다. `rates nowcast`는 opt-in이며 기본 흐름에서는 꺼져 있다.
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+    const viewport = document.getElementById('viewport');
+    const stage = document.getElementById('stage');
+    const zoomLabel = document.getElementById('zoom-label');
+    const zoomInBtn = document.getElementById('zoom-in');
+    const zoomOutBtn = document.getElementById('zoom-out');
+    const zoomResetBtn = document.getElementById('zoom-reset');
+    const fitScreenBtn = document.getElementById('fit-screen');
+
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragOriginX = 0;
+    let dragOriginY = 0;
+
+    mermaid.initialize({ startOnLoad: true });
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function applyTransform() {
+      stage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      zoomLabel.textContent = `배율 ${Math.round(scale * 100)}%`;
+    }
+
+    function setZoom(nextScale, centerX, centerY) {
+      const oldScale = scale;
+      scale = clamp(nextScale, 0.35, 2.8);
+      const ratio = scale / oldScale;
+
+      translateX = centerX - (centerX - translateX) * ratio;
+      translateY = centerY - (centerY - translateY) * ratio;
+      applyTransform();
+    }
+
+    function resetView() {
+      scale = 1;
+      translateX = 0;
+      translateY = 0;
+      applyTransform();
+    }
+
+    function fitToScreen() {
+      const svg = stage.querySelector('svg');
+      if (!svg) return;
+      const bounds = svg.getBBox();
+      const padding = 40;
+      const sx = (viewport.clientWidth - padding * 2) / bounds.width;
+      const sy = (viewport.clientHeight - padding * 2) / bounds.height;
+      scale = clamp(Math.min(sx, sy), 0.35, 1.25);
+      translateX = (viewport.clientWidth - bounds.width * scale) / 2 - bounds.x * scale;
+      translateY = (viewport.clientHeight - bounds.height * scale) / 2 - bounds.y * scale;
+      applyTransform();
+    }
+
+    viewport.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const cx = event.clientX - rect.left;
+      const cy = event.clientY - rect.top;
+      const delta = event.deltaY < 0 ? 1.12 : 0.89;
+      setZoom(scale * delta, cx, cy);
+    }, { passive: false });
+
+    viewport.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
+      isDragging = true;
+      viewport.classList.add('dragging');
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragOriginX = translateX;
+      dragOriginY = translateY;
+    });
+
+    window.addEventListener('mousemove', (event) => {
+      if (!isDragging) return;
+      translateX = dragOriginX + (event.clientX - dragStartX);
+      translateY = dragOriginY + (event.clientY - dragStartY);
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+      viewport.classList.remove('dragging');
+    });
+
+    zoomInBtn.addEventListener('click', () => {
+      setZoom(scale * 1.15, viewport.clientWidth / 2, viewport.clientHeight / 2);
+    });
+
+    zoomOutBtn.addEventListener('click', () => {
+      setZoom(scale * 0.87, viewport.clientWidth / 2, viewport.clientHeight / 2);
+    });
+
+    zoomResetBtn.addEventListener('click', resetView);
+    fitScreenBtn.addEventListener('click', fitToScreen);
+
+    const observer = new MutationObserver(() => {
+      const svg = stage.querySelector('svg');
+      if (svg) {
+        svg.style.maxWidth = 'none';
+        svg.style.height = 'auto';
+        fitToScreen();
+      }
+    });
+
+    observer.observe(stage, { childList: true, subtree: true });
+
+    window.addEventListener('load', () => {
+      setTimeout(fitToScreen, 800);
+    });
+  </script>
+</body>
+</html>

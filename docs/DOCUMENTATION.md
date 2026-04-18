@@ -37,7 +37,12 @@ Use these first. They describe the current branch, not historical experiments.
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
 | [../CLAUDE.md](../CLAUDE.md) | Project conventions, scripts, NAS tables, code modification principles |
-| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Most recent comprehensive handoff including 2026-04-14 data robustness work |
+| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Most recent comprehensive repo-wide handoff (2026-04-14 data robustness) |
+| [./NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md) | Nowcast subsystem state: Phase 0–5 shipped, gate + fuse filter enforced, rates redesign opened as separate track |
+| [./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md](./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md) | Open track — why rates models failed acceptance gate and candidate redesign directions |
+| [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md) | End-to-end workflow narrative — layer-by-layer explanation: source-add path, keyword/theme-add path, observed/estimated split, operationally-important routes |
+| [./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md) | High-level visual walk-through of the detailed workflow |
+| [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.html](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.html) / [.svg](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.svg) / [.png](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.png) / [.mmd](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.mmd) | Zoomable HTML / SVG / PNG renders + Mermaid source for the detailed workflow diagram (companions to the EXPLAINED doc above) |
 | [./ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime, data, and storage architecture |
 | [./USER_GUIDE.md](./USER_GUIDE.md) | Operator-oriented quick start and runtime usage |
 | [./ALGORITHMS.md](./ALGORITHMS.md) | Active signal, evidence, and admission logic |
@@ -55,6 +60,7 @@ Use these first. They describe the current branch, not historical experiments.
 | [./TROUBLESHOOTING_INDEX.md](./TROUBLESHOOTING_INDEX.md) | Symptom-to-fix quick reference |
 | [./DASHBOARD_DATA_CONTINUITY_AUDIT_2026-04-14.md](./DASHBOARD_DATA_CONTINUITY_AUDIT_2026-04-14.md) | Most recent dashboard data freshness/fallback audit |
 | [./COMPREHENSIVE_REVIEW_PROMPT.md](./COMPREHENSIVE_REVIEW_PROMPT.md) | Master prompt for full-stack project review (used 2026-04-14) |
+| [./OPENCLAW_INTEGRATION_ARCHITECTURE_2026-04-16.md](./OPENCLAW_INTEGRATION_ARCHITECTURE_2026-04-16.md) | OpenClaw control-plane integration plan for channels, TaskFlow automation, source repair, scheduler retry, and briefing |
 
 ## How to read the repo now
 

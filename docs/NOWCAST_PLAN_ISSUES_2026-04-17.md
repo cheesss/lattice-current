@@ -1,7 +1,8 @@
 # Nowcast Plan — 발견된 문제 정리
 
+> **Status**: superseded by [NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md). All P1 issues listed below are resolved in the handoff's §3 commit map and §6 gap table. Kept for historical context.
+
 Date: 2026-04-17 KST
-Status: review of [NOWCAST_ESTIMATION_ARCHITECTURE_PLAN_2026-04-17.md](./NOWCAST_ESTIMATION_ARCHITECTURE_PLAN_2026-04-17.md)
 Scope: 원 문서 검토 + repo 실상 조사 + gap-fill 설계 + 뉴스 소스 다양성 검토에서 드러난 모든 문제
 
 ## 1. Executive Summary
