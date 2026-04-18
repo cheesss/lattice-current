@@ -54,12 +54,39 @@ import {
   dismissStructuralAlert,
 } from './_shared/trend-workbench.mjs';
 import { isLowSignalAddRssProposal } from './_shared/rss-proposal-quality.mjs';
+import {
+  MAP_LENS_FILTER_TERMS,
+  MAP_LENS_ANCHORS,
+  TRANSMISSION_TARGETS,
+  normalizeLensFilter,
+  normalizeLensText,
+  matchesLensFilter,
+  inferMapLensAnchor,
+} from './_shared/dashboard-map-lens.mjs';
+import {
+  CACHE_DIR,
+  readJsonCache,
+  writeJsonCache,
+  hasRenderableData,
+  toCacheToken,
+  buildCacheKey,
+  hasDynamicSinceParams,
+  buildSinceToken,
+} from './_shared/dashboard-cache.mjs';
+import {
+  sanitizeTopicText,
+  splitTopicTerms,
+  buildTopicArticleProfile,
+  buildTopicRecentArticleScore,
+} from './_shared/dashboard-topic-scoring.mjs';
+
+// Re-exported for test consumers (tests/event-dashboard-topic-article-matching.test.mjs).
+export { buildTopicArticleProfile, buildTopicRecentArticleScore };
 
 loadOptionalEnvFile();
 
 const { Pool } = pg;
 const PORT = Number(process.env.DASHBOARD_PORT || 46200);
-const CACHE_DIR = path.resolve('data', 'event-dashboard-cache');
 const AUDIT_DIR = path.resolve('data', 'audits');
 const logger = createLogger('event-dashboard-api');
 let pool = null;
@@ -125,263 +152,6 @@ const SIGNAL_STALE_THRESHOLD_HOURS = Object.freeze({
   transmissionStrength: 48,
 });
 
-const TOPIC_ARTICLE_GENERIC_TERMS = new Set([
-  'attack',
-  'attacks',
-  'attacked',
-  'killed',
-  'kill',
-  'kills',
-  'strike',
-  'strikes',
-  'war',
-  'wars',
-  'conflict',
-  'military',
-  'forces',
-  'state',
-  'backed',
-  'backing',
-  'global',
-  'latest',
-  'threat',
-  'threats',
-  'world',
-  'policy',
-  'general',
-  'public',
-  'strategic',
-  'activity',
-  'infrastructure',
-  'investment',
-  'debate',
-  'risk',
-  'security',
-  'growth',
-  'industry',
-]);
-
-const TOPIC_ARTICLE_STOPWORDS = new Set([
-  'the',
-  'and',
-  'for',
-  'in',
-  'of',
-  'to',
-  'on',
-  'at',
-  'by',
-  'as',
-  'or',
-  'with',
-  'from',
-  'into',
-  'that',
-  'this',
-  'these',
-  'those',
-  'their',
-  'them',
-  'they',
-  'have',
-  'has',
-  'had',
-  'are',
-  'was',
-  'were',
-  'will',
-  'would',
-  'could',
-  'should',
-  'across',
-  'about',
-  'under',
-  'over',
-  'after',
-  'before',
-  'between',
-  'through',
-  'around',
-  'against',
-  'while',
-  'where',
-  'which',
-  'what',
-  'when',
-  'than',
-  'then',
-  'into',
-  'onto',
-  'also',
-  'still',
-  'more',
-  'most',
-  'less',
-  'only',
-  'very',
-  'much',
-  'such',
-  'because',
-  'centers',
-  'accelerating',
-  'including',
-  'rising',
-  'demand',
-  'software',
-  'systems',
-  'current',
-  'cluster',
-  'topic',
-]);
-
-const GEO_CONTEXT_PATTERNS = [
-  /\bukrain/i,
-  /\brussi/i,
-  /\bisrael/i,
-  /\biran/i,
-  /\bgaza/i,
-  /\bpalestin/i,
-  /\bsyria?/i,
-  /\byemen/i,
-  /\bsudan/i,
-  /\bhouthi/i,
-  /\btaiwan/i,
-  /\bchina/i,
-  /\bodesa\b/i,
-  /\bodessa\b/i,
-  /\bkyiv\b/i,
-  /\bmoscow\b/i,
-  /\bkremlin\b/i,
-  /\bblack sea\b/i,
-];
-
-function sanitizeTopicText(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s/-]+/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function splitTopicTerms(values, options = {}) {
-  const includeWhole = options.includeWhole !== false;
-  const maxWholeWords = Number(options.maxWholeWords || 4);
-  const terms = new Set();
-  for (const value of values) {
-    const normalized = sanitizeTopicText(value);
-    if (!normalized) continue;
-    if (includeWhole && normalized.split(/\s+/).length <= maxWholeWords) {
-      terms.add(normalized);
-    }
-    for (const token of normalized.split(/[\s/]+/)) {
-      const cleaned = token.replace(/^-+|-+$/g, '');
-      if (!cleaned) continue;
-      terms.add(cleaned);
-    }
-  }
-  return Array.from(terms);
-}
-
-function buildTopicArticleProfile(topic) {
-  const labelTerms = splitTopicTerms([topic.label], { includeWhole: false });
-  const technologyTerms = splitTopicTerms(Array.isArray(topic.key_technologies) ? topic.key_technologies : [], { includeWhole: true, maxWholeWords: 4 });
-  const companyTerms = splitTopicTerms(Array.isArray(topic.key_companies) ? topic.key_companies : [], { includeWhole: true, maxWholeWords: 3 });
-  const descriptionTerms = splitTopicTerms([topic.description], { includeWhole: false });
-  const keywordTerms = splitTopicTerms(Array.isArray(topic.keywords) ? topic.keywords : [], { includeWhole: false });
-
-  const strongTerms = new Set();
-  const supportTerms = new Set();
-
-  for (const term of [...technologyTerms, ...companyTerms, ...labelTerms]) {
-    const compact = term.replace(/\s+/g, ' ').trim();
-    if (!compact || compact.length < 3) continue;
-    if (TOPIC_ARTICLE_STOPWORDS.has(compact) || TOPIC_ARTICLE_GENERIC_TERMS.has(compact)) continue;
-    strongTerms.add(compact);
-  }
-
-  for (const term of [...keywordTerms, ...descriptionTerms]) {
-    const compact = term.replace(/\s+/g, ' ').trim();
-    if (!compact || compact.length < 4) continue;
-    if (TOPIC_ARTICLE_STOPWORDS.has(compact)) continue;
-    if (TOPIC_ARTICLE_GENERIC_TERMS.has(compact)) continue;
-    if (strongTerms.has(compact)) continue;
-    supportTerms.add(compact);
-  }
-
-  if (String(topic.parent_theme || '') === 'geopolitics') {
-    for (const term of ['ukraine', 'ukrainian', 'russia', 'russian']) {
-      supportTerms.add(term);
-    }
-  }
-
-  const geoContext = Array.from(new Set([...labelTerms, ...keywordTerms, ...descriptionTerms]
-    .filter((term) => GEO_CONTEXT_PATTERNS.some((pattern) => pattern.test(term)))))
-    .slice(0, 8);
-
-  const focusTerms = Array.from(new Set([...technologyTerms, ...labelTerms]
-    .filter((term) => !geoContext.includes(term))
-    .filter((term) => !TOPIC_ARTICLE_GENERIC_TERMS.has(term))
-    .filter((term) => !TOPIC_ARTICLE_STOPWORDS.has(term))))
-    .slice(0, 12);
-
-  const strong = Array.from(strongTerms).slice(0, 16);
-  const support = Array.from(supportTerms).slice(0, 24);
-  return { strong, support, geoContext, focusTerms };
-}
-
-function buildTopicRecentArticleScore(article, topicId, parentTheme, profile) {
-  const text = sanitizeTopicText([article.title, article.summary, article.source].filter(Boolean).join(' '));
-  const matchedStrong = [];
-  const matchedSupport = [];
-  const matchedGeo = [];
-  const matchedFocus = [];
-
-  for (const term of profile.strong) {
-    if (text.includes(term)) matchedStrong.push(term);
-  }
-  for (const term of profile.support) {
-    if (text.includes(term)) matchedSupport.push(term);
-  }
-  for (const term of profile.geoContext || []) {
-    if (text.includes(term)) matchedGeo.push(term);
-  }
-  for (const term of profile.focusTerms || []) {
-    if (text.includes(term)) matchedFocus.push(term);
-  }
-
-  const strongHitCount = matchedStrong.length;
-  const supportHitCount = matchedSupport.length;
-  const geoHitCount = matchedGeo.length;
-  const focusHitCount = matchedFocus.length;
-
-  let score = strongHitCount * 8 + supportHitCount * 2;
-  score += geoHitCount * 4 + focusHitCount * 5;
-  if (article.legacy_theme && String(article.legacy_theme) === String(topicId)) score += 6;
-  if (article.theme && String(article.theme) === String(parentTheme || '')) score += 2;
-  if (article.legacy_theme && String(article.legacy_theme) === String(parentTheme || '')) score += 1;
-
-  const publishedAt = article.published_at ? new Date(article.published_at).getTime() : 0;
-  const ageHours = publishedAt > 0 ? Math.max(0, (Date.now() - publishedAt) / 36e5) : 99999;
-  if (ageHours <= 72) score += 4;
-  else if (ageHours <= 24 * 14) score += 3;
-  else if (ageHours <= 24 * 30) score += 2;
-  else if (ageHours <= 24 * 90) score += 1;
-
-  return {
-    score,
-    matchedStrong,
-    matchedSupport,
-    matchedGeo,
-    matchedFocus,
-    strongHitCount,
-    supportHitCount,
-    geoHitCount,
-    focusHitCount,
-  };
-}
-
-export { buildTopicArticleProfile, buildTopicRecentArticleScore };
-
 function buildJsonResponse(data, status = 200) {
   return {
     status,
@@ -420,21 +190,6 @@ async function safeQuery(text, values = []) {
     logger.metric('db.query_error_count', 1);
     return { rows: [] };
   }
-}
-
-async function readJsonCache(name) {
-  const filePath = path.join(CACHE_DIR, `${name}.json`);
-  if (!existsSync(filePath)) return null;
-  try {
-    return JSON.parse(await readFile(filePath, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
-async function writeJsonCache(name, payload) {
-  await mkdir(CACHE_DIR, { recursive: true });
-  await writeFile(path.join(CACHE_DIR, `${name}.json`), JSON.stringify(payload, null, 2));
 }
 
 const DATA_TIMESTAMP_KEYS = new Set([
@@ -838,16 +593,6 @@ export function withMeta(payload, extra = {}) {
   };
 }
 
-function hasRenderableData(payload) {
-  if (!payload || typeof payload !== 'object') return false;
-  return Object.values(payload).some((value) => {
-    if (Array.isArray(value)) return value.length > 0;
-    if (value && typeof value === 'object') return Object.keys(value).length > 0;
-    if (typeof value === 'number') return value > 0;
-    return false;
-  });
-}
-
 async function resolveWithCache(cacheKey, buildPayload) {
   try {
     const payload = await buildPayload();
@@ -872,36 +617,6 @@ async function resolveWithCache(cacheKey, buildPayload) {
     logger.metric('api.cache_miss', 1, { cacheKey });
     throw error;
   }
-}
-
-function toCacheToken(value) {
-  const normalized = String(value ?? 'all')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return normalized || 'all';
-}
-
-function buildCacheKey(prefix, ...parts) {
-  return [prefix, ...parts.map((part) => toCacheToken(part))].join('--');
-}
-
-function hasDynamicSinceParams(params) {
-  if (!params || typeof params.keys !== 'function') return false;
-  if (params.has('since')) return true;
-  return Array.from(params.keys()).some((key) => String(key || '').startsWith('since_'));
-}
-
-function buildSinceToken(params, keyPrefix = 'since') {
-  const parts = [];
-  for (const [key, value] of params.entries()) {
-    if (key === keyPrefix || key.startsWith(`${keyPrefix}_`)) {
-      parts.push(`${key}:${value}`);
-    }
-  }
-  parts.sort();
-  return parts.length > 0 ? parts.join('|') : 'none';
 }
 
 async function readJsonBody(req) {
@@ -948,69 +663,6 @@ function mapExpectedReactions(rows) {
       magnitude: Math.abs(magnitude),
     };
   });
-}
-
-const MAP_LENS_FILTER_TERMS = {
-  all: [],
-  conflict: ['conflict', 'war', 'defense', 'military', 'drone', 'sanction', 'security', 'iran', 'israel', 'ukraine', 'russia'],
-  macro: ['macro', 'macroeconomics', 'fiscal', 'inflation', 'rates', 'liquidity', 'yield', 'monetary', 'budget', 'trade'],
-  tech: ['technology', 'technology-general', 'ai', 'cloud', 'robotics', 'semiconductor', 'cyber', 'quantum', 'science'],
-  energy: ['energy', 'oil', 'gas', 'lng', 'clean-energy', 'renewable', 'power', 'electricity', 'grid'],
-  climate: ['climate', 'wildfire', 'water', 'agriculture', 'weather', 'heat', 'resilience', 'environment'],
-};
-
-const MAP_LENS_ANCHORS = [
-  { id: 'iran', lat: 35.6892, lon: 51.389, terms: ['iran', 'tehran', 'persian gulf', 'hormuz'], filters: ['conflict', 'energy'] },
-  { id: 'israel', lat: 31.7683, lon: 35.2137, terms: ['israel', 'gaza', 'tel aviv', 'jerusalem'], filters: ['conflict', 'energy'] },
-  { id: 'ukraine', lat: 50.4501, lon: 30.5234, terms: ['ukraine', 'kyiv', 'kiev', 'donbas', 'crimea'], filters: ['conflict', 'energy'] },
-  { id: 'russia', lat: 55.7558, lon: 37.6173, terms: ['russia', 'moscow', 'kremlin'], filters: ['conflict', 'energy'] },
-  { id: 'taiwan', lat: 25.033, lon: 121.5654, terms: ['taiwan', 'tsmc', 'strait', 'taipei'], filters: ['tech', 'conflict'] },
-  { id: 'seoul', lat: 37.5665, lon: 126.978, terms: ['korea', 'seoul', 'semiconductor', 'memory chip'], filters: ['tech'] },
-  { id: 'tokyo', lat: 35.6762, lon: 139.6503, terms: ['japan', 'tokyo'], filters: ['tech', 'macro'] },
-  { id: 'silicon-valley', lat: 37.3875, lon: -122.0575, terms: ['ai', 'cloud', 'data center', 'nvidia', 'silicon valley'], filters: ['tech'] },
-  { id: 'london', lat: 51.5072, lon: -0.1276, terms: ['uk', 'britain', 'london', 'budget', 'gilts'], filters: ['macro'] },
-  { id: 'washington', lat: 38.9072, lon: -77.0369, terms: ['us', 'federal reserve', 'treasury', 'washington', 'congress'], filters: ['macro', 'tech'] },
-  { id: 'dubai', lat: 25.2048, lon: 55.2708, terms: ['shipping', 'suez', 'red sea', 'middle east', 'energy', 'oil'], filters: ['energy', 'conflict'] },
-  { id: 'singapore', lat: 1.3521, lon: 103.8198, terms: ['shipping', 'strait', 'container', 'freight', 'logistics'], filters: ['energy', 'macro', 'tech'] },
-  { id: 'santiago', lat: -33.4489, lon: -70.6693, terms: ['lithium', 'copper', 'critical minerals'], filters: ['energy', 'climate', 'tech'] },
-  { id: 'amazon', lat: -3.4653, lon: -62.2159, terms: ['climate', 'wildfire', 'amazon', 'deforestation'], filters: ['climate'] },
-  { id: 'australia', lat: -35.2809, lon: 149.13, terms: ['weather', 'wildfire', 'heat', 'water stress'], filters: ['climate', 'energy'] },
-];
-
-const TRANSMISSION_TARGETS = {
-  commodity: { lat: 25.2048, lon: 55.2708, label: 'Commodity markets' },
-  equity: { lat: 40.7128, lon: -74.006, label: 'Equity markets' },
-  currency: { lat: 51.5072, lon: -0.1276, label: 'FX markets' },
-  rates: { lat: 38.8951, lon: -77.0364, label: 'Rates markets' },
-  country: { lat: 48.8566, lon: 2.3522, label: 'Country exposure' },
-  'supply-chain': { lat: 1.3521, lon: 103.8198, label: 'Supply-chain hubs' },
-};
-
-function normalizeLensFilter(value) {
-  const normalized = String(value || 'all').trim().toLowerCase();
-  return Object.hasOwn(MAP_LENS_FILTER_TERMS, normalized) ? normalized : 'all';
-}
-
-function normalizeLensText(...values) {
-  return values
-    .map((value) => String(value || '').trim().toLowerCase())
-    .filter(Boolean)
-    .join(' ');
-}
-
-function matchesLensFilter(filter, text) {
-  if (filter === 'all') return true;
-  return MAP_LENS_FILTER_TERMS[filter].some((term) => text.includes(term));
-}
-
-function inferMapLensAnchor(title, theme, filter = 'all') {
-  const text = normalizeLensText(title, theme);
-  const direct = MAP_LENS_ANCHORS.find((anchor) => anchor.terms.some((term) => text.includes(term)));
-  if (direct) return direct;
-  if (filter !== 'all') {
-    return MAP_LENS_ANCHORS.find((anchor) => anchor.filters.includes(filter)) || null;
-  }
-  return MAP_LENS_ANCHORS[0] || null;
 }
 
 function periodToDays(period) {
