@@ -3,13 +3,14 @@ import process from 'node:process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { CHROME_UA, sleep } from './_seed-utils.mjs';
+import { sleep } from './_seed-utils.mjs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { writeSignalHistoryRow, SIGNAL_ORIGIN } from './_shared/signal-history-writer.mjs';
 import {
   getAllRequiredSymbols,
   getSignalMappings,
 } from './_shared/market-quote-symbols.mjs';
+import { fetchYahooChart, parseQuoteSnapshot } from './_shared/yahoo-chart.mjs';
 
 const { Pool } = pg;
 
@@ -40,69 +41,17 @@ function parseArgs(argv) {
   return args;
 }
 
-function toIsoFromEpochSeconds(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  const date = new Date(n * 1000);
-  return Number.isFinite(date.valueOf()) ? date.toISOString() : null;
-}
+// Re-export for backward compat with any external consumers importing these
+// names. The implementations live in _shared/yahoo-chart.mjs.
+export { parseQuoteSnapshot as parseYahooQuotePayload } from './_shared/yahoo-chart.mjs';
 
-function asFiniteNumber(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-export function parseYahooQuotePayload(payload, symbol) {
-  const result = payload?.chart?.result?.[0];
-  const meta = result?.meta || {};
-  const timestamps = Array.isArray(result?.timestamp) ? result.timestamp : [];
-  const quote = result?.indicators?.quote?.[0] || {};
-  const closes = Array.isArray(quote.close) ? quote.close : [];
-
-  let observedAt = toIsoFromEpochSeconds(meta.regularMarketTime);
-  let price = asFiniteNumber(meta.regularMarketPrice);
-  for (let i = Math.min(timestamps.length, closes.length) - 1; i >= 0; i -= 1) {
-    const close = asFiniteNumber(closes[i]);
-    if (close == null) continue;
-    if (price == null) price = close;
-    if (!observedAt) observedAt = toIsoFromEpochSeconds(timestamps[i]);
-    break;
-  }
-  if (price == null || !observedAt) return null;
-
-  const previousClose = asFiniteNumber(meta.chartPreviousClose ?? meta.previousClose);
-  const changePct = previousClose && previousClose !== 0
-    ? ((price - previousClose) / previousClose) * 100
-    : null;
-
-  return {
-    symbol,
-    provider: 'yahoo-chart',
-    observedAt,
-    lastPrice: price,
-    changePct: changePct == null ? null : Number(changePct.toFixed(4)),
-    currency: meta.currency || null,
-    exchange: meta.exchangeName || meta.fullExchangeName || null,
-    raw: {
-      regularMarketTime: meta.regularMarketTime || null,
-      chartPreviousClose: meta.chartPreviousClose ?? null,
-      previousClose: meta.previousClose ?? null,
-      timezone: meta.timezone || null,
-      instrumentType: meta.instrumentType || null,
-    },
-  };
-}
-
-async function fetchYahooQuote(symbol, { range = '5d', interval = '1h' } = {}) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
-  const response = await fetch(url, {
-    headers: { 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(12_000),
+async function fetchYahooQuote(symbol, opts = {}) {
+  const payload = await fetchYahooChart(symbol, {
+    range: opts.range || '5d',
+    interval: opts.interval || '1h',
+    timeoutMs: 12_000,
   });
-  if (!response.ok) {
-    throw new Error(`Yahoo ${symbol} HTTP ${response.status}`);
-  }
-  return parseYahooQuotePayload(await response.json(), symbol);
+  return parseQuoteSnapshot(payload, symbol);
 }
 
 export async function fetchMarketQuotes(symbols = DEFAULT_MARKET_QUOTE_SYMBOLS, options = {}) {

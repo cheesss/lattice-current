@@ -14,6 +14,7 @@ import { logAutomationAction } from './_shared/automation-audit.mjs';
 import { queueForApproval, requiresApproval } from './_shared/approval-queue.mjs';
 import { ALLOWED_BACKFILL_SOURCES, validateBackfillArgs } from './_shared/backfill-whitelist.mjs';
 import { isTrustedFeedUrl } from './_shared/feed-trust.mjs';
+import { createOpenClawEvent, emitOpenClawEvent } from './_shared/openclaw-webhook-emitter.mjs';
 
 loadOptionalEnvFile();
 
@@ -700,50 +701,141 @@ async function handleAddRss(client, proposal, options = {}) {
   const { url, name, theme } = proposal;
   if (!url) throw new Error('Missing RSS url');
 
-  if (!isTrustedFeedUrl(url) && !proposal.human_approved) {
-    const queued = await queueForApproval(client, {
-      type: 'add-rss',
-      params: { url, name, theme, reason: proposal.reason || '' },
-      reason: `untrusted RSS domain requires approval: ${url}`,
-    });
-    return {
-      pendingApproval: true,
-      reason: 'awaiting human approval',
-      approvalId: queued.id,
-      url,
-    };
-  }
-
   const { probeSource } = await import('./_shared/source-probe.mjs');
   const probe = await probeSource(url, { theme });
   const effectiveUrl = probe.resolvedUrl || url;
 
-  if (probe.nextAction === 'reject') {
-    return {
+  if (probe.nextAction === 'reject' || probe.nextAction === 'manual-adapter') {
+    const result = {
       skipped: true,
-      reason: `probe rejected: quality ${probe.qualityScore.toFixed(2)} — ${probe.nextAction}`,
+      reason: `probe ${probe.nextAction}: quality ${probe.qualityScore.toFixed(2)}`,
       url,
       resolvedUrl: effectiveUrl,
       connectorKind: probe.connectorKind,
+      nextAction: probe.nextAction,
+      qualityScore: probe.qualityScore,
+      recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+      sampleItems: probe.sampleItems,
+      warnings: probe.warnings,
+      errors: probe.errors,
       probeTraceId: probe.traceId,
     };
+    await emitOpenClawEvent(createOpenClawEvent({
+      eventType: 'source-probe-failed',
+      severity: probe.nextAction === 'manual-adapter' ? 'review' : 'warning',
+      theme,
+      entityType: 'source',
+      entityId: url,
+      surface: 'decision-inbox',
+      summary: `Source probe rejected ${name || url}`,
+      payload: {
+        name,
+        url,
+        resolvedUrl: effectiveUrl,
+        connectorKind: probe.connectorKind,
+        nextAction: probe.nextAction,
+        qualityScore: probe.qualityScore,
+        recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+        probeTraceId: probe.traceId,
+      },
+    }));
+    return result;
   }
 
-  const { evaluateAndRegisterFeed } = await import('./_shared/discovered-source-registry.mjs');
-  const registration = await evaluateAndRegisterFeed(client, effectiveUrl, theme || 'politics', {
+  if (!isTrustedFeedUrl(url) && !proposal.human_approved) {
+    const queued = await queueForApproval(client, {
+      type: 'add-rss',
+      params: {
+        url,
+        name,
+        theme,
+        reason: proposal.reason || '',
+        inputUrl: probe.inputUrl,
+        resolvedUrl: effectiveUrl,
+        connectorKind: probe.connectorKind,
+        nextAction: probe.nextAction,
+        qualityScore: probe.qualityScore,
+        recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+        sampleItems: probe.sampleItems.slice(0, 3),
+        warnings: probe.warnings,
+        probeTraceId: probe.traceId,
+      },
+      reason: `untrusted RSS domain requires approval after probe: ${url} (quality=${probe.qualityScore.toFixed(2)})`,
+    });
+    const result = {
+      pendingApproval: true,
+      reason: 'awaiting human approval',
+      approvalId: queued.id,
+      url,
+      resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      nextAction: probe.nextAction,
+      qualityScore: probe.qualityScore,
+    };
+    await emitOpenClawEvent(createOpenClawEvent({
+      eventType: 'approval-created',
+      severity: 'review',
+      theme,
+      entityType: 'approval',
+      entityId: String(queued.id),
+      surface: 'decision-inbox',
+      summary: `Untrusted source queued for approval: ${name || url}`,
+      payload: {
+        approvalId: queued.id,
+        proposalType: 'add-rss',
+        url,
+        resolvedUrl: effectiveUrl,
+        connectorKind: probe.connectorKind,
+        qualityScore: probe.qualityScore,
+        nextAction: probe.nextAction,
+      },
+    }));
+    return result;
+  }
+
+  const { registerProbedSource } = await import('./_shared/discovered-source-registry.mjs');
+  const registration = await registerProbedSource(client, probe, theme || 'politics', {
     feedName: name || 'rss',
     lang: 'en',
     topics: [theme].filter(Boolean),
     autoRegister: true,
+    minScore: options.minQualityScore ?? 0.65,
   });
   if (!registration.registered) {
-    return {
+    const result = {
       skipped: true,
       reason: registration.reason || 'feed quality below threshold',
       quality: registration.quality,
       url,
       resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      nextAction: probe.nextAction,
+      qualityScore: probe.qualityScore,
+      recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+      sampleItems: probe.sampleItems,
+      warnings: probe.warnings,
+      errors: probe.errors,
+      probeTraceId: probe.traceId,
     };
+    await emitOpenClawEvent(createOpenClawEvent({
+      eventType: 'source-rejected',
+      severity: 'review',
+      theme,
+      entityType: 'source',
+      entityId: url,
+      surface: 'decision-inbox',
+      summary: `Source registration rejected ${name || url}`,
+      payload: {
+        name,
+        url,
+        resolvedUrl: effectiveUrl,
+        reason: result.reason,
+        quality: registration.quality,
+        connectorKind: probe.connectorKind,
+        probeTraceId: probe.traceId,
+      },
+    }));
+    return result;
   }
 
   let items = [];
@@ -780,12 +872,12 @@ async function handleAddRss(client, proposal, options = {}) {
   let inserted = 0;
   for (const item of items.slice(0, 100)) {
     try {
-      await client.query(`
+      const insertResult = await client.query(`
         INSERT INTO articles (source, theme, published_at, title, url)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT DO NOTHING
       `, [name || 'rss', theme || 'tech', item.date, item.title, item.url]);
-      inserted += 1;
+      inserted += Number(insertResult?.rowCount || 0);
     } catch {
       // ignore duplicates
     }
@@ -799,7 +891,7 @@ async function handleAddRss(client, proposal, options = {}) {
       AND NOT EXISTS (SELECT 1 FROM auto_article_themes t WHERE t.article_id = a.id)
   `, [theme || 'tech', name || 'rss']);
 
-  return {
+  const result = {
     summary: `RSS ${name}: registered and seeded ${inserted} articles`,
     feedName: name,
     url,
@@ -809,6 +901,25 @@ async function handleAddRss(client, proposal, options = {}) {
     articleCount: inserted,
     quality: registration.quality,
   };
+  await emitOpenClawEvent(createOpenClawEvent({
+    eventType: 'source-registered',
+    severity: 'info',
+    theme,
+    entityType: 'source',
+    entityId: url,
+    surface: 'ops',
+    summary: `Source registered ${name || url}`,
+    payload: {
+      name,
+      url,
+      resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      articleCount: inserted,
+      quality: registration.quality,
+      probeTraceId: probe.traceId,
+    },
+  }));
+  return result;
 }
 
 async function handleAddTheme(client, proposal) {
@@ -849,39 +960,95 @@ async function handleAddTheme(client, proposal) {
   }
 
   // --- Backfill labeled_outcomes for every matched article × symbol × horizon ---
+  // Bulk pattern: fetch published_at once, fetch each symbol's full price
+  // window once, compute all outcomes in memory, then a single bulk INSERT.
+  // Replaces a prior 3-nested loop that issued up to ~12k round-trips on
+  // large proposals (100 articles × 20 symbols × 3 horizons × 2 queries each).
+  const HORIZONS = [
+    { name: '1w', days: 7 },
+    { name: '2w', days: 14 },
+    { name: '1m', days: 30 },
+  ];
+  const MAX_HORIZON_SLACK_DAYS = Math.max(...HORIZONS.map((h) => h.days)) + 2;
   let outcomeCount = 0;
 
-  for (const row of matched.rows) {
-    const articleId = row.id;
-    // Fetch article published_at for price lookups
-    const artResult = await client.query('SELECT published_at FROM articles WHERE id = $1', [articleId]);
-    if (artResult.rows.length === 0) continue;
-    const publishedAt = artResult.rows[0].published_at;
+  if (matched.rows.length && resolvedSymbols.length) {
+    const articleIds = matched.rows.map((r) => r.id);
+    const { rows: artRows } = await client.query(
+      'SELECT id, published_at FROM articles WHERE id = ANY($1::bigint[])',
+      [articleIds],
+    );
+    const publishedAtById = new Map(artRows.map((r) => [r.id, r.published_at]));
 
-    for (const symbol of resolvedSymbols) {
-      for (const horizon of [{ name: '1w', days: 7 }, { name: '2w', days: 14 }, { name: '1m', days: 30 }]) {
-        const prices = await client.query(`
-          SELECT price
+    const publishedMs = artRows
+      .map((r) => (r.published_at ? new Date(r.published_at).getTime() : null))
+      .filter((t) => Number.isFinite(t));
+    const priceSeriesBySymbol = new Map();
+    if (publishedMs.length) {
+      const minStart = new Date(Math.min(...publishedMs));
+      const maxEnd = new Date(Math.max(...publishedMs) + MAX_HORIZON_SLACK_DAYS * 86_400_000);
+      for (const symbol of resolvedSymbols) {
+        const { rows: priceRows } = await client.query(`
+          SELECT valid_time_start, price
           FROM worldmonitor_intel.historical_raw_items
           WHERE provider = 'yahoo-chart' AND symbol = $1
             AND valid_time_start >= $2::timestamptz
-            AND valid_time_start <= $2::timestamptz + INTERVAL '${horizon.days + 2} days'
+            AND valid_time_start <= $3::timestamptz
           ORDER BY valid_time_start
-          LIMIT 2
-        `, [symbol, publishedAt]);
-        if (prices.rows.length < 2) continue;
-        const entry = Number(prices.rows[0].price);
-        const exit = Number(prices.rows[1].price);
-        if (entry <= 0) continue;
-        const ret = ((exit - entry) / entry) * 100;
-
-        await client.query(`
-          INSERT INTO labeled_outcomes (article_id, theme, symbol, published_at, horizon, entry_price, exit_price, forward_return_pct, hit)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          ON CONFLICT (article_id, symbol, horizon) DO NOTHING
-        `, [articleId, id, symbol, publishedAt, horizon.name, entry, exit, ret, ret > 0]);
-        outcomeCount += 1;
+        `, [symbol, minStart, maxEnd]);
+        priceSeriesBySymbol.set(
+          symbol,
+          priceRows.map((r) => ({ t: new Date(r.valid_time_start).getTime(), p: Number(r.price) })),
+        );
       }
+    }
+
+    const outcomes = [];
+    for (const row of matched.rows) {
+      const articleId = row.id;
+      const publishedAt = publishedAtById.get(articleId);
+      if (!publishedAt) continue;
+      const pubTs = new Date(publishedAt).getTime();
+      for (const symbol of resolvedSymbols) {
+        const series = priceSeriesBySymbol.get(symbol);
+        if (!series?.length) continue;
+        for (const horizon of HORIZONS) {
+          const endTs = pubTs + (horizon.days + 2) * 86_400_000;
+          const within = series.filter((s) => s.t >= pubTs && s.t <= endTs);
+          if (within.length < 2) continue;
+          const entry = within[0].p;
+          const exit = within[1].p;
+          if (!(entry > 0) || !Number.isFinite(exit)) continue;
+          const ret = ((exit - entry) / entry) * 100;
+          outcomes.push({ articleId, symbol, publishedAt, horizon: horizon.name, entry, exit, ret });
+        }
+      }
+    }
+
+    if (outcomes.length) {
+      await client.query(`
+        INSERT INTO labeled_outcomes
+          (article_id, theme, symbol, published_at, horizon,
+           entry_price, exit_price, forward_return_pct, hit)
+        SELECT * FROM UNNEST(
+          $1::bigint[], $2::text[], $3::text[], $4::timestamptz[], $5::text[],
+          $6::double precision[], $7::double precision[],
+          $8::double precision[], $9::bool[]
+        ) AS t(article_id, theme, symbol, published_at, horizon,
+               entry_price, exit_price, forward_return_pct, hit)
+        ON CONFLICT (article_id, symbol, horizon) DO NOTHING
+      `, [
+        outcomes.map((o) => o.articleId),
+        outcomes.map(() => id),
+        outcomes.map((o) => o.symbol),
+        outcomes.map((o) => o.publishedAt),
+        outcomes.map((o) => o.horizon),
+        outcomes.map((o) => o.entry),
+        outcomes.map((o) => o.exit),
+        outcomes.map((o) => o.ret),
+        outcomes.map((o) => o.ret > 0),
+      ]);
+      outcomeCount = outcomes.length;
     }
   }
 

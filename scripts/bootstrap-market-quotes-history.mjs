@@ -22,9 +22,10 @@
 
 import process from 'node:process';
 import pg from 'pg';
-import { CHROME_UA, sleep } from './_seed-utils.mjs';
+import { sleep } from './_seed-utils.mjs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { getAllRequiredSymbols } from './_shared/market-quote-symbols.mjs';
+import { fetchYahooChart, parseDailyBars } from './_shared/yahoo-chart.mjs';
 
 const { Pool } = pg;
 
@@ -61,31 +62,8 @@ async function fuseFromWarmStore(pool, symbol) {
 }
 
 async function fetchYahooDaily(symbol, range = DEFAULT_RANGE, interval = DEFAULT_INTERVAL) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`;
-  const response = await fetch(url, {
-    headers: { 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
-  const result = data?.chart?.result?.[0];
-  const timestamps = result?.timestamp || [];
-  const closes = result?.indicators?.quote?.[0]?.close || [];
-  const meta = result?.meta || {};
-  const rows = [];
-  for (let i = 0; i < timestamps.length; i += 1) {
-    const ts = Number(timestamps[i]);
-    const price = Number(closes[i]);
-    if (!Number.isFinite(ts) || !Number.isFinite(price)) continue;
-    rows.push({
-      symbol,
-      observedAt: new Date(ts * 1000).toISOString(),
-      price,
-      currency: meta.currency || null,
-      exchange: meta.exchangeName || meta.fullExchangeName || null,
-    });
-  }
-  return rows;
+  const payload = await fetchYahooChart(symbol, { range, interval, timeoutMs: 20_000 });
+  return parseDailyBars(payload, symbol);
 }
 
 async function writeHistoricalBars(pool, rows, provider) {
