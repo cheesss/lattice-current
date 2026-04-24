@@ -24,7 +24,7 @@ export const THEME_TAXONOMY = {
     category: 'technology',
     parentTheme: 'technology-general',
     lifecycleHint: 'mainstream',
-    keywords: ['ai', 'artificial intelligence', 'machine learning', 'llm', 'gpt', 'foundation model', 'inference', 'agentic'],
+    keywords: ['ai', 'artificial intelligence', 'machine learning', 'llm', 'gpt', 'chatgpt', 'openai', 'generative ai', 'foundation model', 'inference', 'agentic'],
   },
   semiconductor: {
     label: 'Semiconductor',
@@ -45,7 +45,7 @@ export const THEME_TAXONOMY = {
     category: 'technology',
     parentTheme: 'technology-general',
     lifecycleHint: 'growing',
-    keywords: ['spacex', 'rocket', 'satellite', 'starlink', 'lunar', 'mars mission', 'launch vehicle', 'space economy', 'space station'],
+    keywords: ['space', 'nasa', 'spacex', 'rocket', 'satellite', 'starlink', 'lunar', 'mars mission', 'launch vehicle', 'space economy', 'space station'],
   },
   'robotics-automation': {
     label: 'Robotics / Automation',
@@ -174,7 +174,7 @@ export const THEME_TAXONOMY = {
     category: 'geopolitics',
     parentTheme: 'geopolitics',
     lifecycleHint: 'mainstream',
-    keywords: ['war', 'missile', 'drone strike', 'military conflict', 'battlefield', 'ceasefire', 'troops'],
+    keywords: ['war', 'missile', 'missiles', 'drone strike', 'military drone', 'attack drone', 'combat drone', 'military conflict', 'battlefield', 'ceasefire', 'troops', 'patriot missiles', 'iran war', 'ukraine war', 'airstrike', 'israeli strikes', 'strikes on iran'],
   },
   diplomacy: {
     label: 'Diplomacy',
@@ -195,14 +195,14 @@ export const THEME_TAXONOMY = {
     category: 'geopolitics',
     parentTheme: 'geopolitics',
     lifecycleHint: 'growing',
-    keywords: ['supply chain', 'critical minerals', 'shipping disruption', 'port closure', 'logistics bottleneck'],
+    keywords: ['supply chain', 'critical minerals', 'shipping disruption', 'port closure', 'logistics bottleneck', 'shipping', 'ship owners', 'vessels', 'baltic dry index', 'dry bulk', 'tanker', 'lng carrier', 'bunker fuel', 'strait of hormuz', 'hormuz blockade', 'maritime', 'port of rotterdam'],
   },
   'defense-industrial': {
     label: 'Defense Industrial',
     category: 'geopolitics',
     parentTheme: 'geopolitics',
     lifecycleHint: 'growing',
-    keywords: ['defense contractor', 'munitions', 'procurement', 'fighter jet', 'air defense', 'naval build'],
+    keywords: ['defense contractor', 'defence contractor', 'munitions', 'procurement', 'fighter jet', 'air defense', 'air defence', 'naval build', 'pentagon', 'military budget', 'defence giants', 'defense industrial', 'weapons shipments'],
   },
 
   'environment-general': {
@@ -318,6 +318,9 @@ export const LEGACY_THEME_MAP = {
   tech: 'technology-general',
   economy: 'macroeconomics',
   politics: 'geopolitics',
+  defense: 'defense-industrial',
+  defence: 'defense-industrial',
+  military: 'defense-industrial',
   conflict: 'conflict',
   energy: 'clean-energy',
 };
@@ -586,7 +589,13 @@ function keywordScore(text, keyword) {
   if (!text || !keyword) return 0;
   const normalizedKeyword = normalizeText(keyword);
   if (!normalizedKeyword) return 0;
-  if (!text.includes(normalizedKeyword)) return 0;
+  const keywordPattern = normalizedKeyword.includes(' ')
+    ? normalizedKeyword
+    : `(?:^|[^a-z0-9])${normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9])`;
+  const matched = normalizedKeyword.includes(' ')
+    ? text.includes(keywordPattern)
+    : new RegExp(keywordPattern).test(text);
+  if (!matched) return 0;
   return normalizedKeyword.includes(' ') ? 1.25 : 0.8;
 }
 
@@ -655,7 +664,7 @@ export function classifyArticleAgainstTaxonomy({
   const best = boosted[0] || null;
   const fallbackTheme = mappedEmbedding !== 'unknown' ? mappedEmbedding : null;
   const bestConfig = best ? getThemeConfig(best.theme) : null;
-  const bestScoreThreshold = bestConfig && isGenericBucketTheme(best.theme) ? 1.8 : 1.2;
+  const bestScoreThreshold = bestConfig && isGenericBucketTheme(best.theme) ? 1.8 : 0.8;
   const fallbackThemeAllowed = fallbackTheme && (
     !isGenericBucketTheme(fallbackTheme)
     || Number(embeddingSimilarity || 0) >= 0.72

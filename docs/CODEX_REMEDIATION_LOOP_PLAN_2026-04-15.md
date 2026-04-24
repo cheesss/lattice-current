@@ -1,6 +1,12 @@
 # Codex Remediation Loop — 구현 계획
 
-> **Status**: active (runtime feedback loop implementation in progress; core wiring shipped in commit `19dd486a`)
+> **Status**: partial (runtime feedback loop partially shipped). Last reviewed 2026-04-23:
+> - ✅ Simulate 버튼 UI shipped (`event-dashboard.html` lines 1936, 2131 — approval 타입에 `inboxAction('simulate', id)` 버튼 + `[DRY RUN]` 배너)
+> - ✅ dryRun 백엔드 shipped (`event-dashboard-api.mjs` ~line 1794)
+> - ✅ OpenClaw `simulate_approval` / `review_approval` 도구 shipped (`plugins/openclaw-lattice-control-plane/index.ts` lines 1480-1534)
+> - ✅ alert-notifier 구조화 알림 shipped (`scripts/_shared/alert-notifier.mjs`)
+> - ⚠️ 런타임 이슈 엔벨로프 캡처, 클라이언트 액션 트레이스, Codex 조사 패킷 생성기, Route/Surface 맵은 여전히 미완성
+> - ⚠️ `inboxBulkAction` catch 블록 silent catch 여부 재검토 필요 (CLAUDE.md 7번 규칙 위반 가능성)
 
 Date: 2026-04-15  
 Prerequisite: Decision Inbox 결과 배너(EXECUTED/SKIPPED/FAILED) 구현 완료

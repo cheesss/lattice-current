@@ -1,6 +1,13 @@
 # Live vs Backfill Data Boundary Plan
 
-> **Status**: partial (Phase 0 API-contract work complete; Phase 1 signal-quality classification continued as NOWCAST_HANDOFF_2026-04-18 §0 semantic contract)
+> **Status**: partial — Phase 0 API-contract shipped; Phase 1+ ownership transferred to the Nowcast track. Last reviewed 2026-04-23.
+> 
+> **현재 책임 분리:**
+> - Phase 0 (API freshness contract, `meta.mode`/`dataUpdatedAt`/`staleReason`/trust chips) — ✅ shipped on main, 본 문서 §"Implementation Progress" 참조
+> - Phase 1+ (signal-quality classification: observed/mirrored/proxy/composite/imputed/estimated) — → [NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md) §0 semantic contract + §2 `signal_history` origin tagging
+> - Nowcast model activation gates — → NOWCAST_HANDOFF §3 commit map + §5 production checklist
+> 
+> 이 문서는 Phase 0의 구현 기록으로만 유지. 새로운 freshness/trust 정책은 NOWCAST_HANDOFF에서 관리.
 
 Date: 2026-04-16 KST
 

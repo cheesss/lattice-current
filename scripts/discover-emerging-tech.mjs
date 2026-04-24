@@ -27,6 +27,10 @@ import {
   pickRepresentativeItems,
   runKMeans,
 } from './_shared/emerging-tech-discovery.mjs';
+import {
+  isLowValueGoogleNewsSource,
+  isLowValueGoogleNewsSourceName,
+} from './_shared/google-news-source-policy.mjs';
 
 loadOptionalEnvFile();
 
@@ -115,7 +119,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     minDiversity: 2,
     minCohesion: 0.65,
     minMomentum: 1.3,
-    sources: ['guardian', 'nyt', 'hackernews', 'arxiv', 'google news'],
+    sources: ['guardian', 'nyt', 'hackernews', 'arxiv', 'google news', '* source'],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -405,8 +409,8 @@ async function loadCandidateArticles(client, options) {
       likePatterns.push('google news:%');
       continue;
     }
-    if (source.endsWith('*')) {
-      likePatterns.push(`${source.slice(0, -1)}%`);
+    if (source.includes('*')) {
+      likePatterns.push(source.replace(/\*/g, '%'));
       continue;
     }
     exactSources.push(source);
@@ -451,6 +455,7 @@ async function loadCandidateArticles(client, options) {
       publishedAt: new Date(row.published_at).toISOString(),
       embedding: parseEmbeddingVector(row.embedding_text),
     }))
+    .filter((item) => !isLowValueGoogleNewsSourceName(item.source))
     .filter((item) => item.id > 0 && item.embedding.length > 0 && item.title);
 }
 
@@ -658,6 +663,15 @@ export async function proposeSourcesForNewTopic(client, topic) {
   let inserted = 0;
   for (const keyword of keywords) {
     const googleNewsUrl = buildGoogleNewsSearchUrl(keyword);
+    if (isLowValueGoogleNewsSource({
+      url: googleNewsUrl,
+      feedName: `Google News: ${keyword}`,
+      category: topic.id,
+      theme: topic.id,
+      topics: [topic.id, readiness.context.normalizedTheme, readiness.context.parentTheme].filter(Boolean),
+    })) {
+      continue;
+    }
     const exists = await client.query(
       `
         SELECT 1

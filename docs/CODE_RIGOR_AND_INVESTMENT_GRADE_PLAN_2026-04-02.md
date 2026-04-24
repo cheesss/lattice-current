@@ -1,5 +1,5 @@
 # Code Rigor And Investment-Grade Upgrade Plan
-> **Status**: partial (Phase 1 risk/sizing audits shipped; Phase 2 backtest integrity ongoing)  
+> **Status**: partial (Phase 1 risk/sizing audits shipped; Phase 2 backtest integrity ongoing). Last reviewed 2026-04-23 — referenced files (`idea-generator.ts`, `historical-intelligence.ts`, `weight-learner.ts`, `rag-retriever.ts`) remain in `src/services/` on main. Note: backtest-heavy ML modules (`elastic-net`, `gradient-boosting`, `bayesian-logistic`, `ensemble-predictor`, `cma-es`, `isotonic-calibrator`, `ml-walk-forward`, `cpcv`) were removed from main and preserved on `legacy/backtest`; Phase 2 "backtest integrity" applies to the replay/validation stack that still ships on main, not to the removed modules.
 
 Date: 2026-04-02
 

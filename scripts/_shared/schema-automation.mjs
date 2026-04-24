@@ -43,12 +43,21 @@ export const AUTOMATION_SCHEMA_STATEMENTS = [
       action_type TEXT NOT NULL,
       payload JSONB NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'approved', 'rejected', 'executed')),
+        CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix')),
       reasoning TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       reviewed_at TIMESTAMPTZ,
       reviewer TEXT
     );
+  `,
+  `
+    ALTER TABLE approval_queue
+      DROP CONSTRAINT IF EXISTS approval_queue_status_check;
+  `,
+  `
+    ALTER TABLE approval_queue
+      ADD CONSTRAINT approval_queue_status_check
+      CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix'));
   `,
   `
     CREATE INDEX IF NOT EXISTS idx_approval_queue_status_time

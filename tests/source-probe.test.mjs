@@ -187,6 +187,86 @@ describe('source-probe', () => {
     assert.ok(result.qualityBreakdown.itemCount >= 10, 'Expected at least 10 items from the alternate feed');
   });
 
+  it('selects the strongest adapter result instead of the first successful result', async () => {
+    const nowIso = new Date().toISOString();
+    const jsonLdItems = Array.from({ length: 10 }, (_, index) => ({
+      '@type': 'NewsArticle',
+      headline: `Market signal article ${index + 1}`,
+      url: `https://example.com/news/${index + 1}`,
+      datePublished: nowIso,
+    }));
+    const htmlBody = `<!DOCTYPE html><html><head>
+      <script type="application/ld+json">${JSON.stringify(jsonLdItems)}</script>
+    </head><body>Market signal coverage</body></html>`;
+    const sitemapBody = `<?xml version="1.0"?><urlset>
+      ${Array.from({ length: 20 }, (_, index) => `<url><loc>https://example.com/archive/${index + 1}</loc></url>`).join('')}
+    </urlset>`;
+
+    globalThis.fetch = mockFetchRouter([
+      {
+        match: '/sitemap.xml',
+        response: { body: sitemapBody, contentType: 'application/xml', status: 200 },
+      },
+      {
+        match: 'example.com',
+        response: { body: htmlBody, contentType: 'text/html', status: 200 },
+      },
+    ]);
+
+    const result = await probeSource('https://example.com/', { theme: 'market' });
+
+    assert.equal(result.connectorKind, 'json-ld');
+    assert.equal(result.qualityBreakdown.recentItemCount, 10);
+    assert.ok(result.warnings.some((warning) => warning.includes('Selected json-ld over first successful adapter sitemap-news')));
+  });
+
+  it('expands sitemap indexes and paginated sitemap locs before scoring freshness', async () => {
+    const recentDate = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const sitemapIndex = `<?xml version="1.0"?><sitemapindex>
+      <sitemap><loc>https://example.com/sitemap.xml?page=1</loc></sitemap>
+    </sitemapindex>`;
+    const sitemapPage = `<?xml version="1.0"?><urlset xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+      ${Array.from({ length: 10 }, (_, index) => `
+        <url>
+          <loc>https://example.com/news/airspace-insurance-${index + 1}</loc>
+          <lastmod>${recentDate}</lastmod>
+          <news:news>
+            <news:title>Airspace insurance risk article ${index + 1}</news:title>
+            <news:publication_date>${recentDate}</news:publication_date>
+          </news:news>
+        </url>
+      `).join('')}
+    </urlset>`;
+    const plainHtml = buildPlainHtml();
+
+    globalThis.fetch = mockFetchRouter(
+      [
+        {
+          match: /\/sitemap\.xml\?page=1$/,
+          response: { body: sitemapPage, contentType: 'application/xml', status: 200 },
+        },
+        {
+          match: /\/sitemap\.xml$/,
+          response: { body: sitemapIndex, contentType: 'application/xml', status: 200 },
+        },
+        {
+          match: 'example.com',
+          response: { body: plainHtml, contentType: 'text/html', status: 200 },
+        },
+      ],
+      { body: '', contentType: 'text/html', status: 404 },
+    );
+
+    const result = await probeSource('https://example.com/', { theme: 'airspace insurance' });
+
+    assert.equal(result.connectorKind, 'sitemap-news');
+    assert.equal(result.resolvedUrl, 'https://example.com/sitemap.xml');
+    assert.equal(result.qualityBreakdown.itemCount, 10);
+    assert.equal(result.qualityBreakdown.recentItemCount, 10);
+    assert.equal(result.nextAction, 'register');
+    assert.ok(result.sampleItems.every((item) => !item.url.includes('sitemap.xml?page=')));
+  });
+
   // -------------------------------------------------------------------------
   // Test 3: homepage without feed returns failed or partial, nextAction reject or manual-adapter
   // -------------------------------------------------------------------------
@@ -270,6 +350,20 @@ describe('source-probe', () => {
     assert.ok('title' in first, 'sampleItem should have title');
     assert.ok('url' in first, 'sampleItem should have url');
     assert.ok('publishedAt' in first, 'sampleItem should have publishedAt');
+  });
+
+  it('treats broad source categories as neutral relevance instead of hard keyword filters', async () => {
+    const rssBody = buildRssFixture(10, 5);
+    globalThis.fetch = mockFetchFixed({
+      body: rssBody,
+      contentType: 'application/rss+xml',
+    });
+
+    const result = await probeSource('https://example.com/feed.xml', { theme: 'technology' });
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.qualityBreakdown.themeRelevance, 0.5);
+    assert.ok(result.qualityScore >= 0.65);
   });
 
   // -------------------------------------------------------------------------

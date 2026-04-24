@@ -5,7 +5,7 @@ status: beta
 variants:
   - full
   - finance
-updated: 2026-03-16
+updated: 2026-04-22
 owner: core
 ---
 
@@ -36,6 +36,7 @@ Runs the historical intelligence loop without daily operator intervention:
 - shadow-book rollback that can force the engine back into shadow mode after weak recent samples
 - explainable attribution that shows what part of the score came from corroboration, graph propagation, beta, macro pressure, or reality penalties
 - Codex-only operations view for feeds, promoted themes, dataset proposals, queue diagnosis, and activation checks
+- OpenClaw control-plane bridge for source-registration events, scheduler failure escalation, sidecar observability, and role-separated `lattice-ops` agent dispatch
 
 ## Why it exists
 
@@ -88,6 +89,27 @@ Under `guarded-auto`, it can:
 - promote healthy API candidates from `draft` to `approved` or `active` using health/schema/ToS/rate-limit bonuses plus category/base-url caps
 
 Manual override still exists, but routine registry maintenance no longer requires repeated button clicks.
+
+The source onboarding path now probes candidate URLs before registration, repairs common homepage-to-feed failures, and validates the final resolved feed through the same accept path used by the Decision Inbox. Execution registers and seeds from the resolved RSS, Atom, sitemap, or HTML-list source first, using probe samples only as a fallback. A 20-source runtime smoke run verified that accepted proposals become active source-registry records instead of disappearing as skipped approvals.
+
+Broad taxonomy labels such as `technology`, `defense`, `cybersecurity`, and `space` are treated as neutral relevance hints during feed quality scoring. Specific themes still require content relevance, but general source categories no longer reject otherwise healthy feeds simply because article titles do not repeat the category label.
+
+The approval queue is URL-idempotent for source proposals, using the same canonical URL normalization as cleanup, including trailing slash removal. Repeated self-heal or Codex attempts update one pending or needs-fix row instead of creating duplicate operator tasks. Historical low-quality rows can be audited and cleaned with `npm run cleanup:source-approvals:dry` and applied with `npm run cleanup:source-approvals`.
+
+## OpenClaw bridge
+
+OpenClaw is used as the channel and agent-control layer, not as the source of truth. Lattice keeps approval state, source registry state, ingestion results, and freshness evidence.
+
+The active local bridge uses:
+
+- Lattice dashboard API on `127.0.0.1:46200`
+- Lattice sidecar on `127.0.0.1:46123`
+- OpenClaw gateway on `127.0.0.1:18789`
+- Vite dashboard UI on `localhost:3000`
+
+The `lattice-ops` agent is isolated from the default `main` chat lane. Webhook dispatch is limited to high-value events such as scheduler failures and successful source registrations so routine automation does not refill the default chat context.
+
+The bridge now trims tool payloads and snapshot JSON before they reach chat context, dedupes webhook endpoints before dispatch, uses the real dashboard `#inbox` fragment, and marks the local sidecar as intentionally anonymous with `sidecarAuthMode: none`.
 
 ## Candidate expansion
 

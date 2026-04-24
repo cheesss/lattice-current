@@ -20,6 +20,9 @@ const PROBE_TIMEOUT_MS = 15_000;
 const USER_AGENT = 'Lattice-SourceProbe/1.0';
 const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1_000; // 7 days
 const MAX_SAMPLE_ITEMS = 10;
+const MAX_SITEMAP_ITEMS = 40;
+const MAX_SITEMAP_FETCHES = 8;
+const MAX_SITEMAP_DEPTH = 2;
 
 const SPAM_PATTERNS = [
   /click here/i,
@@ -27,6 +30,31 @@ const SPAM_PATTERNS = [
   /limited offer/i,
   /\$\d+\s*off/i,
 ];
+
+const BROAD_THEME_TOKENS = new Set([
+  'ai',
+  'ml',
+  'macro',
+  'economy',
+  'finance',
+  'market',
+  'markets',
+  'news',
+  'politics',
+  'policy',
+  'defense',
+  'technology',
+  'tech',
+  'cyber',
+  'cybersecurity',
+  'climate',
+  'environment',
+  'energy',
+  'space',
+  'science',
+  'general',
+  'source',
+]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -43,18 +71,33 @@ function stripCdata(text) {
   return text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
 }
 
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function decodeXmlText(text) {
+  return stripCdata(String(text ?? ''))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .trim();
+}
+
 /**
  * Extract the text content between the first matching open/close tag pair.
  */
 function extractTag(xml, tag) {
-  const open = new RegExp(`<${tag}[^>]*>`, 'i');
-  const close = new RegExp(`</${tag}>`, 'i');
+  const escapedTag = escapeRegExp(tag);
+  const open = new RegExp(`<${escapedTag}(?:\\s[^>]*)?>`, 'i');
+  const close = new RegExp(`</${escapedTag}>`, 'i');
   const start = xml.search(open);
   if (start === -1) return null;
   const afterOpen = xml.indexOf('>', start) + 1;
-  const end = xml.search(close);
-  if (end === -1) return null;
-  return stripCdata(xml.slice(afterOpen, end)).trim();
+  const closeOffset = xml.slice(afterOpen).search(close);
+  if (closeOffset === -1) return null;
+  return decodeXmlText(xml.slice(afterOpen, afterOpen + closeOffset));
 }
 
 /**
@@ -63,17 +106,33 @@ function extractTag(xml, tag) {
  */
 function extractBlocks(xml, tag) {
   const blocks = [];
-  const openRe = new RegExp(`<${tag}[^>]*>`, 'gi');
-  const closeStr = `</${tag}>`;
+  const escapedTag = escapeRegExp(tag);
+  const openRe = new RegExp(`<${escapedTag}(?:\\s[^>]*)?>`, 'gi');
+  const closeRe = new RegExp(`</${escapedTag}>`, 'i');
   let match;
   while ((match = openRe.exec(xml)) !== null) {
     const afterOpen = xml.indexOf('>', match.index) + 1;
-    const closeIdx = xml.toLowerCase().indexOf(closeStr.toLowerCase(), afterOpen);
-    if (closeIdx === -1) break;
+    const closeOffset = xml.slice(afterOpen).search(closeRe);
+    if (closeOffset === -1) break;
+    const closeIdx = afterOpen + closeOffset;
     blocks.push(xml.slice(afterOpen, closeIdx));
-    openRe.lastIndex = closeIdx + closeStr.length;
+    openRe.lastIndex = closeIdx + tag.length + 3;
   }
   return blocks;
+}
+
+function titleFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const segment = parsed.pathname.split('/').filter(Boolean).pop();
+    return segment || parsed.hostname;
+  } catch {
+    return String(url || '').split('/').filter(Boolean).pop() || String(url || '');
+  }
+}
+
+function unique(values) {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 /**
@@ -94,7 +153,103 @@ function parseItemBlock(block, kind) {
     publishedAt = extractTag(block, 'published') ?? extractTag(block, 'updated');
   }
 
-  return { title: stripCdata(title).trim(), url: url ? stripCdata(url).trim() : null, publishedAt };
+  return {
+    title: decodeXmlText(title),
+    url: url ? decodeXmlText(url) : null,
+    publishedAt: publishedAt ? decodeXmlText(publishedAt) : null,
+  };
+}
+
+function isLikelySitemapUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const haystack = `${parsed.pathname}${parsed.search}`.toLowerCase();
+    return /sitemap|site-map/.test(haystack);
+  } catch {
+    return /sitemap|site-map/i.test(String(url || ''));
+  }
+}
+
+function normalizeSitemapLoc(loc, baseUrl) {
+  const value = decodeXmlText(loc);
+  if (!value) return null;
+  try {
+    const parsed = new URL(value, baseUrl);
+    if (!/^https?:$/.test(parsed.protocol)) return null;
+    parsed.hash = '';
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+function parseSitemapDocument(xml, documentUrl) {
+  const items = [];
+  const childSitemaps = [];
+
+  for (const block of extractBlocks(xml, 'sitemap')) {
+    const loc = normalizeSitemapLoc(extractTag(block, 'loc'), documentUrl);
+    if (!loc) continue;
+    childSitemaps.push({
+      url: loc,
+      lastmod: extractTag(block, 'lastmod'),
+    });
+  }
+
+  for (const block of extractBlocks(xml, 'url')) {
+    const loc = normalizeSitemapLoc(extractTag(block, 'loc'), documentUrl);
+    if (!loc) continue;
+    if (isLikelySitemapUrl(loc)) {
+      childSitemaps.push({
+        url: loc,
+        lastmod: extractTag(block, 'lastmod'),
+      });
+      continue;
+    }
+    const title = extractTag(block, 'news:title') || titleFromUrl(loc);
+    const publishedAt =
+      extractTag(block, 'news:publication_date') ||
+      extractTag(block, 'lastmod') ||
+      null;
+    items.push({ title, url: loc, publishedAt });
+  }
+
+  if (items.length === 0 && childSitemaps.length === 0) {
+    const locRe = /<loc[^>]*>([\s\S]*?)<\/loc>/gi;
+    let match;
+    while ((match = locRe.exec(xml)) !== null) {
+      const loc = normalizeSitemapLoc(match[1], documentUrl);
+      if (!loc) continue;
+      if (isLikelySitemapUrl(loc)) {
+        childSitemaps.push({ url: loc, lastmod: null });
+      } else {
+        items.push({ title: titleFromUrl(loc), url: loc, publishedAt: null });
+      }
+    }
+  }
+
+  return { items, childSitemaps };
+}
+
+function countRecentSitemapItems(items) {
+  const now = Date.now();
+  return items.filter((item) => {
+    if (!item.publishedAt) return false;
+    const ts = Date.parse(item.publishedAt);
+    return !isNaN(ts) && now - ts <= RECENT_WINDOW_MS;
+  }).length;
+}
+
+function countDatedSitemapItems(items) {
+  return items.filter((item) => item.publishedAt && !isNaN(Date.parse(item.publishedAt))).length;
+}
+
+function compareSitemapResults(left, right) {
+  const recentDiff = countRecentSitemapItems(left.items) - countRecentSitemapItems(right.items);
+  if (recentDiff !== 0) return recentDiff;
+  const datedDiff = countDatedSitemapItems(left.items) - countDatedSitemapItems(right.items);
+  if (datedDiff !== 0) return datedDiff;
+  return left.items.length - right.items.length;
 }
 
 /**
@@ -116,7 +271,7 @@ function computeThemeRelevance(items, theme) {
   const keywords = theme
     .split(/[\s-]+/)
     .map((k) => k.toLowerCase())
-    .filter((k) => k.length >= 4);
+    .filter((k) => k.length >= 2 && !BROAD_THEME_TOKENS.has(k));
   if (keywords.length === 0) return 0.5;
   if (items.length === 0) return 0;
   const matched = items.filter((item) =>
@@ -203,6 +358,64 @@ function determineNextAction(status, qualityScore, threshold, recentItemCount) {
   return 'reject';
 }
 
+function probeStatusFromResult(result, qualityScore, threshold, breakdown) {
+  const connectorKind = result.kind ?? 'manual';
+  if (connectorKind === 'playwright' || connectorKind === 'llm-selector') return 'manual-required';
+  if (!breakdown.parseOk && (result.items ?? []).length === 0) return 'failed';
+  return qualityScore >= threshold ? 'success' : 'partial';
+}
+
+function nextActionRank(nextAction) {
+  return {
+    register: 4,
+    review: 3,
+    'manual-adapter': 2,
+    reject: 1,
+  }[nextAction] ?? 0;
+}
+
+function connectorRank(kind) {
+  return {
+    rss: 7,
+    atom: 7,
+    'html-alternate-feed': 6,
+    'wordpress-rss': 5,
+    'sitemap-news': 4,
+    'json-ld': 3,
+    'open-graph': 2,
+    'html-list': 1,
+  }[kind] ?? 0;
+}
+
+function buildProbeCandidate(adapterName, result, theme, qualityThreshold) {
+  const items = result.items ?? [];
+  const { qualityScore, breakdown } = computeQuality(items, theme);
+  const status = probeStatusFromResult(result, qualityScore, qualityThreshold, breakdown);
+  const connectorKind = result.kind ?? 'manual';
+  const nextAction = determineNextAction(status, qualityScore, qualityThreshold, breakdown.recentItemCount);
+  return {
+    adapterName,
+    result,
+    status,
+    connectorKind,
+    qualityScore,
+    breakdown,
+    nextAction,
+  };
+}
+
+function compareProbeCandidates(left, right) {
+  const actionDiff = nextActionRank(right.nextAction) - nextActionRank(left.nextAction);
+  if (actionDiff !== 0) return actionDiff;
+  const qualityDiff = right.qualityScore - left.qualityScore;
+  if (qualityDiff !== 0) return qualityDiff;
+  const recentDiff = right.breakdown.recentItemCount - left.breakdown.recentItemCount;
+  if (recentDiff !== 0) return recentDiff;
+  const itemDiff = right.breakdown.itemCount - left.breakdown.itemCount;
+  if (itemDiff !== 0) return itemDiff;
+  return connectorRank(right.connectorKind) - connectorRank(left.connectorKind);
+}
+
 /**
  * Fetch with per-call timeout AND overall probe AbortSignal.
  * Returns { ok, status, text, contentType } or throws on network error.
@@ -241,16 +454,12 @@ async function tryDirectFeed(url, overallSignal) {
     const { ok, text, contentType } = await fetchWithTimeout(url, overallSignal);
     if (!ok) return { ok: false, error: `HTTP error fetching ${url}` };
 
-    const isAtomContentType = contentType.includes('application/atom+xml');
-    const isRssContentType =
-      contentType.includes('application/rss+xml') ||
-      contentType.includes('text/xml') ||
-      contentType.includes('application/xml');
-
     const hasRssTag = /<rss[\s>]/i.test(text);
+    const hasRdfRssTag = /<rdf:RDF[\s>]/i.test(text);
     const hasFeedTag = /<feed[\s>]/i.test(text);
+    const isAtomContentType = contentType.includes('application/atom+xml');
 
-    if (!hasRssTag && !hasFeedTag && !isAtomContentType && !isRssContentType) {
+    if (!hasRssTag && !hasRdfRssTag && !hasFeedTag && !isAtomContentType) {
       return { ok: false, error: 'Not RSS or Atom content' };
     }
 
@@ -276,13 +485,16 @@ async function tryHtmlAlternateFeed(url, overallSignal) {
       return { ok: false, error: 'Direct feed, not HTML' };
     }
 
-    // Look for alternate feed links
-    const linkRe = /<link[^>]+rel=["']alternate["'][^>]*>/gi;
+    // Look for alternate feed links. Attribute order and rel token lists vary by site.
+    const linkRe = /<link\b[^>]*>/gi;
     const matches = text.match(linkRe) ?? [];
     let feedHref = null;
-    let feedKind = 'rss';
 
     for (const tag of matches) {
+      const relMatch = tag.match(/\brel=["']([^"']+)["']/i);
+      if (!relMatch) continue;
+      const relTokens = relMatch[1].toLowerCase().split(/\s+/).filter(Boolean);
+      if (!relTokens.includes('alternate')) continue;
       const typeMatch = tag.match(/type=["']([^"']+)["']/i);
       if (!typeMatch) continue;
       const type = typeMatch[1];
@@ -290,7 +502,6 @@ async function tryHtmlAlternateFeed(url, overallSignal) {
         const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
         if (hrefMatch) {
           feedHref = hrefMatch[1];
-          feedKind = type.includes('atom+xml') ? 'html-alternate-feed' : 'html-alternate-feed';
           break;
         }
       }
@@ -360,47 +571,74 @@ async function tryWordPressFeed(url, overallSignal) {
 }
 
 /**
- * Adapter 4: Try sitemap paths and extract <loc> URLs as sampleItems.
+ * Adapter 4: Try sitemap paths and extract article/page URLs as sampleItems.
+ * Follows sitemap indexes and paginated sitemap documents with tight limits.
  */
 async function trySitemap(url, overallSignal) {
-  let origin;
+  let parsedInput;
   try {
-    origin = new URL(url).origin;
+    parsedInput = new URL(url);
   } catch {
     return { ok: false, error: 'Invalid URL for sitemap probe' };
   }
 
-  const candidates = [
+  const origin = parsedInput.origin;
+  const candidates = unique([
+    isLikelySitemapUrl(url) ? url : null,
     `${origin}/sitemap.xml`,
     `${origin}/sitemap_index.xml`,
     `${origin}/news-sitemap.xml`,
-  ];
+  ]);
+  let bestResult = null;
 
   for (const candidate of candidates) {
     if (overallSignal.aborted) return { ok: false, error: 'Probe timeout' };
-    try {
-      const res = await fetchWithTimeout(candidate, overallSignal);
-      if (!res.ok) continue;
-      if (!res.text.includes('<loc>')) continue;
 
-      const locs = [];
-      const locRe = /<loc>([\s\S]*?)<\/loc>/gi;
-      let match;
-      while ((match = locRe.exec(res.text)) !== null && locs.length < 20) {
-        locs.push(match[1].trim());
+    const queue = [{ url: candidate, depth: 0 }];
+    const seen = new Set();
+    const items = [];
+    let fetchCount = 0;
+
+    while (
+      queue.length > 0 &&
+      items.length < MAX_SITEMAP_ITEMS &&
+      fetchCount < MAX_SITEMAP_FETCHES &&
+      !overallSignal.aborted
+    ) {
+      const current = queue.shift();
+      const currentUrl = normalizeSitemapLoc(current.url, candidate);
+      if (!currentUrl || seen.has(currentUrl)) continue;
+      seen.add(currentUrl);
+      fetchCount += 1;
+
+      try {
+        const res = await fetchWithTimeout(currentUrl, overallSignal);
+        if (!res.ok || !/<loc[\s>]/i.test(res.text)) continue;
+
+        const parsed = parseSitemapDocument(res.text, currentUrl);
+        items.push(...parsed.items.slice(0, Math.max(0, MAX_SITEMAP_ITEMS - items.length)));
+
+        if (current.depth >= MAX_SITEMAP_DEPTH) continue;
+        const childSitemaps = parsed.childSitemaps
+          .slice()
+          .sort((a, b) => (Date.parse(b.lastmod || '') || 0) - (Date.parse(a.lastmod || '') || 0));
+        for (const child of childSitemaps) {
+          if (queue.length + seen.size >= MAX_SITEMAP_FETCHES) break;
+          queue.push({ url: child.url, depth: current.depth + 1 });
+        }
+      } catch {
+        // try next sitemap candidate or child
       }
+    }
 
-      const items = locs.map((loc) => ({
-        title: loc.split('/').filter(Boolean).pop() ?? loc,
-        url: loc,
-        publishedAt: null,
-      }));
-
-      return { ok: true, kind: 'sitemap-news', items, resolvedUrl: candidate };
-    } catch {
-      // try next
+    if (items.length > 0) {
+      const result = { ok: true, kind: 'sitemap-news', items, resolvedUrl: candidate };
+      if (!bestResult || compareSitemapResults(result, bestResult) > 0) bestResult = result;
+      if (countRecentSitemapItems(items) >= 3) return result;
     }
   }
+
+  if (bestResult) return bestResult;
 
   return { ok: false, error: 'No sitemap found' };
 }
@@ -573,6 +811,9 @@ export async function probeSource(inputUrl, options = {}) {
   const errors = [];
   const warnings = [];
 
+  // Tier 1: structural feed adapters — high quality ceiling, try all before falling back
+  // Tier 2: content extraction adapters — lower quality ceiling, only if Tier 1 insufficient
+  // Stubs: always record as tried, never produce candidates
   const adapters = [
     { name: 'direct-feed', fn: tryDirectFeed },
     { name: 'html-alternate-feed', fn: tryHtmlAlternateFeed },
@@ -585,7 +826,7 @@ export async function probeSource(inputUrl, options = {}) {
     { name: 'llm-selector', fn: tryLlmSelector },
   ];
 
-  let successResult = null;
+  const successCandidates = [];
 
   try {
     for (const adapter of adapters) {
@@ -593,7 +834,6 @@ export async function probeSource(inputUrl, options = {}) {
         warnings.push('Probe overall timeout reached; remaining adapters skipped');
         break;
       }
-
       adapterTried.push(adapter.name);
       let result;
       try {
@@ -601,21 +841,18 @@ export async function probeSource(inputUrl, options = {}) {
       } catch (err) {
         result = { ok: false, error: err.message ?? String(err) };
       }
-
       if (!result.ok) {
         errors.push({ adapter: adapter.name, message: result.error ?? 'Unknown error' });
         continue;
       }
-
-      successResult = result;
-      break;
+      successCandidates.push(buildProbeCandidate(adapter.name, result, theme, qualityThreshold));
     }
   } finally {
     clearTimeout(probeTimer);
   }
 
   // No adapter succeeded
-  if (!successResult) {
+  if (!successCandidates.length) {
     // If only playwright/llm-selector succeeded as stubs, treat as manual-required
     const allStubs = adapterTried.every(
       (a) => a === 'playwright' || a === 'llm-selector'
@@ -650,26 +887,15 @@ export async function probeSource(inputUrl, options = {}) {
     };
   }
 
-  // Compute quality from parsed items
+  const firstSuccessfulAdapter = successCandidates[0].adapterName;
+  const selectedCandidate = successCandidates.slice().sort(compareProbeCandidates)[0];
+  const successResult = selectedCandidate.result;
   const items = successResult.items ?? [];
-  const { qualityScore, breakdown } = computeQuality(items, theme);
-
-  // Status determination
-  const parseOk = breakdown.parseOk;
-  let status;
-  if (!parseOk && items.length === 0) {
-    status = 'failed';
-  } else if (qualityScore >= qualityThreshold) {
-    status = 'success';
-  } else {
-    status = 'partial';
-  }
-
-  // If playwright or llm-selector were the only successful adapter (stub returns ok:false
-  // so this shouldn't happen, but guard anyway)
-  const connectorKind = successResult.kind ?? 'manual';
-  if (connectorKind === 'playwright' || connectorKind === 'llm-selector') {
-    status = 'manual-required';
+  const { qualityScore, breakdown, status, connectorKind, nextAction } = selectedCandidate;
+  if (selectedCandidate.adapterName !== firstSuccessfulAdapter) {
+    warnings.push(
+      `Selected ${selectedCandidate.adapterName} over first successful adapter ${firstSuccessfulAdapter} because it produced a stronger probe result`,
+    );
   }
 
   const sampleItems = items.slice(0, MAX_SAMPLE_ITEMS).map((item) => ({
@@ -677,8 +903,6 @@ export async function probeSource(inputUrl, options = {}) {
     url: item.url,
     publishedAt: item.publishedAt,
   }));
-
-  const nextAction = determineNextAction(status, qualityScore, qualityThreshold, breakdown.recentItemCount);
 
   return {
     inputUrl,

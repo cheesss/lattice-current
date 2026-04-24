@@ -4,6 +4,30 @@
 
 Date: 2026-04-16 KST
 
+## 2026-04-22 Runtime Hardening Update
+
+The add-source loop was verified through the real Decision Inbox accept path rather than only through unit tests.
+
+Confirmed behavior:
+
+- A previously failing homepage proposal for `https://www.iata.org/` now repairs to `https://www.iata.org/api/rss/pressrelease` and executes as a registered source.
+- 20 additional RSS/Atom proposals were queued, accepted through `/api/approval-queue/:id/review`, and verified as active source-registry records.
+- The active source registry increased from 32 to 52 records during the smoke run.
+- Each accepted proposal reached `approval_queue.status = executed` and wrote an active record to `data/persistent-cache/source-registry%3Av1.json`.
+- Article seeding used actual `INSERT ... ON CONFLICT DO NOTHING` row counts, so duplicate headlines no longer inflate the visible `articleCount`.
+- `queueForApproval()` is now URL-idempotent for pending and needs-fix `add-rss` items. Re-queuing the same URL updates the existing row instead of creating another operator task.
+- Approval dedupe uses the same canonical URL normalization as cleanup, including trailing slash removal, so trivial URL variants do not create duplicate pending rows.
+- The cleanup command `npm run cleanup:source-approvals:dry` / `npm run cleanup:source-approvals` audits and repairs historical approval noise. It reopens incorrectly executed low-quality rows, rejects duplicate open rows, and writes an audit file under `data/audits/`.
+- The live NAS cleanup applied on 2026-04-22 reduced open add-rss approval items to the unresolved unique cases and removed historical duplicate clutter.
+- A later 2026-04-22 cleanup hardening pass rejects stale `needs-fix` add-rss items after 96 hours when their reasoning only contains repeated probe rejects or below-threshold feed failures and no active source or successful repair evidence exists.
+- `add-rss` dry-run and execution now share the same approval-gate logic, so dry-run no longer claims an untrusted or cross-domain-repaired source would directly register when execution would queue approval.
+- `add-rss` dry-run no longer invokes long-running Codex/LLM source repair synchronously by default. It performs probe plus deterministic heuristic repair so Simulate remains responsive. Set `SOURCE_REPAIR_DRY_RUN_LLM_ENABLED=true` only when an operator explicitly wants slow candidate generation during dry-run.
+- `add-rss` execution also avoids synchronous LLM repair unless `SOURCE_REPAIR_SYNC_LLM_ENABLED=true`. If probe and heuristic repair fail, reject/manual-adapter failures are eligible for asynchronous Codex source-code repair through `queueCodexSourceCodeRepair()`.
+- `add-rss` execution now treats `probe.resolvedUrl` as canonical for article seeding. It fetches and parses the resolved RSS, Atom, sitemap, or HTML-list source first and falls back to probe samples only when the resolved source cannot be read.
+- Self-heal suggestions preserve explicit `category`, `theme`, or `sourceCategory` instead of falling back to `politics`.
+
+The source-probe relevance scorer now treats broad category labels as neutral rather than as hard keyword filters. Examples include `technology`, `defense`, `cybersecurity`, `space`, `macro`, `news`, and `politics`. Specific themes such as `war-risk insurance` still require title relevance. This prevents high-quality general feeds from being rejected only because their article titles do not repeat a broad taxonomy label.
+
 ## Executive Summary
 
 The current source onboarding path treats many source candidates as `add-rss` proposals before proving that they are actually ingestible feeds. A homepage URL such as `https://www.hellenicshippingnews.com/` can enter the human approval queue even though the current feed quality evaluator scores it as `0.00` and would skip registration.
@@ -613,4 +637,3 @@ The ingestion layer dynamically chooses the best connector.
 Failures become visible, repairable states.
 Codex assists recovery instead of bypassing validation.
 ```
-

@@ -4,6 +4,68 @@ Date: 2026-04-16 KST
 Status: active  
 Scope: OpenClaw Gateway, Webhooks, TaskFlow, channel automation, operator briefing, source repair, scheduler recovery
 
+## 2026-04-22 Activation Update
+
+The local integration is now wired for actual runtime use rather than documentation-only planning.
+
+Runtime services:
+
+- Lattice dashboard API: `http://127.0.0.1:46200`
+- Lattice Vite UI: `http://localhost:3000/event-dashboard.html`
+- Lattice sidecar/local API: `http://127.0.0.1:46123`
+- OpenClaw gateway/control UI: `http://127.0.0.1:18789`
+
+OpenClaw config changes:
+
+- `openclaw-lattice-control-plane` now includes `sidecarBaseUrl`, so runtime observability tools can read the local sidecar instead of returning `sidecarBaseUrl not configured`.
+- `sidecarAuthMode` is explicit. The current local sidecar runs with `sidecarAuthMode: none`; if it is changed to `bearer`, the plugin fails closed unless `sidecarToken` is configured.
+- The webhook route now uses `agent:lattice-ops:main` instead of `agent:main:main`, separating Lattice automation traffic from the default operator chat.
+- A dedicated `lattice-ops` agent profile exists and points at the Lattice workspace.
+- Webhook dispatch is restricted to high-value events: `scheduler-cycle-failed`, `source-repaired`, and `source-registered`.
+- Routine high-volume events such as `scheduler-cycle-completed`, `brief-ready`, `approval-created`, and `source-probe-failed` are skipped for agent dispatch to prevent context growth.
+- Webhook URL loading dedupes option, environment, and file URLs before dispatch, preventing duplicate fan-out to the same OpenClaw route.
+- Dashboard deep links now use the real `#inbox` fragment instead of the stale `#decision-inbox` fragment.
+- Dashboard deep links default to the current local Vite URL, `http://localhost:3000/event-dashboard.html`. If the dev server moves to another port, update both OpenClaw plugin config and `LATTICE_UI_BASE_URL`.
+- `lattice.get_source_repair_status` now reads both source repair audit schemas:
+  - `codex-source-code-application-evidence-*.json` for aggregate proof runs
+  - `source-repair-closed-loop-*.json` for the newest closed-loop execution audit
+- The plugin normalizes both schemas into one summary, so a fresh closed-loop audit no longer makes the status look empty or stale.
+
+Context limit mitigation:
+
+- The saturated `agent:main:main` session was backed up and reset.
+- The default Control UI chat no longer shows the 100% context warning after reset.
+- Tool payloads from the Lattice OpenClaw plugin are compacted before being returned in `details.payload`.
+- The plugin snapshot route now strips or truncates raw payload fields, recent agent text, and webhook event payloads before returning `/plugins/lattice/api/snapshot`.
+- `AGENTS.md` now explicitly tells OpenClaw/Lattice agents to answer Korean prompts in Korean only.
+- The previous corrupted mojibake `AGENTS.md` block was replaced with a compact UTF-8 agent contract so every `lattice-ops` run starts with readable instructions and fewer prompt tokens.
+- `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, and `USER.md` are compact Korean operational context files instead of generic mixed-language persona text.
+- Webhook-created task instructions are written in Korean and explicitly prohibit Hindi/Hinglish/casual English mixing.
+- Latest verified `lattice-ops` run used about 19k system-prompt chars and did not trigger the previous 100% context warning.
+
+Verification performed:
+
+- `lattice-ops` agent ran successfully with Codex CLI.
+- A `source-registered` webhook dispatch produced an OpenClaw agent run artifact.
+- Screenshots were captured for the Decision Inbox, Ops surface, and authorized OpenClaw Control UI.
+- `lattice.get_runtime_observability` and `lattice.get_source_repair_status` were called through OpenClaw successfully.
+- Current source repair status: 11/11 automated repairs passed, 258 seeded/backfilled articles, 140 recent-72h articles, and 81 themed articles.
+- Control UI chat was verified in a browser by sending `lattice.get_health` requests through the `lattice-ops` chat. Replies appeared in the web chat with current status, DB state, and pending count.
+- Lattice plugin web labels were verified in a browser after localization:
+  - `결정함` instead of `Decision Inbox`
+  - `DB 연결됨` instead of `DB connected`
+  - `발견 검토` instead of `Discovery Triage`
+- Current runtime services verified:
+  - Vite UI: `http://localhost:3000/event-dashboard.html`
+  - dashboard API: `http://127.0.0.1:46200`
+  - sidecar/local API: `http://127.0.0.1:46123`
+  - OpenClaw gateway: `http://127.0.0.1:18789`
+- Latest rendered screenshot: `data/verification-screenshots/openclaw-lattice-control-plane-2026-04-22.png`
+- Latest browser verification screenshots:
+  - `data/verification-screenshots/openclaw-control-ui-chat-verified-2026-04-22.png`
+  - `data/verification-screenshots/openclaw-lattice-plugin-final-web-2026-04-22.png`
+  - `data/verification-screenshots/openclaw-lattice-plugin-final-localized-2026-04-22.png`
+
 ## 1. Executive Summary
 
 Lattice Current already has the hard parts of the product:
@@ -234,9 +296,9 @@ Recommended event shape:
   "theme": "defense",
   "entityType": "approval",
   "entityId": "approval-84",
-  "surface": "decision-inbox",
+  "surface": "inbox",
   "summary": "Source candidate requires repair before registration",
-  "deepLink": "/event-dashboard.html#decision-inbox",
+  "deepLink": "/event-dashboard.html#inbox",
   "payload": {
     "proposalKind": "add-rss",
     "url": "https://www.hellenicshippingnews.com/",

@@ -11,28 +11,51 @@
  */
 
 import pg from 'pg';
-import { resolveNasPgConfig, resolveOllamaEmbedConfig } from './_shared/nas-runtime.mjs';
+import { loadOptionalEnvFile, resolveNasPgConfig, resolveOllamaEmbedConfig } from './_shared/nas-runtime.mjs';
+
+loadOptionalEnvFile();
 
 const { Client } = pg;
 
 const PG_CONFIG = resolveNasPgConfig();
-const OLLAMA = resolveOllamaEmbedConfig();
+let OLLAMA = null;
+
+function getOllamaConfig() {
+  if (!OLLAMA) OLLAMA = resolveOllamaEmbedConfig();
+  return OLLAMA;
+}
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const result = { batch: 50, limit: 0 };
+  const result = { batch: 50, limit: 0, strict: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--batch' && args[i + 1]) result.batch = parseInt(args[++i]);
     if (args[i] === '--limit' && args[i + 1]) result.limit = parseInt(args[++i]);
+    if (args[i] === '--strict') result.strict = true;
   }
   return result;
 }
 
+async function checkOllamaAvailable() {
+  try {
+    const config = getOllamaConfig();
+    const tagsUrl = new URL(config.endpoint);
+    tagsUrl.pathname = '/api/tags';
+    tagsUrl.search = '';
+    const response = await fetch(tagsUrl, { signal: AbortSignal.timeout(3_000) });
+    if (!response.ok) return { ok: false, error: `Ollama health ${response.status}` };
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error || 'Ollama unavailable') };
+  }
+}
+
 async function getEmbeddings(texts) {
-  const resp = await fetch(OLLAMA.endpoint, {
+  const config = getOllamaConfig();
+  const resp = await fetch(config.endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: OLLAMA.model, input: texts }),
+    body: JSON.stringify({ model: config.model, input: texts }),
     signal: AbortSignal.timeout(120000),
   });
   if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${await resp.text()}`);
@@ -45,7 +68,14 @@ function toVectorString(arr) {
 }
 
 async function main() {
-  const { batch, limit } = parseArgs();
+  const { batch, limit, strict } = parseArgs();
+  const ollamaHealth = await checkOllamaAvailable();
+  if (!ollamaHealth.ok) {
+    console.log(`embedding-refresh skipped: ${ollamaHealth.error}`);
+    if (strict) process.exitCode = 1;
+    return;
+  }
+
   const pgClient = new Client(PG_CONFIG);
   await pgClient.connect();
 

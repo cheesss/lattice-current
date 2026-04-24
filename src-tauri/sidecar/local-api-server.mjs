@@ -1936,6 +1936,7 @@ const fallbackLastObservedAt = new Map();
 const cloudPreferred = new Set();
 const IGNORED_MISSING_ROUTE_PATTERNS = [
   /^\/api\/local-data-flow-ops-snapshot$/i,
+  /^\/api\/local-service-status$/i,
 ];
 const FALLBACK_HEALTH_WINDOW_MS = 15 * 60_000;
 
@@ -2233,6 +2234,7 @@ async function probeOpenbbHealth(context) {
 
 async function buildLocalServiceStatusPayload(context) {
   const openbb = await probeOpenbbHealth(context);
+  const openbbOptionalMissing = !openbb.available && openbb.reason === 'OPENBB_API_URL is missing';
   const routeCoverage = summarizeFallbackHealth();
   const services = [
     {
@@ -2246,8 +2248,8 @@ async function buildLocalServiceStatusPayload(context) {
       id: 'openbb',
       name: 'OpenBB API',
       category: 'data',
-      status: openbb.available ? 'operational' : (openbb.reason ? 'degraded' : 'unknown'),
-      description: openbb.reason || 'OpenBB API unavailable',
+      status: openbb.available ? 'operational' : (openbbOptionalMissing ? 'unknown' : (openbb.reason ? 'degraded' : 'unknown')),
+      description: openbbOptionalMissing ? 'Optional OpenBB API is not configured' : (openbb.reason || 'OpenBB API unavailable'),
     },
     {
       id: 'local-route-coverage',
@@ -2392,7 +2394,10 @@ function summarizeAutomationHealth({ automationStatus, automation, blockerReason
   const enabledDatasets = Array.isArray(automation?.registry?.datasets)
     ? automation.registry.datasets.filter((dataset) => dataset?.enabled)
     : [];
-  const datasetStates = Object.values(automation?.state?.datasets || {});
+  const enabledDatasetIds = new Set(enabledDatasets.map((dataset) => String(dataset?.id || '')).filter(Boolean));
+  const datasetStates = Object.entries(automation?.state?.datasets || {})
+    .filter(([datasetId]) => enabledDatasetIds.has(String(datasetId)))
+    .map(([, dataset]) => dataset);
   const datasetErrorCount = datasetStates.filter((dataset) => String(dataset?.lastError || '').trim().length > 0).length;
   const consecutiveFailures = datasetStates.reduce((max, dataset) => Math.max(max, Number(dataset?.consecutiveFailures) || 0), 0);
   const activeCycle = automation?.state?.activeCycle || null;
@@ -2441,7 +2446,9 @@ function summarizeCredentialBlockers({ automation, codex, env }) {
   const blockers = [];
   const requiredKeys = [];
 
-  const datasets = Array.isArray(automation?.registry?.datasets) ? automation.registry.datasets : [];
+  const datasets = Array.isArray(automation?.registry?.datasets)
+    ? automation.registry.datasets.filter((dataset) => dataset?.enabled)
+    : [];
   const providerSet = new Set(datasets.map((dataset) => String(dataset?.provider || '').trim().toLowerCase()).filter(Boolean));
 
   if (providerSet.has('fred') || providerSet.has('alfred')) {
@@ -2581,7 +2588,9 @@ async function buildAutomationOpsSnapshot(context, requestUrl) {
         activeCycle: collected.automation.state?.activeCycle || null,
         queue: collected.automation.queue,
         consecutiveFailures: Object.values(collected.automation.state?.datasets || {}).reduce((max, dataset) => Math.max(max, Number(dataset?.consecutiveFailures) || 0), 0),
-        lastError: collected.lastFailedRun?.detail || Object.values(collected.automation.state?.datasets || {}).map((dataset) => dataset?.lastError || '').filter(Boolean).slice(-1)[0] || null,
+        lastError: collected.health?.status === 'healthy'
+          ? null
+          : (collected.lastFailedRun?.detail || Object.values(collected.automation.state?.datasets || {}).map((dataset) => dataset?.lastError || '').filter(Boolean).slice(-1)[0] || null),
       },
     },
     blockerReasons: collected.blockerReasons,
@@ -2634,49 +2643,82 @@ async function collectAutomationOpsInputs(context, options = {}) {
 
 async function buildRuntimeObservabilityPayload(context, requestUrl) {
   const daemonStatePath = String(requestUrl.searchParams.get('daemonStatePath') || '').trim() || DEFAULT_DAEMON_STATE_PATH;
-  const serviceStatus = await buildLocalServiceStatusPayload(context);
+  const [serviceStatus, automationStatus] = await Promise.all([
+    Promise.resolve(buildLocalServiceStatusPayload(context)),
+    getAutomationStatusCached(context, { timeoutMs: 15_000 }).catch((error) => ({
+      ok: false,
+      error: String(error?.message || 'automation status failed'),
+    })),
+  ]);
   const daemonSnapshot = readDaemonStateSnapshot(daemonStatePath);
   const daemon = summarizeRuntimeObservability({
     daemonState: daemonSnapshot.state,
     statePath: daemonSnapshot.statePath,
   });
+  const automation = summarizeAutomationState(automationStatus);
+  const routeCoverage = serviceStatus?.local?.routeCoverage || summarizeFallbackHealth();
   const unhealthyServices = Number(serviceStatus?.summary?.degraded || 0) + Number(serviceStatus?.summary?.outage || 0);
   const blockerReasons = [
-    ...(daemonSnapshot.error ? [daemonSnapshot.error] : []),
-    ...((serviceStatus?.local?.routeCoverage?.missingHandlerCount || 0) > 0
-      ? [`${serviceStatus.local.routeCoverage.missingHandlerCount} local route misses observed in the last 15m; top missing routes: ${(serviceStatus.local.routeCoverage.topMissingRoutes || []).join(', ') || 'unknown'}`]
+    ...((routeCoverage.missingHandlerCount || 0) > 0
+      ? [`${routeCoverage.missingHandlerCount} local route misses observed in the last 15m; top missing routes: ${(routeCoverage.topMissingRoutes || []).join(', ') || 'unknown'}`]
       : []),
+    ...(automationStatus?.ok === false ? [String(automationStatus?.error || 'automation status failed')] : []),
   ];
-  const blockerCount = blockerReasons.length;
-  let status = daemon.status;
+  const automationHealth = summarizeAutomationHealth({
+    automationStatus,
+    automation,
+    blockerReasons,
+  });
+  let status = automationHealth.status === 'healthy'
+    ? 'ready'
+    : automationHealth.status === 'error'
+      ? 'blocked'
+      : 'watch';
+  if (!automation.registry && !automation.state) {
+    status = daemon.status;
+    if (daemonSnapshot.error && status !== 'blocked') status = 'blocked';
+  }
   if (unhealthyServices > 0 && status === 'ready') status = 'watch';
-  if (daemonSnapshot.error && status !== 'blocked') status = 'blocked';
+  const blockerCount = automationHealth.blockerCount;
   const readinessScore = Math.max(0, Math.min(100,
-    daemon.summary.observabilityScore
+    (automation.registry || automation.state ? 100 : daemon.summary.observabilityScore)
       - unhealthyServices * 8
       - blockerCount * 6
+      - Math.min(40, Number(automationHealth.consecutiveFailures || 0) * 2)
   ));
 
   return json({
     success: true,
     timestamp: new Date().toISOString(),
+    runtime: {
+      mode: context.mode,
+      port: context.port,
+      remoteBase: context.remoteBase,
+      localApiEnabled: true,
+    },
     summary: {
       status,
       observabilityScore: readinessScore,
-      failingTaskCount: daemon.summary.failingTaskCount,
-      staleTaskCount: daemon.summary.staleTaskCount,
+      failingTaskCount: automation.registry || automation.state
+        ? automationHealth.datasetErrorCount
+        : daemon.summary.failingTaskCount,
+      staleTaskCount: automation.registry || automation.state
+        ? (automationHealth.stalled ? 1 : 0)
+        : daemon.summary.staleTaskCount,
       unhealthyServices,
       blockerCount,
-      dashboardHealthy: daemon.summary.dashboardHealthy,
+      dashboardHealthy: automation.registry || automation.state
+        ? true
+        : daemon.summary.dashboardHealthy,
     },
     daemon: {
       ...daemon,
       readError: daemonSnapshot.error || null,
     },
     serviceStatus,
-    automationHealth: null,
-    routeCoverage: serviceStatus?.local?.routeCoverage || summarizeFallbackHealth(),
-    blockerReasons,
+    automationHealth,
+    routeCoverage,
+    blockerReasons: automationHealth.reasons,
   });
 }
 
@@ -5280,7 +5322,7 @@ async function dispatch(requestUrl, req, routes, context) {
     }
   }
 
-  if (requestUrl.pathname === '/api/local-automation-ops-snapshot') {
+  if (requestUrl.pathname === '/api/local-automation-ops-snapshot' || requestUrl.pathname === '/api/automation-ops-snapshot') {
     if (req.method !== 'GET') {
       return json({ error: 'GET required' }, 405);
     }
@@ -5291,7 +5333,18 @@ async function dispatch(requestUrl, req, routes, context) {
     }
   }
 
-  if (requestUrl.pathname === '/api/local-runtime-observability') {
+  if (requestUrl.pathname === '/api/local-service-status') {
+    if (req.method !== 'GET') {
+      return json({ error: 'GET required' }, 405);
+    }
+    try {
+      return await handleLocalServiceStatus(context);
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || 'local service status failed') }, 502);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/local-runtime-observability' || requestUrl.pathname === '/api/runtime-observability') {
     if (req.method !== 'GET') {
       return json({ error: 'GET required' }, 405);
     }
@@ -5768,7 +5821,10 @@ export async function createLocalApiServer(options = {}) {
       || requestUrl.pathname === '/api/local-intelligence-backtest-runs'
       || requestUrl.pathname === '/api/local-intelligence-automation-status'
       || requestUrl.pathname === '/api/local-automation-ops-snapshot'
+      || requestUrl.pathname === '/api/automation-ops-snapshot'
+      || requestUrl.pathname === '/api/local-service-status'
       || requestUrl.pathname === '/api/local-runtime-observability'
+      || requestUrl.pathname === '/api/runtime-observability'
       || requestUrl.pathname === '/api/local-intelligence-postgres'
       || requestUrl.pathname === '/api/local-intelligence-recommendations'
       || requestUrl.pathname === '/api/local-intelligence-theme-intensity'
@@ -5824,6 +5880,10 @@ export async function createLocalApiServer(options = {}) {
     }
   });
 
+  let schedulerTimer = null;
+  let schedulerFirstRunTimer = null;
+  let accumulatorTimer = null;
+
   return {
     context,
     routes,
@@ -5861,9 +5921,6 @@ export async function createLocalApiServer(options = {}) {
 
       // --- Auto-scheduler: trigger intelligence automation on a configurable interval ---
       const schedulerIntervalMs = 60 * 60 * 1000; // 1 hour
-      let schedulerTimer = null;
-      let schedulerFirstRunTimer = null;
-      let accumulatorTimer = null;
 
       function startAutoScheduler() {
         if (schedulerTimer) return;

@@ -23,6 +23,10 @@ const ATTACHMENT_LOOKBACK_DAYS = Object.freeze({
   quarter: 120,
   year: 400,
 });
+const MIN_BREAKOUT_ARTICLE_COUNT = Math.max(1, Number(process.env.STRUCTURAL_ALERT_MIN_BREAKOUT_ARTICLE_COUNT || 10));
+const MIN_SHARE_SHIFT_ARTICLE_COUNT = Math.max(1, Number(process.env.STRUCTURAL_ALERT_MIN_SHARE_ARTICLE_COUNT || 10));
+const MIN_LIFECYCLE_ARTICLE_COUNT = Math.max(1, Number(process.env.STRUCTURAL_ALERT_MIN_LIFECYCLE_ARTICLE_COUNT || 10));
+const MIN_COOLING_ARTICLE_COUNT = Math.max(1, Number(process.env.STRUCTURAL_ALERT_MIN_COOLING_ARTICLE_COUNT || 10));
 
 function safeTrim(value) {
   return String(value ?? '').trim();
@@ -159,6 +163,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
 
 function buildLifecycleAlert(snapshot) {
   if (!snapshot.prevLifecycleStage || snapshot.prevLifecycleStage === snapshot.lifecycleStage) return null;
+  const articleCount = Number(snapshot.articleCount || 0);
+  if (articleCount < MIN_LIFECYCLE_ARTICLE_COUNT) return null;
   const label = snapshot.label || snapshot.theme;
   const vsYearAgo = Math.abs(Number(snapshot.vsYearAgoPct || 0));
   const acceleration = Math.abs(Number(snapshot.acceleration || 0));
@@ -205,6 +211,8 @@ function buildLifecycleAlert(snapshot) {
     metadata: {
       previousLifecycleStage: snapshot.prevLifecycleStage,
       currentLifecycleStage: snapshot.lifecycleStage,
+      articleCount,
+      previousCount: Number(snapshot.previousCount || 0),
     },
   };
 }
@@ -213,6 +221,8 @@ function buildMomentumAlert(snapshot) {
   const vsPrevious = Number(snapshot.vsPreviousPct || 0);
   const acceleration = Number(snapshot.acceleration || 0);
   if (!(vsPrevious >= 45 && acceleration >= 12)) return null;
+  const articleCount = Number(snapshot.articleCount || 0);
+  if (articleCount < MIN_BREAKOUT_ARTICLE_COUNT) return null;
   const label = snapshot.label || snapshot.theme;
   const baseline = resolveBaselineContext(snapshot);
   const severity = (!baseline.isLowBaselineSignal && (vsPrevious >= 90 || acceleration >= 25)) ? 'critical'
@@ -249,6 +259,8 @@ function buildMomentumAlert(snapshot) {
     metadata: {
       vsPreviousPct: round(vsPrevious, 2),
       acceleration: round(acceleration, 2),
+      articleCount,
+      previousCount: Number(snapshot.previousCount || 0),
       sourceDiversity: snapshot.sourceDiversity,
     },
   };
@@ -259,6 +271,8 @@ function buildCoolingAlert(snapshot) {
   const acceleration = Number(snapshot.acceleration || 0);
   const vsYearAgo = Number(snapshot.vsYearAgoPct || 0);
   if (!(vsPrevious <= -25 || acceleration <= -15 || vsYearAgo <= -20)) return null;
+  const articleCount = Number(snapshot.articleCount || 0);
+  if (articleCount < MIN_COOLING_ARTICLE_COUNT) return null;
   const label = snapshot.label || snapshot.theme;
   return {
     theme: snapshot.theme,
@@ -281,12 +295,21 @@ function buildCoolingAlert(snapshot) {
       snapshotDate: snapshot.periodEnd,
     }],
     snapshotDate: snapshot.periodEnd,
+    metadata: {
+      articleCount,
+      previousCount: Number(snapshot.previousCount || 0),
+      vsPreviousPct: round(vsPrevious, 2),
+      vsYearAgoPct: round(vsYearAgo, 2),
+      acceleration: round(acceleration, 2),
+    },
   };
 }
 
 function buildShareJumpAlert(row) {
   const delta = Number(row.deltaSharePct || 0);
   if (Math.abs(delta) < 4) return null;
+  const articleCount = Number(row.articleCount || 0);
+  if (articleCount < MIN_SHARE_SHIFT_ARTICLE_COUNT) return null;
   const label = row.label || row.theme;
   const parentLabel = row.parentLabel || row.parentTheme;
   return {
@@ -313,6 +336,7 @@ function buildShareJumpAlert(row) {
     metadata: {
       lastSharePct: round(row.lastSharePct, 2),
       deltaSharePct: round(delta, 2),
+      articleCount,
     },
   };
 }
@@ -511,21 +535,44 @@ async function loadLatestSnapshots(client, periodType) {
 
 async function loadShareJumps(client, periodType) {
   const result = await client.query(`
-    WITH ranked AS (
+    WITH latest_per_period AS (
       SELECT
         parent_theme,
         sub_theme,
         period_start,
         period_end,
+        article_count,
         share_pct,
         rank_in_parent,
-        ROW_NUMBER() OVER (PARTITION BY parent_theme, sub_theme ORDER BY period_end DESC) AS rn
+        computed_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY parent_theme, sub_theme, period_end
+          ORDER BY computed_at DESC
+        ) AS per_period_rn
       FROM theme_evolution
+      WHERE period_type = $1
+    ),
+    ranked AS (
+      SELECT
+        parent_theme,
+        sub_theme,
+        period_start,
+        period_end,
+        article_count,
+        share_pct,
+        rank_in_parent,
+        ROW_NUMBER() OVER (
+          PARTITION BY parent_theme, sub_theme
+          ORDER BY period_end DESC, computed_at DESC
+        ) AS rn
+      FROM latest_per_period
+      WHERE per_period_rn = 1
     )
     SELECT
       cur.parent_theme,
       cur.sub_theme,
       cur.period_end,
+      cur.article_count,
       cur.share_pct AS last_share_pct,
       COALESCE(cur.share_pct - prev.share_pct, cur.share_pct) AS delta_share_pct,
       cur.rank_in_parent
@@ -535,7 +582,7 @@ async function loadShareJumps(client, periodType) {
      AND prev.sub_theme = cur.sub_theme
      AND prev.rn = 2
     WHERE cur.rn = 1
-  `);
+  `, [periodType]);
   return result.rows
     .map((row) => {
       const theme = normalizeTheme(row.sub_theme);
@@ -549,6 +596,7 @@ async function loadShareJumps(client, periodType) {
         category: config.category,
         periodType,
         periodEnd: row.period_end,
+        articleCount: Number(row.article_count || 0),
         lastSharePct: Number(row.last_share_pct || 0),
         deltaSharePct: Number(row.delta_share_pct || 0),
         rankInParent: Number(row.rank_in_parent || 0),

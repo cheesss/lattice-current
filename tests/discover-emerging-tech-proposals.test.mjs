@@ -128,6 +128,36 @@ test('discovery source proposals keep only specific high-signal keywords', async
   assert.ok(client.insertedPayloads.some((payload) => payload.url.includes('qubit')));
 });
 
+test('discovery source proposals reject single-term dynamic Google News queries', async () => {
+  const client = createMockProposalClient();
+  const topic = buildTopic({
+    id: 'dt-ukraine-conflict',
+    normalizedTheme: 'conflict',
+    parentTheme: 'geopolitics',
+    normalizedCategory: 'geopolitics',
+    keywords: ['ukraine', 'military'],
+    codexMetadata: {
+      normalization: {
+        canonicalTheme: 'conflict',
+        canonicalParentTheme: 'geopolitics',
+        canonicalCategory: 'geopolitics',
+        promotionState: 'canonical',
+        matchedKeywords: ['ukraine', 'military'],
+      },
+      representativeTitles: [
+        'Ukraine border militarization intensifies after military warnings',
+        'Ukraine conflict updates focus on military positioning',
+        'Military support debate continues around Ukraine',
+      ],
+    },
+  });
+
+  assert.deepEqual(selectTopicSourceProposalKeywords(topic), ['military', 'ukraine']);
+  const inserted = await proposeSourcesForNewTopic(client, topic);
+  assert.equal(inserted, 0);
+  assert.equal(client.insertedPayloads.length, 0);
+});
+
 test('discovery source proposals stay conservative for ordinary watch topics', () => {
   const topic = buildTopic({
     id: 'dt-watch-only',

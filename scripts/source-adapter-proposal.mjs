@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * source-adapter-proposal.mjs
- * Phase 6 Codex Repair Loop — Source Adapter Proposal Generator
+ * Phase 6 Codex Repair Loop - Source Adapter Proposal Generator.
  *
- * Probes a failing source URL and sends a structured repair prompt to Claude API,
- * producing a human-reviewable adapter proposal.
+ * Probes a failing source URL and sends a structured repair prompt to Codex CLI,
+ * producing a human-reviewable adapter proposal. This script does not use
+ * Claude Code or Anthropic APIs.
  *
  * Usage:
  *   node scripts/source-adapter-proposal.mjs --url <url>
@@ -15,16 +16,12 @@
 
 import { pathToFileURL } from 'node:url';
 
-// ---------------------------------------------------------------------------
-// Core logic — exported for testing
-// ---------------------------------------------------------------------------
-
 /**
- * Build a Claude repair prompt from a probe result.
+ * Build a Codex repair prompt from a probe result.
  *
  * @param {string} url
  * @param {string} theme
- * @param {object} probe  SourceProbeResult from source-probe.mjs
+ * @param {object} probe SourceProbeResult from source-probe.mjs
  * @returns {string}
  */
 export function buildRepairPrompt(url, theme, probe) {
@@ -33,7 +30,8 @@ export function buildRepairPrompt(url, theme, probe) {
     probe.errors.map((e) => `  - ${e.adapter}: ${e.message}`).join('\n') || '  (none)';
   const qualityStr = JSON.stringify(probe.qualityBreakdown, null, 2);
 
-  return `You are a source adapter specialist for Lattice Current, a news event analysis platform.
+  return `You are Codex, acting as a source adapter specialist for Lattice Current, a news event analysis platform.
+Do not use Claude Code or Anthropic tooling.
 
 A URL has failed automated source ingestion and requires a custom adapter or manual connector.
 
@@ -55,7 +53,7 @@ ${qualityStr}
 Sample Items Found (${probe.sampleItems.length}):
 ${
     probe.sampleItems
-      .map((item, i) => `  ${i + 1}. "${item.title}" — ${item.url || 'no URL'}`)
+      .map((item, i) => `  ${i + 1}. "${item.title}" -> ${item.url || 'no URL'}`)
       .join('\n') || '  (none)'
   }
 
@@ -64,11 +62,11 @@ ${probe.warnings.map((w) => `  - ${w}`).join('\n') || '  (none)'}
 
 Your task:
 1. Explain why this URL failed automated extraction. Be specific about which adapter failed and why.
-2. Determine the most likely content extraction strategy for this domain (RSS feed, API endpoint, sitemap, HTML scraping, etc.).
+2. Determine the most likely content extraction strategy for this domain: RSS feed, API endpoint, sitemap, HTML scraping, etc.
 3. Propose a concrete feed URL or extraction approach. Examples:
-   - "The RSS feed is at https://example.com/rss.xml (found via robots.txt reference)"
-   - "The site uses WordPress REST API at https://example.com/wp-json/wp/v2/posts"
-   - "The site requires HTML scraping with selector: article.post h2 a"
+   - "The RSS feed is at https://example.com/rss.xml, found via robots.txt reference."
+   - "The site uses WordPress REST API at https://example.com/wp-json/wp/v2/posts."
+   - "The site requires HTML scraping with selector: article.post h2 a."
 4. If the site appears to be paywalled or blocked, state that clearly.
 5. If robots.txt disallows crawling, state that clearly.
 6. Produce a human-reviewable connector proposal in this JSON format:
@@ -87,12 +85,8 @@ Your task:
 }
 \`\`\`
 
-IMPORTANT: Do NOT suggest registering the source automatically. This is a proposal for human review only.`;
+IMPORTANT: Do not suggest registering the source automatically. This is a proposal for human review only.`;
 }
-
-// ---------------------------------------------------------------------------
-// CLI entry point — only runs when executed directly
-// ---------------------------------------------------------------------------
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { probeSource } = await import('./_shared/source-probe.mjs');
@@ -100,7 +94,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
   loadOptionalEnvFile();
 
-  // CLI args parsing
   const args = process.argv.slice(2);
   function getArg(flag) {
     const idx = args.indexOf(flag);
@@ -118,7 +111,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(1);
   }
 
-  // Run probe
   console.error(`Probing: ${url}`);
   const probe = await probeSource(url, { theme });
   console.error(
@@ -129,7 +121,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(
       JSON.stringify(
         {
-          message: 'Source probe passed — no repair needed',
+          message: 'Source probe passed - no repair needed',
           probe: {
             status: probe.status,
             resolvedUrl: probe.resolvedUrl,
@@ -163,7 +155,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
             warnings: probe.warnings,
             traceId: probe.traceId,
           },
-          claudePrompt: prompt,
+          codexPrompt: prompt,
         },
         null,
         2,
@@ -172,33 +164,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!sendToApi) process.exit(0);
   }
 
-  // Send to Claude API
-  console.error('\nSending to Claude API...');
-  const Anthropic = (await import('@anthropic-ai/sdk')).default;
-  const client = new Anthropic();
-  const model = process.env.CODEX_MODEL || 'claude-sonnet-4-6';
+  console.error('\nSending to Codex CLI...');
+  const { runCodexJsonPrompt } = await import('./_shared/codex-json.mjs');
+  const result = await runCodexJsonPrompt(
+    prompt,
+    Number(process.env.SOURCE_ADAPTER_CODEX_TIMEOUT_MS || 120_000),
+    { label: 'source-adapter-proposal' },
+  );
+  const responseText = result.message || result.stdout || '';
 
-  const message = await client.messages.create({
-    model,
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const responseText = message.content
-    .map((b) => (b.type === 'text' ? b.text : ''))
-    .join('');
-
-  console.log('\n── Claude Adapter Proposal ────────────────────────────\n');
+  console.log('\n--- Codex Adapter Proposal ---\n');
   console.log(responseText);
 
-  // Try to extract JSON proposal from response
-  const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-  if (jsonMatch) {
-    try {
-      const proposal = JSON.parse(jsonMatch[1]);
-      console.error('\nExtracted proposal:', JSON.stringify(proposal, null, 2));
-    } catch {
-      // ignore malformed JSON in response
-    }
+  if (result.parsed) {
+    console.error('\nExtracted proposal:', JSON.stringify(result.parsed, null, 2));
   }
 }

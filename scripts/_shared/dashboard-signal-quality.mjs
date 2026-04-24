@@ -31,11 +31,11 @@ export const KPI_SIGNAL_CHANNELS = new Set([
 
 export const SIGNAL_STALE_THRESHOLD_HOURS = Object.freeze({
   vix: 36,
-  yieldSpread: 48,
-  hy_credit_spread: 48,
+  yieldSpread: 72,
+  hy_credit_spread: 72,
   dollarIndex: 48,
   oilPrice: 120,
-  marketStress: 48,
+  marketStress: 72,
   transmissionStrength: 48,
 });
 

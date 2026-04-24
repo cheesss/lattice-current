@@ -19,7 +19,55 @@ export function requiresApproval(actionType, payload = {}) {
   return false;
 }
 
+export function normalizeApprovalUrl(value) {
+  return String(value || '').trim().toLowerCase().replace(/\/+$/, '');
+}
+
 export async function queueForApproval(client, action) {
+  const actionType = String(action?.type || 'unknown');
+  const payload = action?.params || {};
+  const reason = action?.reason ? String(action.reason).slice(0, 500) : null;
+  const normalizedUrl = normalizeApprovalUrl(payload?.url);
+
+  if (normalizedUrl) {
+    const existing = await client.query(
+      `
+        SELECT id
+        FROM approval_queue
+        WHERE action_type = $1
+          AND LOWER(REGEXP_REPLACE(payload->>'url', '/+$', '')) = $2
+          AND status IN ('pending', 'needs-fix')
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [actionType, normalizedUrl],
+    );
+    const existingId = existing.rows[0]?.id;
+    if (existingId) {
+      const result = await client.query(
+        `
+          UPDATE approval_queue
+          SET payload = $2::jsonb,
+              status = CASE WHEN status = 'needs-fix' THEN 'pending' ELSE status END,
+              reasoning = CASE
+                WHEN COALESCE($3, '') = '' THEN reasoning
+                WHEN COALESCE(reasoning, '') = '' THEN $3
+                WHEN reasoning = $3 THEN reasoning
+                WHEN reasoning LIKE '%' || E'\n' || $3 THEN reasoning
+                ELSE reasoning || E'\n' || $3
+              END
+          WHERE id = $1
+          RETURNING id, action_type, status, created_at
+        `,
+        [existingId, JSON.stringify(payload), reason || ''],
+      );
+      return {
+        ...result.rows[0],
+        deduped: true,
+      };
+    }
+  }
+
   const result = await client.query(
     `
       INSERT INTO approval_queue (action_type, payload, status, reasoning)
@@ -27,9 +75,9 @@ export async function queueForApproval(client, action) {
       RETURNING id, action_type, status, created_at
     `,
     [
-      String(action?.type || 'unknown'),
-      JSON.stringify(action?.params || {}),
-      action?.reason ? String(action.reason).slice(0, 500) : null,
+      actionType,
+      JSON.stringify(payload),
+      reason,
     ],
   );
   return result.rows[0];
@@ -97,6 +145,8 @@ export async function markApprovalReviewed(client, approvalId, {
           reasoning = CASE
             WHEN COALESCE($4, '') = '' THEN reasoning
             WHEN COALESCE(reasoning, '') = '' THEN $4
+            WHEN reasoning = $4 THEN reasoning
+            WHEN reasoning LIKE '%' || E'\n' || $4 THEN reasoning
             ELSE reasoning || E'\n' || $4
           END
       WHERE id = $1

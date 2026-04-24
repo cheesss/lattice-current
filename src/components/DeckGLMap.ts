@@ -6896,6 +6896,22 @@ export class DeckGLMap {
         map.getCanvas().style.cursor = '';
       }
     });
+
+    map.on('click', (e) => {
+      if (!this.onCountryClick) return;
+      const features = map.queryRenderedFeatures(e.point, { layers: ['country-interactive'] });
+      const properties = (features?.[0]?.properties ?? {}) as Record<string, unknown>;
+      const rawCode = properties['ISO3166-1-Alpha-2'] ?? properties.ISO_A2 ?? properties.iso_a2;
+      const code = typeof rawCode === 'string' ? rawCode.trim().toUpperCase() : '';
+      const rawName = properties.name ?? properties.NAME ?? properties.admin;
+      const name = typeof rawName === 'string' ? rawName.trim() : '';
+      const fallback = this.resolveCountryFromCoordinate(e.lngLat.lng, e.lngLat.lat);
+      this.onCountryClick({
+        lat: e.lngLat.lat,
+        lon: e.lngLat.lng,
+        ...(fallback || (/^[A-Z]{2}$/.test(code) && name ? { code, name } : {})),
+      });
+    });
   }
 
   public highlightCountry(code: string): void {

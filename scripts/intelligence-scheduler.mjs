@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { loadOptionalEnvFile } from './_shared/nas-runtime.mjs';
+
+loadOptionalEnvFile();
+
 function parseArgs(argv) {
   const args = { _: [] };
   for (let index = 0; index < argv.length; index += 1) {
@@ -51,7 +55,13 @@ async function main() {
   }
 
   if (action === 'once' || args.once) {
-    const result = await automation.runIntelligenceAutomationCycle({ registryPath, statePath });
+    const result = await automation.runIntelligenceAutomationCycle({
+      registryPath,
+      statePath,
+      manualTrigger: args.manual === true || args['manual-trigger'] === true || args.force === true,
+      forceFetch: args['force-fetch'] === true || args.force === true,
+      returnRunDetails: args['run-details'] === true,
+    });
     process.stdout.write(JSON.stringify({ ok: true, result }, null, 2));
     return;
   }

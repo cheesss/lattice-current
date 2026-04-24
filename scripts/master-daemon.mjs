@@ -272,6 +272,12 @@ async function taskSignalRefresh() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskFredBackfill() {
+  log('>> fred-backfill: repairing FRED historical gaps before freshness audits');
+  const result = run('node --import tsx scripts/backfill-new-sources.mjs --source fred', 1_200_000);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskMarketQuoteRefresh() {
   log('>> market-quote-refresh: fetching delayed market quotes into NAS market_quotes');
   const result = run('node scripts/refresh-market-quotes-to-nas.mjs', 300_000);
@@ -322,6 +328,16 @@ async function taskArticleCheck() {
   } finally {
     await client.end();
   }
+}
+
+async function taskDynamicRssBackfill() {
+  log('>> dynamic-rss-backfill: fetching active approved RSS sources into NAS articles');
+  const maxSources = Math.max(1, Math.min(200, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_MAX_SOURCES || 10))));
+  const limit = Math.max(1, Math.min(500, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_LIMIT || 25))));
+  const concurrency = Math.max(1, Math.min(20, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_CONCURRENCY || 8))));
+  const timeoutMs = Math.max(3_000, Math.min(60_000, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_TIMEOUT_MS || 6_000))));
+  const result = run(`node scripts/backfill-active-rss-sources.mjs --max-sources ${maxSources} --limit ${limit} --concurrency ${concurrency} --timeout-ms ${timeoutMs} --refresh-discovery`, 180_000);
+  return { ok: result.ok, error: result.error };
 }
 
 async function taskDashboardHealth(state) {
@@ -491,6 +507,12 @@ async function taskDiscoverEmergingTech() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskRefreshRecentDiscovery() {
+  log('>> refresh-recent-discovery: materializing current article themes for discovery triage');
+  const result = run('node scripts/refresh-discovery-from-recent-themes.mjs --days 7 --limit 20 --min-count 2', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskArxivBackfill() {
   log('>> arxiv-backfill: ingesting broad arXiv archive window');
   const result = run('node --import tsx scripts/fetch-arxiv-archive.mjs --since 2021-01-01 --max-batches 5', 1_200_000);
@@ -630,9 +652,31 @@ async function taskSourceSelfHeal() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskSourceRepairClosedLoop() {
+  log('>> source-repair-closed-loop: repairing failed source proposals, registering repaired feeds, and backfilling them');
+  const target = Math.max(1, Math.min(50, Math.floor(Number(process.env.SOURCE_REPAIR_CLOSED_LOOP_TARGET || 20))));
+  const limit = Math.max(1, Math.min(500, Math.floor(Number(process.env.SOURCE_REPAIR_CLOSED_LOOP_LIMIT || 300))));
+  const maxCandidates = Math.max(1, Math.min(80, Math.floor(Number(process.env.SOURCE_REPAIR_MAX_CANDIDATES || 48))));
+  const backfillLimit = Math.max(1, Math.min(300, Math.floor(Number(process.env.SOURCE_REPAIR_BACKFILL_LIMIT || 60))));
+  const dailyBudget = Math.max(0, Math.min(500, Math.floor(Number(process.env.SOURCE_REPAIR_DAILY_RSS_BUDGET || 120))));
+  const codeRepairFlag = process.env.SOURCE_REPAIR_CODE_REPAIR_ENABLED === 'false' ? ' --disable-code-repair' : '';
+  const llmFlag = process.env.SOURCE_REPAIR_LLM_ENABLED === 'true' ? ' --enable-llm' : '';
+  const result = run(
+    `node --import tsx scripts/run-source-repair-closed-loop.mjs --apply --catalog-bootstrap --full-heuristic --count-historical-successes --target-successes ${target} --limit ${limit} --max-candidates ${maxCandidates} --backfill-limit ${backfillLimit} --daily-rss-budget ${dailyBudget}${codeRepairFlag}${llmFlag}`,
+    1_200_000,
+  );
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskAutoPipelineLabels() {
   log('>> auto-pipeline-labels: running step 3 (label assignment)');
   const result = run('node --import tsx scripts/auto-pipeline.mjs --step 3 --limit 200', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenerateEmbeddings() {
+  log('>> embedding-refresh: embedding recent unembedded articles before discovery/event pipelines');
+  const result = run('node scripts/generate-embeddings.mjs --limit 500 --batch 25', 900_000);
   return { ok: result.ok, error: result.error };
 }
 
@@ -767,8 +811,10 @@ const TASKS = {
   'reconcile-nowcasts': { interval: MIN_15_MS, fn: taskReconcileNowcasts },
   'signal-refresh': { interval: HOUR_6_MS, fn: taskSignalRefresh },
   'article-check': { interval: MIN_30_MS, fn: taskArticleCheck },
+  'dynamic-rss-backfill': { interval: HOUR_1_MS, fn: taskDynamicRssBackfill },
   'dashboard-health': { interval: MIN_30_MS, fn: taskDashboardHealth },
   'db-health': { interval: MIN_15_MS, fn: taskDbHealth },
+  'embedding-refresh': { interval: HOUR_1_MS, fn: taskGenerateEmbeddings },
   'auto-pipeline-labels': { interval: HOUR_2_MS, fn: taskAutoPipelineLabels },
   'auto-pipeline-sensitivity': { interval: HOUR_1_MS, fn: taskAutoPipelineSensitivity },
   'sensitivity-refresh': { interval: HOUR_1_MS, fn: taskSensitivityRefresh },
@@ -781,9 +827,12 @@ const TASKS = {
   'arxiv-backfill': { interval: HOUR_6_MS, fn: taskArxivBackfill },
   'hackernews-backfill': { interval: HOUR_6_MS, fn: taskHackerNewsBackfill },
   'discover-emerging-tech': { interval: HOUR_6_MS, fn: taskDiscoverEmergingTech },
+  'refresh-recent-discovery': { interval: HOUR_1_MS, fn: taskRefreshRecentDiscovery },
   'label-discovery-topics': { interval: HOUR_6_MS, fn: taskLabelDiscoveryTopics },
   'generate-tech-report': { interval: HOUR_6_MS, fn: taskGenerateTechReport },
-    'source-self-heal': { interval: HOUR_6_MS, fn: taskSourceSelfHeal },
+  'source-self-heal': { interval: HOUR_6_MS, fn: taskSourceSelfHeal },
+  'source-repair-closed-loop': { interval: HOUR_2_MS, fn: taskSourceRepairClosedLoop },
+    'fred-backfill': { interval: DAY_1_MS, fn: taskFredBackfill },
     'pending-check': { interval: DAY_1_MS, fn: taskPendingCheck },
     'full-rebuild': { interval: DAY_1_MS, fn: taskFullRebuild },
     'daily-backup': { interval: DAY_1_MS, fn: taskDailyBackup },
@@ -816,10 +865,11 @@ async function main() {
   }
   process.stderr.write('  15min: market quote refresh, db health\n');
   process.stderr.write('  30min: article check, dashboard health\n');
-  process.stderr.write('  1h:    auto-pipeline-sensitivity, sensitivity refresh\n');
+  process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    auto-pipeline-labels, refresh-event-market-transmission\n');
     process.stderr.write('  6h:    signal refresh, master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
-    process.stderr.write('  daily: pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
+  process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');
+    process.stderr.write('  daily: FRED backfill, pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
     process.stderr.write('         curated daily news, sec seed universe, openalex theme evidence, followed-theme briefings, weekly digest, coverage-gap-analysis\n');
   process.stderr.write('  6h+:   data freshness audit, codex theme proposals from discovery topics\n');
   process.stderr.write('  weekly:auto-curate\n\n');

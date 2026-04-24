@@ -8,10 +8,20 @@
  * (Requires the API server to be up OR all routes fully mocked via page.route)
  */
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 const DASHBOARD_URL = 'http://127.0.0.1:4173/event-dashboard.html';
 const API_BASE = 'http://localhost:46200/api';
+
+type MockJsonResponse = {
+  status?: number;
+  body: unknown;
+};
+
+type MockApiOptions = {
+  triageReviewResponse?: MockJsonResponse;
+  themeShellSnapshotsResponse?: MockJsonResponse;
+};
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -62,15 +72,69 @@ const MOCK_TRIAGE_ITEM = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function mockAllApis(page: Page) {
+function isAllowedReadOnlyDashboardApi(apiPath: string) {
+  const exactPaths = new Set([
+    '/api/automation-budget',
+    '/api/automation-log',
+    '/api/health',
+    '/api/data-quality',
+    '/api/codex-quality',
+    '/api/structural-alerts',
+    '/api/today',
+    '/api/trends',
+    '/api/emerging-tech',
+    '/api/digest/weekly',
+    '/api/whatif',
+    '/api/anomalies',
+    '/api/codex-latest',
+    '/api/pending',
+    '/api/regime',
+    '/api/regime/',
+    '/api/regime//',
+    '/api/heatmap',
+    '/api/regime-timeline',
+    '/api/event-uplift-grades',
+    '/api/kpi-summary',
+    '/api/signals',
+    '/api/alpha-decay',
+    '/api/signal-correlation',
+    '/api/hawkes-heatmap',
+    '/api/calibration',
+    '/api/live-status',
+  ]);
+  if (exactPaths.has(apiPath)) return true;
+  return [
+    '/api/daily-digest',
+    '/api/trend-pyramid',
+    '/api/theme-evolution/',
+    '/api/category-trends',
+    '/api/insights/quarterly',
+    '/api/theme-brief/',
+    '/api/followed-theme-briefing',
+    '/api/reports/latest',
+    '/api/reports/',
+    '/api/signals/history',
+    '/api/correlation',
+  ].some(prefix => apiPath.startsWith(prefix));
+}
+
+async function fulfillJson(route: Route, response: MockJsonResponse) {
+  return route.fulfill({
+    status: response.status ?? 200,
+    contentType: 'application/json',
+    body: JSON.stringify(response.body),
+  });
+}
+
+async function mockAllApis(page: Page, options: MockApiOptions = {}) {
   await page.route('**/api/**', route => {
     const request = route.request();
     const url = request.url();
-    if (url.includes('/api/proposal-inbox')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
+    const apiPath = new URL(url).pathname;
+    const method = request.method();
+    if (method === 'GET' && apiPath === '/api/proposal-inbox') {
+      return fulfillJson(route, {
+        body: {
           proposals: [{
             id: MOCK_PROPOSAL_ITEM.rawId,
             proposal_type: MOCK_PROPOSAL_ITEM.subtype,
@@ -93,21 +157,12 @@ async function mockAllApis(page: Page) {
             pendingApprovals: 1,
             actionableCount: 2,
           },
-        }),
+        },
       });
     }
-    if (url.includes('/api/discovery-triage')) {
-      if (request.method() === 'POST') {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ ok: true, decision: 'canonical', topicId: MOCK_TRIAGE_ITEM.rawId }),
-        });
-      }
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
+    if (method === 'GET' && apiPath === '/api/discovery-triage') {
+      return fulfillJson(route, {
+        body: {
           items: [{
             id: MOCK_TRIAGE_ITEM.rawId,
             label: MOCK_TRIAGE_ITEM.title,
@@ -122,25 +177,40 @@ async function mockAllApis(page: Page) {
             updatedAt: new Date().toISOString(),
           }],
           summary: { total: 1 },
-        }),
+        },
       });
     }
-    if (url.includes('/api/approval-queue/')
-      || url.includes('/api/codex-proposals/')
-      || url.includes('/api/theme-shell-snapshots')
-      || url.includes('/api/risk-snapshot')) {
+    if (method === 'POST' && apiPath === '/api/discovery-triage/review') {
+      return fulfillJson(route, options.triageReviewResponse || {
+        body: { ok: true, decision: 'canonical', topicId: MOCK_TRIAGE_ITEM.rawId },
+      });
+    }
+    if (method === 'POST' && apiPath === '/api/runtime-issues') {
+      return fulfillJson(route, { body: { ok: true, captured: true } });
+    }
+    if (method === 'GET' && apiPath === '/api/theme-shell-snapshots') {
+      return fulfillJson(route, options.themeShellSnapshotsResponse || {
+        body: { risk: {}, macro: {}, investment: {}, validation: {}, transmission: {}, sourceOps: {}, geo: {} },
+      });
+    }
+    if (apiPath.startsWith('/api/approval-queue/')
+      || apiPath.startsWith('/api/codex-proposals/')) {
       return route.fallback();
     }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: true, data: null }),
+    if (method === 'GET' && isAllowedReadOnlyDashboardApi(apiPath)) {
+      return fulfillJson(route, {
+        body: { ok: true, data: null, items: [], events: [], signals: [], grades: [], meta: { testFixture: true } },
+      });
+    }
+    return fulfillJson(route, {
+      status: 501,
+      body: { error: `Unexpected mocked API call: ${method} ${apiPath}` },
     });
   });
 }
 
-async function goToDashboard(page: Page) {
-  await mockAllApis(page);
+async function goToDashboard(page: Page, options: MockApiOptions = {}) {
+  await mockAllApis(page, options);
   await page.goto(DASHBOARD_URL, { waitUntil: 'domcontentloaded' });
   // Wait for nav to be visible
   await page.waitForSelector('.surface-nav', { timeout: 10_000 });
@@ -187,8 +257,7 @@ test.describe('Decision Inbox — Simulate button (dryRun preflight)', () => {
     await goToDashboard(page);
     await switchToInbox(page);
 
-    // Wait for inbox items to render (mockAllApis stubs approval-inbox-payload but
-    // the JS fetches via refreshDecisionInbox — give it time)
+    // Wait for inbox items to render from the current proposal + discovery endpoints.
     await page.waitForTimeout(1_000);
 
     // Click the approval item
@@ -204,7 +273,7 @@ test.describe('Decision Inbox — Simulate button (dryRun preflight)', () => {
     await expect(page.locator('.inbox-actions button', { hasText: 'Simulate' })).toHaveCount(0);
   });
 
-  test('Simulate click calls dryRun API and shows DRY RUN banner', async ({ page }) => {
+  test('Simulate click calls dryRun API and shows SKIPPED banner for failed source probes', async ({ page }) => {
     // Override approval-queue review endpoint with dryRun response
     await page.route(`${API_BASE}/approval-queue/approval-smoke-001/review`, route => {
       const body = route.request().postDataJSON();
@@ -237,14 +306,16 @@ test.describe('Decision Inbox — Simulate button (dryRun preflight)', () => {
     await approvalItem.click();
     await page.locator('.inbox-actions button', { hasText: 'Simulate' }).click();
 
-    // DRY RUN badge must appear
-    await expect(page.locator('.inbox-result.info .trust-chip-recent', { hasText: 'DRY RUN' })).toBeVisible({ timeout: 5_000 });
+    // Failed source probes remain dry-run safe, but must be visibly marked as skipped.
+    await expect(page.locator('.inbox-result.warning .trust-chip-stale', { hasText: 'SKIPPED' })).toBeVisible({ timeout: 5_000 });
 
     // Result copy must mention simulation
-    const copy = await page.locator('.inbox-result.info .inbox-result-copy').textContent();
+    const copy = await page.locator('.inbox-result.warning .inbox-result-copy').textContent();
     expect(copy).toMatch(/simulation|no changes/i);
 
-    // Approval item must still be in the inbox list (not removed)
+    // Failed probe leaves the item in the queue, but under the Needs Fix segment.
+    await expect(page.locator('.inbox-filter-chip[data-status-filter="needs-fix"]')).toContainText('1');
+    await page.click('.inbox-filter-chip[data-status-filter="needs-fix"]');
     await expect(page.locator('.inbox-item').filter({ hasText: 'Flightradar24' })).toBeVisible();
   });
 
@@ -265,14 +336,50 @@ test.describe('Decision Inbox — Simulate button (dryRun preflight)', () => {
     await switchToInbox(page);
     await page.waitForTimeout(1_000);
 
-    const countBefore = await page.locator('.inbox-item').count();
+    const allChipBefore = await page.locator('.inbox-filter-chip[data-status-filter="all"]').innerText();
     const approvalItem = page.locator('.inbox-item').filter({ hasText: 'Flightradar24' }).first();
     await approvalItem.click();
     await page.locator('.inbox-actions button', { hasText: 'Simulate' }).click();
     await page.waitForTimeout(500);
 
-    const countAfter = await page.locator('.inbox-item').count();
-    expect(countAfter).toBe(countBefore);
+    const allChipAfter = await page.locator('.inbox-filter-chip[data-status-filter="all"]').innerText();
+    expect(allChipAfter).toBe(allChipBefore);
+  });
+
+  test('Failed source probe moves approval into Needs Fix segment and hides Accept', async ({ page }) => {
+    await page.route(`${API_BASE}/approval-queue/approval-smoke-001/review`, route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          approval: { status: 'pending' },
+          execution: {
+            skipped: true,
+            reason: 'quality 0.31 below threshold or feed not found',
+            qualityScore: 0.31,
+            recentItemCount: 0,
+            url: 'https://www.flightradar24.com/',
+          },
+          dryRun: true,
+        }),
+      }),
+    );
+
+    await goToDashboard(page);
+    await switchToInbox(page);
+    await page.waitForTimeout(1_000);
+
+    const approvalItem = page.locator('.inbox-item').filter({ hasText: 'Flightradar24' }).first();
+    await approvalItem.click();
+    await page.locator('.inbox-actions button', { hasText: 'Simulate' }).click();
+
+    await expect(page.locator('.inbox-filter-chip[data-status-filter="needs-fix"]')).toContainText('1');
+    await expect(page.locator('.inbox-filter-chip[data-status-filter="actionable"]')).toContainText('2');
+    await page.click('.inbox-filter-chip[data-status-filter="needs-fix"]');
+    await expect(page.locator('.inbox-item').filter({ hasText: 'Flightradar24' })).toBeVisible();
+    await expect(page.locator('.inbox-actions button', { hasText: 'Accept' })).toHaveCount(0);
+    await expect(page.locator('.inbox-preview')).toContainText('SKIPPED');
+    await expect(page.locator('.inbox-preview')).toContainText('quality 0.31 below threshold');
   });
 });
 
@@ -368,6 +475,40 @@ test.describe('Decision Inbox — action result banners', () => {
       decision: 'canonical',
     });
   });
+
+  test('Canonical API error shows FAILED banner and reports runtime issue', async ({ page }) => {
+    let runtimeIssueRequest: any = null;
+    page.on('request', request => {
+      if (request.method() !== 'POST') return;
+      if (!request.url().includes('/api/runtime-issues')) return;
+      runtimeIssueRequest = request.postDataJSON();
+    });
+
+    await goToDashboard(page, {
+      triageReviewResponse: {
+        status: 500,
+        body: { error: 'Discovery triage write failed' },
+      },
+    });
+    await switchToInbox(page);
+    await page.waitForTimeout(1_000);
+
+    const triageItem = page.locator('.inbox-item').filter({ hasText: 'AI chip export controls' }).first();
+    await triageItem.click();
+    await page.locator('.inbox-actions button', { hasText: 'Canonical' }).click();
+
+    await expect(page.locator('.inbox-result.error .trust-chip-critical', { hasText: 'FAILED' })).toBeVisible({ timeout: 5_000 });
+    await expect.poll(() => runtimeIssueRequest).not.toBeNull();
+    expect(runtimeIssueRequest).toMatchObject({
+      surface: 'decision-inbox',
+      action: 'inbox.canonical',
+      itemType: 'triage',
+      itemId: MOCK_TRIAGE_ITEM.rawId,
+      apiRoute: '/api/discovery-triage/review',
+      classification: 'api-contract',
+      severity: 'review',
+    });
+  });
 });
 
 test.describe('Decision Inbox — bulk action guards', () => {
@@ -407,13 +548,9 @@ test.describe('Decision Inbox — stale/fallback badge', () => {
   test('stale badge appears when snapshot data is old', async ({ page }) => {
     const oldTimestamp = new Date(Date.now() - 60 * 60 * 60 * 1000).toISOString();
 
-    // The dashboard renders the combined theme-shell snapshot, not the legacy
-    // standalone risk endpoint.
-    await page.route(`${API_BASE}/theme-shell-snapshots**`, route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
+    await goToDashboard(page, {
+      themeShellSnapshotsResponse: {
+        body: {
           risk: {
             generatedAt: new Date().toISOString(),
             oldestInternalUpdatedAt: oldTimestamp,
@@ -422,11 +559,9 @@ test.describe('Decision Inbox — stale/fallback badge', () => {
             score: 0,
             summary: {},
           },
-        }),
-      }),
-    );
-
-    await goToDashboard(page);
+        },
+      },
+    });
     // Stay on home surface — risk snapshot card is on home
     await page.waitForTimeout(2_000);
 

@@ -3,12 +3,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import {
+  classifyArticleAgainstTaxonomy,
   getThemeConfig,
   isDiscoveryTopicKey as taxonomyIsDiscoveryTopicKey,
   isLegacyThemeKey as taxonomyIsLegacyThemeKey,
   listChildThemes as taxonomyListChildThemes,
   resolveThemeTaxonomy as taxonomyResolveThemeTaxonomy,
 } from './theme-taxonomy.mjs';
+import { isLowValueGoogleNewsSourceName } from './google-news-source-policy.mjs';
 
 const TABLE_PROBE_TTL_MS = 5 * 60 * 1000;
 const tableProbeCache = new Map();
@@ -295,6 +297,12 @@ function humanizeTheme(value) {
     .trim();
 }
 
+function displayThemeLabel(value) {
+  const canonical = canonicalizeThemeValue(value);
+  const taxonomy = taxonomyResolveThemeTaxonomy(canonical);
+  return taxonomy.themeLabel || humanizeTheme(canonical || value);
+}
+
 function truncateText(value, limit = 320) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (text.length <= limit) return text;
@@ -303,6 +311,24 @@ function truncateText(value, limit = 320) {
 
 function normalizeTheme(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function canonicalizeThemeValue(value) {
+  const theme = normalizeTheme(value);
+  if (!theme || theme === 'unknown' || isDiscoveryTopicKey(theme)) return theme || 'unknown';
+  const resolved = taxonomyResolveThemeTaxonomy(theme);
+  return resolved.themeKey || PARENT_THEME_ALIASES[theme] || resolveThemeTaxonomy(theme).themeKey || theme;
+}
+
+function themeLookupCandidates(value) {
+  const original = normalizeTheme(value);
+  const canonical = canonicalizeThemeValue(original);
+  const aliases = [canonical, original];
+  if (canonical === 'technology-general') aliases.push('tech', 'technology');
+  if (canonical === 'macroeconomics') aliases.push('economy', 'macro');
+  if (canonical === 'geopolitics') aliases.push('politics', 'geopolitical');
+  if (canonical === 'clean-energy') aliases.push('energy');
+  return Array.from(new Set(aliases.filter((item) => item && item !== 'unknown')));
 }
 
 function normalizePeriodType(value) {
@@ -386,10 +412,9 @@ function normalizeParentTheme(value) {
 }
 
 function isCanonicalTrendRow(row) {
-  const theme = normalizeTheme(row?.theme);
+  const theme = canonicalizeThemeValue(row?.theme);
   if (!theme || theme === 'unknown') return false;
   if (isDiscoveryTopicKey(theme)) return false;
-  if (isLegacyThemeKey(theme)) return false;
   const resolved = resolveThemeTaxonomy(theme);
   return Boolean(resolved.themeKey && isCanonicalThemeKey(resolved.themeKey));
 }
@@ -412,10 +437,38 @@ function looksLikeLegacyTheme(value) {
 
 function sanitizeDisplayLabel(label, fallbackValue) {
   const normalized = String(label || '').trim();
+  const taxonomy = taxonomyResolveThemeTaxonomy(fallbackValue);
+  if (taxonomy.themeLabel && (!normalized || normalizeTheme(normalized) === normalizeTheme(fallbackValue))) {
+    return taxonomy.themeLabel;
+  }
   if (normalized && !looksLikeDiscoveryTopicId(normalized)) {
     return normalized;
   }
-  return humanizeTheme(fallbackValue);
+  return taxonomy.themeLabel || humanizeTheme(fallbackValue);
+}
+
+function decodeBasicHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+      const codePoint = Number.parseInt(hex, 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _;
+    })
+    .replace(/&#(\d+);/g, (_, decimal) => {
+      const codePoint = Number.parseInt(decimal, 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _;
+    })
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+export function sanitizeArticleSourceLabel(source) {
+  return decodeBasicHtmlEntities(source)
+    .replace(/^codex\s+(?:e2e|retest)\s+/i, '')
+    .replace(/\s+source(?:\s+\d{8})?$/i, '')
+    .trim();
 }
 
 function toIsoDate(value) {
@@ -529,14 +582,17 @@ function classifyLifecycle({ articleCount, yoyChangePct, periodType }) {
   return 'mainstream';
 }
 
-function inferCategory(theme, explicitCategory = '') {
+export function inferCategory(theme, explicitCategory = '') {
   const normalized = normalizeTheme(theme);
   const hinted = normalizeCategory(explicitCategory);
-  if (hinted) return hinted;
+  if (hinted && hinted !== 'other') return hinted;
   if (!normalized) return 'other';
 
+  const taxonomy = taxonomyResolveThemeTaxonomy(normalized);
+  if (taxonomy?.category && taxonomy.category !== 'other') return taxonomy.category;
+
   if (
-    /(quantum|robot|semiconductor|chip|ai|ml|software|cloud|cyber|space|satellite|autonomous|automation|neural|compute|battery|photon|bioinformatics)/.test(normalized)
+    /(technology|quantum|robot|semiconductor|chip|ai|ml|software|cloud|cyber|space|satellite|autonomous|automation|neural|compute|battery|photon|bioinformatics)/.test(normalized)
     || normalized === 'tech'
   ) return 'technology';
   if (/(biotech|genom|crispr|cell|drug|pharma|therapy|protein|research)/.test(normalized)) return 'science';
@@ -552,6 +608,44 @@ function sourceQualityFor(source) {
   const key = normalizeTheme(source);
   if (!key) return 0.65;
   return SOURCE_QUALITY[key] ?? 0.72;
+}
+
+function isBroadParentTheme(theme) {
+  const key = canonicalizeThemeValue(theme);
+  const config = getThemeConfig(key);
+  return Boolean(config && !config.parentTheme);
+}
+
+function isThemeSupportiveSource(theme, source) {
+  const key = canonicalizeThemeValue(theme);
+  const normalizedSource = normalizeTheme(sanitizeArticleSourceLabel(source));
+  if (!normalizedSource) return false;
+  if (key === 'technology-general') {
+    return /(the-register|the-verge|techcrunch|wired|ars-technica|nasa|bleepingcomputer|dark-reading|cso-online|securityweek|infosecurity|github|openai)/.test(normalizedSource);
+  }
+  return false;
+}
+
+function refineArticleThemeFromText({ theme, title, summary, source } = {}) {
+  const currentTheme = canonicalizeThemeValue(theme || 'unknown');
+  const broadCurrent = isBroadParentTheme(currentTheme);
+  if (currentTheme && currentTheme !== 'unknown' && !broadCurrent && !isDiscoveryTopicKey(currentTheme)) {
+    return currentTheme;
+  }
+  const classified = classifyArticleAgainstTaxonomy({
+    title: [title, summary].filter(Boolean).join(' '),
+    source,
+    embeddingTheme: currentTheme,
+    embeddingSimilarity: broadCurrent ? 0.12 : 0.35,
+  });
+  const classifiedTheme = canonicalizeThemeValue(classified?.theme || '');
+  if (classifiedTheme && classifiedTheme !== 'unknown') {
+    return classifiedTheme;
+  }
+  if (broadCurrent && !isThemeSupportiveSource(currentTheme, source)) {
+    return 'unknown';
+  }
+  return currentTheme || 'unknown';
 }
 
 function buildStagePriority(stage) {
@@ -797,9 +891,11 @@ function mapTrendSnapshotRow(row, periodType) {
 }
 
 function shouldSuppressThemeValue(theme, strictFilteringEnabled) {
-  if (looksLikeDiscoveryTopicId(theme) || looksLikeLegacyTheme(theme)) return true;
+  const canonicalTheme = canonicalizeThemeValue(theme);
+  if (looksLikeDiscoveryTopicId(theme) || looksLikeDiscoveryTopicId(canonicalTheme)) return true;
+  if (!canonicalTheme || canonicalTheme === 'unknown') return true;
   if (!strictFilteringEnabled) return false;
-  return !isCanonicalTrendRow({ theme });
+  return !isCanonicalTrendRow({ theme: canonicalTheme });
 }
 
 function filterVisibleTrendRows(rows, strictFilteringEnabled) {
@@ -825,6 +921,7 @@ function sanitizeRelatedTopics(topics, topicLabel, normalizationState) {
 }
 
 function shouldSuppressDigestItem(item, strictFilteringEnabled) {
+  if (isLowValueGoogleNewsSourceName(item?.source)) return true;
   return shouldSuppressThemeValue(item.theme, strictFilteringEnabled);
 }
 
@@ -1445,8 +1542,27 @@ async function readLatestDailyReport() {
   }
 }
 
+async function loadDigestSupportingStats(safeQuery) {
+  const result = await safeQuery(`
+    SELECT
+      COUNT(*)::int AS total_articles,
+      COUNT(*) FILTER (WHERE published_at >= NOW() - INTERVAL '24 hours')::int AS new_articles_24h,
+      COUNT(*) FILTER (WHERE published_at >= NOW() - INTERVAL '72 hours')::int AS new_articles_72h,
+      MAX(published_at) AS latest_article_at
+    FROM articles
+  `);
+  const row = result.rows?.[0] || {};
+  return {
+    generatedAt: new Date().toISOString(),
+    totalArticles: Number(row.total_articles || 0),
+    newArticles24h: Number(row.new_articles_24h || 0),
+    newArticles72h: Number(row.new_articles_72h || 0),
+    latestArticleAt: row.latest_article_at || null,
+  };
+}
+
 function buildWhyItMatters(item) {
-  const themeText = item.theme && item.theme !== 'unknown' ? humanizeTheme(item.theme) : 'This topic';
+  const themeText = item.theme && item.theme !== 'unknown' ? displayThemeLabel(item.theme) : 'This topic';
   const topicText = item.relatedTopics[0] ? ` The strongest linked discovery topic is ${item.relatedTopics[0]}.` : '';
   const signalText = item.relatedSignals[0]?.signalName
     ? ` The closest cross-signal link is ${item.relatedSignals[0].signalName}.`
@@ -1479,6 +1595,16 @@ function scoreDigestItem(candidate, selectedDate) {
     ),
     2,
   );
+}
+
+function latestDigestItemPublishedAt(items) {
+  const timestamps = asArray(items)
+    .map((item) => parseDateInput(item?.publishedAt))
+    .filter(Boolean)
+    .map((date) => date.getTime())
+    .filter(Number.isFinite);
+  if (!timestamps.length) return null;
+  return new Date(Math.max(...timestamps)).toISOString();
 }
 
 async function loadDailyDigestFromTable(safeQuery, selectedDate, limit, themeFilter, normalizationState) {
@@ -1520,20 +1646,28 @@ async function loadDailyDigestFromTable(safeQuery, selectedDate, limit, themeFil
   `, [toIsoDay(selectedDate), themeFilter, limit]);
 
   return rows.rows.map((row, index) => {
-    const theme = normalizeTheme(row.theme || 'unknown');
+    const source = sanitizeArticleSourceLabel(row.source);
+    const title = decodeBasicHtmlEntities(row.title || row.one_line_summary || '');
+    const summary = decodeBasicHtmlEntities(row.one_line_summary || row.title || '');
+    const theme = refineArticleThemeFromText({
+      theme: row.theme || 'unknown',
+      title,
+      summary,
+      source,
+    });
     return {
       rank: Number(row.rank || index + 1),
       articleId: Number(row.article_id || 0),
-      title: String(row.title || row.one_line_summary || ''),
-      source: String(row.source || ''),
+      title,
+      source,
       publishedAt: row.published_at || null,
-      url: String(row.url || ''),
+      url: decodeBasicHtmlEntities(row.url || ''),
       theme,
-      parentTheme: normalizeParentTheme(row.parent_theme || theme),
+      parentTheme: normalizeParentTheme(theme),
       category: inferCategory(theme, row.category),
       importanceScore: round(Number(row.importance_score || 0), 2),
-      oneLineSummary: String(row.one_line_summary || row.title || ''),
-      whyItMatters: String(row.why_it_matters || ''),
+      oneLineSummary: summary,
+      whyItMatters: decodeBasicHtmlEntities(row.why_it_matters || ''),
       relatedTopics: sanitizeRelatedTopics(row.related_topics, row.topic_label, normalizationState),
       relatedSignals: normalizeSignals(row.related_signals),
     };
@@ -1641,6 +1775,7 @@ async function loadDailyDigestFallback(safeQuery, selectedDate, limit, themeFilt
       ON ts.theme = ${themeExpr}
     WHERE a.published_at >= $1::timestamptz
       AND a.published_at < $2::timestamptz
+      AND ${themeExpr} !~* '^dt-[a-z0-9]+$'
       AND ($4 = '' OR ${themeExpr} = $4)
     ORDER BY a.published_at DESC
     LIMIT $5
@@ -1699,6 +1834,9 @@ async function loadDailyDigestFallback(safeQuery, selectedDate, limit, themeFilt
     ? `COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), ''), 'unknown')`
     : `COALESCE(NULLIF(TRIM(t.auto_theme), ''), 'unknown')`}
       WHERE a.published_at >= NOW() - INTERVAL '72 hours'
+        AND ${normalizationState.hasThemeKeyColumn
+    ? `COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), ''), 'unknown')`
+    : `COALESCE(NULLIF(TRIM(t.auto_theme), ''), 'unknown')`} !~* '^dt-[a-z0-9]+$'
         AND ($1 = '' OR ${normalizationState.hasThemeKeyColumn
     ? `COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), ''), 'unknown')`
     : `COALESCE(NULLIF(TRIM(t.auto_theme), ''), 'unknown')`} = $1)
@@ -1710,22 +1848,30 @@ async function loadDailyDigestFallback(safeQuery, selectedDate, limit, themeFilt
   }
 
   let items = rows.rows.map((row) => {
-    const theme = normalizeTheme(row.theme || 'unknown');
+    const source = sanitizeArticleSourceLabel(row.source);
+    const title = decodeBasicHtmlEntities(row.title || '');
+    const summary = decodeBasicHtmlEntities(row.summary || row.title || '');
+    const theme = refineArticleThemeFromText({
+      theme: row.theme || 'unknown',
+      title,
+      summary,
+      source,
+    });
     const category = inferCategory(theme, row.category || row.topic_category);
     const themeMomentumPct = percentageDelta(Number(row.current_count || 0), Number(row.prior_count || 0));
     return {
       articleId: Number(row.id || 0),
-      title: String(row.title || ''),
-      source: String(row.source || ''),
+      title,
+      source,
       publishedAt: row.published_at || null,
-      url: String(row.url || ''),
+      url: decodeBasicHtmlEntities(row.url || ''),
       theme,
-      parentTheme: normalizeParentTheme(row.parent_theme || theme),
+      parentTheme: normalizeParentTheme(theme),
       category,
-      sourceQuality: Number(row.topic_source_quality_score || sourceQualityFor(row.source)),
+      sourceQuality: Number(row.topic_source_quality_score || sourceQualityFor(source)),
       topicMomentum: Number(row.topic_momentum || 1),
       themeMomentumPct: round(themeMomentumPct),
-      oneLineSummary: String(row.summary || row.title || ''),
+      oneLineSummary: summary,
       relatedTopics: sanitizeRelatedTopics(row.topic_label ? [String(row.topic_label)] : [], row.topic_label, normalizationState),
       relatedSignals: normalizeSignals(row.signals),
     };
@@ -1797,22 +1943,47 @@ export async function buildDailyDigestPayload(safeQuery, params = new URLSearchP
     }
   }
 
-  const dailyReport = await readLatestDailyReport();
+  const [dailyReport, liveStats] = await Promise.all([
+    readLatestDailyReport(),
+    loadDigestSupportingStats(safeQuery),
+  ]);
+  const dataUpdatedAt = latestDigestItemPublishedAt(items);
+  const generatedAt = new Date().toISOString();
+  const latestDigestAt = parseDateInput(dataUpdatedAt);
+  const todayKey = toIsoDay(new Date());
+  const selectedDateKey = toIsoDay(selectedDate);
+  const selectedDateIsToday = selectedDateKey === todayKey;
+  const digestAgeHours = latestDigestAt ? Math.max(0, (Date.now() - latestDigestAt.getTime()) / 3600000) : null;
+  const wideFallback = windowLabel.includes('72h-fallback');
+  const freshLiveItems = selectedDateIsToday
+    && latestDigestAt
+    && Number(digestAgeHours) <= 24
+    && items.length > 0;
+  const staleFallback = (selectedDateIsToday && (!latestDigestAt || Number(digestAgeHours) > 24))
+    || (wideFallback && !freshLiveItems);
+  const responseWindow = wideFallback && freshLiveItems ? windowLabel.replace(/72h-fallback/g, 'live-article-fill') : windowLabel;
   return {
     digestDate: toIsoDay(selectedDate),
     requestedTheme: themeFilter || null,
     requestedCategory: categoryFilter || null,
     source,
     taxonomyFiltering: strictFilteringEnabled ? 'canonical-only' : 'legacy-tolerant-fallback',
-    window: windowLabel,
+    window: responseWindow,
     items,
-    supportingStats: dailyReport
-      ? {
-        generatedAt: dailyReport.generatedAt || null,
-        totalArticles: Number(dailyReport.articles?.total || 0),
-        newArticles24h: Number(dailyReport.articles?.new_24h || 0),
-      }
-      : null,
+    meta: {
+      generatedAt,
+      dataUpdatedAt,
+      updatedAt: dataUpdatedAt,
+      mode: staleFallback ? 'fallback' : 'live',
+      window: responseWindow,
+      source,
+      stale: staleFallback,
+      staleReason: staleFallback ? `daily digest using ${responseWindow || source} fallback path` : null,
+    },
+    supportingStats: {
+      ...liveStats,
+      reportGeneratedAt: dailyReport?.generatedAt || null,
+    },
   };
 }
 
@@ -2024,6 +2195,7 @@ function findThemeSnapshot(rows, themeKey) {
 }
 
 async function loadThemeRecentArticles(safeQuery, themeKey, limit, normalizationState) {
+  const candidates = themeLookupCandidates(themeKey);
   const themeExpr = normalizationState.hasThemeKeyColumn
     ? `COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), ''), 'unknown')`
     : `COALESCE(NULLIF(TRIM(t.auto_theme), ''), 'unknown')`;
@@ -2049,16 +2221,16 @@ async function loadThemeRecentArticles(safeQuery, themeKey, limit, normalization
       ${themeCategoryExpr} AS theme_category
     FROM auto_article_themes t
     JOIN articles a ON a.id = t.article_id
-    WHERE ${themeExpr} = $1
+    WHERE ${themeExpr} = ANY($1::text[])
     ORDER BY a.published_at DESC NULLS LAST, a.id DESC
     LIMIT $2
-  `, [normalizeTheme(themeKey), limit]);
+  `, [candidates, Math.max(limit * 4, limit)]);
 
-  return rows.rows.map((row) => ({
+  return rows.rows.filter((row) => !isLowValueGoogleNewsSourceName(row.source)).map((row) => ({
     articleId: Number(row.id || 0),
-    title: String(row.title || ''),
-    source: String(row.source || ''),
-    url: String(row.url || ''),
+    title: decodeBasicHtmlEntities(row.title || ''),
+    source: sanitizeArticleSourceLabel(row.source),
+    url: decodeBasicHtmlEntities(row.url || ''),
     publishedAt: row.published_at || null,
     theme: normalizeTheme(row.theme_key || themeKey),
     label: sanitizeDisplayLabel(row.theme_label, row.theme_key || themeKey),
@@ -3073,7 +3245,7 @@ function buildThemeWhatChanged(snapshot, subTheme, digestItems, fallbackLabel) {
   return changes.slice(0, 5);
 }
 
-function buildThemeWhyItMatters(snapshot, subTheme, digestItems, fallbackLabel, openAlexContext, githubContext) {
+function buildThemeWhyItMatters(snapshot, subTheme, digestItems, recentArticles, fallbackLabel, openAlexContext, githubContext) {
   const statements = [];
   const provenance = [];
   const label = fallbackLabel || snapshot?.label || subTheme?.label || humanizeTheme(snapshot?.theme || subTheme?.theme || 'theme');
@@ -3107,6 +3279,19 @@ function buildThemeWhyItMatters(snapshot, subTheme, digestItems, fallbackLabel, 
         source: item.source,
       })));
     }
+  }
+  if (recentArticles.length > 0) {
+    const latest = recentArticles[0];
+    const latestPublishedAt = toIsoDate(parseDateInput(latest.publishedAt));
+    statements.push(
+      `${label} has fresh article-level confirmation, led by "${latest.title}" from ${latest.source || 'the current feed'}${latestPublishedAt ? ` at ${latestPublishedAt}` : ''}.`,
+    );
+    provenance.push(...recentArticles.slice(0, 3).map((item) => buildProvenanceRef('recent_article', item.title || 'Recent article', {
+      articleId: item.articleId,
+      source: item.source,
+      publishedAt: item.publishedAt,
+      url: item.url,
+    })));
   }
   if (openAlexContext?.works?.length > 0) {
     const researchSummary = openAlexContext.summary || {};
@@ -3503,7 +3688,7 @@ function buildThemeDeltaSinceLastVisit(previousViewedAt, digestItems, recentArti
 }
 
 export async function buildThemeBriefPayload(themeParam, safeQuery, params = new URLSearchParams()) {
-  const theme = normalizeTheme(themeParam);
+  const theme = canonicalizeThemeValue(themeParam);
   const periodType = normalizePeriodType(params.get('period') || 'quarter');
   const digestLimit = normalizeLimit(params.get('digest_limit'), 3, 10);
   const articleLimit = normalizeLimit(params.get('article_limit'), 5, 12);
@@ -3534,10 +3719,11 @@ export async function buildThemeBriefPayload(themeParam, safeQuery, params = new
     .filter((item) => normalizeTheme(item.theme) === theme)
     .slice(0, digestLimit);
   const subTheme = asArray(evolution?.subThemes).find((item) => normalizeTheme(item.theme) === theme) || null;
-  const label = snapshot?.label || subTheme?.label || humanizeTheme(theme);
-  const category = snapshot?.category || subTheme?.category || inferCategory(theme);
+  const taxonomy = taxonomyResolveThemeTaxonomy(theme);
+  const label = taxonomy.themeLabel || subTheme?.label || snapshot?.label || humanizeTheme(theme);
+  const category = snapshot?.category || subTheme?.category || taxonomy.category || inferCategory(theme);
   const whatChanged = buildThemeWhatChanged(snapshot, subTheme, digestItems, label);
-  const whyItMatters = buildThemeWhyItMatters(snapshot, subTheme, digestItems, label, openAlexContext, githubContext);
+  const whyItMatters = buildThemeWhyItMatters(snapshot, subTheme, digestItems, recentArticles, label, openAlexContext, githubContext);
   const evidence = buildThemeEvidence(snapshot, digestItems, recentArticles, secContext, openAlexContext, githubContext);
   const subtopicMovement = buildThemeSubtopicMovement(parentTheme, asArray(evolution?.subThemes), theme);
   const relatedEntities = buildThemeRelatedEntities(theme, category, secContext);
@@ -4274,6 +4460,7 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
       headline,
       detail,
       signal_score,
+      alert_score,
       evidence_classes,
       provenance,
       metadata,
@@ -4282,7 +4469,7 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
       updated_at
     FROM theme_structural_alerts
     WHERE period_type = $1
-      AND status = 'active'
+      AND COALESCE(status, 'open') IN ('active', 'open')
   `;
   const values = [periodType];
   if (themes.length > 0) {
@@ -4308,8 +4495,8 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
     severity: String(row.severity || 'medium'),
     headline: String(row.headline || ''),
     detail: String(row.detail || ''),
-    signalScore: Number(row.signal_score || 0),
-    alertScore: Number(row.signal_score || 0),
+    signalScore: Number(row.signal_score ?? row.alert_score ?? 0),
+    alertScore: Number(row.alert_score ?? row.signal_score ?? 0),
     evidenceClasses: dedupeEvidenceClasses(row.evidence_classes || []),
     provenance: dedupeProvenance(row.provenance || []),
     metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},

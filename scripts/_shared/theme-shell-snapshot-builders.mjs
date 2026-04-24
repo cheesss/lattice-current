@@ -785,6 +785,7 @@ export async function buildCompactMacroSnapshot(options = {}) {
 
   const topThemes = countThemesFromHeatmap(heatmapPayload.payload);
   const strategies = asArray(strategiesPayload.payload?.strategies);
+  const staleSignalCount = Math.max(0, rawSignals.length - signals.length);
 
   const macroSources = mergeSources(liveStatus.sources, strategiesPayload.sources, heatmapPayload.sources);
   const payload = {
@@ -793,11 +794,14 @@ export async function buildCompactMacroSnapshot(options = {}) {
     verdict: classifyMacroVerdict({ vix, marketStress, hyCredit, transmission }),
     strategyCount: strategies.length,
     signals,
-    staleSignalCount: Math.max(0, rawSignals.length - signals.length),
+    staleSignalCount,
     topThemes,
     meta: {
       available: signals.length > 0 || topThemes.length > 0 || strategies.length > 0,
-      stale: macroSources.some((source) => source.stale),
+      stale: macroSources.some((source) => source.stale) || staleSignalCount > 0,
+      staleReason: staleSignalCount > 0
+        ? `${staleSignalCount} macro signal${staleSignalCount === 1 ? '' : 's'} exceeded freshness thresholds`
+        : null,
       sources: macroSources,
     },
   };

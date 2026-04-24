@@ -44,6 +44,10 @@
     "test:feeds": "node scripts/validate-rss-feeds.mjs",
     "repair:theme-shell-data": "node scripts/repair-theme-shell-data.mjs --apply",
     "repair:theme-shell-data:dry": "node scripts/repair-theme-shell-data.mjs --dry-run",
+    "cleanup:source-approvals": "node scripts/cleanup-source-approval-queue.mjs --apply",
+    "cleanup:source-approvals:dry": "node scripts/cleanup-source-approval-queue.mjs",
+    "source:repair:closed-loop": "node --import tsx scripts/run-source-repair-closed-loop.mjs --apply --catalog-bootstrap --full-heuristic --count-historical-successes --target-successes 20 --limit 300 --max-candidates 48 --backfill-limit 60 --daily-rss-budget 120",
+    "source:repair:closed-loop:dry": "node --import tsx scripts/run-source-repair-closed-loop.mjs --catalog-bootstrap --full-heuristic --count-historical-successes --target-successes 20 --limit 300 --max-candidates 48 --backfill-limit 60 --daily-rss-budget 120",
     "test:sidecar": "node --test src-tauri/sidecar/local-api-server.test.mjs api/_cors.test.mjs api/youtube/embed.test.mjs api/cyber-threats.test.mjs api/usni-fleet.test.mjs scripts/ais-relay-rss.test.cjs api/loaders-xml-wms-regression.test.mjs",
     "test:e2e:visual:full": "node scripts/run-with-env.mjs VITE_VARIANT=full -- playwright test -g \"matches golden screenshots per layer and zoom\"",
     "test:e2e:visual:tech": "node scripts/run-with-env.mjs VITE_VARIANT=tech -- playwright test -g \"matches golden screenshots per layer and zoom\"",
@@ -60,6 +64,8 @@
     "returns:abnormal": "node scripts/compute-abnormal-returns.mjs",
     "returns:abnormal:js": "node scripts/compute-abnormal-returns.mjs --engine js",
     "returns:abnormal:python": "node scripts/compute-abnormal-returns.mjs --engine python",
+    "market:quotes:nas": "node scripts/refresh-market-quotes-to-nas.mjs",
+    "macro:fred:nas": "node scripts/refresh-fred-signals-to-nas.mjs",
     "backtest:nas:status": "node --import tsx scripts/backtest-nas-pipeline.mjs status",
     "backtest:nas:init": "node --import tsx scripts/backtest-nas-pipeline.mjs init",
     "backtest:nas:full": "node --import tsx scripts/backtest-nas-pipeline.mjs full-cycle",
@@ -112,6 +118,7 @@
     "version:check:all": "node scripts/check-version-sync.mjs",
     "schema:check": "node --import tsx scripts/check-schema-versions.mjs",
     "lint:cors": "node scripts/lint-cors.mjs",
+    "audit:freshness": "node scripts/audit-data-freshness.mjs",
     "audit:high": "npm audit --audit-level=high"
   },
   "devDependencies": {

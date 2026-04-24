@@ -37,8 +37,10 @@ Use these first. They describe the current branch, not historical experiments.
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
 | [../CLAUDE.md](../CLAUDE.md) | Project conventions, scripts, NAS tables, code modification principles |
-| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Most recent comprehensive repo-wide handoff (2026-04-14 data robustness) |
-| [./NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md) | Nowcast subsystem state: Phase 0–5 shipped, gate + fuse filter enforced, rates redesign opened as separate track |
+| [./PROJECT_HANDOFF_2026-04-23.md](./PROJECT_HANDOFF_2026-04-23.md) | Current single-file handoff for runtime, source repair, OpenClaw, freshness, tests, and operational checks |
+| [./SESSION_IMPROVEMENTS_2026-04-23.md](./SESSION_IMPROVEMENTS_2026-04-23.md) | Latest session change log for source repair, OpenClaw, freshness, scheduler, and validation fixes |
+| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Historical repo-wide handoff; superseded for current operation by PROJECT_HANDOFF_2026-04-23 |
+| [./NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md) | Nowcast subsystem state: Phase 0–5 shipped, gate + fuse filter enforced, rates redesign opened as separate track. OpenClaw exposure via `lattice.get_nowcast_status` (added 2026-04-23) |
 | [./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md](./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md) | Open track — why rates models failed acceptance gate and candidate redesign directions |
 | [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md) | End-to-end workflow narrative — layer-by-layer explanation: source-add path, keyword/theme-add path, observed/estimated split, operationally-important routes |
 | [./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md) | High-level visual walk-through of the detailed workflow |
@@ -67,9 +69,10 @@ Use these first. They describe the current branch, not historical experiments.
 
 ## How to read the repo now
 
-1. Start with the workspace shell and live operator loop.
-2. Read event resolution and evidence-quality logic.
-3. Read replay and NAS docs only if you are validating historical behavior or debugging storage.
+1. Start with `PROJECT_HANDOFF_2026-04-23.md`.
+2. Read `SESSION_IMPROVEMENTS_2026-04-23.md` only when you need the exact latest change log.
+3. Read the workflow docs for code-level source, theme, Decision Inbox, and OpenClaw paths.
+4. Read replay, NAS, and old plan docs only if you are validating historical behavior or debugging storage.
 
 Do not infer the current product identity from old plan files, handoff notes, or archived backtest experiments.
 
@@ -85,6 +88,11 @@ Recently removed (2026-04-14 cleanup):
 - `docs/API_KEY_DEPLOYMENT.md` — referenced obsolete WORLDMONITOR_API_KEY gating
 - `docs/TAURI_VALIDATION_REPORT.md` — environment-specific one-off report
 - `docs/branding/nanobanana-prompt.md` — one-off design brief
+
+Recently removed (2026-04-23 cleanup):
+
+- `docs/NOWCAST_PLAN_ISSUES_2026-04-17.md` — superseded by `NOWCAST_HANDOFF_2026-04-18.md` (§3 commit map + §6 gap table absorbed all P1 issues)
+- `docs/NOWCAST_ESTIMATION_ARCHITECTURE_PLAN_2026-04-17.md` — superseded by `NOWCAST_HANDOFF_2026-04-18.md` (original design doc; Phase 0–5 implementation landed across commits `62825c96` / `746a0e58` / `8bce577b` / `87c21b6d`)
 
 ## Current implementation notes
 

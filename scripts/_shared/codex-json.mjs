@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 
 const CODEX_PROMPT_METRICS_PATH = path.resolve('data', 'codex-prompt-metrics.json');
 
-function getSafeEnv() {
+export function getSafeEnv() {
   const keys = [
     'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP',
     'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
@@ -20,7 +20,7 @@ function getSafeEnv() {
   return env;
 }
 
-async function resolveCodexCommand() {
+export async function resolveCodexCommand() {
   if (process.env.CODEX_BIN?.trim() && existsSync(process.env.CODEX_BIN.trim())) {
     return process.env.CODEX_BIN.trim();
   }

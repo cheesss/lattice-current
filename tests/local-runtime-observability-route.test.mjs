@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createLocalApiServer } from '../src-tauri/sidecar/local-api-server.mjs';
+
+const localApiSource = readFileSync(new URL('../src-tauri/sidecar/local-api-server.mjs', import.meta.url), 'utf8');
 
 async function setupApiDir() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'wm-observability-route-'));
@@ -65,6 +68,8 @@ test('local runtime observability endpoint returns daemon task summary', async (
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.success, true);
+    assert.equal(body.runtime.localApiEnabled, true);
+    assert.equal(body.runtime.port, port);
     assert.equal(body.daemon.dashboard.ok, true);
     assert.ok(Array.isArray(body.daemon.tasks));
     assert.ok(body.daemon.tasks.some((task) => task.name === 'signal-refresh'));
@@ -74,4 +79,28 @@ test('local runtime observability endpoint returns daemon task summary', async (
     await localApi.cleanup();
     await rm(tempDataDir, { recursive: true, force: true });
   }
+});
+
+test('automation health only counts enabled dataset failures', () => {
+  assert.match(localApiSource, /enabledDatasetIds/);
+  assert.match(localApiSource, /enabledDatasetIds\.has\(String\(datasetId\)\)/);
+  assert.match(localApiSource, /automation\.registry\.datasets\.filter\(\(dataset\) => dataset\?\.enabled\)/);
+});
+
+test('local service status has a first-class route alias', () => {
+  assert.match(localApiSource, /requestUrl\.pathname === '\/api\/local-service-status'/);
+  assert.match(localApiSource, /handleLocalServiceStatus\(context\)/);
+  assert.match(localApiSource, /\/api\\\/local-service-status/);
+});
+
+test('runtime and automation observability expose dashboard-friendly aliases', () => {
+  assert.match(localApiSource, /requestUrl\.pathname === '\/api\/runtime-observability'/);
+  assert.match(localApiSource, /requestUrl\.pathname === '\/api\/automation-ops-snapshot'/);
+  assert.match(localApiSource, /\/api\/runtime-observability/);
+  assert.match(localApiSource, /\/api\/automation-ops-snapshot/);
+});
+
+test('healthy automation ops payload suppresses stale historical last errors', () => {
+  assert.match(localApiSource, /collected\.health\?\.status === 'healthy'/);
+  assert.match(localApiSource, /\? null\s+:\s+\(collected\.lastFailedRun\?\.detail/s);
 });

@@ -132,6 +132,9 @@ th{color:var(--muted);font-weight:normal}
 .review-card-title strong{font-size:12px;color:var(--text)}
 .lens-note{margin-bottom:10px}
 .snapshot-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.snapshot-grid.secondary-snapshot-grid{grid-template-columns:repeat(4,minmax(0,1fr));opacity:.92}
+.snapshot-grid.secondary-snapshot-grid .card{background:rgba(255,255,255,.02)}
+@media (max-width:1320px){.snapshot-grid.secondary-snapshot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .snapshot-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .snapshot-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .snapshot-row{padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:10px;background:rgba(255,255,255,.02)}
@@ -202,7 +205,7 @@ th{color:var(--muted);font-weight:normal}
 .kpi-detail-drawer{margin-top:8px}
 .kpi-detail-drawer>summary{cursor:pointer;color:var(--text-soft);font-size:10px;letter-spacing:.12em;text-transform:uppercase;list-style:none}
 .kpi-detail-drawer>summary::-webkit-details-marker{display:none}
-.cockpit-grid{display:grid;grid-template-columns:minmax(280px,.86fr) minmax(420px,1.45fr);grid-template-areas:"decision signals" "proof proof";gap:12px;margin-top:12px}
+.cockpit-grid{display:grid;grid-template-columns:1fr;grid-template-areas:"signals" "proof";gap:12px;margin-top:12px}
 .cockpit-panel{min-height:160px;padding:14px;border:1px solid var(--border-dim);border-radius:18px;background:rgba(255,255,255,.025);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .priority-decision-card{grid-area:decision;border-left:3px solid var(--amber-risk)}
 .action-signal-panel{grid-area:signals}
@@ -237,7 +240,7 @@ th{color:var(--muted);font-weight:normal}
 .proof-step{padding:10px;border-radius:12px;border:1px solid var(--border-dim);background:rgba(255,255,255,.025)}
 .proof-step-label{font-size:9px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.14em}
 .proof-step-value{margin-top:4px;color:var(--text-loud);font-size:12px;font-weight:600}
-@media (max-width:1100px){.regime-strip{align-items:flex-start;flex-direction:column}.cockpit-grid{grid-template-columns:1fr;grid-template-areas:"decision" "signals" "proof"}.proof-chain{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1100px){.regime-strip{align-items:flex-start;flex-direction:column}.cockpit-grid{grid-template-columns:1fr;grid-template-areas:"signals" "proof"}.proof-chain{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.decision-cockpit{padding:10px}.proof-chain{grid-template-columns:1fr}.signal-card-grid{grid-template-columns:1fr;max-height:none}}
 /* Stale/Fallback badges (legacy) */
 .stale-badge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(250,204,21,.12);color:#facc15;border:1px solid rgba(250,204,21,.2);margin-bottom:8px;letter-spacing:.02em}
@@ -345,6 +348,716 @@ th{color:var(--muted);font-weight:normal}
 .surface-nav-btn .count{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(126,224,129,.15);color:#7ee081;font-size:10px;font-weight:700}
 .surface{display:none}
 .surface.active{display:block}
+
+/* ==================================================================== */
+/* UI Scan Upgrade (2026-04-23): Trust Strip + Evidence Row + Chain TT   */
+/* ==================================================================== */
+
+/* --- Trust Strip: persistent scannable status bar ------------------- */
+.lattice-trust-strip{display:flex;align-items:center;gap:0;padding:0;margin:-4px 0 12px;border:1px solid var(--border-dim);border-radius:10px;background:rgba(13,15,19,.72);font-family:var(--font-mono);font-size:11px;overflow:hidden}
+.lattice-trust-strip .tstrip-chunk{flex:1 1 auto;display:flex;align-items:center;gap:6px;padding:6px 12px;border-right:1px solid var(--border-dim);color:var(--text-base);cursor:pointer;transition:background .12s ease,color .12s ease;text-decoration:none;min-width:0}
+.lattice-trust-strip .tstrip-chunk:last-child{border-right:none}
+.lattice-trust-strip .tstrip-chunk:hover{background:rgba(255,255,255,.03);color:var(--text-loud)}
+.lattice-trust-strip .tstrip-dot{width:6px;height:6px;border-radius:50%;background:var(--graphite);flex-shrink:0}
+.lattice-trust-strip .tstrip-chunk.ok .tstrip-dot{background:var(--signal-green);box-shadow:0 0 4px rgba(22,199,132,.5)}
+.lattice-trust-strip .tstrip-chunk.warning .tstrip-dot{background:var(--amber-risk);box-shadow:0 0 4px rgba(245,158,11,.5)}
+.lattice-trust-strip .tstrip-chunk.critical .tstrip-dot{background:var(--red-critical);box-shadow:0 0 4px rgba(239,68,68,.55)}
+.lattice-trust-strip .tstrip-chunk.warning{color:var(--amber-risk)}
+.lattice-trust-strip .tstrip-chunk.critical{color:var(--red-critical)}
+.lattice-trust-strip .tstrip-label{text-transform:uppercase;letter-spacing:.10em;font-size:9.5px;color:var(--text-soft);flex-shrink:0}
+.lattice-trust-strip .tstrip-value{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lattice-trust-strip .tstrip-delta{font-size:10px;color:var(--text-muted);margin-left:4px}
+.lattice-trust-strip .tstrip-delta.up{color:var(--signal-green)}
+.lattice-trust-strip .tstrip-delta.down{color:var(--red-critical)}
+
+/* --- Evidence-graded row layout (Hot Events row view) --------------- */
+.evidence-rows{display:flex;flex-direction:column;font-family:var(--font-mono);font-size:11.5px;line-height:1.4;max-height:520px;overflow-y:auto}
+.evidence-rows-header{display:grid;grid-template-columns:34px minmax(0,2.2fr) 82px 56px 60px 60px 48px 40px;gap:10px;padding:6px 10px;border-bottom:1px solid var(--border-dim);color:var(--text-soft);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;font-family:var(--font-sans);position:sticky;top:0;background:rgba(13,15,19,.96);backdrop-filter:blur(8px);z-index:5}
+.evidence-row{display:grid;grid-template-columns:34px minmax(0,2.2fr) 82px 56px 60px 60px 48px 40px;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border-dim);align-items:baseline;position:relative;transition:background .1s ease}
+.evidence-row:last-child{border-bottom:none}
+.evidence-row:hover{background:rgba(255,255,255,.025)}
+.evidence-row .ev-grade{font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:4px;text-align:center;font-size:10.5px}
+.evidence-row.grade-e4 .ev-grade{background:rgba(126,224,129,.22);color:#9beb80;border:1px solid rgba(126,224,129,.36)}
+.evidence-row.grade-e3 .ev-grade{background:rgba(126,224,129,.15);color:#9beb80;border:1px solid rgba(126,224,129,.24)}
+.evidence-row.grade-e2 .ev-grade{background:rgba(216,249,157,.15);color:var(--accent);border:1px solid rgba(216,249,157,.28);font-weight:700}
+.evidence-row.grade-e1 .ev-grade{background:rgba(255,255,255,.04);color:var(--text-base);border:1px solid var(--border-dim);font-weight:500}
+.evidence-row.grade-e0 .ev-grade{background:transparent;color:var(--text-muted);border:1px solid var(--border-dim);font-weight:400;text-transform:lowercase}
+.evidence-row.grade-none .ev-grade{background:transparent;color:var(--text-muted);border:1px dashed var(--border-dim);font-weight:400}
+.evidence-row .ev-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-base)}
+.evidence-row.grade-e4 .ev-title,.evidence-row.grade-e3 .ev-title,.evidence-row.grade-e2 .ev-title{color:var(--text-loud);font-weight:500}
+.evidence-row.grade-e0 .ev-title,.evidence-row.grade-none .ev-title{color:var(--text-soft)}
+.evidence-row .ev-theme{color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px}
+.evidence-row .ev-t{color:var(--text-base);text-align:right;font-variant-numeric:tabular-nums}
+.evidence-row.grade-e4 .ev-t,.evidence-row.grade-e3 .ev-t,.evidence-row.grade-e2 .ev-t{color:var(--text-loud);font-weight:600}
+.evidence-row .ev-uplift{text-align:right;font-variant-numeric:tabular-nums;color:var(--text-base)}
+.evidence-row .ev-uplift.pos{color:var(--signal-green)}
+.evidence-row .ev-uplift.neg{color:var(--red-critical)}
+.evidence-row .ev-uplift.muted{color:var(--text-muted)}
+.evidence-row .ev-age{color:var(--text-soft);text-align:right;font-size:10.5px}
+.evidence-row .ev-art{color:var(--text-soft);text-align:right;font-variant-numeric:tabular-nums;font-size:10.5px}
+.evidence-row .ev-surge{text-align:center;font-size:13px;color:var(--amber)}
+
+/* --- Evidence chain tooltip (hover on row) -------------------------- */
+.evidence-row[data-chain]{cursor:help}
+.evidence-chain-tooltip{position:absolute;top:calc(100% - 2px);left:34px;z-index:50;min-width:360px;max-width:480px;padding:10px 12px;background:rgba(8,10,13,.98);border:1px solid rgba(216,249,157,.22);border-radius:8px;box-shadow:0 10px 32px rgba(0,0,0,.45);font-family:var(--font-mono);font-size:10.5px;line-height:1.55;color:var(--text-base);pointer-events:none;opacity:0;transform:translateY(-4px);transition:opacity .12s ease,transform .12s ease;white-space:pre-wrap}
+.evidence-row:hover .evidence-chain-tooltip,.evidence-row:focus-within .evidence-chain-tooltip{opacity:1;transform:translateY(0)}
+.evidence-chain-tooltip .chain-head{color:var(--accent);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:9.5px;margin-bottom:6px;font-family:var(--font-sans)}
+.evidence-chain-tooltip .chain-step{color:var(--text-base);margin-left:8px;position:relative}
+.evidence-chain-tooltip .chain-step::before{content:"←";position:absolute;left:-12px;color:var(--text-muted)}
+.evidence-chain-tooltip .chain-none{color:var(--text-muted);font-style:italic}
+.evidence-chain-tooltip .chain-symbol{color:var(--accent);font-weight:600}
+.evidence-chain-tooltip .chain-loading{color:var(--text-muted);font-style:italic;margin-top:4px}
+
+/* ==================================================================== */
+/* POLISH v1 (2026-04-24): Linear precision + Grafana density + Vercel  */
+/* pure-black aesthetic. Order matters — placed BEFORE older rules to   */
+/* let more specific selectors win. Do not mix older gradients.         */
+/* ==================================================================== */
+
+/* --- 1. Vercel-grade pure-black base + 24px dot grid ------------------ */
+body{
+  background:#000!important;
+  background-image:
+    radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px)!important;
+  background-size:24px 24px!important;
+  background-attachment:fixed!important;
+  color:rgba(255,255,255,.92);
+}
+
+/* --- 2. Semantic color tokens (Grafana/TradingView inspired) ---------- */
+:root{
+  --c-profit:#22c55e; --c-profit-dim:rgba(34,197,94,.12);
+  --c-loss:#ef4444; --c-loss-dim:rgba(239,68,68,.12);
+  --c-info:#3b82f6; --c-info-dim:rgba(59,130,246,.1);
+  --c-warn:#f59e0b; --c-warn-dim:rgba(245,158,11,.1);
+  --c-neutral:rgba(255,255,255,.45);
+  --c-border-hair:rgba(255,255,255,.055);
+  --c-border-soft:rgba(255,255,255,.09);
+  --c-border-loud:rgba(255,255,255,.16);
+  --c-bg-raised:rgba(255,255,255,.02);
+  --c-bg-selected:rgba(216,249,157,.05);
+  --c-accent-dim:rgba(216,249,157,.12);
+  --shadow-card:0 1px 0 rgba(255,255,255,.02) inset, 0 8px 24px rgba(0,0,0,.3);
+  --shadow-focus:0 0 0 2px rgba(0,0,0,.9), 0 0 0 4px rgba(216,249,157,.35);
+}
+
+/* --- 3. Hero + card + section refinement (thin hairline borders) ----- */
+.hero,.section-block{
+  border-color:var(--c-border-hair);
+  background:rgba(10,11,14,.72)!important;
+  backdrop-filter:blur(8px);
+  box-shadow:var(--shadow-card);
+}
+.hero{
+  background:linear-gradient(180deg,rgba(13,15,19,.78),rgba(7,8,10,.55))!important;
+}
+.card,.subcard,.interactive-row,.kpi,.info-note{
+  border-color:var(--c-border-hair);
+  background:var(--c-bg-raised);
+}
+.card:hover,.interactive-row[onclick]:hover{
+  border-color:var(--c-border-soft);
+}
+.accent-card{
+  background:linear-gradient(155deg,rgba(22,199,132,.09),rgba(13,14,17,.85))!important;
+  border-color:rgba(22,199,132,.2);
+}
+
+/* --- 4. Typography refinement (Linear scale) ------------------------- */
+h1{font-weight:500;letter-spacing:-.01em;color:rgba(255,255,255,.98)}
+.section-title{color:rgba(255,255,255,.95);font-weight:500;letter-spacing:-.005em;font-size:16px}
+.section-kicker{color:var(--c-warn);letter-spacing:.22em;font-weight:500}
+.card-title{color:rgba(255,255,255,.92);text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:600}
+.card-title .badge{font-weight:500;letter-spacing:.04em;text-transform:none}
+.eyebrow{color:var(--c-warn);font-weight:500}
+.subtitle{color:rgba(255,255,255,.55);font-size:12.5px;line-height:1.5}
+
+/* --- 5. Button / tab refinement --------------------------------------- */
+.btn,.tab,select{
+  background:rgba(255,255,255,.03)!important;
+  border-color:var(--c-border-soft);
+  font-weight:500;
+  transition:background-color .12s ease,border-color .12s ease;
+}
+.btn:hover,.tab:hover{background:rgba(255,255,255,.06)!important;border-color:var(--c-border-loud)}
+.tab.active{
+  background:linear-gradient(180deg,rgba(216,249,157,.18),rgba(216,249,157,.06))!important;
+  border-color:rgba(216,249,157,.4);
+  color:var(--accent);
+  font-weight:600;
+}
+
+/* --- 6. Badge/chip unified 3-size system ----------------------------- */
+.badge{
+  padding:2px 7px;
+  background:rgba(255,255,255,.045);
+  color:rgba(255,255,255,.72);
+  border:1px solid var(--c-border-hair);
+  font-weight:500;
+  font-size:9.5px;
+  letter-spacing:.04em;
+}
+.trust-chip{font-weight:600;letter-spacing:.04em}
+
+/* --- 7. Surface nav polish (Linear-style pill bar) ------------------- */
+.surface-nav{
+  background:rgba(0,0,0,.7)!important;
+  border-bottom-color:var(--c-border-hair);
+  padding:6px 10px;
+  margin:-16px -16px 14px;
+}
+.surface-nav-btn{
+  padding:7px 14px;
+  font-size:11.5px;
+  letter-spacing:-.003em;
+  border-radius:7px;
+  color:rgba(255,255,255,.52);
+}
+.surface-nav-btn:hover{color:rgba(255,255,255,.95);background:rgba(255,255,255,.035)}
+.surface-nav-btn.active{
+  color:var(--accent);
+  background:var(--c-accent-dim);
+}
+.surface-nav-btn .count{
+  background:rgba(216,249,157,.18);
+  color:#bee87a;
+  font-weight:700;
+  font-size:9.5px;
+}
+
+/* --- 8. Global focus-visible ring (accessibility + cool) ------------- */
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+select:focus-visible,
+input:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+  border-radius:6px;
+}
+
+/* --- 9. Trust Strip refinement (pure black + dividers) --------------- */
+.lattice-trust-strip{
+  background:rgba(0,0,0,.62)!important;
+  border-color:var(--c-border-hair);
+}
+.lattice-trust-strip .tstrip-chunk{border-right-color:var(--c-border-hair)}
+.lattice-trust-strip .tstrip-chunk.critical{
+  background:linear-gradient(90deg,var(--c-loss-dim),transparent 80%);
+}
+.lattice-trust-strip .tstrip-chunk.critical .tstrip-dot{
+  box-shadow:0 0 12px rgba(239,68,68,.6), 0 0 4px rgba(239,68,68,.4);
+}
+.lattice-trust-strip .tstrip-chunk.warning .tstrip-dot{
+  box-shadow:0 0 8px rgba(245,158,11,.4);
+}
+.lattice-trust-strip .tstrip-chunk.ok .tstrip-dot{
+  box-shadow:0 0 6px rgba(34,197,94,.5);
+}
+
+/* --- 10. Since Strip refinement -------------------------------------- */
+.lattice-since-strip{
+  background:rgba(255,255,255,.015)!important;
+  border-color:var(--c-border-hair);
+}
+.lattice-since-strip .since-value{color:rgba(255,255,255,.95);font-weight:600}
+.lattice-since-strip .since-delta.up{background:var(--c-profit-dim);color:var(--c-profit)}
+.lattice-since-strip .since-delta.down{background:var(--c-loss-dim);color:var(--c-loss)}
+
+/* --- 11. Hotkey hint refinement (Linear kbd) ------------------------- */
+.hotkey-hint{
+  border-left-color:rgba(216,249,157,.3);
+  padding-left:12px;
+}
+.hotkey-hint kbd{
+  background:rgba(255,255,255,.045);
+  border-color:var(--c-border-soft);
+  color:rgba(255,255,255,.85);
+  box-shadow:0 1px 0 rgba(0,0,0,.3);
+  font-weight:600;
+}
+
+/* --- 12. Theme spectrum refinement ----------------------------------- */
+.theme-spectrum-strip{
+  background:rgba(0,0,0,.5)!important;
+  border-color:var(--c-border-hair);
+}
+.theme-spectrum-strip .ts-seg.up::before{background:var(--c-profit);box-shadow:0 0 8px rgba(34,197,94,.35)}
+.theme-spectrum-strip .ts-seg.down::before{background:var(--c-loss)}
+
+/* --- 13. Evidence row polish (Grafana-grade table) -------------------- */
+.evidence-rows{background:rgba(0,0,0,.3)}
+.evidence-rows-header{
+  background:rgba(0,0,0,.85)!important;
+  color:rgba(255,255,255,.5);
+  font-weight:600;
+}
+.evidence-row{border-bottom-color:var(--c-border-hair)}
+.evidence-row:hover{background:rgba(255,255,255,.025)}
+.evidence-row.grade-e4 .ev-grade,
+.evidence-row.grade-e3 .ev-grade{
+  background:var(--c-profit-dim);
+  color:var(--c-profit);
+  border-color:rgba(34,197,94,.32);
+}
+.evidence-row.grade-e2 .ev-grade{
+  background:rgba(216,249,157,.14);
+  color:#bee87a;
+  border-color:rgba(216,249,157,.3);
+  font-weight:700;
+}
+.evidence-row .ev-uplift.pos{color:var(--c-profit)}
+.evidence-row .ev-uplift.neg{color:var(--c-loss)}
+
+/* --- 14. Regime strip (KPI chips) refinement ------------------------- */
+.regime-strip{
+  background:rgba(0,0,0,.55)!important;
+  border-color:var(--c-border-hair);
+  backdrop-filter:blur(12px);
+}
+.decision-cockpit{
+  border-color:var(--c-border-hair);
+  background:linear-gradient(180deg,rgba(10,11,14,.7),rgba(5,6,8,.55))!important;
+}
+.decision-cockpit::before{display:none}  /* kill the color radial */
+.cockpit-panel{
+  background:rgba(255,255,255,.02)!important;
+  border-color:var(--c-border-hair);
+}
+
+/* --- 15. Inbox refinement (Linear inbox feel) ------------------------- */
+.inbox-list .inbox-item{
+  border-color:var(--c-border-hair);
+  background:rgba(255,255,255,.015);
+}
+.inbox-list .inbox-item:hover{background:rgba(255,255,255,.035);border-color:var(--c-border-soft)}
+.inbox-list .inbox-item.selected{
+  background:var(--c-accent-dim)!important;
+  border-color:rgba(216,249,157,.35);
+  border-left:3px solid var(--accent);
+}
+
+/* --- 16. Skeleton loader (replaces "Loading..." text) ---------------- */
+@keyframes lat-sk-sweep{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.loading{
+  position:relative;
+  min-height:60px;
+  color:transparent!important;
+  background:linear-gradient(90deg,rgba(255,255,255,.02) 0%,rgba(255,255,255,.05) 50%,rgba(255,255,255,.02) 100%);
+  background-size:200% 100%;
+  animation:lat-sk-sweep 2.2s linear infinite;
+  border-radius:6px;
+  opacity:.7;
+}
+.loading::after{
+  content:"loading";
+  position:absolute;
+  top:50%;left:12px;transform:translateY(-50%);
+  color:rgba(255,255,255,.22);
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.2em;
+}
+@media (prefers-reduced-motion: reduce){
+  .loading{animation:none}
+}
+
+/* --- 17. Pill / tag color semantic alignment ------------------------- */
+.tag-growing{background:var(--c-profit-dim)!important;color:var(--c-profit)!important;border-color:rgba(34,197,94,.25)!important}
+.tag-declining{background:var(--c-loss-dim)!important;color:var(--c-loss)!important;border-color:rgba(239,68,68,.25)!important}
+
+/* --- 18. Section header accent underline (subtle) -------------------- */
+.section-heading{position:relative;padding-bottom:10px;border-bottom:1px solid var(--c-border-hair);margin-bottom:16px}
+.section-heading::after{
+  content:"";
+  position:absolute;
+  left:0;bottom:-1px;
+  width:36px;height:1px;
+  background:linear-gradient(90deg,var(--accent),transparent);
+}
+
+/* --- 19. Bulk bar / drawer refinement -------------------------------- */
+.inbox-bulk-bar,.inbox-filter-bar{
+  background:rgba(0,0,0,.4)!important;
+  border-color:var(--c-border-hair)!important;
+}
+.inbox-btn{
+  background:rgba(255,255,255,.035)!important;
+  border-color:var(--c-border-soft)!important;
+}
+
+/* --- 20. Peek overlay polish ----------------------------------------- */
+.peek-overlay{
+  background:rgba(6,7,10,.96)!important;
+  border-color:rgba(216,249,157,.2)!important;
+  box-shadow:0 30px 80px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04) inset!important;
+  backdrop-filter:blur(20px);
+}
+
+/* ==================================================================== */
+/* POLISH v2 (2026-04-24): Structured skeletons + conditional tint      */
+/* ==================================================================== */
+
+/* --- 21. Structured skeleton loaders --------------------------------- */
+/* Override the generic .loading sweep when a more specific shape is    */
+/* requested via data-skeleton="rows|card|kpi|list|sparkline"           */
+.loading[data-skeleton]{
+  background:transparent!important;
+  animation:none!important;
+  opacity:1;
+  min-height:auto;
+  color:rgba(255,255,255,.25)!important;
+  padding:6px 0;
+}
+.loading[data-skeleton]::after{display:none}
+
+/* skeleton-rows: evidence-row-like pattern (8-column grid) */
+.loading[data-skeleton="rows"]{
+  display:flex;flex-direction:column;gap:6px;padding:6px 2px;
+}
+.loading[data-skeleton="rows"]::before{
+  content:"";
+  display:block;
+  height:14px;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,.04) 0 36px,  transparent 36px 46px,
+      rgba(255,255,255,.04) 46px 60%, transparent 60% 62%,
+      rgba(255,255,255,.04) 62% 76%, transparent 76% 78%,
+      rgba(255,255,255,.04) 78% 86%, transparent 86% 88%,
+      rgba(255,255,255,.04) 88% 100%);
+  border-radius:2px;
+  box-shadow:
+    0 22px 0 -1px rgba(255,255,255,.04),
+    0 44px 0 -1px rgba(255,255,255,.035),
+    0 66px 0 -1px rgba(255,255,255,.03),
+    0 88px 0 -1px rgba(255,255,255,.025);
+}
+.loading[data-skeleton="rows"]{min-height:120px}
+
+/* skeleton-card: title + meta + 3 body rows */
+.loading[data-skeleton="card"]{padding:2px 0}
+.loading[data-skeleton="card"]::before{
+  content:"";
+  display:block;
+  height:10px;width:40%;
+  background:rgba(255,255,255,.05);
+  border-radius:3px;
+  margin-bottom:10px;
+  box-shadow:
+    0 18px 0 -1px rgba(255,255,255,.035),
+    0 34px 0 -1px rgba(255,255,255,.03),
+    0 50px 0 -1px rgba(255,255,255,.025);
+  width:70%;
+}
+.loading[data-skeleton="card"]{min-height:76px}
+
+/* skeleton-kpi: 3-4 small boxes */
+.loading[data-skeleton="kpi"]{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:10px;
+  padding:4px 0;
+}
+.loading[data-skeleton="kpi"]::before,
+.loading[data-skeleton="kpi"]::after{
+  content:"";
+  height:58px;
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));
+  border-radius:6px;
+  border:1px solid var(--c-border-hair);
+}
+.loading[data-skeleton="kpi"]::after{grid-column:span 2}
+
+/* skeleton-list: vertical stack of thin rows */
+.loading[data-skeleton="list"]{display:flex;flex-direction:column;gap:4px}
+.loading[data-skeleton="list"]::before{
+  content:"";
+  display:block;
+  height:36px;
+  background:rgba(255,255,255,.03);
+  border-radius:6px;
+  border:1px solid var(--c-border-hair);
+  box-shadow:
+    0 44px 0 -1px rgba(255,255,255,.03),
+    0 88px 0 -1px rgba(255,255,255,.025),
+    0 132px 0 -1px rgba(255,255,255,.02);
+}
+.loading[data-skeleton="list"]{min-height:148px}
+
+/* skeleton-sparkline: mini chart placeholder */
+.loading[data-skeleton="sparkline"]{
+  height:40px;
+  background:
+    linear-gradient(90deg,transparent 0 8%,
+      rgba(255,255,255,.04) 8% 10%,transparent 10% 22%,
+      rgba(255,255,255,.04) 22% 24%,transparent 24% 38%,
+      rgba(255,255,255,.04) 38% 40%,transparent 40% 56%,
+      rgba(255,255,255,.04) 56% 58%,transparent 58% 72%,
+      rgba(255,255,255,.04) 72% 74%,transparent 74% 90%,
+      rgba(255,255,255,.04) 90% 92%,transparent 92%);
+  border-radius:4px;
+}
+
+/* subtle shimmer overlay on all structured skeletons */
+.loading[data-skeleton]{
+  position:relative;
+  overflow:hidden;
+}
+.loading[data-skeleton]::after{
+  content:"";display:block;position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.035),transparent);
+  background-size:200% 100%;
+  animation:lat-sk-sweep 2.4s linear infinite;
+  pointer-events:none;
+}
+.loading[data-skeleton="kpi"]::after{animation:none;background:none}
+@media (prefers-reduced-motion: reduce){
+  .loading[data-skeleton]::after{animation:none}
+}
+
+/* --- 22. Conditional card tints (Cursor/domain-coded) ---------------- */
+/* Very subtle bg tint (~3%) + matching left-border accent. Still dark. */
+.card.tint-warm, .section-block.tint-warm{
+  background:linear-gradient(180deg,rgba(239,68,68,.035),rgba(255,255,255,.01))!important;
+  border-color:rgba(239,68,68,.14)!important;
+}
+.card.tint-warm > .card-title, .section-block.tint-warm .section-title{color:#fbb4b4}
+
+.card.tint-cold, .section-block.tint-cold{
+  background:linear-gradient(180deg,rgba(59,130,246,.035),rgba(255,255,255,.01))!important;
+  border-color:rgba(59,130,246,.14)!important;
+}
+.card.tint-cold > .card-title, .section-block.tint-cold .section-title{color:#a8c7fa}
+
+.card.tint-profit, .section-block.tint-profit{
+  background:linear-gradient(180deg,rgba(34,197,94,.04),rgba(255,255,255,.01))!important;
+  border-color:rgba(34,197,94,.14)!important;
+}
+.card.tint-profit > .card-title, .section-block.tint-profit .section-title{color:#8be6a4}
+
+.card.tint-amber, .section-block.tint-amber{
+  background:linear-gradient(180deg,rgba(245,158,11,.035),rgba(255,255,255,.01))!important;
+  border-color:rgba(245,158,11,.14)!important;
+}
+.card.tint-amber > .card-title, .section-block.tint-amber .section-title{color:#fbbf24}
+
+.card.tint-teal, .section-block.tint-teal{
+  background:linear-gradient(180deg,rgba(103,209,197,.04),rgba(255,255,255,.01))!important;
+  border-color:rgba(103,209,197,.14)!important;
+}
+.card.tint-teal > .card-title, .section-block.tint-teal .section-title{color:#8ddcd0}
+
+.card.tint-violet, .section-block.tint-violet{
+  background:linear-gradient(180deg,rgba(167,139,250,.035),rgba(255,255,255,.01))!important;
+  border-color:rgba(167,139,250,.14)!important;
+}
+.card.tint-violet > .card-title, .section-block.tint-violet .section-title{color:#c5b5fc}
+
+/* Slight indicator bar on left edge so the tint is immediately readable */
+.card[class*="tint-"]{
+  position:relative;
+  border-left-width:2px!important;
+}
+
+/* ==================================================================== */
+/* AI ANALYSIS LAB — Investigate surface (2026-04-24 P0/P1/P2)          */
+/* ==================================================================== */
+#ai-lab-section .section-title::before{content:"✦ ";color:var(--accent);font-weight:700}
+
+/* Event Timeline SVG strip */
+.ai-timeline{position:relative;background:rgba(0,0,0,.5);border:1px solid var(--c-border-hair);border-radius:8px;padding:8px 12px;overflow:hidden;min-height:160px;font-family:var(--font-mono);font-size:10px}
+.ai-timeline svg{width:100%;height:140px;display:block}
+.ai-timeline .tl-axis{stroke:rgba(255,255,255,.08);stroke-width:1}
+.ai-timeline .tl-axis-label{fill:var(--text-soft);font-size:9px}
+.ai-timeline .tl-regime-crisis{fill:rgba(239,68,68,.18)}
+.ai-timeline .tl-regime-risk-off{fill:rgba(245,158,11,.14)}
+.ai-timeline .tl-regime-balanced{fill:rgba(103,209,197,.08)}
+.ai-timeline .tl-regime-risk-on{fill:rgba(34,197,94,.14)}
+.ai-timeline .tl-vix{fill:none;stroke:#fbbf24;stroke-width:1.4;opacity:.75}
+.ai-timeline .tl-dot{cursor:pointer;transition:filter .1s ease,stroke-width .1s ease}
+.ai-timeline .tl-dot:hover{filter:brightness(1.5);stroke:rgba(216,249,157,.7);stroke-width:1}
+.ai-timeline .tl-dot.grade-E2{fill:var(--accent);stroke:rgba(216,249,157,.6);stroke-width:.5}
+.ai-timeline .tl-dot.grade-E1{fill:var(--c-profit);opacity:.65}
+.ai-timeline .tl-dot.grade-E0{fill:rgba(255,255,255,.18)}
+.ai-timeline .tl-dot.grade-none{fill:rgba(255,255,255,.1)}
+.ai-timeline-legend{display:flex;gap:14px;align-items:center;margin-top:6px;font-size:10px;color:var(--text-soft);font-family:var(--font-sans)}
+.ai-timeline-legend .lk{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.ai-tl-tip{position:fixed;pointer-events:none;background:rgba(15,15,18,.96);border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-base);max-width:320px;z-index:9000;box-shadow:0 6px 18px rgba(0,0,0,.55);display:none;line-height:1.35}
+.ai-tl-tip.show{display:block}
+.ai-tl-tip .tip-title{color:var(--text-loud);font-weight:600;margin-bottom:4px}
+.ai-tl-tip .tip-meta{display:flex;gap:8px;font-size:9.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;flex-wrap:wrap}
+.ai-tl-tip .tip-metric{margin-top:4px;color:var(--text-base);font-variant-numeric:tabular-nums}
+.ai-timeline svg{cursor:crosshair}
+.ai-timeline .tl-dot{cursor:pointer}
+.ai-timeline .tl-brush{fill:rgba(216,249,157,.12);stroke:var(--accent);stroke-width:1;stroke-dasharray:3,3;pointer-events:none}
+.tl-reset-btn{position:absolute;top:6px;right:8px;font-family:var(--font-sans);font-size:9.5px;color:var(--text-soft);background:rgba(255,255,255,.06);border:1px solid var(--c-border-hair);border-radius:3px;padding:2px 7px;cursor:pointer;display:none;letter-spacing:.06em}
+.tl-reset-btn.show{display:block}
+.tl-reset-btn:hover{background:rgba(255,255,255,.12);color:var(--text-loud)}
+
+/* Correlation scatter */
+.corr-scatter{position:relative;width:100%;height:220px;background:rgba(0,0,0,.35);border:1px solid var(--c-border-hair);border-radius:6px;overflow:hidden}
+.corr-scatter svg{width:100%;height:100%;display:block}
+.corr-scatter .cs-grid{stroke:rgba(255,255,255,.06);stroke-width:1;fill:none}
+.corr-scatter .cs-axis{stroke:rgba(255,255,255,.18);stroke-width:1}
+.corr-scatter .cs-diag{stroke:rgba(255,255,255,.18);stroke-width:1;stroke-dasharray:3,3}
+.corr-scatter .cs-label{fill:var(--text-muted);font-size:9px;font-family:var(--font-mono)}
+.corr-scatter .cs-pt{cursor:pointer;transition:r .12s ease,filter .12s ease}
+.corr-scatter .cs-pt:hover{filter:brightness(1.5)}
+.corr-scatter .cs-pt.low{fill:rgba(103,209,197,.75);stroke:rgba(103,209,197,1);stroke-width:.7}
+.corr-scatter .cs-pt.mid{fill:rgba(245,158,11,.78);stroke:rgba(245,158,11,1);stroke-width:.8}
+.corr-scatter .cs-pt.high{fill:rgba(239,68,68,.82);stroke:rgba(239,68,68,1);stroke-width:.9}
+.corr-scatter-legend{display:flex;gap:12px;margin-top:6px;font-size:9.5px;color:var(--text-soft);font-family:var(--font-sans);align-items:center;flex-wrap:wrap}
+
+/* Regime Scenario Lab */
+.scenario-lab{display:flex;flex-direction:column;gap:10px;font-family:var(--font-mono);font-size:11px}
+.scenario-input{display:grid;grid-template-columns:60px 1fr 60px;gap:10px;align-items:center}
+.scenario-input label{color:var(--text-soft);text-transform:uppercase;font-size:9px;letter-spacing:.14em;font-family:var(--font-sans)}
+.scenario-input input[type=range]{width:100%;accent-color:var(--accent)}
+.scenario-input .val{text-align:right;font-weight:600;color:var(--text-loud);font-variant-numeric:tabular-nums}
+.scenario-regime{padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;color:var(--accent);font-family:var(--font-sans);border:1px solid var(--c-border-hair)}
+.scenario-predictions{max-height:260px;overflow-y:auto}
+.scenario-pred-row{display:grid;grid-template-columns:minmax(0,1.2fr) 50px 60px 60px 40px;gap:8px;padding:4px 6px;border-bottom:1px dotted var(--c-border-hair);font-size:10.5px;font-variant-numeric:tabular-nums}
+.scenario-pred-row .theme{color:var(--text-base);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scenario-pred-row .sym{color:var(--text-loud);font-weight:600}
+.scenario-pred-row .ret.pos{color:var(--c-profit)}
+.scenario-pred-row .ret.neg{color:var(--c-loss)}
+.scenario-pred-row .mult{color:var(--text-soft)}
+
+/* Asset Dossier */
+.dossier{display:flex;flex-direction:column;gap:10px}
+.dossier-input{display:flex;gap:6px;align-items:center}
+.dossier-input input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--c-border-soft);color:var(--text-loud);padding:6px 10px;border-radius:6px;font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.dossier-input button{padding:6px 14px}
+.dossier-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-family:var(--font-mono);font-size:11px}
+.dossier-stat{padding:8px 10px;background:rgba(255,255,255,.02);border:1px solid var(--c-border-hair);border-radius:6px}
+.dossier-stat .lbl{color:var(--text-soft);font-size:9px;text-transform:uppercase;letter-spacing:.14em;font-family:var(--font-sans)}
+.dossier-stat .num{color:var(--text-loud);font-weight:600;font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums}
+.dossier-themes,.dossier-events{display:flex;flex-direction:column;gap:4px;font-family:var(--font-mono);font-size:10.5px}
+.dossier-row{display:grid;grid-template-columns:120px 60px 60px 1fr;gap:8px;padding:3px 6px;border-bottom:1px dotted var(--c-border-hair)}
+
+/* Correlation Breaks */
+.corr-breaks{display:flex;flex-direction:column;gap:4px;font-family:var(--font-mono);font-size:11px}
+.corr-row{display:grid;grid-template-columns:minmax(0,1.5fr) 60px 60px 70px 80px;gap:8px;padding:4px 6px;border-bottom:1px dotted var(--c-border-hair);align-items:baseline;font-variant-numeric:tabular-nums}
+.corr-row.alert{background:rgba(245,158,11,.06);border-left:2px solid var(--c-warn);padding-left:8px}
+.corr-row .pair{color:var(--text-loud)}
+.corr-row .c30,.corr-row .c90{color:var(--text-soft);text-align:right}
+.corr-row .delta{text-align:right;font-weight:600}
+.corr-row .delta.tighten{color:var(--c-profit)}
+.corr-row .delta.breaking{color:var(--c-loss)}
+.corr-row .dir{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font-sans)}
+
+/* Weekly Digest */
+.digest-panel{padding:12px;background:rgba(216,249,157,.03);border:1px solid rgba(216,249,157,.18);border-radius:8px}
+.digest-headline{font-size:14px;color:var(--accent);font-weight:500;line-height:1.4;margin-bottom:8px}
+.digest-regime{display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.05);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-base);margin-bottom:10px}
+.digest-section{margin-top:8px}
+.digest-section-label{color:var(--text-soft);font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:4px;font-family:var(--font-sans)}
+.digest-section-body{color:var(--text-base);font-size:12px;line-height:1.55}
+.digest-tickers{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.digest-tickers .tkr{padding:2px 8px;background:rgba(216,249,157,.14);color:#bee87a;border-radius:4px;font-family:var(--font-mono);font-size:10.5px;font-weight:600}
+.digest-generate-btn{padding:8px 14px;font-weight:600}
+
+/* Narrative panel (inside peek overlay extension) */
+.peek-narrative{margin-top:10px;padding:10px 12px;background:rgba(216,249,157,.04);border:1px solid rgba(216,249,157,.18);border-radius:6px;font-size:11.5px;line-height:1.6;color:var(--text-base)}
+.peek-narrative .pn-head{color:var(--accent);font-family:var(--font-sans);font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px;display:flex;justify-content:space-between}
+.peek-narrative .pn-loading{color:var(--text-muted);font-style:italic}
+.peek-narrative .pn-citation{font-size:10px;color:var(--text-soft);margin-top:6px}
+.peek-similar{margin-top:8px}
+.peek-similar-row{display:grid;grid-template-columns:40px minmax(0,1fr) 40px 50px;gap:8px;padding:3px 0;font-size:10px;border-bottom:1px dotted var(--c-border-hair);cursor:pointer}
+.peek-similar-row:hover{background:rgba(255,255,255,.02)}
+.peek-similar-row .sim-pct{color:var(--accent);font-variant-numeric:tabular-nums;text-align:right}
+.peek-similar-row .sim-grade{font-weight:600;text-align:center;font-size:9px}
+.peek-similar-row .sim-grade.E2{color:var(--accent)}
+.peek-similar-row .sim-grade.E1{color:var(--c-profit);opacity:.8}
+.peek-similar-row .sim-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-base)}
+
+/* --- Theme Spectrum Strip: one-line hottest-theme scan --------------- */
+.theme-spectrum-strip{display:flex;align-items:stretch;gap:2px;padding:0;margin:0 0 12px;border:1px solid var(--border-dim);border-radius:8px;background:rgba(13,15,19,.48);font-family:var(--font-mono);font-size:10.5px;overflow:hidden;height:28px}
+.theme-spectrum-strip .ts-head{padding:0 10px;display:flex;align-items:center;color:var(--text-soft);font-family:var(--font-sans);font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;background:rgba(255,255,255,.02);border-right:1px solid var(--border-dim);flex-shrink:0}
+.theme-spectrum-strip .ts-seg{position:relative;display:flex;align-items:center;padding:0 6px;min-width:40px;cursor:pointer;transition:background .12s ease}
+.theme-spectrum-strip .ts-seg:hover{background:rgba(255,255,255,.04);z-index:2}
+.theme-spectrum-strip .ts-seg::before{content:"";position:absolute;left:0;bottom:0;height:3px;background:var(--graphite)}
+.theme-spectrum-strip .ts-seg.up::before{background:var(--signal-green)}
+.theme-spectrum-strip .ts-seg.down::before{background:var(--red-critical)}
+.theme-spectrum-strip .ts-seg.flat::before{background:var(--text-muted);opacity:.4}
+.theme-spectrum-strip .ts-label{color:var(--text-base);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.theme-spectrum-strip .ts-count{color:var(--text-soft);margin-left:5px;font-variant-numeric:tabular-nums}
+.theme-spectrum-strip .ts-seg.up .ts-label{color:var(--text-loud);font-weight:500}
+.theme-spectrum-strip .ts-seg.down .ts-label{color:var(--text-soft)}
+
+/* --- Since You Last Looked: delta panel ----------------------------- */
+.lattice-since-strip{display:flex;align-items:center;gap:16px;padding:7px 14px;margin:0 0 12px;border:1px solid var(--border-dim);border-radius:10px;background:rgba(17,23,15,.48);font-family:var(--font-mono);font-size:11px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.lattice-since-strip .since-head{color:var(--text-soft);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.14em;flex-shrink:0}
+.lattice-since-strip .since-ago{color:var(--text-muted);font-size:10px}
+.lattice-since-strip .since-item{display:flex;align-items:baseline;gap:6px}
+.lattice-since-strip .since-label{color:var(--text-soft);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.lattice-since-strip .since-value{color:var(--text-loud);font-weight:600}
+.lattice-since-strip .since-delta{font-size:10px;padding:1px 5px;border-radius:4px;font-weight:500}
+.lattice-since-strip .since-delta.up{background:rgba(22,199,132,.14);color:var(--signal-green)}
+.lattice-since-strip .since-delta.down{background:rgba(239,68,68,.14);color:var(--red-critical)}
+.lattice-since-strip .since-delta.zero{color:var(--text-muted)}
+.lattice-since-strip .since-reset{margin-left:auto;color:var(--text-muted);cursor:pointer;font-size:10px;background:none;border:1px solid var(--border-dim);padding:2px 8px;border-radius:4px;font-family:var(--font-mono)}
+.lattice-since-strip .since-reset:hover{color:var(--text-base);border-color:var(--border-base)}
+
+/* --- Data flash on update (ag-Grid style, bg-color transition only) - */
+@media (prefers-reduced-motion: no-preference){
+  .lattice-trust-strip .tstrip-chunk,.lattice-since-strip .since-value{transition:background-color .35s ease}
+  .flash-update{background-color:rgba(216,249,157,.18)!important}
+}
+
+/* --- Shortcut hint bar (k9s-style, section-scoped) ------------------ */
+.hotkey-hint{display:flex;align-items:center;gap:12px;padding:4px 10px;margin:-8px 0 10px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);border-left:2px solid var(--border-dim)}
+.hotkey-hint kbd{display:inline-block;padding:1px 5px;border-radius:3px;border:1px solid var(--border-dim);background:rgba(255,255,255,.03);color:var(--text-base);font-family:inherit;font-size:9.5px;line-height:1.3;min-width:14px;text-align:center}
+.hotkey-hint .hk-sep{color:var(--text-muted);opacity:.5}
+
+/* --- Row focus (keyboard nav) --------------------------------------- */
+.evidence-row.focused{background:rgba(216,249,157,.08)!important;box-shadow:inset 2px 0 0 var(--accent)}
+.evidence-row:focus{outline:none}
+.evidence-row[tabindex]{cursor:pointer}
+.evidence-row.theme-group{background:rgba(103,209,197,.05)}
+.evidence-row.theme-group .ev-theme{color:var(--teal);font-weight:600}
+
+/* --- Peek overlay (Space hold) -------------------------------------- */
+.peek-overlay{position:fixed;bottom:18px;right:18px;width:420px;max-height:60vh;overflow:auto;padding:14px 16px;background:rgba(8,10,13,.98);border:1px solid rgba(216,249,157,.28);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.5);font-family:var(--font-mono);font-size:11px;z-index:250;display:none}
+.peek-overlay.active{display:block}
+.peek-overlay .peek-head{color:var(--accent);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px;display:flex;justify-content:space-between}
+.peek-overlay .peek-title{color:var(--text-loud);font-weight:500;margin-bottom:6px;font-family:var(--font-sans);font-size:13px}
+.peek-overlay .peek-row{color:var(--text-base);margin:2px 0}
+.peek-overlay .peek-key{color:var(--text-soft);min-width:86px;display:inline-block}
+
+/* --- Compact number + tabular nums everywhere -------------------- */
+.num-compact{font-variant-numeric:tabular-nums}
+
+/* --- Inbox compact row density upgrade ---------------------------- */
+/* Override card padding + stack to a denser 2-row layout: head on top, title+meta in a compact stack. */
+.inbox-list .inbox-item{padding:8px 10px;gap:2px;font-family:var(--font-mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+.inbox-list .inbox-item .inbox-item-head{gap:6px;margin-bottom:2px}
+.inbox-list .inbox-item .inbox-item-head .trust-chip{font-size:9px;padding:1px 5px;letter-spacing:.04em}
+.inbox-list .inbox-item-title{font-family:var(--font-sans);font-size:12.5px;font-weight:500;color:var(--text-loud);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inbox-list .inbox-item-meta{font-size:10px;color:var(--text-soft);letter-spacing:.02em}
+.inbox-list .inbox-item.focused{background:rgba(216,249,157,.08)!important;border-left-color:var(--accent)!important}
+.inbox-list{display:flex;flex-direction:column;gap:3px}
+
+/* --- Trust strip DATA chunk sparkline ---------------------------- */
+.tstrip-spark{display:inline-block;vertical-align:middle;margin-left:6px;opacity:.85}
+.tstrip-spark polyline{fill:none;stroke-width:1.25;stroke-linecap:round}
+.tstrip-spark polyline.up{stroke:var(--signal-green)}
+.tstrip-spark polyline.down{stroke:var(--red-critical)}
+.tstrip-spark polyline.flat{stroke:var(--text-muted)}
+
+/* --- Bulk simulate result panel --------------------------------- */
+.bulk-sim-panel{margin-top:8px;padding:10px 12px;border:1px solid var(--border-dim);border-radius:8px;background:rgba(8,10,13,.6);font-family:var(--font-mono);font-size:11px}
+.bulk-sim-panel .bs-head{color:var(--accent);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px;display:flex;justify-content:space-between}
+.bulk-sim-panel .bs-row{padding:3px 0;display:grid;grid-template-columns:48px 24px minmax(0,1fr) 56px;gap:8px;align-items:baseline;border-bottom:1px dotted var(--border-dim)}
+.bulk-sim-panel .bs-row:last-child{border-bottom:none}
+.bulk-sim-panel .bs-outcome{font-weight:700;font-size:10px;letter-spacing:.05em}
+.bulk-sim-panel .bs-outcome.accept{color:var(--signal-green)}
+.bulk-sim-panel .bs-outcome.skip{color:var(--amber-risk)}
+.bulk-sim-panel .bs-outcome.fail{color:var(--red-critical)}
+.bulk-sim-panel .bs-quality{color:var(--text-soft);text-align:right;font-variant-numeric:tabular-nums}
+.bulk-sim-panel .bs-summary{margin-top:6px;padding-top:6px;border-top:1px solid var(--border-dim);color:var(--text-base)}
+.bulk-sim-panel .bs-close{cursor:pointer;color:var(--text-muted);background:none;border:1px solid var(--border-dim);padding:2px 6px;border-radius:4px;font-family:inherit;font-size:9.5px}
 </style>
 </head>
 <body>
@@ -381,6 +1094,59 @@ th{color:var(--muted);font-weight:normal}
     <button class="surface-nav-btn" data-surface="ops" onclick="switchSurface('ops')">Ops</button>
   </nav>
 
+  <!-- Trust Strip: 18px persistent status bar (scan in peripheral vision) -->
+  <div class="lattice-trust-strip" id="lattice-trust-strip" role="status" aria-label="System trust status">
+    <a class="tstrip-chunk" data-trust="data" onclick="switchSurface('ops');return false;" href="#ops" title="Data freshness and article ingestion — click to open Ops">
+      <span class="tstrip-dot"></span>
+      <span class="tstrip-label">DATA</span>
+      <span class="tstrip-value" id="tstrip-data-value">loading…</span>
+      <svg class="tstrip-spark" id="tstrip-data-spark" width="48" height="14" viewBox="0 0 48 14" aria-hidden="true"></svg>
+    </a>
+    <a class="tstrip-chunk" data-trust="nowcast" onclick="switchSurface('ops');return false;" href="#ops" title="Nowcast model registry — click to open Ops">
+      <span class="tstrip-dot"></span>
+      <span class="tstrip-label">NOWCAST</span>
+      <span class="tstrip-value" id="tstrip-nowcast-value">loading…</span>
+    </a>
+    <a class="tstrip-chunk" data-trust="source" onclick="switchSurface('ops');return false;" href="#ops" title="Source diversity and syndicator share — click to open Ops">
+      <span class="tstrip-dot"></span>
+      <span class="tstrip-label">SOURCE</span>
+      <span class="tstrip-value" id="tstrip-source-value">loading…</span>
+    </a>
+    <a class="tstrip-chunk" data-trust="meta" onclick="switchSurface('ops');return false;" href="#ops" title="Meta-model calibration — click to open Ops">
+      <span class="tstrip-dot"></span>
+      <span class="tstrip-label">META</span>
+      <span class="tstrip-value" id="tstrip-meta-value">loading…</span>
+    </a>
+  </div>
+
+  <!-- Since You Last Looked: delta vs last visit (localStorage) -->
+  <div class="lattice-since-strip" id="lattice-since-strip" role="status" aria-label="Change since last visit">
+    <span class="since-head">SINCE</span>
+    <span class="since-ago" id="since-ago">first visit</span>
+    <div class="since-item" data-since="articles24h"><span class="since-label">articles 24h</span><span class="since-value" id="since-articles24h">—</span><span class="since-delta zero" id="since-articles24h-delta">Δ—</span></div>
+    <div class="since-item" data-since="hotE2"><span class="since-label">hot E2</span><span class="since-value" id="since-hotE2">—</span><span class="since-delta zero" id="since-hotE2-delta">Δ—</span></div>
+    <div class="since-item" data-since="inbox"><span class="since-label">inbox</span><span class="since-value" id="since-inbox">—</span><span class="since-delta zero" id="since-inbox-delta">Δ—</span></div>
+    <div class="since-item" data-since="synd"><span class="since-label">synd%</span><span class="since-value" id="since-synd">—</span><span class="since-delta zero" id="since-synd-delta">Δ—</span></div>
+    <button class="since-reset" onclick="resetSinceSnapshot()" title="Reset baseline to now">reset</button>
+  </div>
+
+  <!-- Theme Spectrum Strip: one-line hottest-theme scan with lifecycle direction -->
+  <div class="theme-spectrum-strip" id="theme-spectrum-strip" role="status" aria-label="Hottest themes today">
+    <div class="ts-head">THEMES</div>
+    <div id="theme-spectrum-body" style="display:flex;flex:1 1 auto;min-width:0"><span style="padding:0 10px;color:var(--text-muted);align-self:center">loading…</span></div>
+  </div>
+
+  <!-- Global shortcut hint (k9s-style, always visible on all surfaces) -->
+  <div class="hotkey-hint" aria-label="Keyboard shortcuts">
+    <span><kbd>J</kbd><kbd>K</kbd> nav</span><span class="hk-sep">·</span>
+    <span><kbd>E</kbd> explain</span><span class="hk-sep">·</span>
+    <span><kbd>Space</kbd> peek</span><span class="hk-sep">·</span>
+    <span><kbd>G</kbd><kbd>H</kbd> home / <kbd>G</kbd><kbd>I</kbd> inbox / <kbd>G</kbd><kbd>O</kbd> ops</span><span class="hk-sep">·</span>
+    <span><kbd>/</kbd> filter</span><span class="hk-sep">·</span>
+    <span><kbd>?</kbd> help</span><span class="hk-sep">·</span>
+    <span><kbd>Esc</kbd> clear</span>
+  </div>
+
   <section class="decision-cockpit" aria-label="Alert proof action cockpit">
     <div class="regime-strip">
       <div class="regime-strip-title">Regime Strip</div>
@@ -400,16 +1166,6 @@ th{color:var(--muted);font-weight:normal}
       <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX, composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals. E2 means matched-control uplift with t &gt; 1.96.</div>
     </details>
     <div class="cockpit-grid">
-      <div class="cockpit-panel priority-decision-card">
-        <div class="cockpit-title-row">
-          <div class="cockpit-kicker">Pending Decision</div>
-          <span class="badge" id="top-decision-badge">waiting</span>
-        </div>
-        <div id="top-decision-card">
-          <div class="top-decision-title">Loading review queue...</div>
-          <div class="top-decision-meta">The highest urgency approval, proposal, or discovery item will appear here.</div>
-        </div>
-      </div>
       <div class="cockpit-panel action-signal-panel">
         <div id="e2-signal-queue" class="signal-queue">
           <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span> <span style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:normal">Click a card for proof | <a href="#inbox" onclick="switchSurface('inbox');return false;" style="color:var(--accent)">Open Decision Inbox</a></span></div>
@@ -437,6 +1193,66 @@ th{color:var(--muted);font-weight:normal}
     <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Review <strong>Actionable Signals</strong> above for the highest-priority E2 items.</div><div class="step-item"><span class="step-index">2</span>Process pending work in <strong>Decision Inbox</strong> to accept, reject, or triage items.</div><div class="step-item"><span class="step-index">3</span>Drill into a theme via <strong>Investigate</strong> for evidence, citations, and related entities.</div></div></div>
   </div>
 
+  <section class="section-block" id="hot-events-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Scan Row</div><div class="section-title">Hot Events <span class="badge" id="hot-events-badge">loading</span></div></div>
+      <div class="section-meta">Log-style row view ranked by evidence grade, t-stat, and Hawkes temperature. Hover a row for the evidence chain.</div>
+    </div>
+    <div id="hot-events-rows" class="evidence-rows">
+      <div class="evidence-rows-header">
+        <div>GRADE</div>
+        <div>TITLE</div>
+        <div>THEME</div>
+        <div style="text-align:right">T</div>
+        <div style="text-align:right">|UPLIFT|</div>
+        <div style="text-align:right">TEMP</div>
+        <div style="text-align:right">ART</div>
+        <div style="text-align:center">🔥</div>
+      </div>
+      <div class="loading" data-skeleton="rows" style="margin:8px 10px">loading hot events</div>
+    </div>
+  </section>
+
+  <!-- GOLD STRIP: highest-utility evidence-chain snapshots pinned above the fold -->
+  <section class="section-block" id="gold-strip-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Evidence Chain</div><div class="section-title">Geo · Transmission · Investment</div></div>
+      <div class="section-meta">Country pressure, regime transmission, and validated investment ideas — the three sections with the highest signal-to-noise ratio.</div>
+    </div>
+    <div class="grid3">
+      <div class="card tint-violet">
+        <div class="card-title">Geo Pressure <span class="badge" id="geo-pressure-badge">Regions</span></div>
+        <div id="geo-pressure-snapshot" class="loading" data-skeleton="list">loading geo pressure</div>
+      </div>
+      <div class="card tint-amber">
+        <div class="card-title">Transmission <span class="badge" id="transmission-snapshot-badge">Links</span></div>
+        <div id="transmission-snapshot" class="loading" data-skeleton="card">loading transmission</div>
+      </div>
+      <div class="card tint-profit">
+        <div class="card-title">Investment <span class="badge" id="investment-snapshot-badge">Ideas</span></div>
+        <div id="investment-snapshot" class="loading" data-skeleton="card">loading investment</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STRUCTURAL ALERTS: pin wide (was cramped in 3-col grid previously) -->
+  <section class="section-block tint-warm" id="structural-alerts-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Now Acting</div><div class="section-title">Structural Alerts <span class="badge" id="structural-alerts-badge">Weekly</span></div></div>
+      <div class="section-meta">Narrative alerts with concrete ticker exposures.</div>
+    </div>
+    <div id="structural-alerts" class="loading" data-skeleton="list">loading structural alerts</div>
+  </section>
+
+  <!-- RECENT TRANSITIONS: extracted from Trend Pyramid as standalone quick-scan card -->
+  <section class="section-block secondary-block tint-profit" id="recent-transitions-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Lifecycle</div><div class="section-title">Recent Theme Transitions <span class="badge" id="recent-transitions-badge">—</span></div></div>
+      <div class="section-meta">Themes that moved stage (nascent → emerging → growing → mainstream) in the latest pyramid refresh.</div>
+    </div>
+    <div id="recent-transitions-standalone" class="loading" data-skeleton="list">waiting for pyramid refresh</div>
+  </section>
+
   <section class="section-block" id="workspace-section">
     <div class="section-heading">
       <div><div class="section-kicker">Workspace</div><div class="section-title">My Themes And Theme Brief</div></div>
@@ -449,12 +1265,12 @@ th{color:var(--muted);font-weight:normal}
     <div class="grid2">
       <div class="card">
         <div class="card-title">My Themes <span class="badge" id="my-themes-badge">0 followed</span></div>
-        <div id="my-themes" class="loading">Preparing followed themes and suggestions...</div>
+        <div id="my-themes" class="loading" data-skeleton="list">preparing followed themes</div>
       </div>
       <div class="card sticky-card" id="theme-brief-card">
         <div class="card-title">Theme Brief <span class="badge" id="theme-brief-badge">No theme selected</span></div>
         <div class="info-note inline-help" id="theme-brief-help">This is the detailed panel. Any <strong>Open full brief</strong> action updates this card and scrolls you back here.</div>
-        <div id="theme-brief" class="loading">Select a theme from the main trend surfaces to inspect what changed, why it matters, and what to watch next.</div>
+        <div id="theme-brief" class="loading" data-skeleton="card">select a theme from the trend surfaces</div>
       </div>
     </div>
       <div class="card" style="margin-top:12px">
@@ -472,62 +1288,36 @@ th{color:var(--muted);font-weight:normal}
           <div id="proposal-inbox" class="loading">Loading Codex proposal inbox...</div>
         </div>
       </div>
-      <div class="grid3" style="margin-top:12px">
-        <div class="card">
-          <div class="card-title">Structural Alerts <span class="badge" id="structural-alerts-badge">Weekly</span></div>
-          <div id="structural-alerts" class="loading">Loading structural alerts...</div>
-        </div>
-        <div class="card">
+      <div class="grid2" style="margin-top:12px">
+        <div class="card tint-teal">
           <div class="card-title">Discovery Triage <span class="badge" id="discovery-triage-badge">Watch queue</span></div>
-          <div id="discovery-triage" class="loading">Loading discovery triage queue...</div>
+          <div id="discovery-triage" class="loading" data-skeleton="list">loading discovery triage</div>
         </div>
-        <div class="card">
+        <div class="card tint-amber">
           <div class="card-title">Approval Queue <span class="badge" id="approval-queue-badge">0 pending</span></div>
-          <div id="approval-queue" class="loading">Loading human approval queue...</div>
+          <div id="approval-queue" class="loading" data-skeleton="list">loading approval queue</div>
         </div>
       </div>
-      <div class="snapshot-grid">
-        <div class="card">
-          <div class="card-title">Geo Pressure <span class="badge" id="geo-pressure-badge">Regions</span></div>
-          <div id="geo-pressure-snapshot" class="loading">Loading geo pressure snapshot...</div>
-        </div>
-        <div class="card">
+      <!-- Secondary snapshot grid: 4 context cards (Geo/Transmission/Investment moved to GOLD Strip above) -->
+      <div class="snapshot-grid secondary-snapshot-grid">
+        <div class="card tint-warm">
           <div class="card-title">Risk Snapshot <span class="badge" id="risk-snapshot-badge">Field</span></div>
-          <div id="risk-snapshot" class="loading">Loading risk snapshot...</div>
+          <div id="risk-snapshot" class="loading" data-skeleton="card">loading risk snapshot</div>
         </div>
-        <div class="card">
+        <div class="card tint-cold">
           <div class="card-title">Macro Snapshot <span class="badge" id="macro-snapshot-badge">Signals</span></div>
-          <div id="macro-snapshot" class="loading">Loading macro snapshot...</div>
-        </div>
-        <div class="card">
-          <div class="card-title">Investment Snapshot <span class="badge" id="investment-snapshot-badge">Ideas</span></div>
-          <div id="investment-snapshot" class="loading">Loading investment snapshot...</div>
+          <div id="macro-snapshot" class="loading" data-skeleton="kpi">loading macro snapshot</div>
         </div>
         <div class="card">
           <div class="card-title">Validation Snapshot <span class="badge" id="validation-snapshot-badge">Replay</span></div>
-          <div id="validation-snapshot" class="loading">Loading validation snapshot...</div>
+          <div id="validation-snapshot" class="loading" data-skeleton="card">loading validation snapshot</div>
         </div>
-        <div class="card">
-          <div class="card-title">Transmission Snapshot <span class="badge" id="transmission-snapshot-badge">Links</span></div>
-          <div id="transmission-snapshot" class="loading">Loading transmission snapshot...</div>
-        </div>
-        <div class="card">
+        <div class="card tint-cold">
           <div class="card-title">Source Ops Snapshot <span class="badge" id="source-ops-snapshot-badge">Feeds</span></div>
-          <div id="source-ops-snapshot" class="loading">Loading source operations snapshot...</div>
+          <div id="source-ops-snapshot" class="loading" data-skeleton="card">loading source ops</div>
         </div>
       </div>
     </section>
-
-  <section class="section-block">
-    <div class="section-heading">
-      <div><div class="section-kicker">Primary Briefing</div><div class="section-title">Curated Trend Briefing</div></div>
-      <div class="section-meta" id="period-caption">Quarterly operating view</div>
-    </div>
-    <div class="primary-grid">
-      <div class="card span-7"><div class="card-title">Top Curated Items <span class="badge" id="curated-period-badge">Quarterly lens</span></div><div id="curated-items" class="loading">Loading curated trend items...</div></div>
-      <div class="card span-5"><div class="card-title">Trend Pyramid <span class="badge">Lifecycle</span></div><div id="trend-pyramid" class="loading">Loading lifecycle pyramid...</div></div>
-    </div>
-  </section>
 
   </div><!-- /surface: home -->
 
@@ -540,8 +1330,10 @@ th{color:var(--muted);font-weight:normal}
       <button class="inbox-btn inbox-btn-accept" id="inbox-bulk-accept" onclick="inboxBulkAction('accept')" disabled>Accept All <span class="inbox-shortcut">A</span></button>
       <button class="inbox-btn inbox-btn-reject" id="inbox-bulk-reject" onclick="inboxBulkAction('reject')" disabled>Reject All <span class="inbox-shortcut">R</span></button>
       <button class="inbox-btn inbox-btn-snooze" id="inbox-bulk-snooze" onclick="inboxBulkAction('snooze')" disabled>Snooze All <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn" id="inbox-bulk-simulate" onclick="inboxBulkSimulate()" disabled title="Dry-run accept decisions for all selected approval items (no state change)">Simulate All <span class="inbox-shortcut">⇧S</span></button>
       <button class="inbox-btn" id="inbox-bulk-clear" style="margin-left:auto" onclick="inboxClearSelection()" disabled>Clear</button>
     </div>
+    <div id="inbox-bulk-sim-result"></div>
     <div class="inbox-filter-bar" id="inbox-filter-bar">
       <span style="font-size:11px;color:var(--muted);margin-right:4px">State:</span>
       <button class="inbox-filter-chip active" data-status-filter="actionable" onclick="inboxFilter('actionable')">Actionable <span id="inbox-count-status-actionable">...</span></button>
@@ -573,6 +1365,18 @@ th{color:var(--muted);font-weight:normal}
   <!-- SURFACE 3: INVESTIGATE ??rotation, breadth, analytics, tactical     -->
   <!-- ??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??-->
   <div class="surface" data-surface="investigate">
+  <!-- Curated Trend Briefing — relocated from Home (2026-04-23 layout restructure) -->
+  <section class="section-block">
+    <div class="section-heading">
+      <div><div class="section-kicker">Primary Briefing</div><div class="section-title">Curated Trend Briefing</div></div>
+      <div class="section-meta" id="period-caption">Quarterly operating view</div>
+    </div>
+    <div class="primary-grid">
+      <div class="card span-7"><div class="card-title">Top Curated Items <span class="badge" id="curated-period-badge">Quarterly lens</span></div><div id="curated-items" class="loading">Loading curated trend items...</div></div>
+      <div class="card span-5"><div class="card-title">Trend Pyramid <span class="badge">Lifecycle</span></div><div id="trend-pyramid" class="loading">Loading lifecycle pyramid...</div></div>
+    </div>
+  </section>
+
   <section class="section-block">
     <div class="section-heading">
       <div><div class="section-kicker">Rotation</div><div class="section-title">Theme Evolution And Structural Shifts</div></div>
@@ -678,6 +1482,87 @@ th{color:var(--muted);font-weight:normal}
         <div class="card-title">Source Credibility <span class="badge" id="source-count-badge">--</span></div>
         <div class="desc-text" data-i18n="source-desc">Trust score per news source based on how well their articles predict actual asset reactions. High score = articles from this source align with real price moves. Low score = noisy or unreliable source.</div>
         <div id="source-credibility-chart"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI ANALYSIS LAB — P0/P1/P2 features (2026-04-24) -->
+  <section class="section-block" id="ai-lab-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">AI Analysis</div><div class="section-title">AI Analysis Lab</div></div>
+      <div class="section-meta">Event timeline · regime scenarios · asset dossiers · correlation breaks · Codex-generated narratives.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">Event Timeline <span class="badge" id="ai-timeline-badge">90d</span></div>
+      <div id="ai-event-timeline" class="ai-timeline">
+        <svg viewBox="0 0 1400 140" preserveAspectRatio="none"><text x="10" y="20" fill="rgba(255,255,255,.4)" font-family="monospace" font-size="11">loading timeline…</text></svg>
+      </div>
+      <div class="ai-timeline-legend">
+        <span><span class="lk" style="background:var(--accent)"></span>E2</span>
+        <span><span class="lk" style="background:#22c55e;opacity:.7"></span>E1</span>
+        <span><span class="lk" style="background:rgba(255,255,255,.2)"></span>E0</span>
+        <span><span class="lk" style="background:rgba(239,68,68,.2)"></span>crisis regime</span>
+        <span><span class="lk" style="background:rgba(245,158,11,.18)"></span>risk-off</span>
+        <span><span class="lk" style="background:rgba(103,209,197,.12)"></span>balanced</span>
+        <span><span class="lk" style="background:rgba(34,197,94,.18)"></span>risk-on</span>
+        <span><span class="lk" style="background:#fbbf24"></span>VIX line</span>
+        <span style="margin-left:auto;color:var(--text-muted)">Click a dot for peek · J/K also navigates</span>
+      </div>
+    </div>
+
+    <div class="grid3" style="margin-bottom:12px">
+      <div class="card tint-cold">
+        <div class="card-title">Regime Scenario Lab <span class="badge" id="scenario-regime-badge">balanced</span></div>
+        <div id="scenario-lab" class="scenario-lab">
+          <div class="scenario-input">
+            <label>VIX</label>
+            <input type="range" id="scenario-vix" min="8" max="45" step="0.5" value="19">
+            <span class="val" id="scenario-vix-val">19</span>
+          </div>
+          <div class="scenario-input">
+            <label>Yield</label>
+            <input type="range" id="scenario-yield" min="-1" max="3" step="0.05" value="0.5">
+            <span class="val" id="scenario-yield-val">0.50</span>
+          </div>
+          <div class="scenario-input">
+            <label>Oil</label>
+            <input type="range" id="scenario-oil" min="40" max="150" step="1" value="92">
+            <span class="val" id="scenario-oil-val">92</span>
+          </div>
+          <div class="scenario-regime" id="scenario-regime-out">balanced</div>
+          <div class="scenario-predictions" id="scenario-predictions"><div class="meta-line" style="padding:8px">drag a slider to simulate</div></div>
+        </div>
+      </div>
+
+      <div class="card tint-profit">
+        <div class="card-title">Asset Dossier <span class="badge" id="dossier-badge">—</span></div>
+        <div class="dossier">
+          <div class="dossier-input">
+            <input type="text" id="dossier-input" placeholder="ticker symbol (NVDA, XLE, CL=F)…" value="NVDA" />
+            <button class="btn" onclick="refreshAssetDossier()">Lookup</button>
+          </div>
+          <div id="dossier-body">
+            <div class="meta-line" style="padding:8px">enter a ticker and press Lookup</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card tint-warm">
+        <div class="card-title">Correlation Breaks <span class="badge" id="corr-breaks-badge">90d vs 30d</span></div>
+        <div id="corr-breaks-body" class="corr-breaks">
+          <div class="meta-line" style="padding:8px">loading correlation breaks…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card tint-profit" style="margin-bottom:12px">
+      <div class="card-title" style="justify-content:space-between">
+        <span>Weekly AI Digest <span class="badge" id="digest-badge">7-day</span></span>
+        <button class="btn digest-generate-btn" onclick="refreshWeeklyDigest()">Generate via Codex</button>
+      </div>
+      <div id="digest-body">
+        <div class="meta-line" style="padding:8px">press <strong>Generate via Codex</strong> to produce a 7-day AI brief (takes ~60s)</div>
       </div>
     </div>
   </section>
@@ -790,9 +1675,28 @@ let followedThemeBriefing={periodType:'week',itemCount:0,items:[]};
 let structuralAlertsPayload={items:[]};
 let discoveryTriagePayload={items:[],summary:{}};
 let proposalInboxPayload={proposals:[],approvals:[]};
+const CLIENT_CACHE_TTL_MS=15*60*1000;
+const CLIENT_CACHE_LONG_TTL_MS=6*60*60*1000;
+const CLIENT_CACHE_SHORT_TTL_MS=2*60*1000;
 
 function lsGet(key){try{return JSON.parse(localStorage.getItem('ei_'+key));}catch{return null;}}
 function lsSet(key,val){try{localStorage.setItem('ei_'+key,JSON.stringify(val));}catch{}}
+function lsDel(key){try{localStorage.removeItem('ei_'+key);}catch{}}
+function invalidateClientCaches(keys=[]){keys.forEach((key)=>lsDel(key));}
+function clientCacheMaxAgeMs(key){
+  const normalized=String(key||'');
+  if(/proposal-inbox|approval|pending|discovery-triage/.test(normalized))return CLIENT_CACHE_SHORT_TTL_MS;
+  if(/theme-brief|followed-theme-briefing|structural-alerts|theme-shell-snapshots/.test(normalized))return CLIENT_CACHE_LONG_TTL_MS;
+  return CLIENT_CACHE_TTL_MS;
+}
+function getUsableClientCache(key){
+  const cached=lsGet(key);
+  if(!cached||!cached.ts)return null;
+  const ts=Date.parse(cached.ts);
+  if(!Number.isFinite(ts))return null;
+  if(Date.now()-ts>clientCacheMaxAgeMs(key))return null;
+  return cached;
+}
 function postEmbedMessage(type,payload={}){if(!EMBED_MODE||window.parent===window)return;try{window.parent.postMessage({source:'theme-workspace',type,payload},window.location.origin);}catch{}}
 function getLensContext(){return{theme:state.currentTheme||null,period:getCurrentPeriod(),evolutionParent:state.evolutionParent||null,followedThemes:state.myThemes.slice(0,20)};}
 function getMapLensFrame(){return document.getElementById('theme-map-lens');}
@@ -1384,14 +2288,15 @@ async function f(url,cacheKey){
   try{
     const response=await fetch(url);
     const data=await response.json();
+    if(!response.ok)throw new Error(data?.error||`Request failed (${response.status})`);
     if(cacheKey)lsSet(cacheKey,{data,ts:new Date().toISOString()});
     return{data,cached:false};
-  }catch{
+  }catch(error){
     if(cacheKey){
-      const cached=lsGet(cacheKey);
-      if(cached)return{data:cached.data,cached:true,cachedAt:cached.ts};
+      const cached=getUsableClientCache(cacheKey);
+      if(cached)return{data:cached.data,cached:true,cachedAt:cached.ts,cacheReason:String(error?.message||error||'fetch failed')};
     }
-    return{data:null,cached:false};
+    return{data:null,cached:false,error:String(error?.message||error||'fetch failed')};
   }
 }
 async function postJson(url,body){
@@ -1509,6 +2414,15 @@ async function loadStructuralAlerts(){
   html+='</div>';
   el.innerHTML=html;
 }
+async function fetchThemeSymbolsBulk(themes){
+  const unique=Array.from(new Set(asArray(themes).map(t=>String(t||'').trim().toLowerCase()).filter(Boolean)));
+  if(!unique.length)return{};
+  try{
+    const res=await fetch(`${API}/theme-symbols-bulk?limit=3&themes=${encodeURIComponent(unique.join(','))}`);
+    const data=await res.json();
+    return data?.themes||{};
+  }catch(e){return{};}
+}
 async function loadDiscoveryTriage(){
   const el=document.getElementById('discovery-triage');
   const badge=document.getElementById('discovery-triage-badge');
@@ -1516,9 +2430,16 @@ async function loadDiscoveryTriage(){
   discoveryTriagePayload=data||{items:[],summary:{}};
   const items=asArray(data?.items);
   const summary=data?.summary||{};
-  badge.textContent=`${fmtWhole(summary.watch||items.length)} watch`;
+  // L8: fetch top 3 symbols per suggested theme in one bulk call
+  const themeKeys=items.map(it=>normalizeTheme(it.normalizedTheme||'')).filter(Boolean);
+  const symbolMap=await fetchThemeSymbolsBulk(themeKeys);
+  const staleVisible=items.filter((item)=>item.dataStale).length;
+  badge.textContent=`${fmtWhole(summary.watch||items.length)} watch${staleVisible?` | ${fmtWhole(staleVisible)} stale`:''}`;
   let html='';
   if(cached)html+=cachedBadge(cachedAt);
+  if(data?.meta?.stale||(items.length>0&&staleVisible===items.length)){
+    html+=`<div class="stale-badge">Discovery topics are stale; latest linked article ${escapeHtml(fmtDateTime(data?.meta?.dataUpdatedAt||items[0]?.dataUpdatedAt||items[0]?.updatedAt))}</div>`;
+  }
   if(!items.length){
     el.innerHTML=`${html}<div class="theme-empty">No discovery topics need triage right now.</div>`;
     return;
@@ -1527,7 +2448,11 @@ async function loadDiscoveryTriage(){
   items.slice(0,8).forEach((item)=>{
     const normalizedTheme=normalizeTheme(item.normalizedTheme||'');
     const briefTheme=shouldShowDiscoveryTheme(normalizedTheme)?normalizedTheme:'';
-    html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><strong>${escapeHtml(item.label||item.id)}</strong><div class="meta-line">${escapeHtml(item.category||'other')} | articles ${escapeHtml(fmtWhole(item.articleCount||0))} | momentum ${escapeHtml(fmt(item.momentum||0,2))} | score ${escapeHtml(fmt(item.structuralScore||0,2))}</div></div><span class="badge">${escapeHtml(item.promotionState||'watch')}</span></div>${item.keywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.keywords,'tag-neutral',6)}</div>`:''}${briefTheme?`<div class="meta-line" style="margin-top:6px">Suggested theme ${escapeHtml(humanizeTheme(briefTheme))}</div>`:''}${item.lastReview?.decidedAt?`<div class="meta-line" style="margin-top:6px">Last review ${escapeHtml(fmtDateTime(item.lastReview.decidedAt))} by ${escapeHtml(item.lastReview.reviewer||'unknown')}</div>`:''}<div class="theme-actions" style="margin-top:8px">${briefTheme?`<button class="btn" onclick="openThemeBrief('${briefTheme}')">Open full brief</button>`:''}<button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','canonical','${escapeHtml(normalizedTheme)}','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Canonical</button><button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','watch','${escapeHtml(normalizedTheme)}','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Watch</button><button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','suppressed','','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Suppress</button></div></div>`;
+    const freshnessLine=item.dataUpdatedAt?` | data ${escapeHtml(fmtDateTime(item.dataUpdatedAt))}${item.dataStale?' | stale':''}`:'';
+    const themeKey=normalizedTheme.toLowerCase();
+    const syms=symbolMap[themeKey]||[];
+    const symChips=syms.length?`<div class="pill-row" style="margin-top:6px;gap:4px">${syms.map(s=>`<span class="tag tag-emerging" title="${escapeHtml((s.reactionCount||0)+' reactions · hit '+(s.outcomeHitRate!=null?(s.outcomeHitRate*100).toFixed(0)+'%':'n/a'))}">${escapeHtml(s.symbol)}${s.qualityScore!=null?` <span style="opacity:.6">${s.qualityScore.toFixed(2)}</span>`:''}</span>`).join('')}</div>`:'';
+    html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><strong>${escapeHtml(item.label||item.id)}</strong><div class="meta-line">${escapeHtml(item.category||'other')} | articles ${escapeHtml(fmtWhole(item.articleCount||0))} | momentum ${escapeHtml(fmt(item.momentum||0,2))} | score ${escapeHtml(fmt(item.structuralScore||0,2))}${freshnessLine}</div></div><span class="badge">${escapeHtml(item.promotionState||'watch')}</span></div>${symChips}${item.keywords?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.keywords,'tag-neutral',6)}</div>`:''}${briefTheme?`<div class="meta-line" style="margin-top:6px">Suggested theme ${escapeHtml(humanizeTheme(briefTheme))}</div>`:''}${item.lastReview?.decidedAt?`<div class="meta-line" style="margin-top:6px">Last review ${escapeHtml(fmtDateTime(item.lastReview.decidedAt))} by ${escapeHtml(item.lastReview.reviewer||'unknown')}</div>`:''}<div class="theme-actions" style="margin-top:8px">${briefTheme?`<button class="btn" onclick="openThemeBrief('${briefTheme}')">Open full brief</button>`:''}<button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','canonical','${escapeHtml(normalizedTheme)}','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Canonical</button><button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','watch','${escapeHtml(normalizedTheme)}','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Watch</button><button class="btn" onclick="applyDiscoveryTriageDecision('${escapeHtml(item.id)}','suppressed','','${escapeHtml(item.parentTheme||item.normalizedParentTheme||'')}','${escapeHtml(item.category||'')}')">Suppress</button></div></div>`;
   });
   html+='</div>';
   el.innerHTML=html;
@@ -1717,6 +2642,7 @@ function normalizeApprovalToReviewItem(approval) {
   };
 }
 function normalizeTriageToReviewItem(triage) {
+  const sources = Array.isArray(triage.sources) ? triage.sources.filter((source) => source && source.url).slice(0, 6) : [];
   return {
     id: 'triage-' + (triage.id || Math.random().toString(36).slice(2)),
     rawId: String(triage.id || ''),
@@ -1727,10 +2653,12 @@ function normalizeTriageToReviewItem(triage) {
     detail: Array.isArray(triage.keywords) ? triage.keywords.slice(0, 6).join(', ') : '',
     payload: triage,
     urgency: Number(triage.structuralScore || 0) > 0.5 ? 'high' : 'medium',
-    updatedAt: triage.lastReview?.decidedAt || triage.updatedAt || null,
+    updatedAt: triage.latestLinkedArticleAt || triage.lastReview?.decidedAt || triage.updatedAt || null,
     source: 'auto-discovery',
     decisionState: triage.promotionState || 'watch',
     whyVisible: `Discovery topic | momentum ${Number(triage.momentum || 0).toFixed(2)} | ${Number(triage.articleCount || 0)} articles`,
+    sourceCount: Number(triage.sourceCount || sources.length || 0) || null,
+    sources,
   };
 }
 function hasApprovalProbeMeta(item) {
@@ -1814,7 +2742,71 @@ function updateInboxBulkState() {
   if (acceptButton) acceptButton.disabled = selectedCount === 0 || inboxBulkBusy || !canBulkApplyDecision('accept');
   if (rejectButton) rejectButton.disabled = selectedCount === 0 || inboxBulkBusy || !canBulkApplyDecision('reject');
   if (snoozeButton) snoozeButton.disabled = selectedCount === 0 || inboxBulkBusy || !canBulkApplyDecision('snooze');
+  const simulateButton = document.getElementById('inbox-bulk-simulate');
+  if (simulateButton) {
+    // Only approval items support dry-run simulation via /api/approval-queue/:id/review
+    const anyApproval = Array.from(inboxSelection).some(id => {
+      const item = (typeof inboxItems !== 'undefined') ? inboxItems.find(x => String(x.id) === String(id)) : null;
+      return item && item.type === 'approval';
+    });
+    simulateButton.disabled = selectedCount === 0 || inboxBulkBusy || !anyApproval;
+  }
   if (clearButton) clearButton.disabled = selectedCount === 0 || inboxBulkBusy;
+}
+
+// Client-side bulk dry-run: fanout /api/approval-queue/:id/review { dryRun:true, decision:'accept' }
+async function inboxBulkSimulate(){
+  const ids = Array.from(inboxSelection);
+  const approvalIds = ids.filter(id => {
+    const item = (typeof inboxItems !== 'undefined') ? inboxItems.find(x => String(x.id) === String(id)) : null;
+    return item && item.type === 'approval';
+  });
+  const resultEl = document.getElementById('inbox-bulk-sim-result');
+  if(!approvalIds.length){
+    if(resultEl) resultEl.innerHTML = `<div class="bulk-sim-panel"><div class="bs-head"><span>Bulk simulate</span><button class="bs-close" onclick="document.getElementById('inbox-bulk-sim-result').innerHTML=''">Close</button></div><div class="bs-row">No approval items selected.</div></div>`;
+    return;
+  }
+  if(resultEl) resultEl.innerHTML = `<div class="bulk-sim-panel"><div class="bs-head"><span>Simulating ${approvalIds.length}…</span></div><div class="bs-row">running dry-run fanout…</div></div>`;
+  inboxBulkBusy = true; updateInboxBulkState();
+  const results = await Promise.all(approvalIds.map(async (id) => {
+    try{
+      const res = await fetch(`${API}/approval-queue/${id}/review`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ decision:'accept', reviewer:'ui-bulk-sim', dryRun:true })
+      });
+      const data = await res.json().catch(()=>({}));
+      const execution = data.execution || {};
+      const probe = execution.probe || execution.result || {};
+      const quality = Number.isFinite(Number(probe.quality)) ? Number(probe.quality) : (Number.isFinite(Number(data.quality)) ? Number(data.quality) : null);
+      const skipped = Boolean(data.skipped) || Boolean(execution.skipped);
+      const failed = !res.ok || Boolean(data.error);
+      const outcome = failed ? 'fail' : skipped ? 'skip' : 'accept';
+      const reason = data.reason || execution.reason || probe.reason || null;
+      return { id, ok: res.ok, outcome, quality, reason };
+    }catch(err){
+      return { id, ok:false, outcome:'fail', error: err.message || String(err) };
+    }
+  }));
+  inboxBulkBusy = false; updateInboxBulkState();
+  results.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  const counts = { accept: 0, skip: 0, fail: 0 };
+  for(const r of results) counts[r.outcome] = (counts[r.outcome]||0) + 1;
+  const rows = results.map(r => {
+    const titleItem = (typeof inboxItems !== 'undefined') ? inboxItems.find(x => String(x.id) === String(r.id)) : null;
+    const title = titleItem ? (titleItem.title || '').slice(0,60) : String(r.id);
+    const q = r.quality == null ? '—' : r.quality.toFixed(2);
+    const label = r.outcome === 'accept' ? 'ACCEPT' : r.outcome === 'skip' ? 'SKIP' : 'FAIL';
+    const reasonLine = r.reason ? ` · ${String(r.reason).slice(0,80)}` : (r.error ? ` · ${r.error.slice(0,80)}` : '');
+    return `<div class="bs-row"><span class="bs-outcome ${r.outcome}">${label}</span><span style="color:var(--text-muted)">#${String(r.id).slice(-4)}</span><span title="${(title||'').replace(/"/g,'&quot;')}">${escapeHtml(title)}${reasonLine?`<span style="color:var(--text-muted)">${escapeHtml(reasonLine)}</span>`:''}</span><span class="bs-quality">${q}</span></div>`;
+  }).join('');
+  if(resultEl){
+    resultEl.innerHTML = `<div class="bulk-sim-panel">
+      <div class="bs-head"><span>Bulk dry-run result — ${approvalIds.length} simulated</span><button class="bs-close" onclick="document.getElementById('inbox-bulk-sim-result').innerHTML=''">Close</button></div>
+      ${rows}
+      <div class="bs-summary">would accept ${counts.accept||0} · would skip ${counts.skip||0} · would fail ${counts.fail||0} · no state changed (dryRun=true)</div>
+    </div>`;
+  }
 }
 async function refreshDecisionInbox() {
   const listEl = document.getElementById('inbox-list');
@@ -2344,11 +3336,13 @@ async function inboxAction(decision, id) {
     // needs-fix / skipped: keep item in queue, show warning banner
     if (response?.needsFix || response?.execution?.skipped) {
       item.actionState = 'needs-fix';
+      invalidateClientCaches(['proposal-inbox']);
       renderInboxList();
       updateInboxCounts();
       const preview = document.getElementById('inbox-preview-content');
       if (preview) preview.innerHTML = renderInboxActionResult(item, resolvedDecision, response);
       updateInboxBulkState();
+      loadProposalInbox().catch(() => {});
       return;
     }
     // Remove from list and advance
@@ -2367,6 +3361,13 @@ async function inboxAction(decision, id) {
       renderTopDecisionCard();
       renderSelectedProofCard(sortedInboxItemsForDecision()[0] || null);
       updateInboxBulkState();
+      invalidateClientCaches(['proposal-inbox']);
+      Promise.all([
+        loadProposalInbox(),
+        loadAutomationBudget(),
+        loadAutomationLog(),
+        loadThemeShellSnapshots(),
+      ]).catch(() => {});
     }, 220);
   } catch (e) {
     const errorMsg = String(e?.message || e || 'Action failed');
@@ -2503,6 +3504,1029 @@ document.addEventListener('keydown', (ev) => {
   }
 });
 
+// --- Theme Spectrum Strip (UI scan upgrade 2026-04-23 Part 2) ---------
+async function refreshThemeSpectrum(){
+  const body = document.getElementById('theme-spectrum-body');
+  if(!body) return;
+  try {
+    const res = await fetch(`${API}/trend-pyramid`);
+    const data = await res.json();
+    const stages = ['mainstream','growing','emerging','nascent','declining'];
+    const items = [];
+    for(const stage of stages){
+      const arr = Array.isArray(data?.[stage]) ? data[stage] : [];
+      for(const it of arr) items.push({ ...it, stage });
+    }
+    items.sort((a,b) => (Number(b.articleCount)||0) - (Number(a.articleCount)||0));
+    const top = items.slice(0, 14);
+    if(top.length === 0){
+      body.innerHTML = '<span style="padding:0 10px;color:var(--text-muted);align-self:center">no theme data</span>';
+      return;
+    }
+    const maxCount = top[0].articleCount || 1;
+    // transitions map for direction
+    const transMap = new Map();
+    for(const t of (data?.transitions||[])){
+      const key = String(t.theme||'').toLowerCase();
+      const order = ['declining','nascent','emerging','growing','mainstream'];
+      const fi = order.indexOf(String(t.from||'').toLowerCase());
+      const ti = order.indexOf(String(t.to||'').toLowerCase());
+      if(fi>=0 && ti>=0) transMap.set(key, ti > fi ? 'up' : ti < fi ? 'down' : 'flat');
+    }
+    body.innerHTML = top.map(it => {
+      const count = Number(it.articleCount||0);
+      const label = escapeHtml(it.themeLabel || humanizeTheme(it.theme||'') || 'theme');
+      const dir = transMap.get(String(it.theme||'').toLowerCase()) || 'flat';
+      const widthPct = Math.max(6, (count / maxCount) * 100);
+      const accel = Number(it.acceleration || 0);
+      const title = `${label} — ${count} articles · stage ${it.stage || it.lifecycleStage || '?'} · accel ${accel>0?'+':''}${accel}%${transMap.has(String(it.theme||'').toLowerCase()) ? ' · transition ' + dir : ''}`;
+      return `<a class="ts-seg ${dir}" title="${title}" onclick="openThemeBrief('${normalizeTheme(it.theme||'')}');return false;" href="#" style="flex:${widthPct} 1 0;max-width:${Math.max(80, Math.min(260, widthPct*10))}px">
+        <span class="ts-label">${label}</span><span class="ts-count">${count}</span>
+      </a>`;
+    }).join('');
+  } catch(e){
+    body.innerHTML = `<span style="padding:0 10px;color:var(--text-muted);align-self:center">error: ${escapeHtml(String(e.message||e))}</span>`;
+  }
+}
+
+// ============ AI ANALYSIS LAB (P0/P1/P2 — 2026-04-24) ============
+// Timeline state — shared between fetch, render, and brush handlers
+let _tlData = null;
+let _tlZoom = null;   // [startMs, endMs] or null
+let _tlBrush = null;  // { x0, x1, rect, svg, start, end } while dragging
+const _TL_W = 1400, _TL_H = 140, _TL_PL = 36, _TL_PR = 18, _TL_PT = 10, _TL_PB = 22;
+
+function _installTlBrushHandlers(){
+  if(window._tlBrushInstalled) return;
+  window._tlBrushInstalled = true;
+  document.addEventListener('mousemove', (e) => {
+    if(!_tlBrush) return;
+    const { rect, svg } = _tlBrush;
+    if(!rect || !svg) return;
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    _tlBrush.x1 = x;
+    let brushRect = svg.querySelector('.tl-brush');
+    if(!brushRect){
+      brushRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      brushRect.setAttribute('class', 'tl-brush');
+      svg.appendChild(brushRect);
+    }
+    const pxToUser = (px) => (px / rect.width) * _TL_W;
+    const u0 = pxToUser(Math.min(_tlBrush.x0, _tlBrush.x1));
+    const u1 = pxToUser(Math.max(_tlBrush.x0, _tlBrush.x1));
+    brushRect.setAttribute('x', u0);
+    brushRect.setAttribute('y', _TL_PT);
+    brushRect.setAttribute('width', Math.max(0, u1 - u0));
+    brushRect.setAttribute('height', _TL_H - _TL_PT - _TL_PB);
+  });
+  document.addEventListener('mouseup', () => {
+    if(!_tlBrush) return;
+    const { x0, x1, rect, svg, start, end } = _tlBrush;
+    _tlBrush = null;
+    const b = svg?.querySelector('.tl-brush'); if(b) b.remove();
+    if(!rect) return;
+    const plotW = _TL_W - _TL_PL - _TL_PR;
+    const pxToUser = (px) => (px / rect.width) * _TL_W;
+    const u0 = Math.max(_TL_PL, pxToUser(Math.min(x0, x1)));
+    const u1 = Math.min(_TL_W - _TL_PR, pxToUser(Math.max(x0, x1)));
+    if(u1 - u0 < 12) return; // click, not drag
+    const userToMs = (u) => start.getTime() + ((u - _TL_PL) / plotW) * (end.getTime() - start.getTime());
+    const ms0 = userToMs(u0);
+    const ms1 = userToMs(u1);
+    if(ms1 - ms0 < 86400000) return; // at least 1 day
+    _tlZoom = [ms0, ms1];
+    renderAiTimeline();
+  });
+}
+
+async function refreshAiTimeline(){
+  const host = document.getElementById('ai-event-timeline');
+  if(!host) return;
+  try {
+    const res = await fetch(`${API}/event-timeline?days=90`);
+    const data = await res.json();
+    if(!data.ok || !Array.isArray(data.events)) throw new Error('no data');
+    _tlData = data;
+    _tlZoom = null;
+    _installTlBrushHandlers();
+    renderAiTimeline();
+  } catch(err){
+    host.innerHTML = `<svg viewBox="0 0 1400 140"><text x="10" y="20" fill="rgba(255,255,255,.4)" font-family="monospace" font-size="11">error: ${escapeHtml(String(err.message||err))}</text></svg>`;
+  }
+}
+
+function renderAiTimeline(){
+  const host = document.getElementById('ai-event-timeline');
+  const badge = document.getElementById('ai-timeline-badge');
+  const data = _tlData;
+  if(!host || !data) return;
+
+  const W = _TL_W, H = _TL_H, PL = _TL_PL, PR = _TL_PR, PT = _TL_PT, PB = _TL_PB;
+  const plotW = W - PL - PR, plotH = H - PT - PB;
+  const dayMs = 86400000;
+
+  const end = _tlZoom ? new Date(_tlZoom[1]) : (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+  const start = _tlZoom ? new Date(_tlZoom[0]) : (() => { const d = new Date(end); d.setDate(end.getDate() - data.days); return d; })();
+  const totalMs = end.getTime() - start.getTime() || 1;
+  const xAt = (d) => PL + ((new Date(d).getTime() - start.getTime()) / totalMs) * plotW;
+
+  if(badge){
+    if(_tlZoom){
+      const days = Math.round((end.getTime() - start.getTime()) / dayMs);
+      const visible = data.events.filter(ev => {
+        const t = new Date(ev.eventDate).getTime();
+        return t >= start.getTime() && t <= end.getTime();
+      }).length;
+      badge.textContent = `zoom · ${days}d · ${visible} events`;
+    } else {
+      badge.textContent = `${data.events.length} events · ${data.vixSeries?.length||0}d VIX`;
+    }
+  }
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Regime bands
+  const regimeMap = data.regimeByDate || {};
+  const regimeClass = { 'crisis':'tl-regime-crisis','risk-off':'tl-regime-risk-off','balanced':'tl-regime-balanced','risk-on':'tl-regime-risk-on' };
+  const regimeBandY = H - PB - 8, regimeBandH = 6;
+  let lastRegime = null, runStart = null;
+  for(let t = start.getTime(); t <= end.getTime(); t += dayMs){
+    const d = new Date(t).toISOString().slice(0,10);
+    const r = regimeMap[d]?.regime || null;
+    if(r !== lastRegime){
+      if(lastRegime && runStart != null){
+        const cls = regimeClass[lastRegime] || 'tl-regime-balanced';
+        svg += `<rect x="${xAt(runStart)}" y="${regimeBandY}" width="${xAt(t) - xAt(runStart)}" height="${regimeBandH}" class="${cls}"/>`;
+      }
+      lastRegime = r;
+      runStart = r ? t : null;
+    }
+  }
+  if(lastRegime && runStart != null){
+    const cls = regimeClass[lastRegime] || 'tl-regime-balanced';
+    svg += `<rect x="${xAt(runStart)}" y="${regimeBandY}" width="${xAt(end.getTime()) - xAt(runStart)}" height="${regimeBandH}" class="${cls}"/>`;
+  }
+
+  // Time ticks — adapt density to zoom level
+  const spanDays = totalMs / dayMs;
+  const tickStep = spanDays > 180 ? 'month' : spanDays > 30 ? 'week' : 'day';
+  const ticks = [];
+  const d0 = new Date(start);
+  if(tickStep === 'month'){ d0.setDate(1); for(let d = new Date(d0); d <= end; d.setMonth(d.getMonth()+1)) ticks.push(new Date(d)); }
+  else if(tickStep === 'week'){ d0.setHours(0,0,0,0); for(let d = new Date(d0); d <= end; d.setDate(d.getDate()+7)) ticks.push(new Date(d)); }
+  else { d0.setHours(0,0,0,0); for(let d = new Date(d0); d <= end; d.setDate(d.getDate()+Math.max(1, Math.round(spanDays/10)))) ticks.push(new Date(d)); }
+  for(const tk of ticks){
+    const x = xAt(tk);
+    if(x < PL || x > W - PR) continue;
+    svg += `<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" class="tl-axis"/>`;
+    const label = tickStep === 'month' ? tk.toISOString().slice(0,7) : tk.toISOString().slice(5,10);
+    svg += `<text x="${x+3}" y="${H-PB+12}" class="tl-axis-label">${label}</text>`;
+  }
+
+  // VIX line
+  const vix = Array.isArray(data.vixSeries) ? data.vixSeries : [];
+  const validVix = vix.filter(v => Number.isFinite(v.value) && new Date(v.date).getTime() >= start.getTime() && new Date(v.date).getTime() <= end.getTime());
+  if(validVix.length >= 2){
+    const vMin = Math.min(...validVix.map(v=>v.value));
+    const vMax = Math.max(...validVix.map(v=>v.value));
+    const rng = (vMax - vMin) || 1;
+    const vixY = (v) => PT + plotH - 10 - ((v - vMin) / rng) * (plotH - 26);
+    const pts = validVix.map(v => `${xAt(v.date).toFixed(1)},${vixY(v.value).toFixed(1)}`).join(' ');
+    svg += `<polyline class="tl-vix" points="${pts}"/>`;
+  }
+
+  // Event dots — distributed vertically by grade, sized by |t|
+  const gradeY = { E4:20, E3:32, E2:44, E1:62, E0:80, none:95 };
+  const dotRadius = (ev) => {
+    const t = Math.abs(Number(ev.maxAbsT) || 0);
+    return Math.max(2.0, Math.min(8, 2.0 + Math.sqrt(t) * 1.9));
+  };
+  for(const ev of data.events){
+    if(!ev.eventDate) continue;
+    const tMs = new Date(ev.eventDate).getTime();
+    if(tMs < start.getTime() || tMs > end.getTime()) continue;
+    const grade = ev.bestEvidenceGrade || 'none';
+    const x = xAt(ev.eventDate);
+    if(x < PL || x > W - PR) continue;
+    const y = gradeY[grade] ?? 95;
+    const r = dotRadius(ev);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y}" r="${r.toFixed(1)}" class="tl-dot grade-${grade}" data-event-id="${ev.id}"/>`;
+  }
+  svg += '</svg>';
+  svg += `<div class="ai-tl-tip"></div>`;
+  svg += `<button class="tl-reset-btn${_tlZoom?' show':''}" type="button">Reset zoom ⟲</button>`;
+  host.innerHTML = svg;
+
+  const tip = host.querySelector('.ai-tl-tip');
+  const resetBtn = host.querySelector('.tl-reset-btn');
+  const svgEl = host.querySelector('svg');
+  if(resetBtn) resetBtn.onclick = () => { _tlZoom = null; renderAiTimeline(); };
+
+  // Hover + click handlers on dots
+  host.querySelectorAll('.tl-dot').forEach(dot => {
+    dot.addEventListener('mousemove', (e) => {
+      const id = dot.getAttribute('data-event-id');
+      const ev = data.events.find(x => String(x.id) === String(id));
+      if(!ev || !tip) return;
+      const tAbs = Number.isFinite(Number(ev.maxAbsT)) ? Number(ev.maxAbsT).toFixed(2) : '—';
+      const upAbs = Number.isFinite(Number(ev.maxAbsUplift)) ? Number(ev.maxAbsUplift).toFixed(2) + '%' : '—';
+      tip.innerHTML = `
+        <div class="tip-title">${escapeHtml(String(ev.title || '—').slice(0,140))}</div>
+        <div class="tip-meta"><span>${escapeHtml(ev.theme || '—')}</span><span>${String(ev.eventDate).slice(0,10)}</span><span>grade ${ev.bestEvidenceGrade || '—'}</span></div>
+        <div class="tip-metric">|t| ${tAbs} · |uplift| ${upAbs} · articles ${ev.articleCount || 0} · sources ${ev.sourceCount || 0}</div>
+      `;
+      tip.classList.add('show');
+      const tipW = tip.offsetWidth || 260, tipH = tip.offsetHeight || 60;
+      const px = Math.min(window.innerWidth - tipW - 12, e.clientX + 14);
+      const py = Math.max(8, e.clientY - tipH - 14);
+      tip.style.left = px + 'px';
+      tip.style.top = py + 'px';
+    });
+    dot.addEventListener('mouseleave', () => tip?.classList.remove('show'));
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = dot.getAttribute('data-event-id');
+      if(!id) return;
+      const existingRow = document.querySelector(`#hot-events-rows .evidence-row[data-event-id="${id}"]`);
+      document.querySelectorAll('.evidence-row.focused').forEach(r => r.classList.remove('focused'));
+      if(existingRow){ existingRow.classList.add('focused'); showPeekForFocused(); }
+      else { openEventPeekById(id); }
+    });
+  });
+
+  // Brush-to-zoom on the SVG background
+  if(svgEl){
+    svgEl.addEventListener('mousedown', (e) => {
+      if(e.target.classList && e.target.classList.contains('tl-dot')) return;
+      if(e.button !== 0) return;
+      const rect = svgEl.getBoundingClientRect();
+      const x0 = e.clientX - rect.left;
+      _tlBrush = { x0, x1: x0, rect, svg: svgEl, start, end };
+      e.preventDefault();
+    });
+    svgEl.addEventListener('dblclick', () => {
+      if(_tlZoom){ _tlZoom = null; renderAiTimeline(); }
+    });
+  }
+}
+
+// Fabricate a peek for an event id not in the local hot-events list
+async function openEventPeekById(eventId){
+  const overlay = ensurePeekOverlay();
+  overlay.innerHTML = `<div class="peek-head"><span>EVENT #${eventId} PEEK</span><span style="color:var(--text-muted);font-size:10px">Esc to close</span></div><div class="chain-loading">loading…</div>`;
+  overlay.classList.add('active');
+  try {
+    const res = await fetch(`${API}/explain-event/${eventId}`);
+    const data = await res.json();
+    if(!data.ok){ overlay.innerHTML = `<div class="peek-head">PEEK</div><div>not found</div>`; return; }
+    const ev = data.event;
+    overlay.innerHTML = `
+      <div class="peek-head"><span>EVENT #${ev.id} PEEK</span><span style="color:var(--text-muted);font-size:10px">Esc to close · N for narrative · S for similar</span></div>
+      <div class="peek-title">${(ev.title||'').replace(/</g,'&lt;')}</div>
+      <div class="peek-row"><span class="peek-key">theme</span>${ev.theme || '—'}</div>
+      <div class="peek-row"><span class="peek-key">date</span>${String(ev.eventDate||'').slice(0,10)}</div>
+      <div class="peek-row"><span class="peek-key">articles</span>${ev.articleCount} · ${ev.sourceCount} sources</div>
+      ${(data.uplift||[]).slice(0,3).map(u => `<div class="peek-row"><span class="peek-key">${u.symbol} ${u.horizon}</span><span class="chain-symbol">${u.evidenceGrade || '—'}</span> · T=${u.tStat?.toFixed(2) || '—'} · uplift ${u.uplift==null?'—':u.uplift.toFixed(2)+'%'}</div>`).join('')}
+      <div class="peek-row" style="margin-top:10px">
+        <button class="btn" onclick="loadEventNarrative(${ev.id})" style="font-size:10px">Generate narrative (Codex)</button>
+        <button class="btn" onclick="loadSimilarEvents(${ev.id})" style="font-size:10px;margin-left:6px">Find similar</button>
+      </div>
+      <div id="peek-narrative-slot"></div>
+      <div id="peek-similar-slot"></div>
+    `;
+  } catch(e){
+    overlay.innerHTML = `<div class="peek-head">PEEK</div><div>error: ${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+async function loadEventNarrative(eventId){
+  const slot = document.getElementById('peek-narrative-slot');
+  if(!slot) return;
+  slot.innerHTML = `<div class="peek-narrative"><div class="pn-head"><span>AI NARRATIVE (Codex)</span><span class="pn-loading">generating… ~60s</span></div></div>`;
+  try {
+    const res = await fetch(`${API}/event-narrative/${eventId}`);
+    const data = await res.json();
+    if(!data.ok){
+      slot.innerHTML = `<div class="peek-narrative"><div class="pn-head">AI NARRATIVE</div><div style="color:var(--c-loss)">error: ${escapeHtml(data.error||'unknown')}</div><div class="pn-citation">${escapeHtml((data.codexMessage||'').slice(0,200))}</div></div>`;
+      return;
+    }
+    const cites = (data.citations||[]).map(c => `[${c.index}] ${escapeHtml(c.source||'?')} · ${escapeHtml((c.title||'').slice(0,60))}`).join('<br>');
+    slot.innerHTML = `
+      <div class="peek-narrative">
+        <div class="pn-head"><span>AI NARRATIVE${data.cached?' · CACHED':''}</span><span>${new Date(data.generatedAt).toLocaleTimeString()}</span></div>
+        <div>${escapeHtml(data.narrative||'').replace(/\\n/g,'<br>')}</div>
+        ${cites?`<div class="pn-citation">Citations:<br>${cites}</div>`:''}
+      </div>
+    `;
+  } catch(e){
+    slot.innerHTML = `<div class="peek-narrative"><div class="pn-head">AI NARRATIVE</div><div style="color:var(--c-loss)">fetch failed: ${escapeHtml(e.message||String(e))}</div></div>`;
+  }
+}
+
+async function loadSimilarEvents(eventId){
+  const slot = document.getElementById('peek-similar-slot');
+  if(!slot) return;
+  slot.innerHTML = `<div class="peek-similar"><div class="pn-head" style="color:var(--accent);font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;margin-top:10px">Similar events</div><div style="color:var(--text-muted)">searching…</div></div>`;
+  try {
+    const res = await fetch(`${API}/similar-events/${eventId}?limit=6`);
+    const data = await res.json();
+    if(!data.ok){
+      slot.innerHTML = `<div class="peek-similar"><div class="pn-head">SIMILAR</div><div style="color:var(--c-loss)">${escapeHtml(data.error||'error')}</div></div>`;
+      return;
+    }
+    const rows = (data.similar||[]).map(s => {
+      const pct = (s.similarity*100).toFixed(0) + '%';
+      const g = s.bestEvidenceGrade || '—';
+      return `<div class="peek-similar-row" onclick="openEventPeekById(${s.id})">
+        <span class="sim-pct">${pct}</span>
+        <span class="sim-title" title="${escapeHtml(s.title||'')}">${escapeHtml((s.title||'').slice(0,60))}</span>
+        <span class="sim-grade ${g}">${g}</span>
+        <span style="color:var(--text-soft);text-align:right;font-size:9px">${String(s.eventDate||'').slice(0,10)}</span>
+      </div>`;
+    }).join('');
+    const avg = data.summary?.avgUplift;
+    slot.innerHTML = `
+      <div class="peek-similar">
+        <div class="pn-head" style="color:var(--accent);font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;margin:10px 0 4px">Similar events · ${data.summary.count} found</div>
+        ${rows}
+        ${data.summary.withUpliftCount>0?`<div style="margin-top:6px;color:var(--text-soft);font-size:10px">${data.summary.withUpliftCount} had uplift data · avg |uplift| ${avg!=null?avg.toFixed(2)+'%':'—'} · ${data.summary.e2Count} E2</div>`:''}
+      </div>
+    `;
+  } catch(e){
+    slot.innerHTML = `<div class="peek-similar"><div>error: ${escapeHtml(e.message||String(e))}</div></div>`;
+  }
+}
+
+async function refreshScenarioLab(){
+  const vixEl = document.getElementById('scenario-vix');
+  const yieldEl = document.getElementById('scenario-yield');
+  const oilEl = document.getElementById('scenario-oil');
+  if(!vixEl || !yieldEl || !oilEl) return;
+  const vix = Number(vixEl.value), yieldV = Number(yieldEl.value), oil = Number(oilEl.value);
+  document.getElementById('scenario-vix-val').textContent = vix.toFixed(1);
+  document.getElementById('scenario-yield-val').textContent = yieldV.toFixed(2);
+  document.getElementById('scenario-oil-val').textContent = oil.toFixed(0);
+  try {
+    const res = await fetch(`${API}/regime-scenario?vix=${vix}&yieldSpread=${yieldV}&oilPrice=${oil}`);
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'failed');
+    const badge = document.getElementById('scenario-regime-badge');
+    const out = document.getElementById('scenario-regime-out');
+    const preds = document.getElementById('scenario-predictions');
+    if(badge) badge.textContent = data.targetRegime;
+    if(out) out.textContent = `Predicted regime: ${data.targetRegime}  ·  ${data.summary.totalPairs} pairs  ·  ${data.summary.posAvg} positive / ${data.summary.negAvg} negative`;
+    if(preds){
+      if(!data.predictions?.length){
+        preds.innerHTML = '<div class="meta-line" style="padding:8px">no data for this regime — adjust sliders</div>';
+      } else {
+        preds.innerHTML = data.predictions.slice(0, 20).map(p => {
+          const ret = p.avgReturn;
+          const retCls = ret > 0 ? 'pos' : ret < 0 ? 'neg' : '';
+          const retTxt = ret == null ? '—' : (ret > 0 ? '+' : '') + ret.toFixed(2) + '%';
+          const hit = p.hitRate == null ? '—' : (p.hitRate * 100).toFixed(0) + '%';
+          const mult = p.regimeMultiplier == null ? '—' : p.regimeMultiplier.toFixed(2) + 'x';
+          return `<div class="scenario-pred-row">
+            <span class="theme" title="${p.theme}">${escapeHtml(p.theme)}</span>
+            <span class="sym">${escapeHtml(p.symbol)}</span>
+            <span class="ret ${retCls}">${retTxt}</span>
+            <span>${hit}</span>
+            <span class="mult">${mult}</span>
+          </div>`;
+        }).join('');
+      }
+    }
+  } catch(e){
+    document.getElementById('scenario-predictions').innerHTML = `<div class="meta-line" style="padding:8px;color:var(--c-loss)">error: ${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+async function refreshAssetDossier(){
+  const input = document.getElementById('dossier-input');
+  const body = document.getElementById('dossier-body');
+  const badge = document.getElementById('dossier-badge');
+  const sym = String(input?.value || '').trim().toUpperCase();
+  if(!sym){ body.innerHTML = '<div class="meta-line">enter a symbol</div>'; return; }
+  body.innerHTML = '<div class="meta-line" style="padding:8px">loading…</div>';
+  try {
+    const res = await fetch(`${API}/asset-dossier/${encodeURIComponent(sym)}`);
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error || 'failed');
+    if(badge) badge.textContent = sym;
+    const s = data.upliftStats || {};
+    const themes = (data.themes || []).slice(0,5).map(t => {
+      const hit = t.outcomeHitRate == null ? '—' : (t.outcomeHitRate*100).toFixed(0)+'%';
+      const avg = t.outcomeAvgReturn == null ? '—' : (t.outcomeAvgReturn>0?'+':'')+t.outcomeAvgReturn.toFixed(2)+'%';
+      return `<div class="dossier-row"><span>${escapeHtml(t.theme)}</span><span style="text-align:right">${t.reactionCount}</span><span style="text-align:right">${hit}</span><span style="color:var(--text-soft)">${avg} · Q ${t.qualityScore!=null?t.qualityScore.toFixed(2):'—'}</span></div>`;
+    }).join('') || '<div class="meta-line">no theme mappings</div>';
+    const events = (data.recentEvents || []).slice(0,5).map(e => {
+      const grade = e.evidenceGrade || '—';
+      const upl = e.uplift == null ? '—' : e.uplift.toFixed(2)+'%';
+      const t = e.tStat == null ? '—' : e.tStat.toFixed(2);
+      return `<div class="dossier-row"><span class="sim-grade ${grade}">${grade}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(e.title||'')}">${escapeHtml((e.title||'').slice(0,40))}</span><span>T=${t}</span><span>${upl}</span></div>`;
+    }).join('') || '<div class="meta-line">no recent events</div>';
+    body.innerHTML = `
+      <div class="dossier-stats">
+        <div class="dossier-stat"><div class="lbl">E2 rows</div><div class="num">${s.e2||0}</div></div>
+        <div class="dossier-stat"><div class="lbl">avg E2 |uplift|</div><div class="num">${s.avgE2Uplift!=null?s.avgE2Uplift.toFixed(1)+'%':'—'}</div></div>
+        <div class="dossier-stat"><div class="lbl">avg E2 |t|</div><div class="num">${s.avgE2T!=null?s.avgE2T.toFixed(2):'—'}</div></div>
+        <div class="dossier-stat"><div class="lbl">total events</div><div class="num">${s.total||0}</div></div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="color:var(--text-soft);font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:4px">Top themes</div>
+        <div class="dossier-themes">${themes}</div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="color:var(--text-soft);font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:4px">Recent events</div>
+        <div class="dossier-events">${events}</div>
+      </div>
+    `;
+  } catch(e){
+    body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">error: ${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+async function refreshCorrelationBreaks(){
+  const body = document.getElementById('corr-breaks-body');
+  if(!body) return;
+  body.innerHTML = '<div class="meta-line" style="padding:8px">computing…</div>';
+  try {
+    const res = await fetch(`${API}/correlation-breaks`);
+    const data = await res.json();
+    if(!data.ok) throw new Error('failed');
+    const breaks = data.breaks || [];
+    if(!breaks.length){ body.innerHTML = `<div class="meta-line" style="padding:8px">no pairs available</div>`; return; }
+
+    const W = 280, H = 200, P = 26;
+    const clamp = (v) => Math.max(-1, Math.min(1, v));
+    const xAt = (c) => P + ((clamp(c) + 1) / 2) * (W - 2*P);
+    const yAt = (c) => (H - P) - ((clamp(c) + 1) / 2) * (H - 2*P);
+    const alertSet = new Set((data.alerts||[]).map(a => a.pair));
+
+    const pts = breaks.map(b => {
+      const ad = Math.abs(b.delta);
+      const cls = ad >= 0.5 ? 'high' : ad >= 0.3 ? 'mid' : 'low';
+      const r = (3 + Math.min(5, ad * 6)).toFixed(1);
+      const isAlert = alertSet.has(b.pair) ? 1 : 0;
+      return `<circle class="cs-pt ${cls}" cx="${xAt(b.corr90d).toFixed(1)}" cy="${yAt(b.corr30d).toFixed(1)}" r="${r}" data-pair="${escapeHtml(b.pair)}" data-c30="${b.corr30d.toFixed(3)}" data-c90="${b.corr90d.toFixed(3)}" data-d="${b.delta.toFixed(3)}" data-dir="${escapeHtml(b.direction||'')}" data-alert="${isAlert}"/>`;
+    }).join('');
+
+    const gridMidX = xAt(0), gridMidY = yAt(0);
+    const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <rect x="${P}" y="${P}" width="${W-2*P}" height="${H-2*P}" class="cs-grid"/>
+      <line x1="${P}" y1="${gridMidY}" x2="${W-P}" y2="${gridMidY}" class="cs-grid"/>
+      <line x1="${gridMidX}" y1="${P}" x2="${gridMidX}" y2="${H-P}" class="cs-grid"/>
+      <line x1="${P}" y1="${H-P}" x2="${W-P}" y2="${P}" class="cs-diag"/>
+      <text x="${W/2}" y="${H-6}" text-anchor="middle" class="cs-label">corr 90d →</text>
+      <text x="10" y="${H/2}" class="cs-label" transform="rotate(-90 10 ${H/2})">corr 30d →</text>
+      <text x="${P-2}" y="${H-P+11}" text-anchor="end" class="cs-label">-1</text>
+      <text x="${W-P+2}" y="${H-P+11}" class="cs-label">+1</text>
+      <text x="${W-P-6}" y="${P+4}" text-anchor="end" class="cs-label" style="opacity:.6">stable</text>
+      <text x="${P+4}" y="${H-P-4}" class="cs-label" style="opacity:.6">far from diag = break</text>
+      ${pts}
+    </svg>`;
+    body.innerHTML = `<div class="corr-scatter">${svg}<div class="ai-tl-tip cs-tip"></div></div>
+      <div class="corr-scatter-legend">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(103,209,197,.8);vertical-align:middle;margin-right:3px"></span>|Δ|&lt;0.3</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(245,158,11,.8);vertical-align:middle;margin-right:3px"></span>0.3–0.5</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(239,68,68,.85);vertical-align:middle;margin-right:3px"></span>≥0.5</span>
+        <span style="margin-left:auto">${breaks.length} pairs${data.alerts?.length?` · <span style="color:var(--c-warn)">⚠ ${data.alerts.length}</span>`:''}</span>
+      </div>`;
+
+    const tip = body.querySelector('.cs-tip');
+    body.querySelectorAll('.cs-pt').forEach(pt => {
+      pt.addEventListener('mousemove', (e) => {
+        const pair = pt.getAttribute('data-pair');
+        const c30 = parseFloat(pt.getAttribute('data-c30'));
+        const c90 = parseFloat(pt.getAttribute('data-c90'));
+        const d = parseFloat(pt.getAttribute('data-d'));
+        const dir = pt.getAttribute('data-dir');
+        const isAlert = pt.getAttribute('data-alert') === '1';
+        tip.innerHTML = `
+          <div class="tip-title">${escapeHtml(pair)}${isAlert?' <span style="color:var(--c-warn)">⚠</span>':''}</div>
+          <div class="tip-meta"><span>${escapeHtml(dir)}</span><span>Δ ${d>0?'+':''}${d.toFixed(2)}</span></div>
+          <div class="tip-metric">30d=${c30.toFixed(2)} · 90d=${c90.toFixed(2)}</div>
+        `;
+        tip.classList.add('show');
+        const tipW = tip.offsetWidth || 220, tipH = tip.offsetHeight || 60;
+        tip.style.left = Math.min(window.innerWidth - tipW - 12, e.clientX + 14) + 'px';
+        tip.style.top = Math.max(8, e.clientY - tipH - 14) + 'px';
+      });
+      pt.addEventListener('mouseleave', () => tip?.classList.remove('show'));
+    });
+  } catch(e){
+    body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">error</div>`;
+  }
+}
+
+async function refreshWeeklyDigest(){
+  const body = document.getElementById('digest-body');
+  if(!body) return;
+  body.innerHTML = '<div class="meta-line" style="padding:10px">generating via Codex (60-90s)…</div>';
+  try {
+    const res = await fetch(`${API}/weekly-digest`);
+    const data = await res.json();
+    if(!data.ok){ body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">error: ${escapeHtml(data.error||'failed')}</div>`; return; }
+    const d = data.digest || {};
+    const tkrs = (d.top_tickers||[]).map(t => `<span class="tkr">${escapeHtml(t)}</span>`).join('');
+    body.innerHTML = `<div class="digest-panel">
+      <div class="digest-headline">${escapeHtml(d.headline||'—')}</div>
+      <div class="digest-regime">${escapeHtml(d.regime||'—')}</div>
+      <div class="digest-section"><div class="digest-section-label">What changed</div><div class="digest-section-body">${escapeHtml(d.what_changed||'—')}</div></div>
+      <div class="digest-section"><div class="digest-section-label">Watch next</div><div class="digest-section-body">${escapeHtml(d.watch_next||'—')}</div></div>
+      ${tkrs?`<div class="digest-section"><div class="digest-section-label">Top tickers</div><div class="digest-tickers">${tkrs}</div></div>`:''}
+      <div style="margin-top:10px;color:var(--text-muted);font-size:9.5px">Generated ${new Date(data.generatedAt).toLocaleString()} · stats: ${data.stats?.new_events||0} events · ${data.stats?.themes||0} themes</div>
+    </div>`;
+  } catch(e){
+    body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">fetch error</div>`;
+  }
+}
+
+// Scenario slider wiring (init on load)
+function initScenarioLab(){
+  const vixEl = document.getElementById('scenario-vix');
+  const yieldEl = document.getElementById('scenario-yield');
+  const oilEl = document.getElementById('scenario-oil');
+  if(!vixEl) return;
+  let scenarioDebounce = null;
+  const trigger = () => {
+    if(scenarioDebounce) clearTimeout(scenarioDebounce);
+    scenarioDebounce = setTimeout(() => refreshScenarioLab(), 250);
+  };
+  [vixEl, yieldEl, oilEl].forEach(el => el && el.addEventListener('input', trigger));
+  refreshScenarioLab();
+}
+
+// --- Compact number formatter ----------------------------------------
+const NUM_COMPACT = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+function numCompact(n){ return Number.isFinite(n) ? NUM_COMPACT.format(n) : '—'; }
+
+// --- Since You Last Looked (delta vs last visit, localStorage) -------
+const SINCE_KEY = 'lattice:since:v1';
+function loadSinceSnapshot(){
+  try { const raw = localStorage.getItem(SINCE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+function saveSinceSnapshot(data){
+  try { localStorage.setItem(SINCE_KEY, JSON.stringify({...data, ts: Date.now()})); } catch {}
+}
+function resetSinceSnapshot(){
+  localStorage.removeItem(SINCE_KEY);
+  refreshSinceStrip();
+}
+function formatAgo(ms){
+  if(!ms) return '—';
+  const h = ms / 3.6e6;
+  if(h < 1) return `${Math.max(1, Math.round(h * 60))}m ago`;
+  if(h < 24) return `${Math.round(h)}h ago`;
+  return `${Math.round(h/24)}d ago`;
+}
+function setSinceItem(id, current, prev){
+  const valEl = document.getElementById(`since-${id}`);
+  const dEl = document.getElementById(`since-${id}-delta`);
+  if(!valEl || !dEl) return;
+  const fmtValue = id === 'synd' ? (current==null?'—':(current*100).toFixed(0)+'%') : (current==null?'—':numCompact(current));
+  const wasValue = valEl.textContent;
+  valEl.textContent = fmtValue;
+  if(wasValue !== fmtValue && wasValue !== '—') {
+    valEl.classList.remove('flash-update'); void valEl.offsetWidth; valEl.classList.add('flash-update');
+    setTimeout(()=>valEl.classList.remove('flash-update'), 400);
+  }
+  if(prev == null || current == null) { dEl.textContent = 'Δ—'; dEl.className = 'since-delta zero'; return; }
+  const diff = id === 'synd' ? (current - prev) * 100 : (current - prev);
+  if(Math.abs(diff) < 0.005 || diff === 0) { dEl.textContent = 'Δ0'; dEl.className = 'since-delta zero'; return; }
+  const sign = diff > 0 ? '+' : '';
+  const formatted = id === 'synd' ? `${diff.toFixed(1)}pp` : numCompact(Math.abs(diff));
+  dEl.textContent = `Δ${sign}${id==='synd'?formatted:(diff>0?'+':'-')+formatted}`;
+  dEl.className = `since-delta ${diff > 0 ? 'up' : 'down'}`;
+}
+async function refreshSinceStrip(){
+  // Gather current values from already-loaded Trust Strip endpoints + hot events + inbox
+  const results = await Promise.allSettled([
+    fetch(`${API}/data-freshness-audit`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/hot-events?limit=25&lookback=7`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/proposal-inbox`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/source-diversity-audit?window=24`).then(r=>r.json()).catch(()=>null),
+  ]);
+  const [fresh, hot, inbox, src] = results.map(r=>r.status==='fulfilled'?r.value:null);
+  const current = {
+    articles24h: fresh?.summary?.articleCount24h ?? null,
+    hotE2: hot?.gradeCounts?.E2 ?? null,
+    inbox: Array.isArray(inbox?.items) ? inbox.items.length : (Array.isArray(inbox) ? inbox.length : null),
+    synd: src?.syndicatorShare ?? null,
+  };
+  const prev = loadSinceSnapshot();
+  const agoEl = document.getElementById('since-ago');
+  if(agoEl) agoEl.textContent = prev?.ts ? formatAgo(Date.now() - prev.ts) : 'first visit';
+  setSinceItem('articles24h', current.articles24h, prev?.articles24h);
+  setSinceItem('hotE2', current.hotE2, prev?.hotE2);
+  setSinceItem('inbox', current.inbox, prev?.inbox);
+  setSinceItem('synd', current.synd, prev?.synd);
+  // Update snapshot only on explicit reset or first visit (keep stable delta across refreshes within a session)
+  if(!prev) saveSinceSnapshot(current);
+}
+
+// --- Keyboard navigation: G-chord, J/K, E, Space peek, ? help --------
+let keyChord = null;
+let keyChordTimer = null;
+function setKeyChord(ch){
+  keyChord = ch;
+  if(keyChordTimer) clearTimeout(keyChordTimer);
+  keyChordTimer = setTimeout(()=>{ keyChord = null; }, 900);
+}
+function getActiveSurface(){ return document.querySelector('.surface.active')?.getAttribute('data-surface') || 'home'; }
+function focusableRows(){
+  const surface = getActiveSurface();
+  if(surface === 'home') return Array.from(document.querySelectorAll('#hot-events-rows .evidence-row'));
+  if(surface === 'inbox') return Array.from(document.querySelectorAll('#inbox-list .inbox-item, #inbox-list .evidence-row'));
+  return [];
+}
+function focusedRowIndex(){
+  const rows = focusableRows();
+  return rows.findIndex(r => r.classList.contains('focused'));
+}
+function focusRow(idx){
+  const rows = focusableRows();
+  if(!rows.length) return;
+  rows.forEach(r => r.classList.remove('focused'));
+  const i = Math.max(0, Math.min(rows.length - 1, idx));
+  const row = rows[i];
+  if(row){
+    row.classList.add('focused');
+    row.scrollIntoView({block:'nearest'});
+  }
+}
+function moveFocus(delta){
+  const rows = focusableRows();
+  if(!rows.length) return;
+  const cur = focusedRowIndex();
+  focusRow(cur < 0 ? (delta > 0 ? 0 : rows.length - 1) : cur + delta);
+}
+// Dispatcher for any focused row (hot event OR inbox item)
+async function showPeekForFocusedAny(){
+  const row = document.querySelector('.evidence-row.focused, .inbox-item.focused');
+  if(!row) return;
+  if(row.classList.contains('evidence-row')) return showPeekForFocused();
+  if(row.classList.contains('inbox-item')) return showPeekForFocusedInbox(row);
+}
+function togglePeekAny(){
+  const overlay = document.getElementById('lattice-peek-overlay');
+  if(overlay && overlay.classList.contains('active')){ overlay.classList.remove('active'); return; }
+  showPeekForFocusedAny();
+}
+function showPeekForFocusedInbox(row){
+  const id = row.getAttribute('data-id');
+  if(!id) return;
+  // Find the inbox item in the in-memory list
+  const item = (typeof inboxItems !== 'undefined' && Array.isArray(inboxItems))
+    ? inboxItems.find(x => String(x.id) === String(id))
+    : null;
+  const overlay = ensurePeekOverlay();
+  if(!item){
+    overlay.innerHTML = `<div class="peek-head"><span>INBOX PEEK</span></div><div class="peek-row chain-none">item not found</div>`;
+    overlay.classList.add('active');
+    return;
+  }
+  const fmtDateSafe = (d) => { try { return new Date(d).toISOString().slice(0,16).replace('T',' '); } catch { return String(d||'—'); } };
+  const fresh = item.updatedAt ? Math.round((Date.now() - Date.parse(item.updatedAt)) / 3.6e6) : null;
+  const freshLabel = fresh==null ? '—' : (fresh < 1 ? 'now' : `${fresh}h ago`);
+  const typeLabel = { 'e2-signal':'E2 SIGNAL', 'proposal':'CODEX PROPOSAL', 'approval':'APPROVAL', 'triage':'DISCOVERY TRIAGE' }[item.type] || (item.type || 'INBOX');
+  const payload = item.payload && typeof item.payload === 'object' ? item.payload : null;
+  const extra = [];
+  if(payload){
+    const keys = ['feedUrl','feedName','url','theme','symbol','horizon','reason','quality','qualityScore','source'];
+    for(const k of keys){
+      if(payload[k] != null){
+        let v = payload[k];
+        if(typeof v === 'number') v = k.toLowerCase().includes('quality') ? v.toFixed(2) : String(v);
+        if(typeof v === 'string' && v.length > 120) v = v.slice(0,120) + '…';
+        extra.push(`<div class="peek-row"><span class="peek-key">${k}</span>${String(v).replace(/</g,'&lt;')}</div>`);
+      }
+    }
+  }
+  overlay.innerHTML = `
+    <div class="peek-head"><span>${typeLabel} #${String(item.id).slice(0,24)}</span><span style="color:var(--text-muted);font-size:10px">Space/Esc to close</span></div>
+    <div class="peek-title">${(item.title||'(no title)').replace(/</g,'&lt;')}</div>
+    <div class="peek-row"><span class="peek-key">type</span>${item.type||'?'}</div>
+    <div class="peek-row"><span class="peek-key">theme</span>${item.theme||'—'}</div>
+    <div class="peek-row"><span class="peek-key">source</span>${item.source||'—'}</div>
+    <div class="peek-row"><span class="peek-key">urgency</span>${item.urgency||'—'}</div>
+    <div class="peek-row"><span class="peek-key">updated</span>${fmtDateSafe(item.updatedAt)} (${freshLabel})</div>
+    <div class="peek-row"><span class="peek-key">status</span>${item.actionState||'pending'}</div>
+    ${extra.length?`<div class="peek-row" style="margin-top:8px;color:var(--accent);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.1em">Payload</div>${extra.join('')}`:''}
+    <div class="peek-row" style="margin-top:8px;color:var(--text-muted);font-size:10px">Press <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">A</kbd> accept · <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">R</kbd> reject · <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">S</kbd> simulate</div>
+  `;
+  overlay.classList.add('active');
+}
+
+async function showPeekForFocused(){
+  const row = document.querySelector('.evidence-row.focused');
+  if(!row) return;
+  const eventId = row.getAttribute('data-event-id');
+  if(!eventId) return;
+  const overlay = ensurePeekOverlay();
+  overlay.innerHTML = `<div class="peek-head"><span>EVENT PEEK</span><span style="color:var(--text-muted);font-size:10px">Space to close</span></div><div class="chain-loading">loading…</div>`;
+  overlay.classList.add('active');
+  try{
+    const res = await fetch(`${API}/explain-event/${eventId}`);
+    const data = await res.json();
+    if(!data.ok){ overlay.innerHTML = `<div class="peek-head">EVENT PEEK</div><div>not found</div>`; return; }
+    const ev = data.event;
+    const upl = (data.uplift || []).slice(0, 3).map(u =>
+      `<div class="peek-row"><span class="peek-key">${u.symbol} ${u.horizon}</span><span class="chain-symbol">${u.evidenceGrade || '—'}</span> · T=${u.tStat?.toFixed(2) || '—'} · uplift ${u.uplift==null?'—':u.uplift.toFixed(2)+'%'}</div>`
+    ).join('') || '<div class="peek-row chain-none">no uplift data</div>';
+    const arts = (data.articles || []).slice(0, 4).map(a =>
+      `<div class="peek-row" style="color:var(--text-soft)">• [${a.sourceId||'?'}] ${(a.title||'').slice(0,80)}</div>`
+    ).join('');
+    const hawkes = data.hawkes;
+    overlay.innerHTML = `
+      <div class="peek-head"><span>EVENT #${ev.id} PEEK</span><span style="color:var(--text-muted);font-size:10px">Space to close</span></div>
+      <div class="peek-title">${(ev.title||'').replace(/</g,'&lt;')}</div>
+      <div class="peek-row"><span class="peek-key">theme</span>${ev.theme || '—'}</div>
+      <div class="peek-row"><span class="peek-key">event date</span>${(ev.eventDate||'').slice(0,10)}</div>
+      <div class="peek-row"><span class="peek-key">articles</span>${ev.articleCount} · ${ev.sourceCount} sources · ${ev.sampledSourceDiversity} diverse</div>
+      ${hawkes?`<div class="peek-row"><span class="peek-key">hawkes</span>temp ${hawkes.temperature==null?'n/a':Number(hawkes.temperature).toFixed(2)}${hawkes.isSurge?' · 🔥 surge':''}</div>`:''}
+      <div class="peek-row" style="margin-top:8px;color:var(--accent);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.1em">Top uplift</div>
+      ${upl}
+      ${arts?`<div class="peek-row" style="margin-top:8px;color:var(--accent);font-family:var(--font-sans);font-size:10px;text-transform:uppercase;letter-spacing:.1em">Articles</div>${arts}`:''}
+    `;
+  }catch(e){
+    overlay.innerHTML = `<div class="peek-head">EVENT PEEK</div><div>error: ${e.message}</div>`;
+  }
+}
+function ensurePeekOverlay(){
+  let overlay = document.getElementById('lattice-peek-overlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'lattice-peek-overlay';
+    overlay.className = 'peek-overlay';
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+}
+function togglePeek(){
+  const overlay = document.getElementById('lattice-peek-overlay');
+  if(overlay && overlay.classList.contains('active')){ overlay.classList.remove('active'); return; }
+  showPeekForFocused();
+}
+function showHelpOverlay(){
+  const overlay = ensurePeekOverlay();
+  overlay.innerHTML = `
+    <div class="peek-head"><span>KEYBOARD HELP</span><span style="color:var(--text-muted);font-size:10px">? to close</span></div>
+    <div class="peek-row"><span class="peek-key">J / K</span>navigate rows (hot events, inbox)</div>
+    <div class="peek-row"><span class="peek-key">Space</span>peek event detail (uplift, hawkes, articles)</div>
+    <div class="peek-row"><span class="peek-key">E</span>explain focused event (same as Space)</div>
+    <div class="peek-row"><span class="peek-key">/</span>focus inbox filter</div>
+    <div class="peek-row"><span class="peek-key">G H</span>go to Home surface</div>
+    <div class="peek-row"><span class="peek-key">G I</span>go to Inbox</div>
+    <div class="peek-row"><span class="peek-key">G V</span>go to Investigate</div>
+    <div class="peek-row"><span class="peek-key">G M</span>go to Geo (map)</div>
+    <div class="peek-row"><span class="peek-key">G O</span>go to Ops</div>
+    <div class="peek-row"><span class="peek-key">A / R / S</span>accept / reject / simulate in Inbox</div>
+    <div class="peek-row"><span class="peek-key">Esc</span>clear focus / close overlay</div>
+  `;
+  overlay.classList.add('active');
+}
+function globalKeyHandler(e){
+  // Skip when typing in input/textarea
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+
+  // G-chord: goto surface (+ G+K = scroll KPI strip to top)
+  if(keyChord === 'g'){
+    const map = { h:'home', i:'inbox', v:'investigate', m:'geo', o:'ops' };
+    const target = map[e.key.toLowerCase()];
+    if(target){ switchSurface(target); keyChord = null; e.preventDefault(); return; }
+    if(e.key.toLowerCase() === 'k'){
+      // Scroll to KPI strip (regime strip)
+      const kpi = document.querySelector('.regime-strip') || document.querySelector('.decision-cockpit');
+      if(kpi) kpi.scrollIntoView({block:'start', behavior:'auto'});
+      keyChord = null; e.preventDefault(); return;
+    }
+  }
+
+  if(e.key === 'g' || e.key === 'G'){ setKeyChord('g'); return; }
+
+  if(e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown'){ moveFocus(1); e.preventDefault(); return; }
+  if(e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp'){ moveFocus(-1); e.preventDefault(); return; }
+  if(e.key === 'e' || e.key === 'E'){ showPeekForFocusedAny(); e.preventDefault(); return; }
+  if(e.key === ' '){ togglePeekAny(); e.preventDefault(); return; }
+  if(e.key === '?'){ showHelpOverlay(); e.preventDefault(); return; }
+  if(e.key === 'Escape'){
+    // Esc cascades: (1) close peek/help overlay first if open,
+    //               (2) else clear row focus. This lets the user press
+    //                   Esc to close overlay then immediately press E/Space
+    //                   again on the same row.
+    const overlay = document.getElementById('lattice-peek-overlay');
+    if(overlay && overlay.classList.contains('active')){
+      overlay.classList.remove('active');
+      return;
+    }
+    document.querySelectorAll('.evidence-row.focused, .inbox-item.focused').forEach(r=>r.classList.remove('focused'));
+    return;
+  }
+}
+if(typeof window !== 'undefined' && !window.__latticeKeyBound){
+  window.addEventListener('keydown', globalKeyHandler);
+  window.__latticeKeyBound = true;
+}
+
+// --- Trust Strip (UI scan upgrade 2026-04-23) ---------------------------
+function setTrustChunk(id, value, level, title){
+  const chunk=document.querySelector(`.lattice-trust-strip .tstrip-chunk[data-trust="${id}"]`);
+  if(!chunk)return;
+  chunk.classList.remove('ok','warning','critical');
+  if(level)chunk.classList.add(level);
+  const v=document.getElementById(`tstrip-${id}-value`);
+  if(v){
+    const prev=v.textContent;
+    v.textContent=value;
+    if(prev && prev!=='loading…' && prev!==value){
+      chunk.classList.remove('flash-update'); void chunk.offsetWidth; chunk.classList.add('flash-update');
+      setTimeout(()=>chunk.classList.remove('flash-update'),400);
+    }
+  }
+  if(title)chunk.setAttribute('title', title);
+}
+function renderSparkline(svgEl, series, { w=48, h=14 } = {}){
+  if(!svgEl || !Array.isArray(series) || series.length < 3) return;
+  const trimmed = series.slice(-32).map(Number).filter(Number.isFinite);
+  if(trimmed.length < 3) return;
+  const mn = Math.min(...trimmed), mx = Math.max(...trimmed), rng = (mx - mn) || 1;
+  const pts = trimmed.map((v, i) => `${(i/(trimmed.length-1)*(w-2)+1).toFixed(1)},${(h - ((v-mn)/rng)*(h-3) - 1.5).toFixed(1)}`).join(' ');
+  const trend = trimmed[trimmed.length-1] - trimmed[0];
+  const cls = trend > rng*0.05 ? 'up' : (trend < -rng*0.05 ? 'down' : 'flat');
+  svgEl.innerHTML = `<polyline class="${cls}" points="${pts}"/>`;
+}
+
+async function refreshTrustStrip(){
+  const results=await Promise.allSettled([
+    fetch(`${API}/data-freshness-audit`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/nowcast-status`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/source-diversity-audit?window=24`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/meta-model-health`).then(r=>r.json()).catch(()=>null),
+    fetch(`${API}/kpi-summary`).then(r=>r.json()).catch(()=>null),
+  ]);
+  const [freshRes,nowRes,srcRes,metaRes,kpiRes]=results.map(r=>r.status==='fulfilled'?r.value:null);
+
+  // Sparkline: use kpi-summary.vixHistory (market volatility context in DATA chunk)
+  const spark = document.getElementById('tstrip-data-spark');
+  if(spark && Array.isArray(kpiRes?.vixHistory)) renderSparkline(spark, kpiRes.vixHistory);
+
+  // DATA chunk — audit response uses summary.{findings,cacheIssues,articleCount24h,articleCount72h}
+  if(freshRes){
+    const summary=freshRes.summary||{};
+    const findings=Number(summary.findings??(Array.isArray(freshRes.findings)?freshRes.findings.length:0));
+    const cacheIssues=Number(summary.cacheIssues??0);
+    const art24=Number(summary.articleCount24h??freshRes.nas?.articles?.count24h??0);
+    let level='ok';
+    if(findings>0||cacheIssues>0)level='warning';
+    if(findings>=3)level='critical';
+    setTrustChunk('data', `${art24.toLocaleString()} 24h · stale ${findings} · cache ${cacheIssues}`, level, `Findings ${findings}, cache issues ${cacheIssues}, ${art24} articles in 24h`);
+  } else {
+    setTrustChunk('data','unavailable','critical','freshness audit fetch failed');
+  }
+
+  // NOWCAST chunk
+  if(nowRes){
+    const s=nowRes.summary||{};
+    const active=Number(s.activeModels??0), shadow=Number(s.shadowModels??0), cand=Number(s.candidateModels??0);
+    const dc=Number(s.driftCritical??0), dw=Number(s.driftWarning??0);
+    let level='ok';
+    if(s.level==='warning'||dw>0)level='warning';
+    if(s.level==='critical'||dc>0)level='critical';
+    const label=active===0&&shadow===0?`OFF · cand ${cand}`:`${active} active · ${shadow} shadow${dw||dc?` · drift W${dw} C${dc}`:''}`;
+    setTrustChunk('nowcast',label,level,`Active ${active}, shadow ${shadow}, candidate ${cand}`);
+  } else {
+    setTrustChunk('nowcast','unavailable','warning','nowcast-status fetch failed');
+  }
+
+  // SOURCE chunk
+  if(srcRes){
+    const level=srcRes.level||'ok';
+    const topShare=Number(srcRes.topSourceShare??0);
+    const syndShare=Number(srcRes.syndicatorShare??0);
+    const tot=Number(srcRes.totalArticles??0);
+    const synPct=(syndShare*100).toFixed(0);
+    setTrustChunk('source',`${tot} 24h · top ${(topShare*100).toFixed(0)}% · synd ${synPct}%`,level,`${srcRes.distinctSources||0} distinct sources · syndicator share ${synPct}%`);
+  } else {
+    setTrustChunk('source','unavailable','warning','source audit fetch failed');
+  }
+
+  // META chunk
+  if(metaRes){
+    const s=metaRes.summary||{};
+    const le=s.latestEval;
+    if(le&&Number.isFinite(Number(le.brierScore))){
+      const b=Number(le.brierScore), e=Number(le.ece);
+      const level=s.level||'ok';
+      setTrustChunk('meta',`Brier ${b.toFixed(3)} · ECE ${Number.isFinite(e)?e.toFixed(3):'n/a'}`,level,`Latest ${le.modelVersion||'?'} · n=${le.sampleCount||'?'}${s.notes&&s.notes.length?' · '+s.notes[0]:''}`);
+    } else {
+      setTrustChunk('meta','no eval','warning','model_eval empty');
+    }
+  } else {
+    setTrustChunk('meta','unavailable','warning','meta-model health fetch failed');
+  }
+}
+
+// --- Hot Events row view (evidence-graded scan layout) ------------------
+function buildEvidenceChainText(ev){
+  const grade=ev.bestEvidenceGrade||'none';
+  const lines=[];
+  lines.push(`<div class="chain-head">Evidence chain</div>`);
+  lines.push(`<div>event #${ev.id} · ${escapeHtml(ev.theme||'')} · ${String(ev.eventDate||'').slice(0,10)}</div>`);
+  lines.push(`<div class="chain-step">${ev.articleCount||0} articles · ${ev.sourceCount||0} sources · temp ${ev.temperature==null?'n/a':Number(ev.temperature).toFixed(2)}${ev.isSurge?' 🔥 surge':''}</div>`);
+  if(ev.upliftRows&&ev.upliftRows>0){
+    const upl=ev.maxAbsUplift==null?'n/a':`${ev.maxAbsUplift.toFixed(2)}%`;
+    const t=ev.maxAbsTStat==null?'n/a':Number(ev.maxAbsTStat).toFixed(2);
+    lines.push(`<div class="chain-step">${ev.upliftRows} uplift rows · max|uplift| ${upl} · max|t| ${t}</div>`);
+    lines.push(`<div class="chain-step">grade resolved: <strong>${grade}</strong> (rule: E2=alpha+independence; E3/E4 = doc-defined but absent in prod data)</div>`);
+  } else {
+    lines.push(`<div class="chain-step chain-none">no uplift rows yet — matched_controls may not have been built for this event</div>`);
+    lines.push(`<div class="chain-step">grade: ${grade}</div>`);
+  }
+  lines.push(`<div style="margin-top:6px;color:var(--text-muted);font-size:10px">Press <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">Space</kbd> or <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">E</kbd> for full drill · <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">J</kbd>/<kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">K</kbd> to move</div>`);
+  return lines.join('');
+}
+function ageLabel(iso){
+  if(!iso)return '—';
+  const t=Date.parse(iso);
+  if(!Number.isFinite(t))return '—';
+  const diffH=(Date.now()-t)/36e5;
+  if(diffH<1)return `${Math.max(1,Math.round(diffH*60))}m`;
+  if(diffH<24)return `${Math.round(diffH)}h`;
+  return `${Math.round(diffH/24)}d`;
+}
+async function refreshHotEventsRows(){
+  const container=document.getElementById('hot-events-rows');
+  const badge=document.getElementById('hot-events-badge');
+  if(!container)return;
+  let data=null;
+  try{
+    // Lookback 60d intentional: event_uplift labeling has a natural 2w outcome window,
+    // so E2 events emerge only after outcomes complete (~2w old). The UNION query on the
+    // API side ensures recent-by-volume + outcome-completed high-grade events both surface.
+    const res=await fetch(`${API}/hot-events?limit=12&lookback=60`);
+    data=await res.json();
+  }catch(e){/* ignore */}
+  // keep header, replace body
+  const header=container.querySelector('.evidence-rows-header');
+  container.innerHTML='';
+  if(header)container.appendChild(header);
+  if(!data||!data.available||!Array.isArray(data.events)||data.events.length===0){
+    const empty=document.createElement('div');
+    empty.className='loading';
+    empty.style.padding='12px 10px';
+    empty.textContent=data?.note||'No hot events in lookback window';
+    container.appendChild(empty);
+    if(badge)badge.textContent='0';
+    return;
+  }
+  const gc=data.gradeCounts||{};
+  if(badge)badge.textContent=`${data.totalReturned} · E2 ${gc.E2||0} · E1 ${gc.E1||0} · e0 ${gc.E0||0} · none ${gc.none||0}`;
+  for(const ev of data.events){
+    const grade=(ev.bestEvidenceGrade||'none').toLowerCase();
+    const row=document.createElement('div');
+    row.className=`evidence-row grade-${grade}`;
+    row.setAttribute('data-event-id', ev.id);
+    row.setAttribute('data-chain','1');
+    row.setAttribute('tabindex','0');
+    row.setAttribute('data-theme', String(ev.theme || '').toLowerCase());
+    row.addEventListener('click', () => {
+      document.querySelectorAll('.evidence-row.focused').forEach(r=>r.classList.remove('focused'));
+      row.classList.add('focused');
+    });
+    row.addEventListener('mouseenter', () => {
+      const theme = row.getAttribute('data-theme');
+      if(!theme) return;
+      document.querySelectorAll(`#hot-events-rows .evidence-row[data-theme="${theme}"]`).forEach(r => {
+        if(r !== row) r.classList.add('theme-group');
+      });
+    });
+    row.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.evidence-row.theme-group').forEach(r => r.classList.remove('theme-group'));
+    });
+    const gradeLabel=ev.bestEvidenceGrade||'—';
+    const title=escapeHtml(ev.title||'(untitled)');
+    const theme=escapeHtml(ev.theme||'—');
+    const t=ev.maxAbsTStat==null?'—':Number(ev.maxAbsTStat).toFixed(2);
+    const uplift=ev.maxAbsUplift==null?'—':`${ev.maxAbsUplift.toFixed(1)}%`;
+    const upClass=ev.maxAbsUplift==null?'muted':(ev.maxAbsUplift>=0?'pos':'neg');
+    const temp=ev.temperature==null?'—':Number(ev.temperature).toFixed(1);
+    const age=ageLabel(ev.eventDate);
+    row.innerHTML=`
+      <div class="ev-grade">${gradeLabel}</div>
+      <div class="ev-title" title="${title}">${title}</div>
+      <div class="ev-theme" title="${theme}">${theme}</div>
+      <div class="ev-t">${t}</div>
+      <div class="ev-uplift ${upClass}">${uplift}</div>
+      <div class="ev-age">${temp}</div>
+      <div class="ev-art">${ev.articleCount||0}</div>
+      <div class="ev-surge">${ev.isSurge?'🔥':'·'}</div>
+      <div class="evidence-chain-tooltip">${buildEvidenceChainText(ev)}</div>
+    `;
+    container.appendChild(row);
+  }
+}
+
 async function refreshAll(){
   renderTabs();
   renderEvolutionSelect();
@@ -2517,7 +4541,10 @@ async function refreshAll(){
     loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
+    refreshTrustStrip(),refreshHotEventsRows(),refreshSinceStrip(),refreshThemeSpectrum(),
+    refreshAiTimeline(),refreshCorrelationBreaks(),refreshAssetDossier(),
   ]);
+  if (typeof initScenarioLab === 'function') initScenarioLab();
   ensureCurrentTheme();
   renderMyThemes();
   await loadThemeBrief();
@@ -2827,6 +4854,33 @@ async function loadTrendPyramid(){
     html+='</div></div>';
   }
   el.innerHTML=html;
+
+  // L4: also render standalone Recent Transitions card on Home surface
+  const standaloneEl=document.getElementById('recent-transitions-standalone');
+  const standaloneBadge=document.getElementById('recent-transitions-badge');
+  if(standaloneEl){
+    if(transitions.length){
+      if(standaloneBadge)standaloneBadge.textContent=`${transitions.length} transition${transitions.length===1?'':'s'}`;
+      const dirTag=(from,to)=>{
+        const order=['declining','nascent','emerging','growing','mainstream'];
+        const fi=order.indexOf(String(from).toLowerCase()), ti=order.indexOf(String(to).toLowerCase());
+        if(fi>=0 && ti>=0 && ti>fi) return 'tag-growing';
+        if(fi>=0 && ti>=0 && ti<fi) return 'tag-declining';
+        return 'tag-neutral';
+      };
+      standaloneEl.innerHTML=`<div class="pill-row" style="gap:6px">${transitions.slice(0,12).map(item=>{
+        const label=item.theme||item.label||item.name||'theme';
+        const from=item.from||item.previousStage||'prior';
+        const to=item.to||item.stage||'current';
+        return `<span class="tag ${dirTag(from,to)}" onclick="openThemeBrief('${normalizeTheme(label)}');return false;" style="cursor:pointer">${escapeHtml(humanizeTheme(label))}: ${escapeHtml(from)} → ${escapeHtml(to)}</span>`;
+      }).join('')}</div><div class="meta-line" style="margin-top:10px">Click a transition to open its theme brief. Up-arrows (→) mean accelerating lifecycle, down-arrows mean decelerating.</div>`;
+      standaloneEl.classList.remove('loading');
+    } else {
+      if(standaloneBadge)standaloneBadge.textContent='no change';
+      standaloneEl.innerHTML='<div class="theme-empty">No theme transitions in the latest pyramid refresh.</div>';
+      standaloneEl.classList.remove('loading');
+    }
+  }
 }
 async function loadThemeEvolution(){
   const {data,cached,cachedAt}=await f(`${API}/theme-evolution/${encodeURIComponent(state.evolutionParent)}?period=${encodeURIComponent(getCurrentPeriod())}`,`theme-evolution-${state.evolutionParent}-${getCurrentPeriod()}`);
@@ -3713,7 +5767,17 @@ function renderRiskSnapshot(snapshot={},cachedAt=null,cached=false){
   const highlights=Array.isArray(snapshot.highlights)?snapshot.highlights:[];
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
   html+=snapshotStaleBadge(snapshot);
-  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Risk posture ${escapeHtml(String(snapshot.level||'watch').toUpperCase())}</strong><div class="meta-line">Score ${fmtWhole(snapshot.score||0)} | alerts ${fmtWhole(snapshot.summary?.alertCount||0)} | pending validation ${fmtWhole(snapshot.summary?.pendingValidation||0)} | articles 24h ${fmtWhole(snapshot.summary?.articleCount24h||0)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
+  // L6: "why" line — derive plain reason from the strongest contributor
+  const lvl=String(snapshot.level||'watch').toLowerCase();
+  const alertN=Number(snapshot.summary?.alertCount||0);
+  const hotN=hottest.filter(h=>/hot|warm/i.test(String(h.temperature||''))).length;
+  const staleArt=Number(snapshot.summary?.articleCount24h||0)===0;
+  const reasons=[];
+  if(alertN>=2)reasons.push(`${alertN} structural alerts`);
+  if(hotN>=1)reasons.push(`${hotN} hot theme${hotN>1?'s':''}`);
+  if(staleArt)reasons.push('articles stalled');
+  const whyText=reasons.length?`${lvl==='high'||lvl==='elevated'?'Driven by':'Noting'} ${reasons.join(' · ')}`:'Baseline posture';
+  html+=`<div class="review-card-head"><div class="review-card-title"><strong>Risk posture ${escapeHtml(lvl.toUpperCase())}</strong><div class="meta-line">Score ${fmtWhole(snapshot.score||0)} | alerts ${fmtWhole(alertN)} | pending validation ${fmtWhole(snapshot.summary?.pendingValidation||0)} | articles 24h ${fmtWhole(snapshot.summary?.articleCount24h||0)}</div><div class="meta-line" style="color:var(--text-soft);font-style:italic;margin-top:2px">${escapeHtml(whyText)}</div></div><span class="tag ${snapshotLevelClass(snapshot.level)}">${escapeHtml(snapshot.level||'watch')}</span></div>`;
   if(hottest.length)html+=`<div class="pill-row" style="margin-top:8px">${renderTags(hottest.map((item)=>`${item.themeLabel||humanizeTheme(item.theme)} ${item.temperature||''}`),'tag-neutral',6)}</div>`;
   html+=highlights.length
     ? `<div class="brief-list" style="margin-top:10px">${highlights.slice(0,3).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.themeLabel||humanizeTheme(item.theme)||'Theme')}</strong><div class="meta-line">${escapeHtml(item.severity||'medium')} | ${escapeHtml(item.alertType||'signal')}</div><div class="brief-item-copy">${escapeHtml(truncate(item.headline||item.detail||'Structural pressure detected.',140))}</div></div>`).join('')}</div>`
@@ -3837,12 +5901,14 @@ async function loadThemeShellSnapshots(){
 async function reviewCodexProposal(id,decision){
   if(!id||!decision)return;
   await postJson(`${API}/codex-proposals/${encodeURIComponent(id)}/review`,{decision,reviewer:'theme-dashboard'});
-  await Promise.all([loadProposalInbox(),loadCodex(),loadPending(),loadThemeShellSnapshots()]);
+  invalidateClientCaches(['proposal-inbox']);
+  await Promise.all([refreshDecisionInbox(),loadProposalInbox(),loadCodex(),loadPending(),loadThemeShellSnapshots()]);
 }
 async function reviewApprovalQueue(id,decision){
   if(!id||!decision)return;
   await postJson(`${API}/approval-queue/${encodeURIComponent(id)}/review`,{decision,reviewer:'theme-dashboard'});
-  await Promise.all([loadProposalInbox(),loadAutomationBudget(),loadAutomationLog(),loadThemeShellSnapshots()]);
+  invalidateClientCaches(['proposal-inbox']);
+  await Promise.all([refreshDecisionInbox(),loadProposalInbox(),loadAutomationBudget(),loadAutomationLog(),loadThemeShellSnapshots()]);
 }
 async function loadProposalInbox(){
   const {data,cached,cachedAt}=await f(`${API}/proposal-inbox?limit=8`,'proposal-inbox');

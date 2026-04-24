@@ -18,6 +18,24 @@ import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.m
 import { createLogger } from './_shared/structured-logger.mjs';
 import { computeCalibrationDiagnostic } from './_shared/calibration-diagnostic.mjs';
 import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
+import { buildFreshnessAudit } from './audit-data-freshness.mjs';
+import { buildNowcastStatusPayload } from './_shared/nowcast-status-builder.mjs';
+import {
+  buildHotEventsPayload,
+  buildMetaModelHealthPayload,
+  buildExplainEventPayload,
+  buildSourceDiversityAuditPayload,
+  buildThemeImpactPayload,
+} from './_shared/event-intelligence-builder.mjs';
+import {
+  buildEventTimelinePayload,
+  buildEventNarrativePayload,
+  buildSimilarEventsPayload,
+  buildRegimeScenarioPayload,
+  buildAssetDossierPayload,
+  buildWeeklyDigestPayload,
+  buildCorrelationBreaksPayload,
+} from './_shared/ai-analysis-builder.mjs';
 import { getBudgetStatus } from './_shared/automation-budget.mjs';
 import { getRecentAutomationActions } from './_shared/automation-audit.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
@@ -53,7 +71,12 @@ import {
   buildStructuralAlertsPayload,
   dismissStructuralAlert,
 } from './_shared/trend-workbench.mjs';
+import {
+  mapThemeToTaxonomy,
+  rankThemesForText,
+} from './_shared/theme-taxonomy.mjs';
 import { isLowSignalAddRssProposal } from './_shared/rss-proposal-quality.mjs';
+import { isLowValueGoogleNewsSourceName } from './_shared/google-news-source-policy.mjs';
 import {
   MAP_LENS_FILTER_TERMS,
   MAP_LENS_ANCHORS,
@@ -108,12 +131,29 @@ import { fuseNowcastsIntoLookup } from './_shared/dashboard-nowcast-fusion.mjs';
 export { buildTopicArticleProfile, buildTopicRecentArticleScore };
 export { classifySignalQuality, withMeta, deriveResponseMeta };
 export { fuseNowcastsIntoLookup };
+export {
+  inferArticleDashboardTheme,
+  normalizeDashboardThemeKey,
+  sanitizeArticleDisplaySource,
+  shouldRenderTodayEvent,
+};
 
 loadOptionalEnvFile();
 
 const { Pool } = pg;
 const PORT = Number(process.env.DASHBOARD_PORT || 46200);
 const AUDIT_DIR = path.resolve('data', 'audits');
+const DATA_FRESHNESS_AUDIT_TTL_MS = Number(process.env.DATA_FRESHNESS_AUDIT_TTL_MS || 5 * 60 * 1000);
+const SERVER_CACHE_FALLBACK_TTL_MS = Number(process.env.DASHBOARD_CACHE_FALLBACK_TTL_MS || 60 * 60 * 1000);
+const HOT_THEME_HAWKES_MAX_AGE_HOURS = Number(process.env.HOT_THEME_HAWKES_MAX_AGE_HOURS || 72);
+const ARTICLE_LIVE_MAX_AGE_HOURS = Number(process.env.ARTICLE_LIVE_MAX_AGE_HOURS || 24);
+const SIDECAR_BASE_URL = String(
+  process.env.LATTICE_SIDECAR_BASE_URL
+  || process.env.LOCAL_API_BASE_URL
+  || (process.env.LOCAL_API_PORT ? `http://127.0.0.1:${process.env.LOCAL_API_PORT}` : 'http://127.0.0.1:46123'),
+).replace(/\/+$/, '');
+const SIDECAR_PROXY_TIMEOUT_MS = Number(process.env.SIDECAR_PROXY_TIMEOUT_MS || 10_000);
+const OPAQUE_DISCOVERY_THEME_PATTERN = /^dt-[a-z0-9]+$/i;
 const logger = createLogger('event-dashboard-api');
 let pool = null;
 let poolConfig = null;
@@ -329,7 +369,7 @@ async function resolveWithCache(cacheKey, buildPayload) {
     return buildJsonResponse(enriched);
   } catch (error) {
     const cached = await readJsonCache(cacheKey);
-    if (cached) {
+    if (cached && canUseServerCacheFallback(cacheKey, cached)) {
       logger.metric('api.cache_hit', 1, { cacheKey });
       return buildJsonResponse(withMeta(cached, {
         cacheHit: true,
@@ -337,6 +377,13 @@ async function resolveWithCache(cacheKey, buildPayload) {
         stale: true,
         cacheReason: String(error?.message || error || 'cache fallback'),
       }));
+    }
+    if (cached) {
+      logger.warn('server cache fallback rejected because cache is stale', {
+        cacheKey,
+        generatedAt: cacheGeneratedAt(cached),
+        reason: String(error?.message || error || 'cache fallback'),
+      });
     }
     logger.metric('api.cache_miss', 1, { cacheKey });
     throw error;
@@ -354,6 +401,52 @@ async function readJsonBody(req) {
   return JSON.parse(text);
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = SIDECAR_PROXY_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = { raw: text };
+    }
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function buildSidecarProxyPayload(endpoint) {
+  try {
+    const result = await fetchJsonWithTimeout(`${SIDECAR_BASE_URL}${endpoint}`);
+    return {
+      ok: result.ok,
+      status: result.status,
+      sidecarBaseUrl: SIDECAR_BASE_URL,
+      endpoint,
+      payload: result.payload,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 503,
+      sidecarBaseUrl: SIDECAR_BASE_URL,
+      endpoint,
+      error: String(error?.message || error),
+    };
+  }
+}
+
 function normalizeTemperatureValue(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -362,6 +455,49 @@ function normalizeTemperatureValue(value) {
 function clamp(value, minimum, maximum) {
   if (!Number.isFinite(value)) return minimum;
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function timestampMs(value) {
+  const iso = toIsoTimestamp(value);
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function latestIsoTimestampFrom(...values) {
+  const max = values
+    .flat()
+    .map(timestampMs)
+    .filter((value) => Number.isFinite(value))
+    .reduce((current, value) => Math.max(current, value), 0);
+  return max > 0 ? new Date(max).toISOString() : null;
+}
+
+function ageHoursFrom(value, now = new Date()) {
+  const ms = timestampMs(value);
+  if (!ms) return null;
+  return Math.max(0, (now.getTime() - ms) / 36e5);
+}
+
+function isFreshWithinHours(value, maxAgeHours, now = new Date()) {
+  const age = ageHoursFrom(value, now);
+  return age != null && age <= maxAgeHours;
+}
+
+function cacheGeneratedAt(payload) {
+  return toIsoTimestamp(payload?.meta?.generatedAt || payload?.generatedAt || payload?.meta?.updatedAt || payload?.updatedAt);
+}
+
+function canUseServerCacheFallback(cacheKey, payload, now = new Date()) {
+  const generatedAt = cacheGeneratedAt(payload);
+  if (!generatedAt) return false;
+  const ageMs = now.getTime() - Date.parse(generatedAt);
+  if (!Number.isFinite(ageMs) || ageMs < 0) return false;
+  const key = String(cacheKey || '');
+  const ttlMs = key === 'today' || key === 'live-status'
+    ? Math.min(SERVER_CACHE_FALLBACK_TTL_MS, 15 * 60 * 1000)
+    : SERVER_CACHE_FALLBACK_TTL_MS;
+  return ageMs <= ttlMs;
 }
 
 function normalizeSignalQueueTitle(value) {
@@ -376,6 +512,68 @@ function classifyTemperature(intensity) {
   if (intensity >= 0.45) return 'WARM';
   if (intensity >= 0.2) return 'COOL';
   return 'COLD';
+}
+
+function isOpaqueDiscoveryTheme(value) {
+  return OPAQUE_DISCOVERY_THEME_PATTERN.test(String(value || '').trim());
+}
+
+function normalizeDashboardThemeKey(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === 'unknown' || isOpaqueDiscoveryTheme(raw)) return null;
+  const canonical = mapThemeToTaxonomy(raw);
+  return canonical && canonical !== 'unknown' ? canonical : null;
+}
+
+function inferArticleDashboardTheme(row) {
+  const explicit = normalizeDashboardThemeKey(row?.raw_theme)
+    || normalizeDashboardThemeKey(row?.auto_theme)
+    || normalizeDashboardThemeKey(row?.theme_key)
+    || normalizeDashboardThemeKey(row?.theme)
+    || normalizeDashboardThemeKey(row?.legacy_theme);
+  if (explicit) return explicit;
+
+  const ranked = rankThemesForText(
+    [row?.title, row?.summary, row?.source].filter(Boolean).join(' '),
+    { includeParents: false, limit: 1 },
+  );
+  const best = ranked[0];
+  return best && Number(best.score || 0) >= 0.8 ? best.theme : null;
+}
+
+function decodeDashboardHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+      const codePoint = Number.parseInt(hex, 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _;
+    })
+    .replace(/&#(\d+);/g, (_, decimal) => {
+      const codePoint = Number.parseInt(decimal, 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _;
+    })
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function sanitizeArticleDisplaySource(source, title = '') {
+  const rawSource = decodeDashboardHtmlEntities(source).trim();
+  const rawTitle = decodeDashboardHtmlEntities(title).trim();
+  const cleanedSource = rawSource
+    .replace(/\s+source(?:\s+\d{8})?$/i, '')
+    .replace(/^codex\s+(?:e2e|retest)\s+/i, '')
+    .trim();
+  if (!cleanedSource.toLowerCase().startsWith('google news:')) return cleanedSource;
+
+  const titleParts = rawTitle.split(/\s[-–—]\s/).map((part) => part.trim()).filter(Boolean);
+  const publisher = titleParts.length > 1 ? titleParts.at(-1) : null;
+  return publisher || 'Google News';
+}
+
+function shouldRenderTodayEvent(event) {
+  return Boolean(String(event?.title || '').trim() && normalizeDashboardThemeKey(event?.theme));
 }
 
 function mapExpectedReactions(rows) {
@@ -540,11 +738,12 @@ async function buildMapLensOverlayPayload(params) {
 }
 
 async function buildLiveStatus() {
+  const now = new Date();
   const [signalState, quoteFeed, tempsR, pendingR, articlesR, recentThemesR] = await Promise.all([
     loadLatestSignalsWithQuality(),
     detectLiveQuoteFeed(),
     safeQuery(`
-      SELECT DISTINCT ON (theme) theme, normalized_temperature
+      SELECT DISTINCT ON (theme) theme, normalized_temperature, event_date, updated_at
       FROM event_hawkes_intensity
       ORDER BY theme, event_date DESC
     `),
@@ -554,31 +753,58 @@ async function buildLiveStatus() {
       WHERE status IN ('pending', 'waiting')
     `),
     safeQuery(`
-      SELECT COUNT(*)::int AS count
+      SELECT COUNT(*)::int AS count, MAX(published_at) AS latest_published_at
       FROM articles
       WHERE published_at >= NOW() - INTERVAL '24 hours'
     `),
     safeQuery(`
-      SELECT auto_theme AS theme, COUNT(*)::int AS count
-      FROM auto_article_themes t
-      JOIN articles a ON a.id = t.article_id
-      WHERE a.published_at >= NOW() - INTERVAL '7 days'
-      GROUP BY auto_theme
+      WITH recent_theme_rows AS (
+        SELECT
+          CASE
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'tech' THEN 'technology-general'
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'economy' THEN 'macroeconomics'
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'politics' THEN 'geopolitics'
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'energy' THEN 'clean-energy'
+            ELSE COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), ''))
+          END AS theme,
+          a.published_at
+        FROM auto_article_themes t
+        JOIN articles a ON a.id = t.article_id
+        WHERE a.published_at >= NOW() - INTERVAL '7 days'
+      )
+      SELECT theme, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at
+      FROM recent_theme_rows
+      WHERE theme IS NOT NULL
+        AND theme <> ''
+        AND theme !~* '^dt-[a-z0-9]+$'
+        AND theme <> 'unknown'
+      GROUP BY theme
       ORDER BY count DESC
       LIMIT 8
     `),
   ]);
 
-  const temperatures = (tempsR.rows.length > 0 ? tempsR.rows : recentThemesR.rows).map((row) => {
-    const intensity = normalizeTemperatureValue(
-      row.normalized_temperature ?? Math.min(1, Number(row.count || 0) / 20),
-    );
-    return {
-      theme: String(row.theme || 'unknown'),
-      temperature: classifyTemperature(intensity),
-      intensity,
-    };
-  });
+  const freshHawkesRows = tempsR.rows.filter((row) => (
+    isFreshWithinHours(row.event_date, HOT_THEME_HAWKES_MAX_AGE_HOURS, now)
+    || isFreshWithinHours(row.updated_at, HOT_THEME_HAWKES_MAX_AGE_HOURS, now)
+  ));
+  const temperatureRows = freshHawkesRows.length > 0 ? freshHawkesRows : recentThemesR.rows;
+  const temperatureSource = freshHawkesRows.length > 0 ? 'event_hawkes_intensity' : 'recent_article_themes';
+  const maxRecentThemeCount = Math.max(...recentThemesR.rows.map((row) => Number(row.count || 0)), 1);
+  const temperatures = temperatureRows
+    .filter((row) => !isOpaqueDiscoveryTheme(row.theme))
+    .map((row) => {
+      const intensity = normalizeTemperatureValue(
+        row.normalized_temperature ?? Math.min(1, Number(row.count || 0) / maxRecentThemeCount),
+      );
+      return {
+        theme: String(row.theme || 'unknown'),
+        temperature: classifyTemperature(intensity),
+        intensity,
+        updatedAt: row.updated_at || row.latest_published_at || row.event_date || null,
+        source: temperatureSource,
+      };
+    });
 
   const signals = signalState.rows.map((row) => {
     const channel = String(row.signal_name || '');
@@ -590,17 +816,45 @@ async function buildLiveStatus() {
       quality: row.quality,
     };
   });
+  const articleCount24h = Number(articlesR.rows[0]?.count || 0);
+  const latestArticlePublishedAt = toIsoTimestamp(articlesR.rows[0]?.latest_published_at);
+  const articleAgeHours = latestArticlePublishedAt ? ageHoursFrom(latestArticlePublishedAt, now) : null;
+  const articlesStale = !latestArticlePublishedAt || Number(articleAgeHours) > ARTICLE_LIVE_MAX_AGE_HOURS;
+  const latestSignalAt = latestIsoTimestampFrom(signals.map((row) => row.updatedAt));
+  const latestTemperatureAt = latestIsoTimestampFrom(temperatures.map((row) => row.updatedAt));
+  const dataUpdatedAt = latestIsoTimestampFrom(latestArticlePublishedAt, latestSignalAt, latestTemperatureAt);
 
   return {
     temperatures,
     signals,
     signalQuality: signalState.qualityBySignal,
     pending: Number(pendingR.rows[0]?.count || 0),
-    todayArticles: Number(articlesR.rows[0]?.count || 0),
+    todayArticles: articleCount24h,
+    articleFreshness: {
+      latestPublishedAt: latestArticlePublishedAt,
+      ageHours: Number.isFinite(articleAgeHours) ? Math.round(articleAgeHours * 10) / 10 : null,
+      stale: articlesStale,
+      count24h: articleCount24h,
+      maxAgeHours: ARTICLE_LIVE_MAX_AGE_HOURS,
+    },
+    temperatureSource,
+    temperatureFreshness: {
+      source: temperatureSource,
+      fallbackUsed: freshHawkesRows.length === 0 && tempsR.rows.length > 0,
+      reason: freshHawkesRows.length === 0 && tempsR.rows.length > 0
+        ? 'event_hawkes_intensity is stale; using recent article themes'
+        : null,
+    },
     meta: {
       mode: signalState.mode,
-      stale: signalState.stale || quoteFeed.status !== 'configured',
-      staleReason: [signalState.staleReason, quoteFeed.status === 'configured' ? null : quoteFeed.reason].filter(Boolean).join('; ') || null,
+      dataUpdatedAt,
+      latestInternalUpdatedAt: dataUpdatedAt,
+      stale: signalState.stale || quoteFeed.status !== 'configured' || articlesStale,
+      staleReason: [
+        signalState.staleReason,
+        quoteFeed.status === 'configured' ? null : quoteFeed.reason,
+        articlesStale ? `article age ${articleAgeHours == null ? 'unknown' : Math.round(articleAgeHours)}h exceeds ${ARTICLE_LIVE_MAX_AGE_HOURS}h threshold` : null,
+      ].filter(Boolean).join('; ') || null,
       quoteFeed,
     },
   };
@@ -769,25 +1023,7 @@ async function buildHeatmap() {
   return { themes, symbols, cells };
 }
 
-async function buildTodayEvents() {
-  const recent24h = await safeQuery(`
-    SELECT id, title, source, published_at
-    FROM articles
-    WHERE published_at >= NOW() - INTERVAL '24 hours'
-    ORDER BY published_at DESC
-    LIMIT 40
-  `);
-
-  const articleRows = recent24h.rows.length > 0
-    ? recent24h.rows
-    : (await safeQuery(`
-      SELECT id, title, source, published_at
-      FROM articles
-      WHERE published_at >= NOW() - INTERVAL '7 days'
-      ORDER BY published_at DESC
-      LIMIT 40
-    `)).rows;
-
+async function materializeTodayEvents(articleRows, window) {
   if (!articleRows.length) {
     return { events: [], meta: { window: 'collecting' } };
   }
@@ -795,7 +1031,11 @@ async function buildTodayEvents() {
   const articleIds = articleRows.map((row) => Number(row.id)).filter(Number.isFinite);
   const themesR = articleIds.length > 0
     ? await safeQuery(`
-      SELECT article_id, auto_theme
+      SELECT
+        article_id,
+        auto_theme,
+        theme_key,
+        COALESCE(NULLIF(TRIM(theme_key), ''), NULLIF(TRIM(auto_theme), '')) AS raw_theme
       FROM auto_article_themes
       WHERE article_id = ANY($1::int[])
     `, [articleIds])
@@ -803,10 +1043,19 @@ async function buildTodayEvents() {
 
   const themeByArticle = new Map();
   for (const row of themesR.rows) {
-    themeByArticle.set(Number(row.article_id), String(row.auto_theme || 'unknown'));
+    const articleId = Number(row.article_id);
+    if (!Number.isFinite(articleId) || themeByArticle.has(articleId)) continue;
+    const theme = inferArticleDashboardTheme(row);
+    if (theme) themeByArticle.set(articleId, theme);
+  }
+  for (const row of articleRows) {
+    const articleId = Number(row.id);
+    if (!Number.isFinite(articleId) || themeByArticle.has(articleId)) continue;
+    const theme = inferArticleDashboardTheme(row);
+    if (theme) themeByArticle.set(articleId, theme);
   }
 
-  const distinctThemes = Array.from(new Set(themesR.rows.map((row) => String(row.auto_theme || 'unknown')).filter(Boolean)));
+  const distinctThemes = Array.from(new Set([...themeByArticle.values()].filter(Boolean)));
   const sensitivityR = distinctThemes.length > 0
     ? await safeQuery(`
       SELECT theme, symbol, avg_return
@@ -824,21 +1073,51 @@ async function buildTodayEvents() {
     reactionsByTheme.set(theme, bucket);
   }
 
-  return {
-    events: articleRows.map((row) => {
-      const theme = themeByArticle.get(Number(row.id)) || 'unknown';
+  const events = articleRows
+    .map((row) => {
+      const theme = themeByArticle.get(Number(row.id)) || null;
       return {
-        title: String(row.title || ''),
-        source: String(row.source || ''),
+        title: decodeDashboardHtmlEntities(row.title || ''),
+        source: sanitizeArticleDisplaySource(row.source, row.title),
         publishedAt: row.published_at,
         theme,
         expectedReactions: mapExpectedReactions(reactionsByTheme.get(theme) || []),
       };
-    }),
+    })
+    .filter(shouldRenderTodayEvent)
+    .slice(0, 40);
+
+  return {
+    events,
     meta: {
-      window: recent24h.rows.length > 0 ? '24h' : '7d-fallback',
+      window,
+      dataUpdatedAt: latestIsoTimestampFrom((events.length > 0 ? events : articleRows).map((row) => row.publishedAt || row.published_at)),
     },
   };
+}
+
+async function buildTodayEvents() {
+  const recent24h = await safeQuery(`
+    SELECT id, title, summary, source, published_at, theme, legacy_theme
+    FROM articles
+    WHERE published_at >= NOW() - INTERVAL '24 hours'
+    ORDER BY published_at DESC
+    LIMIT 240
+  `);
+
+  if (recent24h.rows.length > 0) {
+    const today = await materializeTodayEvents(recent24h.rows, '24h');
+    if (today.events.length > 0) return today;
+  }
+
+  const fallbackRows = (await safeQuery(`
+      SELECT id, title, summary, source, published_at, theme, legacy_theme
+      FROM articles
+      WHERE published_at >= NOW() - INTERVAL '7 days'
+      ORDER BY published_at DESC
+      LIMIT 500
+    `)).rows;
+  return materializeTodayEvents(fallbackRows, '7d-fallback');
 }
 
 async function buildStrategies(params) {
@@ -846,7 +1125,12 @@ async function buildStrategies(params) {
   const symbol = String(params.get('symbol') || '').trim().toUpperCase();
 
   const primary = await safeQuery(`
-    SELECT name, sharpe_ratio, expected_return, max_drawdown, theme
+    SELECT
+      CONCAT(theme, ' / ', symbol, COALESCE(' ' || direction, '')) AS name,
+      sharpe_ratio,
+      COALESCE(avg_pnl_pct, total_return_pct, 0) AS expected_return,
+      COALESCE(max_drawdown_pct, 0) AS max_drawdown,
+      theme
     FROM whatif_simulations
     WHERE ($1 = '' OR theme = $1) AND ($2 = '' OR symbol = $2)
     ORDER BY sharpe_ratio DESC
@@ -984,7 +1268,33 @@ async function buildDataQuality() {
   return computeDataQualityMetrics(getPool());
 }
 
-async function loadLatestDataFreshnessAudit() {
+function auditDateToken(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+function normalizeFreshnessAuditPayload(payload, auditPath, extra = {}) {
+  return {
+    ok: true,
+    auditPath: auditPath ? path.relative(process.cwd(), auditPath).replace(/\\/g, '/') : null,
+    generatedAt: payload.generatedAt || null,
+    summary: payload.summary || null,
+    findings: Array.isArray(payload.findings) ? payload.findings : [],
+    nas: payload.nas || null,
+    backfill: payload.backfill || null,
+    cache: {
+      checkedFiles: payload.cache?.checkedFiles || 0,
+      issues: Array.isArray(payload.cache?.issues) ? payload.cache.issues.slice(0, 20) : [],
+    },
+    ...extra,
+  };
+}
+
+async function readLatestDataFreshnessAuditArtifact() {
   if (!existsSync(AUDIT_DIR)) {
     return {
       ok: false,
@@ -1010,18 +1320,141 @@ async function loadLatestDataFreshnessAudit() {
   const file = files[0];
   const auditPath = path.join(AUDIT_DIR, file);
   const payload = JSON.parse(await readFile(auditPath, 'utf8'));
+  return normalizeFreshnessAuditPayload(payload, auditPath, { source: 'artifact' });
+}
+
+async function writeDataFreshnessAuditArtifact(payload, now = new Date()) {
+  await mkdir(AUDIT_DIR, { recursive: true });
+  const auditPath = path.join(AUDIT_DIR, `data-freshness-${auditDateToken(now)}.json`);
+  await writeFile(auditPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return auditPath;
+}
+
+async function loadLatestDataFreshnessAudit(options = {}) {
+  const forceRefresh = Boolean(options.forceRefresh);
+  const existing = await readLatestDataFreshnessAuditArtifact();
+  const existingAgeMs = existing.ok && existing.generatedAt
+    ? Date.now() - Date.parse(existing.generatedAt)
+    : Number.POSITIVE_INFINITY;
+  if (!forceRefresh && existing.ok && Number.isFinite(existingAgeMs) && existingAgeMs >= 0 && existingAgeMs <= DATA_FRESHNESS_AUDIT_TTL_MS) {
+    return existing;
+  }
+
+  const now = new Date();
+  try {
+    const audit = await buildFreshnessAudit({ cwd: process.cwd(), now, envFile: '.env.local' });
+    const auditPath = await writeDataFreshnessAuditArtifact(audit, now);
+    return normalizeFreshnessAuditPayload(audit, auditPath, { source: 'live-refresh' });
+  } catch (error) {
+    if (existing.ok) {
+      return {
+        ...existing,
+        stale: true,
+        refreshError: String(error?.message || error),
+      };
+    }
+    return {
+      ok: false,
+      error: String(error?.message || error),
+      auditPath: null,
+      summary: null,
+      findings: [],
+    };
+  }
+}
+
+async function readLatestSourceRepairAuditArtifact() {
+  if (!existsSync(AUDIT_DIR)) {
+    return {
+      ok: false,
+      error: 'No source repair audit directory found',
+      auditPath: null,
+      audit: null,
+    };
+  }
+  const files = (await readdir(AUDIT_DIR))
+    .filter((name) => /^source-repair-closed-loop-.*\.json$/.test(name))
+    .sort()
+    .reverse();
+  if (!files.length) {
+    return {
+      ok: false,
+      error: 'No source repair audit artifact found',
+      auditPath: null,
+      audit: null,
+    };
+  }
+  const auditPath = path.join(AUDIT_DIR, files[0]);
+  const audit = JSON.parse(await readFile(auditPath, 'utf8'));
   return {
-    ok: true,
+    ok: audit?.ok !== false,
     auditPath: path.relative(process.cwd(), auditPath).replace(/\\/g, '/'),
-    generatedAt: payload.generatedAt || null,
-    summary: payload.summary || null,
-    findings: Array.isArray(payload.findings) ? payload.findings : [],
-    nas: payload.nas || null,
-    backfill: payload.backfill || null,
-    cache: {
-      checkedFiles: payload.cache?.checkedFiles || 0,
-      issues: Array.isArray(payload.cache?.issues) ? payload.cache.issues.slice(0, 20) : [],
+    generatedAt: audit.finishedAt || audit.generatedAt || audit.startedAt || null,
+    audit,
+  };
+}
+
+function summarizeApprovalCounts(approvals = []) {
+  const counts = {
+    total: approvals.length,
+    pending: 0,
+    needsFix: 0,
+    rejected: 0,
+    executed: 0,
+    sourceNeedsFix: 0,
+  };
+  for (const item of approvals) {
+    const status = String(item?.status || 'unknown');
+    if (status === 'pending') counts.pending += 1;
+    if (status === 'needs-fix') counts.needsFix += 1;
+    if (status === 'rejected') counts.rejected += 1;
+    if (status === 'executed') counts.executed += 1;
+    if (status === 'needs-fix' && String(item?.action_type || item?.actionType || '') === 'add-rss') {
+      counts.sourceNeedsFix += 1;
+    }
+  }
+  return counts;
+}
+
+async function buildSourceRepairStatusPayload() {
+  const [audit, approvalQueue, freshness] = await Promise.all([
+    readLatestSourceRepairAuditArtifact(),
+    buildApprovalQueuePayload().catch(() => ({ approvals: [] })),
+    loadLatestDataFreshnessAudit({ forceRefresh: false }).catch((error) => ({ ok: false, error: String(error?.message || error) })),
+  ]);
+  const approvals = Array.isArray(approvalQueue.approvals) ? approvalQueue.approvals : [];
+  const historical = audit.audit?.historical && typeof audit.audit.historical === 'object' ? audit.audit.historical : {};
+  const countedSuccesses = Number(audit.audit?.countedSuccesses ?? historical.eventMappedSources ?? 0);
+  const targetSuccesses = Number(audit.audit?.targetSuccesses ?? 20);
+  const sourceRepairSummary = {
+    countedSuccesses,
+    targetSuccesses,
+    targetMet: countedSuccesses >= targetSuccesses,
+    thisRunSuccesses: Number(audit.audit?.pipelineSuccesses ?? audit.audit?.successes?.length ?? 0),
+    registeredSources: Number(historical.seededSources ?? 0),
+    themedSources: Number(historical.themedSources ?? 0),
+    eventMappedSources: Number(historical.eventMappedSources ?? 0),
+    codexRepairActiveSources: Number(historical.codexRepairActiveSources ?? 0),
+    codexRepairEventMappedSources: Number(historical.codexRepairEventMappedSources ?? 0),
+    fullHeuristic: Boolean(audit.audit?.inputs?.fullHeuristic),
+    catalogBootstrap: Boolean(audit.audit?.inputs?.catalogBootstrap),
+    codeRepairEnabled: Boolean(audit.audit?.inputs?.enableCodeRepair),
+  };
+  return {
+    ok: Boolean(audit.ok && sourceRepairSummary.targetMet),
+    generatedAt: new Date().toISOString(),
+    auditPath: audit.auditPath,
+    sourceRepair: sourceRepairSummary,
+    approval: summarizeApprovalCounts(approvals),
+    freshness: {
+      ok: freshness.ok !== false,
+      articleCount24h: freshness.summary?.articleCount24h ?? null,
+      articleCount72h: freshness.summary?.articleCount72h ?? null,
+      latestPublishedAt: freshness.nas?.articles?.latestPublishedAt ?? null,
+      findings: freshness.summary?.findings ?? null,
+      cacheIssues: freshness.summary?.cacheIssues ?? null,
     },
+    audit: audit.audit,
   };
 }
 
@@ -1209,7 +1642,9 @@ async function buildEmergingTechDetail(topicId) {
     `, [topicId, String(topic.parent_theme || 'emerging-tech')]),
   ]);
 
-  const linkedArticles = linkedArticlesResponse.rows.map((row) => ({
+  const linkedArticles = linkedArticlesResponse.rows
+    .filter((row) => !isLowValueGoogleNewsSourceName(row.source))
+    .map((row) => ({
     id: Number(row.id || 0),
     title: String(row.title || ''),
     source: String(row.source || ''),
@@ -1224,6 +1659,7 @@ async function buildEmergingTechDetail(topicId) {
   const linkedById = new Map(linkedArticles.map((article) => [article.id, article]));
   const recentCandidates = [];
   for (const row of candidateArticlesResponse.rows) {
+    if (isLowValueGoogleNewsSourceName(row.source)) continue;
     const candidate = {
       id: Number(row.id || 0),
       title: String(row.title || ''),
@@ -1311,7 +1747,8 @@ async function buildEmergingTechDetail(topicId) {
               url: article.url,
               match_type: article.matchType,
             }))
-          : reportResponse.rows[0].top_articles,
+          : asArray(reportResponse.rows[0].top_articles)
+            .filter((article) => !isLowValueGoogleNewsSourceName(article?.source)),
       }
     : null;
 
@@ -1796,7 +2233,218 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'data-freshness-audit') {
-      return buildJsonResponse(await loadLatestDataFreshnessAudit());
+      return buildJsonResponse(await loadLatestDataFreshnessAudit({ forceRefresh: params.get('refresh') === '1' }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'source-repair-status') {
+      return buildJsonResponse(await buildSourceRepairStatusPayload());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'nowcast-status') {
+      try {
+        const payload = await buildNowcastStatusPayload(getPool());
+        const status = payload?.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, status);
+      } catch (err) {
+        logger.warn('nowcast-status route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'hot-events') {
+      try {
+        const payload = await buildHotEventsPayload(getPool(), {
+          limit: Number(params.get('limit') || 10),
+          lookbackDays: Number(params.get('lookback') || 7),
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('hot-events route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'meta-model-health') {
+      try {
+        const payload = await buildMetaModelHealthPayload(getPool());
+        const status = payload?.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, status);
+      } catch (err) {
+        logger.warn('meta-model-health route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'explain-event' && segments[2]) {
+      try {
+        const payload = await buildExplainEventPayload(getPool(), { eventId: segments[2] });
+        return buildJsonResponse(payload, payload.ok ? 200 : 404);
+      } catch (err) {
+        logger.warn('explain-event route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-symbols-bulk') {
+      try {
+        const themesRaw = String(params.get('themes') || '').trim();
+        if (!themesRaw) return buildJsonResponse({ ok: true, themes: {} });
+        const themes = themesRaw.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 20);
+        if (!themes.length) return buildJsonResponse({ ok: true, themes: {} });
+        const limit = Math.min(5, Math.max(1, Number(params.get('limit') || 3)));
+        const { rows } = await getPool().query(
+          `
+          SELECT theme, symbol, quality_score, correlation, reaction_count, directional_edge,
+                 avg_abs_reaction, outcome_hit_rate, outcome_avg_return,
+                 ROW_NUMBER() OVER (PARTITION BY LOWER(theme) ORDER BY COALESCE(quality_score, 0) DESC NULLS LAST, reaction_count DESC) AS rn
+            FROM auto_theme_symbols
+           WHERE LOWER(theme) = ANY($1::text[])
+          `,
+          [themes],
+        );
+        const byTheme = {};
+        for (const r of rows) {
+          if (Number(r.rn) > limit) continue;
+          const key = String(r.theme).toLowerCase();
+          if (!byTheme[key]) byTheme[key] = [];
+          byTheme[key].push({
+            symbol: r.symbol,
+            qualityScore: r.quality_score == null ? null : Number(r.quality_score),
+            correlation: r.correlation == null ? null : Number(r.correlation),
+            reactionCount: Number(r.reaction_count ?? 0),
+            directionalEdge: r.directional_edge == null ? null : Number(r.directional_edge),
+            avgAbsReaction: r.avg_abs_reaction == null ? null : Number(r.avg_abs_reaction),
+            outcomeHitRate: r.outcome_hit_rate == null ? null : Number(r.outcome_hit_rate),
+            outcomeAvgReturn: r.outcome_avg_return == null ? null : Number(r.outcome_avg_return),
+          });
+        }
+        return buildJsonResponse({ ok: true, themes: byTheme });
+      } catch (err) {
+        logger.warn('theme-symbols-bulk route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'event-timeline') {
+      try {
+        const payload = await buildEventTimelinePayload(getPool(), {
+          days: Number(params.get('days') || 90),
+          theme: params.get('theme') || null,
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('event-timeline failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'event-narrative' && segments[2]) {
+      try {
+        const payload = await buildEventNarrativePayload(getPool(), {
+          eventId: segments[2],
+          forceRefresh: params.get('refresh') === '1',
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('event-narrative failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'similar-events' && segments[2]) {
+      try {
+        const payload = await buildSimilarEventsPayload(getPool(), {
+          eventId: segments[2],
+          limit: Number(params.get('limit') || 6),
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('similar-events failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'regime-scenario') {
+      try {
+        const payload = await buildRegimeScenarioPayload(getPool(), {
+          vix: params.get('vix') ? Number(params.get('vix')) : null,
+          yieldSpread: params.get('yieldSpread') ? Number(params.get('yieldSpread')) : null,
+          oilPrice: params.get('oilPrice') ? Number(params.get('oilPrice')) : null,
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('regime-scenario failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'asset-dossier' && segments[2]) {
+      try {
+        const payload = await buildAssetDossierPayload(getPool(), { symbol: segments[2] });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('asset-dossier failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'weekly-digest') {
+      try {
+        const payload = await buildWeeklyDigestPayload(getPool(), {
+          forceRefresh: params.get('refresh') === '1',
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 500);
+      } catch (err) {
+        logger.warn('weekly-digest failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'correlation-breaks') {
+      try {
+        const payload = await buildCorrelationBreaksPayload(getPool());
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('correlation-breaks failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-impact' && segments[2]) {
+      try {
+        const payload = await buildThemeImpactPayload(getPool(), {
+          theme: segments[2],
+          horizon: params.get('horizon') || null,
+          symbolLimit: Number(params.get('limit') || 12),
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('theme-impact route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'source-diversity-audit') {
+      try {
+        const payload = await buildSourceDiversityAuditPayload(getPool(), {
+          windowHours: Number(params.get('window') || 24),
+        });
+        const status = payload?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, status);
+      } catch (err) {
+        logger.warn('source-diversity-audit route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'runtime-observability') {
+      const payload = await buildSidecarProxyPayload('/api/local-runtime-observability');
+      return buildJsonResponse(payload, payload.ok ? 200 : 503);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'automation-ops-snapshot') {
+      const payload = await buildSidecarProxyPayload('/api/local-automation-ops-snapshot');
+      return buildJsonResponse(payload, payload.ok ? 200 : 503);
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-quality') {
@@ -2304,6 +2952,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             lo.symbol,
             lo.forward_return_pct,
             lo.abnormal_return,
+            art.sources,
             ROW_NUMBER() OVER (
               PARTITION BY eu.canonical_event_id
               ORDER BY ABS(COALESCE(lo.abnormal_return, eu.uplift, 0)) DESC,

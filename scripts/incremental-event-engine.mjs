@@ -220,6 +220,8 @@ async function main() {
     console.log(`  ${marketAdj.rowCount} rows updated (article-based SPY join)`);
 
     // Method 2: date-based join from market_returns table (broader coverage)
+    // NOTE: PostgreSQL UPDATE ... FROM cannot correlate the target alias (lo) inside
+    // a JOIN ON condition. Move mr.horizon = lo.horizon to WHERE (2026-04-23 fix).
     const dateAdj = await pool.query(`
       UPDATE labeled_outcomes lo
       SET market_return = mr.forward_return_pct,
@@ -227,8 +229,8 @@ async function main() {
       FROM articles a
       JOIN market_returns mr ON mr.trade_date = DATE(a.published_at)
         AND mr.symbol = 'SPY'
-        AND mr.horizon = lo.horizon
       WHERE a.id = lo.article_id
+        AND mr.horizon = lo.horizon
         AND lo.symbol != 'SPY'
         AND lo.forward_return_pct IS NOT NULL
         AND lo.abnormal_return IS NULL

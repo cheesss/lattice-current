@@ -41,6 +41,7 @@ test('generate-structural-alerts emits lifecycle, share, evidence delta, and adj
         category: 'technology',
         periodType: 'week',
         periodEnd: '2026-04-07',
+        articleCount: 24,
         lastSharePct: 14,
         deltaSharePct: 6,
       },
@@ -124,6 +125,147 @@ test('generate-structural-alerts dampens near-zero baseline alerts across breako
   assert.equal(lifecycle.severity, 'medium');
   assert.match(breakout.detail, /near-zero baseline/i);
   assert.match(lifecycle.detail, /near-zero baseline/i);
+});
+
+test('generate-structural-alerts suppresses low-count breakout alerts', () => {
+  const alerts = buildStructuralAlertCandidates({
+    snapshots: [
+      {
+        theme: 'space',
+        label: 'Space Economy',
+        parentTheme: 'technology-general',
+        category: 'technology',
+        periodType: 'week',
+        periodEnd: '2026-04-07',
+        articleCount: 3,
+        vsPreviousPct: 100,
+        vsYearAgoPct: 100,
+        acceleration: 200,
+        lifecycleStage: 'growing',
+        prevLifecycleStage: 'growing',
+        sourceDiversity: 0.9,
+      },
+    ],
+    shareJumps: [],
+    evidenceDeltas: [],
+    attachments: [],
+    limit: 5,
+  });
+
+  assert.equal(alerts.some((item) => item.alertType === 'acceleration-breakout'), false);
+});
+
+test('generate-structural-alerts suppresses low-count lifecycle alerts', () => {
+  const alerts = buildStructuralAlertCandidates({
+    snapshots: [
+      {
+        theme: 'migration',
+        label: 'Migration',
+        parentTheme: 'society-general',
+        category: 'society',
+        periodType: 'week',
+        periodEnd: '2026-04-07',
+        articleCount: 1,
+        vsPreviousPct: 100,
+        vsYearAgoPct: 100,
+        acceleration: 200,
+        lifecycleStage: 'growing',
+        prevLifecycleStage: 'emerging',
+        sourceDiversity: 0,
+      },
+    ],
+    shareJumps: [],
+    evidenceDeltas: [],
+    attachments: [],
+    limit: 5,
+  });
+
+  assert.equal(alerts.some((item) => item.alertType === 'lifecycle-transition'), false);
+});
+
+test('generate-structural-alerts suppresses low-count share-shift alerts', () => {
+  const alerts = buildStructuralAlertCandidates({
+    snapshots: [],
+    shareJumps: [
+      {
+        theme: 'space',
+        label: 'Space Economy',
+        parentTheme: 'technology-general',
+        parentLabel: 'Technology',
+        category: 'technology',
+        periodType: 'week',
+        periodEnd: '2026-04-07',
+        articleCount: 3,
+        lastSharePct: 33.3,
+        deltaSharePct: 25,
+      },
+    ],
+    evidenceDeltas: [],
+    attachments: [],
+    limit: 5,
+  });
+
+  assert.equal(alerts.some((item) => item.alertType === 'share-jump'), false);
+});
+
+test('generate-structural-alerts suppresses low-count cooling alerts', () => {
+  const alerts = buildStructuralAlertCandidates({
+    snapshots: [
+      {
+        theme: 'quantum-computing',
+        label: 'Quantum Computing',
+        parentTheme: 'technology-general',
+        category: 'technology',
+        periodType: 'week',
+        periodEnd: '2026-04-07',
+        articleCount: 0,
+        vsPreviousPct: -100,
+        vsYearAgoPct: -100,
+        acceleration: -400,
+        lifecycleStage: 'cooling',
+        prevLifecycleStage: 'growing',
+        sourceDiversity: 0,
+      },
+    ],
+    shareJumps: [],
+    evidenceDeltas: [],
+    attachments: [],
+    limit: 5,
+  });
+
+  assert.equal(alerts.some((item) => item.alertType === 'cooling-reversal'), false);
+});
+
+test('generate-structural-alerts includes article count evidence on breakout alerts', () => {
+  const alerts = buildStructuralAlertCandidates({
+    snapshots: [
+      {
+        theme: 'cybersecurity',
+        label: 'Cybersecurity',
+        parentTheme: 'technology-general',
+        category: 'technology',
+        periodType: 'week',
+        periodEnd: '2026-04-07',
+        articleCount: 53,
+        previousCount: 20,
+        vsPreviousPct: 165,
+        vsYearAgoPct: 120,
+        acceleration: 185,
+        lifecycleStage: 'growing',
+        prevLifecycleStage: 'growing',
+        sourceDiversity: 0.9,
+      },
+    ],
+    shareJumps: [],
+    evidenceDeltas: [],
+    attachments: [],
+    limit: 5,
+  });
+
+  const breakout = alerts.find((item) => item.alertType === 'acceleration-breakout');
+  assert.ok(breakout);
+  assert.equal(breakout.metadata.articleCount, 53);
+  assert.equal(breakout.metadata.previousCount, 20);
 });
 
 test('generate-structural-alerts job persists alerts when not dry-run', async () => {

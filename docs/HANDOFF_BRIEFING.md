@@ -14,7 +14,6 @@ GDELT, Guardian, NYT 등 뉴스를 수집하고, 클러스터링/신뢰도 평�
 | `docs/NAS_BACKTEST_STORAGE_PLAN_2026-04-01.md` | NAS 데이터 저장 아키텍처, 테이블 스키마 |
 | `docs/AGENT_QUICKSTART.md` | 에이전트 온보딩 가이드 |
 | `docs/TEST_OPERATIONS_RUNBOOK.md` | 테스트 및 검증 절차 |
-| `docs/GDELT_GUARDIAN_INGEST_AND_TRAINING_PLAN_2026-04-01.md` | GDELT vs Guardian 데이터 특성 차이, 설계 철학 |
 
 ## 현재 상태 요약
 

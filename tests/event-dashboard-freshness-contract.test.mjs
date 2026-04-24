@@ -97,6 +97,22 @@ test('classifySignalQuality flags old observations as stale', () => {
   assert.match(quality.reason, /exceeds 120h threshold/);
 });
 
+test('classifySignalQuality gives daily FRED spread signals a 72h live window', () => {
+  const dailyTs = new Date(Date.now() - 49 * 60 * 60 * 1000).toISOString();
+  const quality = classifySignalQuality('yieldSpread', { ts: dailyTs, value: 0.54 }, [
+    { ts: dailyTs, value: 0.54 },
+  ]);
+  assert.equal(quality.status, 'observed');
+  assert.equal(quality.stale, false);
+
+  const staleTs = new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString();
+  const stale = classifySignalQuality('hy_credit_spread', { ts: staleTs, value: 2.87 }, [
+    { ts: staleTs, value: 2.87 },
+  ]);
+  assert.equal(stale.status, 'stale');
+  assert.match(stale.reason, /exceeds 72h threshold/);
+});
+
 test('withMeta derives valueOrigin=observed for live mode', () => {
   const updatedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const payload = withMeta({
