@@ -670,7 +670,8 @@ async function taskSourceRepairClosedLoop() {
 
 async function taskAutoPipelineLabels() {
   log('>> auto-pipeline-labels: running step 3 (label assignment)');
-  const result = run('node --import tsx scripts/auto-pipeline.mjs --step 3 --limit 200', 600_000);
+  const labelLimit = Math.max(200, Math.min(5000, Math.floor(Number(process.env.AUTO_PIPELINE_LABEL_LIMIT || 1500))));
+  const result = run(`node --import tsx scripts/auto-pipeline.mjs --step 3 --limit ${labelLimit}`, 600_000);
   return { ok: result.ok, error: result.error };
 }
 

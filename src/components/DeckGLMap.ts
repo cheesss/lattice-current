@@ -6505,7 +6505,13 @@ export class DeckGLMap {
           return `${ts}Z [API] INTERCEPT :: ${capture.requestUrl.slice(0, 88)} :: ${capture.schemaHint.toUpperCase()} :: ${capture.category.toUpperCase()}`;
         }),
       ];
-      const streamText = (lines.length > 0 ? lines : ['LOADER ACTIVE :: awaiting next discovery cycle']).join('   //   ');
+      // Empty-state copy is informative rather than alarming: previous "AWAITING NEXT
+      // DISCOVERY CYCLE" looked like data was missing even when the main map had
+      // 36+ markers plotted. The border stream is source-ops + network-discovery
+      // captures only — silence here just means no NEW sources were touched
+      // this cycle, not that the map is empty.
+      const idleNote = `READY :: live map active · no new source ops this cycle · next refresh in ~5min`;
+      const streamText = (lines.length > 0 ? lines : [idleNote]).join('   //   ');
       this.borderStreamTracks.forEach((track) => {
         track.textContent = `${streamText}   //   ${streamText}`;
       });

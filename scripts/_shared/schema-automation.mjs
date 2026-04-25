@@ -51,13 +51,20 @@ export const AUTOMATION_SCHEMA_STATEMENTS = [
     );
   `,
   `
-    ALTER TABLE approval_queue
-      DROP CONSTRAINT IF EXISTS approval_queue_status_check;
-  `,
-  `
-    ALTER TABLE approval_queue
-      ADD CONSTRAINT approval_queue_status_check
-      CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix'));
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'approval_queue_status_check'
+          AND conrelid = 'approval_queue'::regclass
+      ) THEN
+        ALTER TABLE approval_queue
+          ADD CONSTRAINT approval_queue_status_check
+          CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix'));
+      END IF;
+    END
+    $$;
   `,
   `
     CREATE INDEX IF NOT EXISTS idx_approval_queue_status_time

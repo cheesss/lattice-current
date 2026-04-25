@@ -885,6 +885,7 @@ input:focus-visible{
 .ai-timeline-legend .lk{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
 .ai-tl-tip{position:fixed;pointer-events:none;background:rgba(15,15,18,.96);border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-base);max-width:320px;z-index:9000;box-shadow:0 6px 18px rgba(0,0,0,.55);display:none;line-height:1.35}
 .ai-tl-tip.show{display:block}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(1.4)}}
 .ai-tl-tip .tip-title{color:var(--text-loud);font-weight:600;margin-bottom:4px}
 .ai-tl-tip .tip-meta{display:flex;gap:8px;font-size:9.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;flex-wrap:wrap}
 .ai-tl-tip .tip-metric{margin-top:4px;color:var(--text-base);font-variant-numeric:tabular-nums}
@@ -3051,30 +3052,59 @@ function renderSelectedProofCard(item) {
     return;
   }
   const fresh = item.updatedAt ? classifyFreshness(item.updatedAt, 48) : null;
-  const uplift = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '--';
-  const tStat = item.tStat != null && Number.isFinite(Number(item.tStat)) ? Number(item.tStat).toFixed(2) : '--';
-  const controls = item.matchedControls != null ? fmtWhole(item.matchedControls) : '--';
-  const direction = item.direction ? String(item.direction).toUpperCase() : item.type.toUpperCase();
+  const titleText = escapeHtml(truncate(item.title || item.symbol || item.theme || 'Selected item', 120));
+  const metaText = `${escapeHtml(item.theme || item.source || 'workspace')} ${fresh ? '| ' + escapeHtml(fresh.label) : ''}`;
   const citations = Array.isArray(item.sources) && item.sources.length
     ? item.sources.slice(0, 4).map((src, i) => {
       const safeData = escapeHtml(JSON.stringify(src));
       return `<span class="signal-cite" onclick="event.stopPropagation();showSignalCitePopover(event,'${safeData}',${i+1})">[${i+1}]</span>`;
     }).join('')
-    : '<span class="meta-line">No source citations attached to this item.</span>';
+    : '';
+
+  // E2 signals get the full proof chain (direction / uplift / t-stat / controls).
+  // Other inbox types (proposal, approval, triage) use a domain-appropriate summary
+  // since those metrics aren't meaningful for them.
+  let body = '';
+  let actionsHint = '';
+  if (item.type === 'e2-signal') {
+    const uplift = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '--';
+    const tStat = item.tStat != null && Number.isFinite(Number(item.tStat)) ? Number(item.tStat).toFixed(2) : '--';
+    const controls = item.matchedControls != null ? fmtWhole(item.matchedControls) : '--';
+    const direction = item.direction ? String(item.direction).toUpperCase() : 'E2';
+    body = `<div class="proof-chain">
+      <div class="proof-step"><div class="proof-step-label">Direction</div><div class="proof-step-value">${escapeHtml(direction)}</div></div>
+      <div class="proof-step"><div class="proof-step-label">Uplift</div><div class="proof-step-value">${escapeHtml(uplift)}</div></div>
+      <div class="proof-step"><div class="proof-step-label">t-stat</div><div class="proof-step-value">${escapeHtml(tStat)}</div></div>
+      <div class="proof-step"><div class="proof-step-label">Controls</div><div class="proof-step-value">${escapeHtml(controls)}</div></div>
+    </div>`;
+  } else if (item.type === 'approval' || item.type === 'proposal') {
+    const url = item.payload?.url ? `<div class="proof-meta" style="margin-top:6px;word-break:break-all;color:var(--text-soft)">${escapeHtml(String(item.payload.url))}</div>` : '';
+    const reason = item.payload?.reason || item.detail;
+    const reasonHtml = reason ? `<div class="proof-meta" style="margin-top:6px">${escapeHtml(truncate(String(reason), 220))}</div>` : '';
+    body = `${url}${reasonHtml}`;
+    actionsHint = item.type === 'approval'
+      ? '<div class="meta-line" style="margin-top:8px">Use Simulate · Accept · Reject buttons in the preview panel below.</div>'
+      : '<div class="meta-line" style="margin-top:8px">Use Accept · Snooze · Reject buttons in the preview panel below.</div>';
+  } else if (item.type === 'triage') {
+    const kw = Array.isArray(item.payload?.keywords) ? item.payload.keywords.slice(0, 8) : [];
+    const kwHtml = kw.length ? `<div class="pill-row" style="margin-top:6px">${kw.map(k => `<span class="tag tag-neutral">${escapeHtml(String(k))}</span>`).join(' ')}</div>` : '';
+    const detail = item.detail ? `<div class="proof-meta" style="margin-top:6px">${escapeHtml(truncate(String(item.detail), 220))}</div>` : '';
+    body = `${detail}${kwHtml}`;
+    actionsHint = '<div class="meta-line" style="margin-top:8px">Use Canonical · Watch · Suppress buttons below to triage this discovery.</div>';
+  } else {
+    body = '';
+  }
+
   el.innerHTML = `
     <div class="cockpit-title-row">
       <div class="cockpit-kicker">Selected Proof</div>
       <span class="badge">${escapeHtml(item.proofLevel || item.type || 'review')}</span>
     </div>
-    <div class="proof-title">${escapeHtml(truncate(item.title || item.symbol || item.theme || 'Selected item', 120))}</div>
-    <div class="proof-meta">${escapeHtml(item.theme || item.source || 'workspace')} ${fresh ? '| ' + escapeHtml(fresh.label) : ''}</div>
-    <div class="proof-chain">
-      <div class="proof-step"><div class="proof-step-label">Direction</div><div class="proof-step-value">${escapeHtml(direction)}</div></div>
-      <div class="proof-step"><div class="proof-step-label">Uplift</div><div class="proof-step-value">${escapeHtml(uplift)}</div></div>
-      <div class="proof-step"><div class="proof-step-label">t-stat</div><div class="proof-step-value">${escapeHtml(tStat)}</div></div>
-      <div class="proof-step"><div class="proof-step-label">Controls</div><div class="proof-step-value">${escapeHtml(controls)}</div></div>
-    </div>
-    <div class="signal-citations" style="margin-top:10px">${citations}</div>`;
+    <div class="proof-title">${titleText}</div>
+    <div class="proof-meta">${metaText}</div>
+    ${body}
+    ${citations ? `<div class="signal-citations" style="margin-top:10px">${citations}</div>` : ''}
+    ${actionsHint}`;
 }
 function buildInboxActions(item) {
   if (item.type === 'proposal') {
@@ -3812,9 +3842,15 @@ async function loadEventNarrative(eventId){
       return;
     }
     const cites = (data.citations||[]).map(c => `[${c.index}] ${escapeHtml(c.source||'?')} · ${escapeHtml((c.title||'').slice(0,60))}`).join('<br>');
+    const ts = data.generatedAt ? new Date(data.generatedAt) : new Date();
+    const tsStr = `${ts.toISOString().slice(0,16).replace('T',' ')} UTC`;
+    const eventLabel = `Event #${eventId}`;
     slot.innerHTML = `
       <div class="peek-narrative">
-        <div class="pn-head"><span>AI NARRATIVE${data.cached?' · CACHED':''}</span><span>${new Date(data.generatedAt).toLocaleTimeString()}</span></div>
+        <div class="pn-head">
+          <span>AI NARRATIVE${data.cached?' · CACHED':''} · ${eventLabel}</span>
+          <span title="${escapeHtml(ts.toISOString())}">${escapeHtml(tsStr)}</span>
+        </div>
         <div>${escapeHtml(data.narrative||'').replace(/\\n/g,'<br>')}</div>
         ${cites?`<div class="pn-citation">Citations:<br>${cites}</div>`:''}
       </div>
@@ -3880,7 +3916,10 @@ async function refreshScenarioLab(){
       if(!data.predictions?.length){
         preds.innerHTML = '<div class="meta-line" style="padding:8px">no data for this regime — adjust sliders</div>';
       } else {
-        preds.innerHTML = data.predictions.slice(0, 20).map(p => {
+        const header = `<div class="scenario-pred-row" style="color:var(--text-soft);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--c-border-hair);font-family:var(--font-sans);padding-bottom:6px;margin-bottom:4px" title="If an event in this theme fires while regime matches, expected reaction on the symbol over the post-event window.">
+          <span>theme</span><span>symbol</span><span style="text-align:right">avg %</span><span style="text-align:right">hit rate</span><span style="text-align:right">×regime</span>
+        </div>`;
+        preds.innerHTML = header + data.predictions.slice(0, 20).map(p => {
           const ret = p.avgReturn;
           const retCls = ret > 0 ? 'pos' : ret < 0 ? 'neg' : '';
           const retTxt = ret == null ? '—' : (ret > 0 ? '+' : '') + ret.toFixed(2) + '%';
@@ -4022,9 +4061,32 @@ async function refreshCorrelationBreaks(){
 async function refreshWeeklyDigest(){
   const body = document.getElementById('digest-body');
   if(!body) return;
-  body.innerHTML = '<div class="meta-line" style="padding:10px">generating via Codex (60-90s)…</div>';
+  // Show animated progress so the user knows it isn't frozen during the 60-90s
+  // Codex round-trip. Auto-stops once the fetch resolves.
+  const start = Date.now();
+  const expectedMs = 75_000;
+  body.innerHTML = `
+    <div class="meta-line" style="padding:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span class="dot-pulse" style="width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite"></span>
+        <span>generating via Codex…</span>
+        <span id="digest-eta" style="margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text-soft)">~75s</span>
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">
+        <div id="digest-bar" style="width:0%;height:100%;background:var(--accent);transition:width .5s ease"></div>
+      </div>
+    </div>`;
+  const tick = setInterval(() => {
+    const elapsed = Date.now() - start;
+    const pct = Math.min(95, Math.round((elapsed / expectedMs) * 100));
+    const bar = document.getElementById('digest-bar');
+    const eta = document.getElementById('digest-eta');
+    if(bar) bar.style.width = pct + '%';
+    if(eta) eta.textContent = `${Math.round(elapsed/1000)}s elapsed`;
+  }, 500);
   try {
     const res = await fetch(`${API}/weekly-digest`);
+    clearInterval(tick);
     const data = await res.json();
     if(!data.ok){ body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">error: ${escapeHtml(data.error||'failed')}</div>`; return; }
     const d = data.digest || {};
@@ -4038,7 +4100,8 @@ async function refreshWeeklyDigest(){
       <div style="margin-top:10px;color:var(--text-muted);font-size:9.5px">Generated ${new Date(data.generatedAt).toLocaleString()} · stats: ${data.stats?.new_events||0} events · ${data.stats?.themes||0} themes</div>
     </div>`;
   } catch(e){
-    body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">fetch error</div>`;
+    clearInterval(tick);
+    body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">fetch error: ${escapeHtml(e?.message || String(e))}</div>`;
   }
 }
 
