@@ -86,6 +86,8 @@
     "daemon": "node scripts/master-daemon.mjs",
     "daemon:once": "node scripts/master-daemon.mjs --once",
     "daemon:task": "node scripts/master-daemon.mjs --task",
+    "daemon:accumulator": "node --import tsx scripts/data-accumulator.mjs",
+    "daemon:accumulator:once": "node --import tsx scripts/data-accumulator.mjs --once",
     "migrate:articles-embedding-index": "node scripts/migrations/add-articles-embedding-index.mjs",
     "intelligence:scheduler:service:remove": "powershell -ExecutionPolicy Bypass -File scripts/remove-intelligence-scheduler-task.ps1",
     "desktop:build:full": "npm run version:sync && node scripts/run-with-env.mjs VITE_VARIANT=full VITE_DESKTOP_RUNTIME=1 -- tauri build",
