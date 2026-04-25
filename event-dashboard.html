@@ -638,18 +638,23 @@ input:focus-visible{
 }
 
 /* --- 16. Skeleton loader (replaces "Loading..." text) ---------------- */
+/* Skeleton sweep is shown ONLY while the placeholder still contains the bootstrap
+ * "Loading…" text and no child elements. Renders use innerHTML to fill these
+ * elements but historically never stripped the .loading class — leaving the
+ * sweep animation forever visible over real data. Selecting on
+ * :not(:has(*)) means: as soon as ANY child element (table/span/div) is
+ * rendered inside, the skeleton automatically disappears. No JS bookkeeping. */
 @keyframes lat-sk-sweep{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.loading{
-  position:relative;
+.loading{position:relative;border-radius:6px;color:var(--muted);padding:12px 0}
+.loading:not(:has(*)){
   min-height:60px;
   color:transparent!important;
   background:linear-gradient(90deg,rgba(255,255,255,.02) 0%,rgba(255,255,255,.05) 50%,rgba(255,255,255,.02) 100%);
   background-size:200% 100%;
   animation:lat-sk-sweep 2.2s linear infinite;
-  border-radius:6px;
   opacity:.7;
 }
-.loading::after{
+.loading:not(:has(*))::after{
   content:"loading";
   position:absolute;
   top:50%;left:12px;transform:translateY(-50%);
@@ -659,7 +664,7 @@ input:focus-visible{
   letter-spacing:.2em;
 }
 @media (prefers-reduced-motion: reduce){
-  .loading{animation:none}
+  .loading:not(:has(*)){animation:none}
 }
 
 /* --- 17. Pill / tag color semantic alignment ------------------------- */
