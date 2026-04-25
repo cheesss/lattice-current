@@ -27,25 +27,31 @@ async function main() {
     );
     const rowCount = before.rows[0]?.n ?? 0;
 
-    // Heuristic: lists ≈ sqrt(rows). Cap at 200 to avoid over-partitioning.
-    const lists = Math.max(50, Math.min(200, Math.round(Math.sqrt(rowCount))));
+    const existing = await pool.query(
+      "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'articles' AND indexdef ILIKE '%ivfflat%embedding%'",
+    );
+    const hasIvfflat = existing.rows.length > 0;
 
     console.log(`articles with embedding: ${rowCount}`);
-    console.log(`creating IVFFlat index with lists=${lists}…`);
+    console.log(`existing IVFFlat indexes on articles.embedding: ${existing.rows.length}`);
+    for (const row of existing.rows) {
+      console.log(`  ${row.indexname}: ${row.indexdef}`);
+    }
 
+    if (hasIvfflat) {
+      console.log('skip — embedding column already has an IVFFlat index. Done.');
+      return;
+    }
+
+    // Heuristic: lists ≈ sqrt(rows). Cap at 200 to avoid over-partitioning.
+    const lists = Math.max(50, Math.min(200, Math.round(Math.sqrt(rowCount))));
+    console.log(`creating IVFFlat index with lists=${lists}…`);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS articles_embedding_cos_idx
       ON articles
       USING ivfflat (embedding vector_cosine_ops)
       WITH (lists = ${lists})
     `);
-
-    const indexes = await pool.query(
-      "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'articles' AND indexname LIKE '%embedding%'",
-    );
-    for (const row of indexes.rows) {
-      console.log(`  ${row.indexname}: ${row.indexdef}`);
-    }
     console.log('done.');
   } finally {
     await pool.end();

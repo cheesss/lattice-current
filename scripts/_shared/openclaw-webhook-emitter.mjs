@@ -1,7 +1,45 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+
+/**
+ * Verify an inbound webhook signature header against the raw request body.
+ *
+ * Header format (matches what postOpenClawWebhook emits):
+ *   x-lattice-signature: t=<unix_seconds>,v1=<hex_hmac_sha256>
+ *
+ * Usage in a receiver:
+ *   const ok = verifyLatticeWebhookSignature({
+ *     header: req.headers['x-lattice-signature'],
+ *     body: rawBodyString,
+ *     secret: process.env.OPENCLAW_WEBHOOK_SIGNING_SECRET || process.env.OPENCLAW_WEBHOOK_SECRET,
+ *     toleranceSeconds: 300,
+ *   });
+ *   if (!ok) return res.writeHead(401).end();
+ *
+ * Returns true only if (a) header is well-formed, (b) timestamp is within
+ * tolerance, and (c) HMAC matches in constant time. Never throws.
+ */
+export function verifyLatticeWebhookSignature({ header, body, secret, toleranceSeconds = 300 } = {}) {
+  if (!header || !secret || typeof body !== 'string') return false;
+  const parts = String(header).split(',').reduce((acc, kv) => {
+    const idx = kv.indexOf('=');
+    if (idx > 0) acc[kv.slice(0, idx).trim()] = kv.slice(idx + 1).trim();
+    return acc;
+  }, {});
+  const ts = Number(parts.t);
+  const sig = parts.v1;
+  if (!Number.isFinite(ts) || !sig) return false;
+  if (Math.abs(Date.now() / 1000 - ts) > toleranceSeconds) return false;
+  const expected = createHmac('sha256', String(secret)).update(`${ts}.${body}`).digest('hex');
+  if (expected.length !== sig.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(sig, 'utf8'));
+  } catch {
+    return false;
+  }
+}
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
