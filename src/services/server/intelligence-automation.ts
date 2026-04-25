@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
-import { mkdir, open, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import type { HistoricalBackfillOptions, HistoricalFrameLoadOptions } from '../importer/historical-stream-worker';
 import { listHistoricalDatasets, loadHistoricalReplayFramesFromDuckDb, processHistoricalDump } from '../importer/historical-stream-worker';
@@ -862,7 +862,15 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 
 async function writeJsonFile(filePath: string, payload: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8');
+  const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  const body = JSON.stringify(payload, null, 2);
+  try {
+    await writeFile(tmpPath, body, 'utf8');
+    await rename(tmpPath, filePath);
+  } catch (error) {
+    await rm(tmpPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 export async function loadAutomationRegistry(registryPath = DEFAULT_REGISTRY_PATH): Promise<IntelligenceAutomationRegistry> {
@@ -3259,12 +3267,26 @@ export async function runIntelligenceAutomationWorker(args: {
   once?: boolean;
 } = {}): Promise<void> {
   const intervalMs = Math.max(1, Math.round(args.pollIntervalMinutes || 5)) * 60_000;
+  let consecutiveFailures = 0;
   do {
-    await runIntelligenceAutomationCycle({
-      registryPath: args.registryPath,
-      statePath: args.statePath,
-    });
+    const cycleStart = Date.now();
+    try {
+      await runIntelligenceAutomationCycle({
+        registryPath: args.registryPath,
+        statePath: args.statePath,
+      });
+      consecutiveFailures = 0;
+    } catch (error) {
+      consecutiveFailures += 1;
+      const message = String((error as Error)?.stack || (error as Error)?.message || error);
+      process.stderr.write(
+        `[intelligence-automation-worker] cycle failed (consecutive=${consecutiveFailures}, durationMs=${Date.now() - cycleStart}): ${message.slice(0, 800)}\n`,
+      );
+    }
     if (args.once) return;
-    await sleep(intervalMs);
+    const backoffMs = consecutiveFailures > 0
+      ? Math.min(intervalMs * Math.pow(2, Math.min(consecutiveFailures - 1, 4)), 30 * 60_000)
+      : intervalMs;
+    await sleep(backoffMs);
   } while (true);
 }

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -350,15 +350,25 @@ function extractFlowId(responseJson) {
 
 async function postOpenClawWebhook(url, body, config, event, stage) {
   try {
+    const payload = JSON.stringify(body);
+    const signingKey = config.signingSecret || config.secret;
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = signingKey
+      ? createHmac('sha256', String(signingKey)).update(`${timestamp}.${payload}`).digest('hex')
+      : null;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(config.secret ? { Authorization: `Bearer ${config.secret}` } : {}),
+        ...(signature ? {
+          'x-lattice-signature': `t=${timestamp},v1=${signature}`,
+          'x-lattice-signature-timestamp': timestamp,
+        } : {}),
         'x-lattice-event-type': event.eventType,
         'x-lattice-event-id': event.eventId,
       },
-      body: JSON.stringify(body),
+      body: payload,
       signal: AbortSignal.timeout(config.timeoutMs),
     });
     const text = await response.text().catch(() => '');

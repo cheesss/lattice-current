@@ -162,7 +162,12 @@ let poolConfigError = null;
 function getPgConfig() {
   if (!poolConfig && !poolConfigError) {
     try {
-      poolConfig = { ...resolveNasPgConfig(), max: 6 };
+      poolConfig = {
+        ...resolveNasPgConfig(),
+        max: Number(process.env.EVENT_DASHBOARD_PG_POOL_MAX || 20),
+        idleTimeoutMillis: Number(process.env.EVENT_DASHBOARD_PG_IDLE_MS || 30_000),
+        connectionTimeoutMillis: Number(process.env.EVENT_DASHBOARD_PG_CONNECT_MS || 10_000),
+      };
     } catch (error) {
       poolConfigError = error;
     }

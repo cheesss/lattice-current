@@ -2835,6 +2835,7 @@ async function refreshDecisionInbox() {
     [...inboxSelection].forEach((id) => {
       if (!inboxItems.some((x) => x.id === id)) inboxSelection.delete(id);
     });
+    inboxLoading = false;
     renderInboxList();
     updateInboxCounts();
     if (!inboxSelectedId) {
@@ -3625,8 +3626,8 @@ function renderAiTimeline(){
   const plotW = W - PL - PR, plotH = H - PT - PB;
   const dayMs = 86400000;
 
-  const end = _tlZoom ? new Date(_tlZoom[1]) : (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
-  const start = _tlZoom ? new Date(_tlZoom[0]) : (() => { const d = new Date(end); d.setDate(end.getDate() - data.days); return d; })();
+  const end = _tlZoom ? new Date(_tlZoom[1]) : (() => { const d = new Date(); d.setUTCHours(0,0,0,0); return d; })();
+  const start = _tlZoom ? new Date(_tlZoom[0]) : new Date(end.getTime() - data.days * dayMs);
   const totalMs = end.getTime() - start.getTime() || 1;
   const xAt = (d) => PL + ((new Date(d).getTime() - start.getTime()) / totalMs) * plotW;
 

@@ -6,7 +6,7 @@ const results = [];
 const check = (n,p,d='')=>{ console.log((p?'✅':'❌')+' '+n+(d?' — '+d:'')); results.push({n,p,d}); };
 
 page.on('pageerror', err => console.log('⚠️ PAGE ERROR:', err.message.slice(0,200)));
-await page.goto('http://127.0.0.1:8088/event-dashboard.html', { waitUntil: 'load', timeout: 20000 });
+await page.goto('http://localhost:3000/event-dashboard.html', { waitUntil: 'load', timeout: 20000 });
 await page.waitForTimeout(2000);
 
 // Jump to Investigate (surface where the AI Lab lives)
