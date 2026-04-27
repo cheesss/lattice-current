@@ -29,14 +29,23 @@ export const KPI_SIGNAL_CHANNELS = new Set([
   'transmissionStrength',
 ]);
 
+// Stale thresholds reflect publication cadence of the upstream source, not
+// arbitrary freshness preferences. Values shorter than the upstream's natural
+// lag generate misleading "stale signal" alerts even when the fetcher is
+// healthy (e.g., FRED daily series typically publish 2-5 days after observation).
 export const SIGNAL_STALE_THRESHOLD_HOURS = Object.freeze({
-  vix: 36,
-  yieldSpread: 72,
-  hy_credit_spread: 72,
-  dollarIndex: 48,
-  oilPrice: 120,
-  marketStress: 72,
-  transmissionStrength: 48,
+  vix: 36,                  // Yahoo intraday — fast
+  yieldSpread: 120,         // FRED DGS10/DGS2 lag 3-5d
+  hy_credit_spread: 120,    // FRED BAMLH0A0HYM2 lag 3-5d
+  ig_credit_spread: 120,    // FRED BAMLC0A0CM lag 3-5d
+  treasury10y: 120,         // FRED DGS10 lag 3-5d
+  fedFundsRate: 240,        // monthly publish (~10d cadence)
+  cpiIndex: 1080,           // monthly (~45d delay)
+  unemployment: 1080,       // monthly
+  dollarIndex: 48,          // Yahoo end-of-day
+  oilPrice: 120,            // Yahoo daily settlement
+  marketStress: 120,        // derived from credit spreads (inherits FRED lag)
+  transmissionStrength: 48, // computed locally
 });
 
 export const DATA_TIMESTAMP_KEYS = new Set([

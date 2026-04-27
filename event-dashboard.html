@@ -5040,7 +5040,10 @@ async function loadThemeBrief(){
     updatedAt: data.generatedAt || data.updatedAt || latestArticleDate,
     sources: Number(data.summary?.sourceDiversity) > 0 ? Math.round(Number(data.summary.sourceDiversity) * 10) : undefined,
     evidenceCount: briefCitations.length,
-    slaHours: 72,
+    // Brief auto-refresh cycle is weekly (master-daemon generate-followed-theme-briefings @ DAY_1_MS),
+    // and only followed themes get auto-refreshed. Suggested themes refresh on user click.
+    // SLA 168h (7d) so suggested themes don't show as "Stale" between manual reviews.
+    slaHours: 168,
   });
   html+=`<div class="info-note"><div class="brief-hero"><div><strong>${escapeHtml(data.label||humanizeTheme(state.currentTheme))}</strong><div class="meta-line" style="margin-top:4px">${escapeHtml(data.categoryLabel||data.category||'Theme')} | ${escapeHtml(data.parentTheme||'parent unavailable')} | ${escapeHtml(PERIODS[getCurrentPeriod()].label)} lens</div>${previousViewedAt?`<div class="meta-line" style="margin-top:4px">Previous view ${escapeHtml(fmtDateTime(previousViewedAt))}</div>`:'<div class="meta-line" style="margin-top:4px">First view in this browser workspace</div>'}</div><div class="theme-actions"><button class="btn" onclick="${followed?`unfollowTheme('${state.currentTheme}')`:`followTheme('${state.currentTheme}')`}">${followed?'Unfollow':'Follow'}</button><button class="btn" onclick="${muted?`unmuteTheme('${state.currentTheme}')`:`muteTheme('${state.currentTheme}')`}">${muted?'Unmute':'Mute'}</button></div></div>${data.summary?`<div class="brief-stats" style="margin-top:10px"><div class="brief-stat"><div class="brief-stat-label">Lifecycle</div><div class="brief-stat-value">${escapeHtml(data.summary.lifecycleStage||'n/a')}</div></div><div class="brief-stat"><div class="brief-stat-label">YoY</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.vsYearAgoPct,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Acceleration</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.acceleration,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Source Diversity</div><div class="brief-stat-value">${escapeHtml(fmt(data.summary.sourceDiversity,2))}</div></div></div>`:''}</div>`;
   html+='<div class="brief-grid" style="margin-top:12px">';

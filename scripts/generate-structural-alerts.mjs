@@ -169,6 +169,12 @@ function buildLifecycleAlert(snapshot) {
   const vsYearAgo = Math.abs(Number(snapshot.vsYearAgoPct || 0));
   const acceleration = Math.abs(Number(snapshot.acceleration || 0));
   const baseline = resolveBaselineContext(snapshot);
+  // Suppress noise from near-zero baselines: Quantum Computing 2000% YoY alerts
+  // were spamming because the prior period had ~0 articles (1 → 21 = 2000%).
+  // These dominate the dashboard alert list with no actionable content.
+  // Drop the alert entirely when baseline profile is near-zero AND
+  // magnitude looks like a 0→N artifact AND volume is still tiny.
+  if (baseline.hasNearZeroProfile && (vsYearAgo >= 1500 || acceleration >= 1500) && articleCount < 10) return null;
   const stage = safeTrim(snapshot.lifecycleStage || '').toLowerCase();
   const stageBonus = stage === 'emerging' ? 12
     : stage === 'nascent' ? 10

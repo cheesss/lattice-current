@@ -90,7 +90,12 @@ check('Asset dossier rendered', ail.dossierBody > 100, ail.dossierBody + ' chars
 // Hover a timeline dot — verify tooltip
 const firstDot = await page.$('#ai-event-timeline .tl-dot');
 if (firstDot) {
-  await firstDot.hover();
+  // Dispatch synthetic mousemove because real hover can be intercepted by
+  // overlapping dots when many circles share the same x position.
+  await firstDot.evaluate(d => {
+    const box = d.getBoundingClientRect();
+    d.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: box.x + box.width/2, clientY: box.y + box.height/2 }));
+  });
   await page.waitForTimeout(250);
   const tip = await page.evaluate(() => {
     const t = document.querySelector('#ai-event-timeline .ai-tl-tip');

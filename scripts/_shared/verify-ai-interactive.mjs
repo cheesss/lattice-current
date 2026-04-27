@@ -25,8 +25,11 @@ check('timeline has dots', dotCount > 0, dotCount + ' dots');
 console.log('\n━ 2. Dot hover → tooltip ━');
 const firstDot = await page.$('#ai-event-timeline .tl-dot');
 if(firstDot){
-  await firstDot.hover();
-  await page.waitForTimeout(250);
+  await firstDot.evaluate(d => {
+    const box = d.getBoundingClientRect();
+    d.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: box.x + box.width/2, clientY: box.y + box.height/2 }));
+  });
+  await page.waitForTimeout(300);
   const tipShown = await page.evaluate(() => {
     const t = document.querySelector('#ai-event-timeline .ai-tl-tip');
     return { show: t?.classList.contains('show'), text: t?.innerText?.slice(0,240) };

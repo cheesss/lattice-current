@@ -98,6 +98,9 @@ class PredictResponse(BaseModel):
 HORIZON_LABELS = ["1w", "2w", "1m"]
 
 def create_app(model_path: str) -> FastAPI:
+    import json
+    from pathlib import Path
+
     app = FastAPI(title="Lattice Meta-Model Server", version="1.0")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -115,13 +118,49 @@ def create_app(model_path: str) -> FastAPI:
     feature_std = torch.tensor(ckpt["feature_std"], dtype=torch.float32, device=device).clamp(min=1e-6)
     model_version = ckpt.get("model_version", "unknown")
 
-    print(f"Model loaded: {model_version}, {ckpt['n_features']} features, device={device}")
+    # Optional post-hoc temperature scaling sidecar (calibrate-meta-model.py).
+    # If present, divide alpha_prob logit by T before sigmoid so calibration
+    # (ECE) improves without changing rank ordering.
+    calibration_path = Path(model_path).parent / f"{Path(model_path).stem}.calibration.json"
+    temperature = 1.0
+    calibration_meta = None
+    if calibration_path.exists():
+        try:
+            calibration_meta = json.loads(calibration_path.read_text())
+            t_val = float(calibration_meta.get("temperature", 1.0))
+            if t_val > 0 and t_val < 100:
+                temperature = t_val
+            print(f"  calibration sidecar loaded: T={temperature:.3f}, "
+                  f"ECE {calibration_meta.get('pre_metrics', {}).get('ece', '?'):.4f} → "
+                  f"{calibration_meta.get('post_metrics', {}).get('ece', '?'):.4f}")
+        except Exception as e:
+            print(f"  WARN: failed to parse calibration sidecar: {e}")
+
+    print(f"Model loaded: {model_version}, {ckpt['n_features']} features, device={device}, T={temperature:.3f}")
     if device.type == "cuda":
         print(f"  GPU: {torch.cuda.get_device_name(0)}")
 
+    def apply_temperature(prob_tensor):
+        """Apply post-hoc temperature scaling to a sigmoid-output probability tensor.
+        Returns the recalibrated probability. T=1.0 is a no-op."""
+        if abs(temperature - 1.0) < 1e-6:
+            return prob_tensor
+        eps = 1e-7
+        clamped = prob_tensor.clamp(min=eps, max=1.0 - eps)
+        logit = torch.log(clamped / (1 - clamped))
+        return torch.sigmoid(logit / temperature)
+
     @app.get("/health")
     async def health():
-        return {"status": "ok", "model_version": model_version, "device": str(device)}
+        out = {"status": "ok", "model_version": model_version, "device": str(device), "temperature": temperature}
+        if calibration_meta:
+            out["calibration"] = {
+                "temperature": temperature,
+                "pre_ece": calibration_meta.get("pre_metrics", {}).get("ece"),
+                "post_ece": calibration_meta.get("post_metrics", {}).get("ece"),
+                "validation_n": calibration_meta.get("validation_n"),
+            }
+        return out
 
     @app.post("/predict", response_model=PredictResponse)
     async def predict(req: PredictRequest):
@@ -140,6 +179,7 @@ def create_app(model_path: str) -> FastAPI:
 
         with torch.no_grad():
             alpha_prob, expected_alpha, downside, time_logits = model(features, regime_id)
+            alpha_prob = apply_temperature(alpha_prob)
 
         # Softmax for time_to_peak
         time_probs = torch.softmax(time_logits[0], dim=0).cpu().tolist()
@@ -171,6 +211,7 @@ def create_app(model_path: str) -> FastAPI:
 
         with torch.no_grad():
             alpha_prob, expected_alpha, downside, time_logits = model(features, regime_ids)
+            alpha_prob = apply_temperature(alpha_prob)
 
         results = []
         for i in range(n):
