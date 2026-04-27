@@ -155,6 +155,23 @@ const SIDECAR_BASE_URL = String(
 const SIDECAR_PROXY_TIMEOUT_MS = Number(process.env.SIDECAR_PROXY_TIMEOUT_MS || 10_000);
 const OPAQUE_DISCOVERY_THEME_PATTERN = /^dt-[a-z0-9]+$/i;
 const logger = createLogger('event-dashboard-api');
+
+// Lightweight Array coercion helper used by the emerging-tech topic detail
+// fallback path. Pulled inline because the existing copies live in builders
+// that aren't imported here, and a runtime ReferenceError was crashing
+// /api/emerging-tech/:topicId with HTTP 500 ("asArray is not defined").
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  if (typeof value === 'object') return Object.values(value);
+  return [];
+}
 let pool = null;
 let poolConfig = null;
 let poolConfigError = null;
