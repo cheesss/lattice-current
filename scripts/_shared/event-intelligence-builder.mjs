@@ -61,11 +61,21 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
       WITH recent_events AS (
         -- UNION two pools: (a) most recent events by volume, (b) top graded events by |t|
         -- so the 200-row cap doesn't clip out the event_uplift-labeled zone (~2w older).
+        --
+        -- Filters applied to both pools:
+        --   article_count >= 2   excludes singleton arXiv-style entries that are
+        --                        publications, not multi-source confirmed events.
+        --                        Without this, the volume pool fills with ~500/day
+        --                        emerging-tech singletons.
+        --   theme NOT LIKE 'dt-%' excludes auto-generated dynamic theme codes
+        --                        (hash-named, missing canonical classification).
         (SELECT ce.id, ce.theme, ce.representative_title, ce.event_date,
                 COALESCE(ce.article_count, 0) AS article_count,
                 COALESCE(ce.source_count, 0)  AS source_count
            FROM canonical_events ce
           WHERE ce.event_date >= CURRENT_DATE - ($2::int * INTERVAL '1 day')
+            AND COALESCE(ce.article_count, 0) >= 2
+            AND ce.theme NOT LIKE 'dt-%'
           ORDER BY ce.event_date DESC, ce.article_count DESC NULLS LAST
           LIMIT 120)
         UNION
@@ -77,6 +87,8 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
           WHERE ce.event_date >= CURRENT_DATE - ($2::int * INTERVAL '1 day')
             AND eu.evidence_grade IN ('E2','E3','E4')
             AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+            AND COALESCE(ce.article_count, 0) >= 2
+            AND ce.theme NOT LIKE 'dt-%'
           ORDER BY ce.event_date DESC
           LIMIT 80)
       ),

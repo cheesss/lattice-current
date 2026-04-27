@@ -695,7 +695,9 @@ async function taskAutoPipelineLabels() {
 
 async function taskGenerateEmbeddings() {
   log('>> embedding-refresh: embedding recent unembedded articles before discovery/event pipelines');
-  const result = run('node scripts/generate-embeddings.mjs --limit 500 --batch 25', 900_000);
+  const limit = Math.max(500, Math.min(5000, Number(process.env.EMBEDDING_REFRESH_LIMIT) || 2000));
+  const batch = Math.max(10, Math.min(50, Number(process.env.EMBEDDING_REFRESH_BATCH) || 25));
+  const result = run(`node scripts/generate-embeddings.mjs --limit ${limit} --batch ${batch}`, 900_000);
   return { ok: result.ok, error: result.error };
 }
 
