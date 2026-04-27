@@ -284,6 +284,24 @@ async function taskMarketQuoteRefresh() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskBuildMarketReturns() {
+  log('>> build-market-returns: rebuilding date-based market_returns table for event-engine joins');
+  const py = process.env.PYTHON_BIN || 'python';
+  const result = run(`${py} scripts/build-market-returns.py`, 1_800_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskTrainMetaModel() {
+  log('>> train-meta-model: weekly retrain pass (full epochs)');
+  const py = process.env.PYTHON_BIN || 'python';
+  // Train script supports --dry-run, --epochs, --lr, --splits. No skip flag —
+  // weekly cadence is the throttle.
+  const result = run(`${py} scripts/train-meta-model.py`, 3_600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+// taskDataAccumulator removed — see comment in TASKS dict.
+
 async function taskRatesNowcast() {
   log('>> rates-nowcast: computing nowcasts for hy_credit_spread, treasury10y, yieldSpread, ig_credit_spread');
   const result = run('node scripts/compute-rates-nowcast.mjs', 180_000);
@@ -804,6 +822,11 @@ const RATES_NOWCAST_ENABLED = process.env.NOWCAST_RATES_ENABLED === 'true';
 
 const TASKS = {
   'market-quote-refresh': { interval: MIN_15_MS, fn: taskMarketQuoteRefresh },
+  // NOTE: data-accumulator runs as its own continuous daemon (npm run daemon:accumulator)
+  // because each cycle is 5-10 min long and would block downstream master-daemon tasks
+  // if inlined here. Keep it OUT of TASKS — verify it's running via process check.
+  'build-market-returns': { interval: HOUR_6_MS, fn: taskBuildMarketReturns },
+  'train-meta-model': { interval: WEEK_1_MS, fn: taskTrainMetaModel },
   ...(RATES_NOWCAST_ENABLED
     ? { 'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast } }
     : {}),
