@@ -37,6 +37,7 @@ Use these first. They describe the current branch, not historical experiments.
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
 | [../CLAUDE.md](../CLAUDE.md) | Project conventions, scripts, NAS tables, code modification principles |
+| [./AGENT_NEXT_SESSION.md](./AGENT_NEXT_SESSION.md) | **READ FIRST in a new chat session.** Concise reading order, daemon liveness checks, topic-specific file map, common gotchas, bringup sequence. |
 | [./PROJECT_HANDOFF_2026-04-27.md](./PROJECT_HANDOFF_2026-04-27.md) | **Current** — 14-commit sprint covering ML pipeline activation, data-pipeline cascade fixes, perf audit, root-cause closures |
 | [./PROJECT_HANDOFF_2026-04-23.md](./PROJECT_HANDOFF_2026-04-23.md) | Architectural reference for OpenClaw + decision-engine internals (still authoritative for those subsystems) |
 | [./SESSION_IMPROVEMENTS_2026-04-23.md](./SESSION_IMPROVEMENTS_2026-04-23.md) | Source repair, OpenClaw, freshness, scheduler, validation fixes (4-23 session log) |
