@@ -179,6 +179,11 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) 
     });
     let stdout = '';
     let stderr = '';
+    let oversized = false;
+    // Cap accumulated output to keep heap bounded if Codex returns a runaway
+    // response. 20MB is well above any legitimate completion (~50KB typical)
+    // but small enough to prevent OOM during silent infinite-loop replies.
+    const MAX_OUTPUT_BYTES = Number(process.env.CODEX_MAX_OUTPUT_BYTES) || 20 * 1024 * 1024;
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
     }, timeoutMs);
@@ -186,10 +191,22 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) 
     child.stdin?.write(String(prompt || ''));
     child.stdin?.end();
     child.stdout?.on('data', (chunk) => {
+      if (oversized) return;
       stdout += String(chunk);
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        oversized = true;
+        stdout += `\n[truncated at ${MAX_OUTPUT_BYTES} bytes — likely runaway response]\n`;
+        try { child.kill('SIGTERM'); } catch {}
+      }
     });
     child.stderr?.on('data', (chunk) => {
+      if (oversized) return;
       stderr += String(chunk);
+      if (stderr.length > MAX_OUTPUT_BYTES) {
+        oversized = true;
+        stderr += '\n[truncated]\n';
+        try { child.kill('SIGTERM'); } catch {}
+      }
     });
     child.on('close', (code) => {
       clearTimeout(timer);

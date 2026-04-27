@@ -42,6 +42,19 @@ Lattice는 뉴스 이벤트-종목 반응 분석 플랫폼. 40개 실시간 소�
 | `scripts/_shared/market-quote-coverage.mjs` / `market_quote_coverage.py` | 180d 커버리지 감사 (학습/추론 선-차단) |
 | `scripts/_shared/nowcast-source-gate.mjs` / `nowcast_source_gate.py` | source eligibility 게이트 (INSERT 전) |
 | `scripts/_shared/nowcast_acceptance_gate.py` | 학습 후 MAE/cov90/N 게이트 (fail 시 .pkl 저장 거부) |
+| `scripts/meta-model-server.py` | FastAPI GPU 추론 서버 (port 8100), temperature scaling sidecar 자동 로드 |
+| `scripts/meta-model-infer.mjs` | 메타모델 inference cron — event_features → /predict/batch → model_predictions (multi-row INSERT) |
+| `scripts/calibrate-meta-model.py` | Post-hoc temperature scaling, validation NLL L-BFGS, sidecar JSON 저장 |
+| `scripts/data-accumulator.mjs` | warm yahoo / GDELT / FRED 채우는 별도 daemon (env: YAHOO_BATCH_SIZE=30) |
+| `scripts/_shared/event-intelligence-builder.mjs` | dashboard 분석 payload (hot-events, theme-impact, explain-event, source-diversity, meta-model-health) |
+| `scripts/_shared/ai-analysis-builder.mjs` | AI Lab — event timeline, narrative (Codex), similar events (pgvector), regime scenario, asset dossier, weekly digest, correlation breaks |
+| `scripts/_shared/nowcast-status-builder.mjs` | 모델 promotion 상태 + drift 분류 |
+| `scripts/_shared/event-decision-alerts.mjs` | 고-uplift 이벤트 webhook 발신 (HMAC 서명) |
+| `scripts/_shared/openclaw-webhook-emitter.mjs` | OpenClaw 게이트웨이 webhook + `verifyLatticeWebhookSignature()` helper |
+| `scripts/migrations/seed-theme-symbols-curation.mjs` | 41 테마 × 5 symbols 수동 큐레이션 (auto-pipeline 데이터 누적 시 자동 override) |
+| `scripts/migrations/cleanup-dt-canonical-events.mjs` | dt-* 동적 테마 코드 정리 (FK chain 안전) |
+| `scripts/migrations/add-articles-embedding-index.mjs` | pgvector IVFFlat 인덱스 idempotent 보강 |
+| `scripts/_shared/dashboard-click-verify.mjs` / `verify-ai-interactive.mjs` | Playwright 회귀 (5 surfaces + AI Lab interactivity) |
 
 ## NAS 테이블 구조
 

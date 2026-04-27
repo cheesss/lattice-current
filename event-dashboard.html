@@ -6188,7 +6188,19 @@ updateShareUrl();
 postEmbedMessage('wm-theme-workspace-ready',{theme:state.currentTheme||null,period:getCurrentPeriod()});
 getMapLensFrame()?.addEventListener('load',()=>pushMapLensContext(),{once:true});
 void refreshAll().then(()=>emitEmbeddedContext());
-setInterval(()=>{void refreshAll().then(()=>emitEmbeddedContext());},60000);
+const __mainRefreshTimer = setInterval(()=>{void refreshAll().then(()=>emitEmbeddedContext());},60000);
+// Stop the refresh loop when the tab unloads / hides so background tabs don't
+// keep firing API calls. Browsers will GC the timer with the page anyway, but
+// explicit clear avoids the brief window where a tab being closed still issues
+// a final refreshAll() against the server.
+const __stopRefreshLoop = () => { try { clearInterval(__mainRefreshTimer); } catch{} };
+window.addEventListener('beforeunload', __stopRefreshLoop, { once: true });
+window.addEventListener('pagehide', __stopRefreshLoop, { once: true });
+document.addEventListener('visibilitychange', () => {
+  // Pause polling when tab is hidden to save bandwidth + DB load. Resume on
+  // re-show. Don't fully clearInterval — interval handle is shared.
+  if (document.visibilityState === 'hidden') { try { clearInterval(__mainRefreshTimer); } catch{} }
+});
 
 // Analytics Section: KPI + Charts (Event Decision Engine)
 const NAS_API = 'http://localhost:46200/api';

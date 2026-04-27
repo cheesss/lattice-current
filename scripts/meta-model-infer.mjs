@@ -167,21 +167,29 @@ async function main() {
         }
         const out = await res.json();
         totalRequests += out.length;
+
+        // Multi-row INSERT — previous per-row pattern caused N round-trips
+        // per event (15 INSERTs per event × hundreds of events per cycle).
+        // Single bulk INSERT cuts cycle time roughly 5-8x and stays within
+        // the pg parameter limit (PG_MAX_PARAMS≈65535 / 8 cols = 8192 rows).
+        if (out.length === 0) continue;
+        const values = [];
+        const placeholders = [];
+        let p = 1;
         for (let k = 0; k < out.length; k += 1) {
           const m = sliceMeta[k];
-          const p = out[k];
-          await pool.query(`
-            INSERT INTO model_predictions
-              (canonical_event_id, symbol, horizon, alpha_prob, expected_alpha, downside_risk, time_to_peak, model_version, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-            ON CONFLICT DO NOTHING
-          `, [
-            m.event_id, m.symbol, m.horizon,
-            p.alpha_prob, p.expected_alpha, p.downside_risk, p.time_to_peak,
-            modelVersion,
-          ]);
-          totalInserted += 1;
+          const r = out[k];
+          placeholders.push(`($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, NOW())`);
+          values.push(m.event_id, m.symbol, m.horizon, r.alpha_prob, r.expected_alpha, r.downside_risk, r.time_to_peak, modelVersion);
         }
+        const ins = await pool.query(
+          `INSERT INTO model_predictions
+             (canonical_event_id, symbol, horizon, alpha_prob, expected_alpha, downside_risk, time_to_peak, model_version, created_at)
+           VALUES ${placeholders.join(',')}
+           ON CONFLICT DO NOTHING`,
+          values,
+        );
+        totalInserted += ins.rowCount || 0;
       }
     }
 

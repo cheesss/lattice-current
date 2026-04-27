@@ -37,8 +37,9 @@ Use these first. They describe the current branch, not historical experiments.
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
 | [../CLAUDE.md](../CLAUDE.md) | Project conventions, scripts, NAS tables, code modification principles |
-| [./PROJECT_HANDOFF_2026-04-23.md](./PROJECT_HANDOFF_2026-04-23.md) | Current single-file handoff for runtime, source repair, OpenClaw, freshness, tests, and operational checks |
-| [./SESSION_IMPROVEMENTS_2026-04-23.md](./SESSION_IMPROVEMENTS_2026-04-23.md) | Latest session change log for source repair, OpenClaw, freshness, scheduler, and validation fixes |
+| [./PROJECT_HANDOFF_2026-04-27.md](./PROJECT_HANDOFF_2026-04-27.md) | **Current** — 14-commit sprint covering ML pipeline activation, data-pipeline cascade fixes, perf audit, root-cause closures |
+| [./PROJECT_HANDOFF_2026-04-23.md](./PROJECT_HANDOFF_2026-04-23.md) | Architectural reference for OpenClaw + decision-engine internals (still authoritative for those subsystems) |
+| [./SESSION_IMPROVEMENTS_2026-04-23.md](./SESSION_IMPROVEMENTS_2026-04-23.md) | Source repair, OpenClaw, freshness, scheduler, validation fixes (4-23 session log) |
 | [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Historical repo-wide handoff; superseded for current operation by PROJECT_HANDOFF_2026-04-23 |
 | [./NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md) | Nowcast subsystem state: Phase 0–5 shipped, gate + fuse filter enforced, rates redesign opened as separate track. OpenClaw exposure via `lattice.get_nowcast_status` (added 2026-04-23) |
 | [./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md](./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md) | Open track — why rates models failed acceptance gate and candidate redesign directions |
