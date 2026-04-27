@@ -300,6 +300,13 @@ async function taskTrainMetaModel() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskMetaModelInfer() {
+  log('>> meta-model-infer: run pending events through meta-model-server :8100, write to model_predictions');
+  // META_INFER_LIMIT, META_MODEL_URL, META_INFER_BATCH inherited from process.env.
+  const result = run('node --import tsx scripts/meta-model-infer.mjs', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
 // taskDataAccumulator removed — see comment in TASKS dict.
 
 async function taskRatesNowcast() {
@@ -829,6 +836,7 @@ const TASKS = {
   // if inlined here. Keep it OUT of TASKS — verify it's running via process check.
   'build-market-returns': { interval: HOUR_6_MS, fn: taskBuildMarketReturns },
   'train-meta-model': { interval: WEEK_1_MS, fn: taskTrainMetaModel },
+  'meta-model-infer': { interval: HOUR_2_MS, fn: taskMetaModelInfer },
   ...(RATES_NOWCAST_ENABLED
     ? { 'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast } }
     : {}),
