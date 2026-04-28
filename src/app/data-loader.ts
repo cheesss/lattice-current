@@ -1264,14 +1264,26 @@ export class DataLoaderManager implements AppModule {
         const panel = this.ctx.panels['alpha-decay'] as import('@/components/AlphaDecayPanel').AlphaDecayPanel | undefined;
         panel?.setData(data as Array<{ theme: string; points: Array<{ horizon: string; alpha: number }> }>);
       }},
-      { url: '/api/event-uplift-grades', handler: (data: unknown[]) => {
+      { url: '/api/event-uplift-grades', handler: (data: unknown) => {
         // Evidence distribution
         const gradeMap = new Map<string, { count: number; totalUplift: number }>();
-        for (const row of data as Array<{ evidence_grade: string; uplift?: number }>) {
-          const g = row.evidence_grade || 'E0';
+        const payload = data as { grades?: Array<{ grade?: string; count?: number; avgUplift?: number }>; signals?: unknown[] };
+        const rows: Array<{ evidence_grade?: string; grade?: string; uplift?: number; count?: number; avgUplift?: number }> = Array.isArray(data)
+          ? data as Array<{ evidence_grade?: string; grade?: string; uplift?: number; count?: number; avgUplift?: number }>
+          : Array.isArray(payload.grades)
+            ? payload.grades as Array<{ evidence_grade?: string; grade?: string; uplift?: number; count?: number; avgUplift?: number }>
+            : [];
+        for (const row of rows) {
+          const g = String(row.grade || row.evidence_grade || 'E0');
           const existing = gradeMap.get(g) || { count: 0, totalUplift: 0 };
-          existing.count++;
-          existing.totalUplift += Number(row.uplift) || 0;
+          if (row.count != null) {
+            const count = Number(row.count) || 0;
+            existing.count += count;
+            existing.totalUplift += (Number(row.avgUplift) || 0) * count;
+          } else {
+            existing.count++;
+            existing.totalUplift += Number(row.uplift) || 0;
+          }
           gradeMap.set(g, existing);
         }
         const grades = Array.from(gradeMap.entries()).map(([grade, { count, totalUplift }]) => ({

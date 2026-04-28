@@ -10,11 +10,12 @@ If you only have 5 minutes, read just **§1**. If you're working on a specific a
 
 | File | Why | Time |
 |------|-----|------|
-| `docs/PROJECT_HANDOFF_2026-04-27.md` | **Current state of the system.** Daemons, ports, recent fixes, ML pipeline, deferred items, quick-start commands. | 5 min |
+| `docs/PROJECT_HANDOFF_2026-04-28.md` | **Current dashboard/UI state.** Signal-first dashboard direction, Theme Brief metric caveats, Korean support, operator tooltips, file-mode map fallback, verification notes. | 5 min |
+| `docs/PROJECT_HANDOFF_2026-04-27.md` | Prior system baseline. Daemons, ports, recent fixes, ML pipeline background, deferred items, quick-start commands. | 5 min |
 | `CLAUDE.md` | Project conventions, scripts table, NAS tables, code modification rules. | 3 min |
 | `docs/DOCUMENTATION.md` | Index of canonical docs vs archived. Use this to navigate when you hit unfamiliar terms. | 1 min |
 
-After these you should know: 5 dashboard surfaces, 3 standalone daemons that must be running, ML pipeline 4-stage flow, and where to find any other doc.
+After these you should know: the signal-first dashboard direction, 5 dashboard surfaces, Theme Brief caveat rules, Evolution lens behavior, Korean UI support, 3 standalone daemons that must be running, ML pipeline background, and where to find any other doc.
 
 ---
 

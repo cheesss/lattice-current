@@ -12,6 +12,7 @@ import {
 
 function makeFakePool(queryHandler) {
   return {
+    query: queryHandler,
     connect: async () => ({
       query: queryHandler,
       release: () => {},
@@ -49,20 +50,29 @@ async function testHotEvents() {
           {
             id: 101, theme: 'energy', representative_title: 'Oil spike',
             event_date: '2026-04-22', article_count: 24, source_count: 12,
-            temperature: 2.3, is_surge: true, best_grade: 'E4',
-            uplift_rows: 6, max_abs_uplift: 0.045, max_abs_t: 3.1,
+            temperature: 2.3, is_surge: true, raw_best_grade: 'E4', promoted_grade: 'E4',
+            uplift_rows: 6, promoted_uplift_rows: 6, raw_max_abs_uplift: 0.045, raw_max_abs_t: 3.1,
+            rank_abs_uplift: 0.045, rank_abs_t: 3.1, min_strong_controls: 12, max_strong_controls: 40,
+            known_market_relevance_articles: 12, market_relevant_articles: 10, low_relevance_articles: 0,
+            controls_blocked: false, relevance_blocked: false,
           },
           {
             id: 102, theme: 'technology', representative_title: 'AI chip news',
             event_date: '2026-04-22', article_count: 14, source_count: 8,
-            temperature: 1.1, is_surge: false, best_grade: 'E2',
-            uplift_rows: 2, max_abs_uplift: 0.012, max_abs_t: 1.4,
+            temperature: 1.1, is_surge: false, raw_best_grade: 'E2', promoted_grade: 'E2',
+            uplift_rows: 2, promoted_uplift_rows: 2, raw_max_abs_uplift: 0.012, raw_max_abs_t: 2.4,
+            rank_abs_uplift: 0.012, rank_abs_t: 2.4, min_strong_controls: 10, max_strong_controls: 20,
+            known_market_relevance_articles: 6, market_relevant_articles: 5, low_relevance_articles: 1,
+            controls_blocked: false, relevance_blocked: false,
           },
           {
             id: 103, theme: 'defense', representative_title: 'Weak cluster',
             event_date: '2026-04-21', article_count: 3, source_count: 2,
-            temperature: null, is_surge: false, best_grade: null,
-            uplift_rows: 0, max_abs_uplift: null, max_abs_t: null,
+            temperature: null, is_surge: false, raw_best_grade: null, promoted_grade: null,
+            uplift_rows: 0, promoted_uplift_rows: 0, raw_max_abs_uplift: null, raw_max_abs_t: null,
+            rank_abs_uplift: null, rank_abs_t: null, min_strong_controls: null, max_strong_controls: null,
+            known_market_relevance_articles: 0, market_relevant_articles: 0, low_relevance_articles: 0,
+            controls_blocked: false, relevance_blocked: false,
           },
         ],
       };
@@ -136,19 +146,22 @@ async function testExplainEvent() {
         ],
       };
     }
-    if (sql.includes('article_event_map')) {
-      return {
-        rows: [
-          { id: 1, title: 'Big oil move', source_id: 'reuters', published_at: '2026-04-22', url: 'http://x' },
-          { id: 2, title: 'Oil redux', source_id: 'bloomberg', published_at: '2026-04-22', url: 'http://y' },
-        ],
-      };
-    }
     if (sql.includes('FROM event_uplift')) {
       return {
         rows: [
-          { symbol: 'XOM', horizon: '5d', uplift: 0.03, t_stat: 2.5, evidence_grade: 'E3',
-            event_alpha_mean: 0.02, control_alpha_mean: -0.01, n_controls: 40 },
+          { symbol: 'XOM', horizon: '5d', uplift: 0.03, t_stat: 2.5,
+            raw_evidence_grade: 'E3', promoted_grade: 'E3',
+            event_alpha: 0.02, control_avg_return: -0.01, n_controls: 40,
+            known_market_relevance_articles: 2, market_relevant_articles: 2, low_relevance_articles: 0,
+            controls_blocked: false, relevance_blocked: false },
+        ],
+      };
+    }
+    if (sql.includes('article_event_map')) {
+      return {
+        rows: [
+          { id: 1, title: 'Big oil move', source: 'reuters', published_at: '2026-04-22', url: 'http://x' },
+          { id: 2, title: 'Oil redux', source: 'bloomberg', published_at: '2026-04-22', url: 'http://y' },
         ],
       };
     }
@@ -181,7 +194,7 @@ async function testSourceDiversity() {
 
   const poolCritical = makeFakePool(async (sql) => {
     if (sql.includes('to_regclass')) return tableExistsResponse('articles');
-    if (sql.includes('GROUP BY source_id')) {
+    if (sql.includes('GROUP BY source')) {
       return {
         rows: [
           { source_id: 'google-news', article_count: 600 },
@@ -204,7 +217,7 @@ async function testSourceDiversity() {
 
   const poolBalanced = makeFakePool(async (sql) => {
     if (sql.includes('to_regclass')) return tableExistsResponse('articles');
-    if (sql.includes('GROUP BY source_id')) {
+    if (sql.includes('GROUP BY source')) {
       return {
         rows: [
           { source_id: 'reuters', article_count: 150 },

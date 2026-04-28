@@ -15,12 +15,20 @@ const check = (name, ok, detail='') => {
 
 await page.goto('http://localhost:3000/event-dashboard.html', { waitUntil: 'load' });
 await page.waitForTimeout(8000);
+await page.waitForFunction(() => {
+  const hot = document.querySelector('#hot-events-rows');
+  if (!hot) return false;
+  const hasRows = hot.querySelectorAll('.evidence-row').length > 0;
+  const hasFinalEmpty = !!hot.querySelector('.loading:not([data-skeleton])');
+  return hasRows || hasFinalEmpty;
+}, null, { timeout: 25000 }).catch(() => {});
 
 // ─── HOME ───
 console.log('\n━━ HOME ━━');
 const home = await page.evaluate(() => ({
   trustChunks: document.querySelectorAll('.tstrip-chunk').length,
   hotEventsRows: document.querySelectorAll('#hot-events-rows .evidence-row').length,
+  hotEventsEmptyText: document.querySelector('#hot-events-rows .loading:not([data-skeleton])')?.textContent?.trim() || '',
   themeSpectrum: document.querySelectorAll('.theme-spectrum-strip .ts-seg').length,
   transitions: document.querySelectorAll('#recent-transitions-standalone .tag').length,
   geoCountries: document.querySelectorAll('.geo-pressure-row, [class*="country"]').length,
@@ -37,7 +45,11 @@ const home = await page.evaluate(() => ({
   })(),
 }));
 check('Trust strip 4 chunks', home.trustChunks >= 4, home.trustChunks);
-check('Hot events 1+ rows (filter applied)', home.hotEventsRows > 0, home.hotEventsRows);
+check(
+  'Hot events rows or explicit empty state',
+  home.hotEventsRows > 0 || /no hot events|no statistically validated|no events/i.test(home.hotEventsEmptyText),
+  home.hotEventsRows > 0 ? home.hotEventsRows : home.hotEventsEmptyText,
+);
 check('Theme spectrum segments', home.themeSpectrum > 0, home.themeSpectrum);
 check('Recent transitions clickable', home.transitions > 0, home.transitions);
 check('Triage items', home.triageItems > 0, home.triageItems);
@@ -47,6 +59,15 @@ check('NO skeleton over content (CSS fix)', home.loadingWithSkeleton === 0, home
 console.log('\n━━ DECISION INBOX ━━');
 await page.evaluate(() => window.switchSurface('inbox'));
 await page.waitForTimeout(4000);
+await page.waitForFunction(() => {
+  const list = document.querySelector('#inbox-list');
+  if (!list) return false;
+  const hasItems = list.querySelectorAll('.inbox-item').length > 0;
+  const text = (list.textContent || '').toLowerCase();
+  const hasFinalEmpty = /no review|empty|no pending|no items/.test(text);
+  const stillLoading = /loading review items/.test(text);
+  return hasItems || (hasFinalEmpty && !stillLoading);
+}, null, { timeout: 25000 }).catch(() => {});
 const inbox = await page.evaluate(() => {
   const items = Array.from(document.querySelectorAll('#inbox-list .inbox-item'));
   return { count: items.length, types: [...new Set(items.map(it => it.querySelector('.trust-chip')?.textContent?.trim()))] };

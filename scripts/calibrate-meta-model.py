@@ -28,6 +28,7 @@ Usage:
 import argparse
 import json
 import sys
+import os
 from pathlib import Path
 
 import numpy as np
@@ -45,9 +46,26 @@ try:
 except ImportError:
     print("PyTorch not installed."); sys.exit(1)
 
+
+
+def require_pg_password():
+    password = (
+        os.environ.get("PG_PASSWORD")
+        or os.environ.get("PGPASSWORD")
+        or os.environ.get("INTEL_PG_PASSWORD")
+        or os.environ.get("NAS_PG_PASSWORD")
+    )
+    if not password:
+        raise RuntimeError(
+            "Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, "
+            "INTEL_PG_PASSWORD, or NAS_PG_PASSWORD."
+        )
+    return password
+
+
 PG_CONFIG = {
     "host": "192.168.0.2", "port": 5433,
-    "dbname": "lattice", "user": "postgres", "password": "lattice1234",
+    "dbname": "lattice", "user": "postgres", "password": require_pg_password(),
 }
 
 FEATURE_COLUMNS = [

@@ -112,9 +112,16 @@ th{color:var(--muted);font-weight:normal}
 .brief-hero{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .brief-copy{color:var(--text);font-size:12px}
 .brief-stats,.brief-provenance-list{display:flex;gap:8px;flex-wrap:wrap}
-.brief-stat{min-width:124px;padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:12px;background:rgba(255,255,255,.02)}
+.brief-stat{min-width:124px;padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:12px;background:rgba(255,255,255,.02);cursor:help}
+.brief-stat.metric-watch{border-color:rgba(243,181,98,.34);background:linear-gradient(145deg,rgba(243,181,98,.08),rgba(255,255,255,.02))}
+.brief-stat.metric-info{border-color:rgba(124,169,255,.22);background:linear-gradient(145deg,rgba(124,169,255,.07),rgba(255,255,255,.02))}
 .brief-stat-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.12em}
 .brief-stat-value{margin-top:4px;font-size:14px;color:var(--text)}
+.metric-caveat-panel{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.metric-caveat-row{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid rgba(243,181,98,.16);border-radius:12px;background:rgba(243,181,98,.055);color:var(--text);font-size:11px;line-height:1.45}
+.metric-caveat-row.info{border-color:rgba(124,169,255,.14);background:rgba(124,169,255,.045)}
+.metric-caveat-mark{flex:0 0 auto;color:var(--amber);font-weight:800;font-family:var(--font-mono)}
+.metric-caveat-row.info .metric-caveat-mark{color:var(--blue)}
 .delta-kpi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
 .brief-section{padding:12px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:rgba(255,255,255,.02)}
 .brief-section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
@@ -143,6 +150,46 @@ th{color:var(--muted);font-weight:normal}
 .brief-entity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .entity-card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .entity-name{font-size:12px;color:var(--text)}
+.entity-network{display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;align-items:stretch}
+.entity-network-center{display:flex;flex-direction:column;justify-content:center;gap:8px;padding:14px;border:1px solid rgba(216,249,157,.22);border-radius:16px;background:radial-gradient(circle at top,rgba(216,249,157,.12),rgba(255,255,255,.025));min-height:140px}
+.entity-network-label{color:var(--amber);font-size:9px;text-transform:uppercase;letter-spacing:.16em}
+.entity-network-title{color:var(--text-loud);font-weight:700;font-size:14px;line-height:1.25}
+.entity-network-meta{color:var(--text-soft);font-size:10.5px}
+.entity-network-spokes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.entity-node{position:relative;padding:10px;border:1px solid rgba(255,255,255,.055);border-radius:14px;background:linear-gradient(145deg,rgba(255,255,255,.04),rgba(0,0,0,.18));overflow:hidden}
+.entity-node::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--accent),rgba(216,249,157,.15));opacity:.78}
+.entity-node-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.entity-node-name{color:var(--text-loud);font-weight:650;font-size:12px;line-height:1.25}
+.entity-node-sub{margin-top:4px;color:var(--text-soft);font-size:10.5px}
+.entity-edge-meter{height:5px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.entity-edge-meter span{display:block;height:100%;width:var(--confidence-pct,50%);border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--teal))}
+.compact-status{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:rgba(255,255,255,.018);color:var(--text-soft)}
+.compact-status-dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted)}
+.compact-status.ok .compact-status-dot{background:var(--accent2)}
+.pathway-map{display:flex;flex-direction:column;gap:8px}
+.pathway-route{padding:10px;border:1px solid rgba(255,255,255,.055);border-radius:13px;background:rgba(255,255,255,.025)}
+.pathway-route-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.pathway-flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;color:var(--text-soft);font-family:var(--font-mono);font-size:10px}
+.pathway-flow span{padding:3px 7px;border:1px solid rgba(255,255,255,.055);border-radius:999px;background:rgba(0,0,0,.18)}
+.pathway-flow .arrow{border:0;background:transparent;padding:0;color:var(--accent)}
+.watch-checklist{counter-reset:watch;display:flex;flex-direction:column;gap:8px}
+.watch-task{counter-increment:watch;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:flex-start;padding:11px;border:1px solid rgba(216,249,157,.08);border-radius:13px;background:linear-gradient(145deg,rgba(216,249,157,.04),rgba(255,255,255,.018))}
+.watch-task-num{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(216,249,157,.12);color:var(--accent);font-family:var(--font-mono);font-size:10px}
+.watch-task-num::before{content:counter(watch)}
+.watch-task-action{display:inline-flex;width:max-content;margin-bottom:4px;padding:2px 7px;border-radius:999px;background:rgba(243,181,98,.12);color:var(--amber);font-size:9px;text-transform:uppercase;letter-spacing:.12em}
+.watch-task-copy{color:var(--text-loud);font-size:12px;line-height:1.45}
+.watch-task-thresholds{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.watch-threshold{padding:2px 6px;border-radius:999px;border:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.2);color:var(--text-soft);font-family:var(--font-mono);font-size:9.5px}
+.risk-strip{display:flex;flex-direction:column;gap:8px}
+.risk-item{display:grid;grid-template-columns:26px minmax(0,1fr);gap:9px;padding:10px;border:1px solid rgba(239,68,68,.16);border-radius:13px;background:rgba(239,68,68,.045)}
+.risk-mark{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(239,68,68,.13);color:var(--red);font-family:var(--font-mono);font-weight:800}
+.notebook-drawer{padding:0!important;overflow:hidden}
+.notebook-drawer>summary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;cursor:pointer;list-style:none}
+.notebook-drawer>summary::-webkit-details-marker{display:none}
+.notebook-drawer[open]>summary{border-bottom:1px solid rgba(255,255,255,.05)}
+.notebook-summary-title{color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.14em}
+.notebook-summary-copy{margin-top:3px;color:var(--text-soft);font-size:11px}
+.notebook-body{padding:12px}
 .section-note{color:var(--muted);font-size:11px;margin-top:6px}
 .theme-empty{color:var(--muted)}
 .surface-drawer{margin-top:18px;overflow:hidden}
@@ -930,6 +977,30 @@ input:focus-visible{
 .scenario-pred-row .ret.neg{color:var(--c-loss)}
 .scenario-pred-row .mult{color:var(--text-soft)}
 
+/* Current Regime Brief */
+.regime-brief-panel{padding:14px;background:linear-gradient(135deg,rgba(103,209,197,.08),rgba(216,249,157,.035));border:1px solid rgba(103,209,197,.24);border-radius:10px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);gap:14px}
+.regime-brief-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.regime-brief-title{font-size:17px;line-height:1.25;color:var(--text-loud);font-weight:650;letter-spacing:-.01em}
+.regime-brief-meta{margin-top:4px;color:var(--text-soft);font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+.regime-brief-mode{padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--c-border-hair);color:var(--text-soft);font-size:9.5px;white-space:nowrap;text-transform:uppercase;letter-spacing:.12em}
+.regime-brief-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.regime-brief-kpi{padding:8px 10px;border:1px solid var(--c-border-hair);border-radius:8px;background:rgba(0,0,0,.22)}
+.regime-brief-kpi .lbl{font-size:9px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.12em}
+.regime-brief-kpi .val{margin-top:3px;color:var(--text-loud);font-family:var(--font-mono);font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.regime-brief-section{padding:10px;border:1px solid var(--c-border-hair);border-radius:8px;background:rgba(0,0,0,.16);margin-top:8px}
+.regime-brief-section h4{margin:0 0 6px;font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.14em;font-family:var(--font-sans);font-weight:650}
+.regime-brief-list{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.regime-brief-list li{position:relative;padding-left:13px;color:var(--text-base);font-size:12px;line-height:1.45}
+.regime-brief-list li::before{content:"";position:absolute;left:0;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:.75}
+.regime-brief-evidence{display:flex;flex-direction:column;gap:7px}
+.regime-evidence-row{display:grid;grid-template-columns:72px minmax(0,1fr) 48px;gap:8px;align-items:center;padding:7px 8px;border:1px solid var(--c-border-hair);border-radius:7px;background:rgba(255,255,255,.025);font-size:10.5px}
+.regime-evidence-row .tag{justify-self:start}
+.regime-evidence-row .main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-base)}
+.regime-evidence-row .metric{text-align:right;color:var(--text-soft);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.regime-brief-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.regime-brief-note{color:var(--text-muted);font-size:10px;line-height:1.45;margin-top:8px}
+@media (max-width:1100px){.regime-brief-panel{grid-template-columns:1fr}.regime-brief-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 /* Asset Dossier */
 .dossier{display:flex;flex-direction:column;gap:10px}
 .dossier-input{display:flex;gap:6px;align-items:center}
@@ -1023,6 +1094,8 @@ input:focus-visible{
 .evidence-row[tabindex]{cursor:pointer}
 .evidence-row.theme-group{background:rgba(103,209,197,.05)}
 .evidence-row.theme-group .ev-theme{color:var(--teal);font-weight:600}
+.evidence-row.quality-warning{border-left:2px solid rgba(255,198,89,.55);padding-left:8px}
+.evidence-row.quality-warning .ev-grade{color:var(--amber);border-color:rgba(255,198,89,.38)}
 
 /* --- Peek overlay (Space hold) -------------------------------------- */
 .peek-overlay{position:fixed;bottom:18px;right:18px;width:420px;max-height:60vh;overflow:auto;padding:14px 16px;background:rgba(8,10,13,.98);border:1px solid rgba(216,249,157,.28);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,.5);font-family:var(--font-mono);font-size:11px;z-index:250;display:none}
@@ -1064,14 +1137,282 @@ input:focus-visible{
 .bulk-sim-panel .bs-quality{color:var(--text-soft);text-align:right;font-variant-numeric:tabular-nums}
 .bulk-sim-panel .bs-summary{margin-top:6px;padding-top:6px;border-top:1px solid var(--border-dim);color:var(--text-base)}
 .bulk-sim-panel .bs-close{cursor:pointer;color:var(--text-muted);background:none;border:1px solid var(--border-dim);padding:2px 6px;border-radius:4px;font-family:inherit;font-size:9.5px}
+
+/* ==================================================================== */
+/* DESKTOP IA v3: signal-first workbench + preserved interactions       */
+/* ==================================================================== */
+@media (min-width:1180px){
+  .container{max-width:1920px;padding:14px 22px 48px}
+  .hero{padding:13px 16px;align-items:center;border-radius:14px}
+  .hero h1{font-size:22px;margin-bottom:4px;letter-spacing:-.02em}
+  .hero .eyebrow{margin-bottom:4px}
+  .hero .subtitle{max-width:780px;font-size:12px;line-height:1.4}
+  .hero-actions{min-width:560px;flex-direction:row;justify-content:flex-end;align-items:center;gap:10px}
+  .hero-actions .toolbar{justify-content:flex-end}
+  .surface-nav{top:0;margin:-6px -10px 8px;padding:6px 10px}
+  .lattice-trust-strip{margin:0 0 8px;height:30px}
+  .lattice-since-strip{margin:0 0 8px;padding:5px 10px}
+  .theme-spectrum-strip{margin:0 0 8px;height:26px}
+  .hotkey-hint{margin:-2px 0 8px;max-height:22px;overflow:hidden}
+  .decision-cockpit{margin:8px 0 12px;padding:10px 12px;border-radius:16px}
+  .regime-strip{padding:6px 8px;border-radius:12px}
+  .regime-strip-title{min-width:96px;font-size:9px}
+  .kpi-chip{padding:4px 8px}
+  .kpi-chip-value{font-size:12px}
+  .kpi-detail-drawer{margin-top:5px}
+  .cockpit-grid{
+    grid-template-columns:minmax(0,1.35fr) minmax(360px,.65fr);
+    grid-template-areas:"signals proof";
+    gap:10px;
+    align-items:stretch;
+    margin-top:8px;
+  }
+  .cockpit-panel{min-height:118px;padding:11px;border-radius:14px}
+  .signal-card-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));max-height:255px}
+  .selected-proof-panel{min-height:118px}
+  .proof-chain{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero-grid.hero-grid-summary{grid-template-columns:1.05fr .95fr .9fr;margin-top:10px}
+  .section-block{margin-top:12px;padding:14px;border-radius:14px}
+  .section-heading{margin-bottom:10px;padding-bottom:8px}
+}
+
+body:not([data-surface="home"]) .hero,
+body:not([data-surface="home"]) .home-orientation,
+body:not([data-surface="home"]) .decision-cockpit,
+body:not([data-surface="home"]) .lattice-since-strip,
+body:not([data-surface="home"]) .theme-spectrum-strip,
+body:not([data-surface="home"]) .hotkey-hint{
+  display:none!important;
+}
+
+body:not([data-surface="home"]) .surface-nav{
+  margin-top:0;
+  border:1px solid var(--c-border-hair);
+  border-radius:12px;
+}
+
+.surface-context-bar{
+  display:none;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin:8px 0 12px;
+  padding:9px 12px;
+  border:1px solid var(--c-border-hair);
+  border-radius:12px;
+  background:rgba(0,0,0,.5);
+  box-shadow:var(--shadow-card);
+}
+body:not([data-surface="home"]) .surface-context-bar{display:flex}
+.surface-context-main{min-width:0}
+.surface-context-kicker{font-size:9.5px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.18em}
+.surface-context-title{margin-top:2px;color:var(--text-loud);font-size:15px;font-weight:600;letter-spacing:-.01em}
+.surface-context-copy{margin-top:2px;color:var(--text-soft);font-size:11px}
+.surface-context-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.shortcut-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:4px 8px;
+  border:1px solid var(--c-border-hair);
+  border-radius:999px;
+  background:rgba(255,255,255,.03);
+  color:var(--text-soft);
+  font-family:var(--font-mono);
+  font-size:10px;
+  white-space:nowrap;
+}
+.shortcut-chip kbd{
+  display:inline-flex;
+  min-width:16px;
+  justify-content:center;
+  padding:1px 4px;
+  border:1px solid var(--c-border-soft);
+  border-radius:4px;
+  color:var(--text-base);
+  background:rgba(255,255,255,.05);
+  font:inherit;
+}
+
+.operator-tooltip{
+  position:fixed;
+  z-index:10000;
+  max-width:380px;
+  padding:10px 12px;
+  border:1px solid rgba(216,249,157,.22);
+  border-radius:10px;
+  background:rgba(5,6,8,.96);
+  box-shadow:0 18px 48px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04) inset;
+  color:var(--text-base);
+  font-size:11px;
+  line-height:1.45;
+  pointer-events:none;
+  opacity:0;
+  transform:translate3d(0,4px,0);
+  transition:opacity .12s ease,transform .12s ease;
+  backdrop-filter:blur(16px);
+}
+.operator-tooltip.show{opacity:1;transform:translate3d(0,0,0)}
+.operator-tooltip-title{
+  color:var(--accent);
+  font-size:9.5px;
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  margin-bottom:4px;
+}
+.operator-tooltip-body{white-space:normal}
+.operator-tooltip-meta{margin-top:6px;color:var(--text-muted);font-family:var(--font-mono);font-size:10px}
+.kpi-chip,.tstrip-chunk,.since-item,.ts-seg,.signal-card,.inbox-item,.evidence-row[data-chain],.interactive-row[onclick],.theme-chip,.inbox-btn,.btn,.tab{
+  scroll-margin-top:82px;
+}
+.kpi-chip:hover,.tstrip-chunk:hover,.since-item:hover,.ts-seg:hover,.signal-card:hover,.inbox-item:hover,.interactive-row[onclick]:hover,.theme-chip:hover{
+  box-shadow:0 0 0 1px rgba(216,249,157,.08) inset;
+}
+
+/* --- UX information architecture pass (2026-04-28) ------------------ */
+.command-launch{
+  width:min(420px,100%);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid rgba(216,249,157,.18);
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(216,249,157,.08),rgba(255,255,255,.025));
+  color:var(--text-soft);
+  cursor:pointer;
+  text-align:left;
+}
+.command-launch:hover{border-color:rgba(216,249,157,.34);background:rgba(216,249,157,.095)}
+.command-launch .cmd-icon{color:var(--accent);font-family:var(--font-mono);font-weight:700}
+.command-launch .cmd-copy{flex:1;min-width:0}
+.command-launch .cmd-title{display:block;color:var(--text-loud);font-weight:600;font-size:12px}
+.command-launch .cmd-sub{display:block;color:var(--text-soft);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.command-launch .cmd-key{padding:2px 6px;border:1px solid var(--c-border-soft);border-radius:6px;background:rgba(0,0,0,.35);color:var(--text-base);font-family:var(--font-mono);font-size:10px}
+.home-orientation{
+  display:grid;
+  grid-template-columns:1.2fr repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0;
+}
+.orientation-hero,.orientation-step{
+  border:1px solid var(--c-border-hair);
+  border-radius:16px;
+  background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(0,0,0,.22));
+  padding:14px;
+}
+.orientation-hero{border-color:rgba(216,249,157,.2);background:linear-gradient(145deg,rgba(216,249,157,.09),rgba(0,0,0,.28))}
+.orientation-kicker{color:var(--amber);font-size:9.5px;text-transform:uppercase;letter-spacing:.18em;margin-bottom:5px}
+.orientation-title{color:var(--text-loud);font-size:15px;font-weight:650;letter-spacing:-.01em}
+.orientation-copy{margin-top:6px;color:var(--text-soft);font-size:11.5px;line-height:1.55}
+.orientation-step{cursor:pointer;transition:border-color .15s ease,transform .15s ease,background .15s ease}
+.orientation-step:hover{transform:translateY(-1px);border-color:rgba(216,249,157,.24);background:rgba(255,255,255,.045)}
+.orientation-num{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:999px;background:rgba(216,249,157,.12);color:var(--accent);font-family:var(--font-mono);font-size:10px;margin-bottom:8px}
+.orientation-label{display:block;color:var(--text-loud);font-weight:600}
+.orientation-hint{display:block;margin-top:5px;color:var(--text-soft);font-size:10.5px}
+.ux-section-primary{border-color:rgba(216,249,157,.16)!important;background:linear-gradient(145deg,rgba(216,249,157,.055),rgba(255,255,255,.025))!important}
+.ux-section-primary .section-title{color:var(--text-loud)}
+.ux-section-secondary{border-color:rgba(124,169,255,.12)!important;background:rgba(255,255,255,.022)!important}
+.ux-section-tertiary{opacity:.9;background:rgba(255,255,255,.015)!important}
+.ux-section-tertiary .section-title{color:var(--text-base)}
+.command-backdrop,.evidence-drawer-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:10020;
+  display:none;
+  background:rgba(0,0,0,.48);
+  backdrop-filter:blur(8px);
+}
+.command-backdrop.active,.evidence-drawer-backdrop.active{display:block}
+.command-palette{
+  position:fixed;
+  z-index:10021;
+  top:82px;
+  left:50%;
+  width:min(760px,calc(100vw - 36px));
+  transform:translateX(-50%) translateY(-8px);
+  display:none;
+  border:1px solid rgba(216,249,157,.22);
+  border-radius:18px;
+  background:rgba(6,7,10,.98);
+  box-shadow:0 30px 110px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.04) inset;
+  overflow:hidden;
+}
+.command-palette.active{display:block;transform:translateX(-50%) translateY(0)}
+.command-search{width:100%;border:0;border-bottom:1px solid var(--c-border-hair);background:rgba(255,255,255,.025);color:var(--text-loud);padding:16px 18px;font:500 15px var(--font-sans);outline:none}
+.command-results{max-height:420px;overflow:auto;padding:8px}
+.command-item{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--text);padding:10px 12px;text-align:left;cursor:pointer}
+.command-item:hover,.command-item.active{border-color:rgba(216,249,157,.18);background:rgba(216,249,157,.075)}
+.command-kind{color:var(--amber);font:700 9.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+.command-title{color:var(--text-loud);font-weight:600}
+.command-desc{margin-top:2px;color:var(--text-soft);font-size:11px}
+.command-shortcut{color:var(--text-muted);font-family:var(--font-mono);font-size:10px}
+.evidence-drawer{
+  position:fixed;
+  top:0;
+  right:0;
+  z-index:10022;
+  width:min(560px,calc(100vw - 24px));
+  height:100vh;
+  display:none;
+  padding:18px;
+  border-left:1px solid rgba(216,249,157,.2);
+  background:linear-gradient(180deg,rgba(12,14,18,.98),rgba(5,6,8,.98));
+  box-shadow:-32px 0 90px rgba(0,0,0,.62);
+  overflow:auto;
+}
+.evidence-drawer.active{display:block}
+.drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.drawer-kicker{color:var(--amber);font-size:9.5px;text-transform:uppercase;letter-spacing:.18em}
+.drawer-title{margin-top:4px;color:var(--text-loud);font-size:18px;line-height:1.25;font-weight:650}
+.drawer-close{border:1px solid var(--c-border-soft);border-radius:999px;background:rgba(255,255,255,.035);color:var(--text-soft);padding:6px 10px;cursor:pointer}
+.drawer-close:hover{color:var(--text-loud);border-color:rgba(216,249,157,.26)}
+.drawer-section{margin-top:12px;padding:12px;border:1px solid var(--c-border-hair);border-radius:14px;background:rgba(255,255,255,.025)}
+.drawer-section-title{color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px}
+.drawer-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.drawer-metric{padding:9px;border:1px solid rgba(255,255,255,.045);border-radius:10px;background:rgba(0,0,0,.22)}
+.drawer-metric span{display:block;color:var(--text-soft);font-size:9.5px;text-transform:uppercase;letter-spacing:.12em}
+.drawer-metric strong{display:block;margin-top:3px;color:var(--text-loud);font-size:13px}
+.drawer-source{padding:9px 0;border-top:1px solid rgba(255,255,255,.045)}
+.drawer-source:first-child{border-top:0}
+.drawer-source a{color:var(--accent);text-decoration:none}
+.drawer-source .meta-line{margin-top:3px}
+.drawer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.proof-open-drawer{margin-top:10px}
+
+@media (max-width:1179px){
+  .surface-context-bar{display:none!important}
+  .home-orientation{grid-template-columns:1fr 1fr}
+}
+@media (max-width:760px){
+  .home-orientation{grid-template-columns:1fr}
+  .command-palette{top:58px}
+  .drawer-metrics{grid-template-columns:1fr}
+}
 </style>
 </head>
-<body>
+<body data-surface="home">
 <!-- Language Toggle -->
 <div class="lang-toggle" id="lang-toggle">
   <button class="active" data-lang="en">EN</button>
   <button data-lang="ko">KO</button>
 </div>
+<div class="command-backdrop" id="command-backdrop" onclick="closeCommandPalette()" aria-hidden="true"></div>
+<div class="command-palette" id="command-palette" role="dialog" aria-modal="true" aria-label="Command palette">
+  <input class="command-search" id="command-search" type="text" placeholder="Search surfaces, filters, actions..." autocomplete="off" aria-label="Search commands">
+  <div class="command-results" id="command-results"></div>
+</div>
+<div class="evidence-drawer-backdrop" id="evidence-drawer-backdrop" onclick="closeEvidenceDrawer()" aria-hidden="true"></div>
+<aside class="evidence-drawer" id="evidence-drawer" role="dialog" aria-modal="true" aria-label="Evidence drawer">
+  <div class="drawer-head">
+    <div>
+      <div class="drawer-kicker">Evidence Drawer</div>
+      <div class="drawer-title" id="evidence-drawer-title">No item selected</div>
+    </div>
+    <button class="drawer-close" onclick="closeEvidenceDrawer()">Close</button>
+  </div>
+  <div id="evidence-drawer-body" class="meta-line">Select a signal or inbox item, then open evidence.</div>
+</aside>
 
 <div class="container">
   <header class="hero">
@@ -1081,6 +1422,11 @@ input:focus-visible{
       <div class="subtitle">The theme shell is now the primary product surface. Live signals, 2D geo context, Codex proposals, approvals, validation, and operator diagnostics are all reviewed from here instead of a separate legacy main page.</div>
     </div>
     <div class="hero-actions">
+      <button class="command-launch" type="button" onclick="openCommandPalette()" data-lattice-tip="Open a single navigation and action search. Use it when the screen feels dense or you do not know where a function lives.">
+        <span class="cmd-icon">></span>
+        <span class="cmd-copy"><span class="cmd-title">Find a signal, surface, filter, or action</span><span class="cmd-sub">Search Home, Inbox, Investigate, Geo, Ops, periods, and current theme actions</span></span>
+        <span class="cmd-key">Ctrl K</span>
+      </button>
       <div id="period-tabs" class="tabs"></div>
       <div class="toolbar">
         <label class="select-label">Evolution lens <select id="evolution-parent-select"></select></label>
@@ -1099,6 +1445,20 @@ input:focus-visible{
     <button class="surface-nav-btn" data-surface="geo" onclick="switchSurface('geo')">Geo Lens</button>
     <button class="surface-nav-btn" data-surface="ops" onclick="switchSurface('ops')">Ops</button>
   </nav>
+
+  <div class="surface-context-bar" id="surface-context-bar" aria-live="polite">
+    <div class="surface-context-main">
+      <div class="surface-context-kicker" id="surface-context-kicker">Workspace</div>
+      <div class="surface-context-title" id="surface-context-title">Home</div>
+      <div class="surface-context-copy" id="surface-context-copy">Hover metrics, rows, chips, and buttons for context. Keyboard shortcuts stay active per surface.</div>
+    </div>
+    <div class="surface-context-actions">
+      <span class="shortcut-chip"><kbd>J</kbd><kbd>K</kbd> move</span>
+      <span class="shortcut-chip"><kbd>Space</kbd> peek</span>
+      <span class="shortcut-chip"><kbd>E</kbd> explain</span>
+      <span class="shortcut-chip"><kbd>?</kbd> help</span>
+    </div>
+  </div>
 
   <!-- Trust Strip: 18px persistent status bar (scan in peripheral vision) -->
   <div class="lattice-trust-strip" id="lattice-trust-strip" role="status" aria-label="System trust status">
@@ -1150,10 +1510,34 @@ input:focus-visible{
     <span><kbd>G</kbd><kbd>H</kbd> home / <kbd>G</kbd><kbd>I</kbd> inbox / <kbd>G</kbd><kbd>O</kbd> ops</span><span class="hk-sep">·</span>
     <span><kbd>/</kbd> filter</span><span class="hk-sep">·</span>
     <span><kbd>?</kbd> help</span><span class="hk-sep">·</span>
+    <span><kbd>Ctrl</kbd><kbd>K</kbd> search</span><span class="hk-sep">·</span>
     <span><kbd>Esc</kbd> clear</span>
   </div>
 
-  <section class="decision-cockpit" aria-label="Alert proof action cockpit">
+  <section class="home-orientation" id="home-orientation" aria-label="New user orientation">
+    <div class="orientation-hero">
+      <div class="orientation-kicker">First read</div>
+      <div class="orientation-title">Start with the decision path, not the whole dashboard.</div>
+      <div class="orientation-copy">Use this order: scan validated signals, inspect the evidence drawer, then drill into a surface only when the signal is worth more attention.</div>
+    </div>
+    <button class="orientation-step" type="button" onclick="document.getElementById('decision-cockpit')?.scrollIntoView({block:'start',behavior:'smooth'})" data-lattice-tip="Primary starting point. These cards are the highest-priority validated signals.">
+      <span class="orientation-num">1</span>
+      <span class="orientation-label">Scan signals</span>
+      <span class="orientation-hint">Validated E2 items and market regime context.</span>
+    </button>
+    <button class="orientation-step" type="button" onclick="openEvidenceDrawerFromSelected()" data-lattice-tip="Open the evidence drawer for the currently selected signal or inbox item.">
+      <span class="orientation-num">2</span>
+      <span class="orientation-label">Read evidence</span>
+      <span class="orientation-hint">Metrics, citations, freshness, and action context in one panel.</span>
+    </button>
+    <button class="orientation-step" type="button" onclick="openCommandPalette('investigate')" data-lattice-tip="Use command search when you know the intent but not the surface.">
+      <span class="orientation-num">3</span>
+      <span class="orientation-label">Drill down</span>
+      <span class="orientation-hint">Search surfaces, filters, periods, and theme actions.</span>
+    </button>
+  </section>
+
+  <section class="decision-cockpit" id="decision-cockpit" aria-label="Alert proof action cockpit">
     <div class="regime-strip">
       <div class="regime-strip-title">Regime Strip</div>
       <div class="kpi-strip" id="kpi-strip">
@@ -1169,7 +1553,7 @@ input:focus-visible{
     </div>
     <details class="kpi-detail-drawer">
       <summary>How to read this strip</summary>
-      <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX, composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals. E2 means matched-control uplift with t &gt; 1.96.</div>
+      <div class="desc-text" data-i18n="kpi-desc">Market snapshot: VIX, composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of quality-gated validated signals. Promoted E2 means matched-control uplift with t >= 2 and enough controls.</div>
     </details>
     <div class="cockpit-grid">
       <div class="cockpit-panel action-signal-panel">
@@ -1180,7 +1564,7 @@ input:focus-visible{
       </div>
       <div class="cockpit-panel selected-proof-panel" id="selected-proof-card">
         <div class="cockpit-title-row">
-          <div class="cockpit-kicker">Selected Proof</div>
+          <div class="cockpit-kicker">Selected Review Item</div>
           <span class="badge">evidence chain</span>
         </div>
         <div class="proof-title">Select an actionable signal or inbox item.</div>
@@ -1199,10 +1583,10 @@ input:focus-visible{
     <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Review <strong>Actionable Signals</strong> above for the highest-priority E2 items.</div><div class="step-item"><span class="step-index">2</span>Process pending work in <strong>Decision Inbox</strong> to accept, reject, or triage items.</div><div class="step-item"><span class="step-index">3</span>Drill into a theme via <strong>Investigate</strong> for evidence, citations, and related entities.</div></div></div>
   </div>
 
-  <section class="section-block" id="hot-events-section">
+  <section class="section-block ux-section-primary" id="hot-events-section">
     <div class="section-heading">
       <div><div class="section-kicker">Scan Row</div><div class="section-title">Hot Events <span class="badge" id="hot-events-badge">loading</span></div></div>
-      <div class="section-meta">Log-style row view ranked by evidence grade, t-stat, and Hawkes temperature. Hover a row for the evidence chain.</div>
+      <div class="section-meta">Quality-gated row view: promoted evidence first, then live Hawkes surges. Low-control or low-relevance raw grades are not promoted. Hover a row for the evidence chain.</div>
     </div>
     <div id="hot-events-rows" class="evidence-rows">
       <div class="evidence-rows-header">
@@ -1220,7 +1604,7 @@ input:focus-visible{
   </section>
 
   <!-- GOLD STRIP: highest-utility evidence-chain snapshots pinned above the fold -->
-  <section class="section-block" id="gold-strip-section">
+  <section class="section-block ux-section-secondary" id="gold-strip-section">
     <div class="section-heading">
       <div><div class="section-kicker">Evidence Chain</div><div class="section-title">Geo · Transmission · Investment</div></div>
       <div class="section-meta">Country pressure, regime transmission, and validated investment ideas — the three sections with the highest signal-to-noise ratio.</div>
@@ -1242,7 +1626,7 @@ input:focus-visible{
   </section>
 
   <!-- STRUCTURAL ALERTS: pin wide (was cramped in 3-col grid previously) -->
-  <section class="section-block tint-warm" id="structural-alerts-section">
+  <section class="section-block ux-section-primary tint-warm" id="structural-alerts-section">
     <div class="section-heading">
       <div><div class="section-kicker">Now Acting</div><div class="section-title">Structural Alerts <span class="badge" id="structural-alerts-badge">Weekly</span></div></div>
       <div class="section-meta">Narrative alerts with concrete ticker exposures.</div>
@@ -1251,7 +1635,7 @@ input:focus-visible{
   </section>
 
   <!-- RECENT TRANSITIONS: extracted from Trend Pyramid as standalone quick-scan card -->
-  <section class="section-block secondary-block tint-profit" id="recent-transitions-section">
+  <section class="section-block ux-section-tertiary secondary-block tint-profit" id="recent-transitions-section">
     <div class="section-heading">
       <div><div class="section-kicker">Lifecycle</div><div class="section-title">Recent Theme Transitions <span class="badge" id="recent-transitions-badge">—</span></div></div>
       <div class="section-meta">Themes that moved stage (nascent → emerging → growing → mainstream) in the latest pyramid refresh.</div>
@@ -1259,7 +1643,7 @@ input:focus-visible{
     <div id="recent-transitions-standalone" class="loading" data-skeleton="list">waiting for pyramid refresh</div>
   </section>
 
-  <section class="section-block" id="workspace-section">
+  <section class="section-block ux-section-secondary" id="workspace-section">
     <div class="section-heading">
       <div><div class="section-kicker">Workspace</div><div class="section-title">My Themes And Theme Brief</div></div>
       <div class="section-meta">The product should revolve around themes you follow, not generic feeds.</div>
@@ -1452,7 +1836,7 @@ input:focus-visible{
     <div class="grid2">
       <div class="card">
         <div class="card-title">Evidence Grade Distribution <span class="badge" id="evidence-badge">--</span></div>
-        <div class="desc-text" data-i18n="evidence-desc">Classifies all event-asset pairs by statistical strength. E0 = noise (no excess return vs market). E1 = positive alpha. E2 = statistically significant uplift vs matched control days (t &gt; 1.96). More E2 = more genuine signals.</div>
+      <div class="desc-text" data-i18n="evidence-desc">Classifies event-asset pairs after quality gates. E0 = noise. E1 = positive alpha. Promoted E2 = statistically significant uplift with enough matched controls and no low-relevance block.</div>
         <div id="evidence-chart"></div>
       </div>
       <div class="card">
@@ -1514,6 +1898,19 @@ input:focus-visible{
         <span><span class="lk" style="background:rgba(34,197,94,.18)"></span>risk-on</span>
         <span><span class="lk" style="background:#fbbf24"></span>VIX line</span>
         <span style="margin-left:auto;color:var(--text-muted)">Click a dot for peek · J/K also navigates</span>
+      </div>
+    </div>
+
+    <div class="card tint-cold" style="margin-bottom:12px">
+      <div class="card-title" style="justify-content:space-between">
+        <span>Current Regime Brief <span class="badge" id="current-regime-badge">deterministic</span></span>
+        <div class="regime-brief-actions">
+          <button class="btn" onclick="refreshCurrentRegimeBrief(false)">Refresh</button>
+          <button class="btn regime-brief-generate-btn" onclick="refreshCurrentRegimeBrief(true)">Synthesize via Codex</button>
+        </div>
+      </div>
+      <div id="current-regime-brief-body">
+        <div class="meta-line" style="padding:8px">loading current regime brief...</div>
       </div>
     </div>
 
@@ -1637,7 +2034,24 @@ input:focus-visible{
 </div>
 
 <script>
-const API='http://localhost:46200/api';
+const SIGNAL_API_PORT='46200';
+function normalizeApiBase(raw){
+  const value=String(raw||'').trim();
+  if(!value)return'';
+  return value.replace(/\/+$/,'').replace(/\/api$/,'/api');
+}
+function resolveSignalApiBase(){
+  const params=new URLSearchParams(window.location.search||'');
+  const explicit=normalizeApiBase(params.get('api')||localStorage.getItem('lattice:signal-api-base'));
+  if(explicit)return explicit;
+  if(window.location.protocol==='file:')return`http://localhost:${SIGNAL_API_PORT}/api`;
+  const host=window.location.hostname||'localhost';
+  const origin=window.location.origin;
+  if(window.location.port===SIGNAL_API_PORT)return`${origin}/api`;
+  if(host==='localhost'||host==='127.0.0.1')return`http://${host}:${SIGNAL_API_PORT}/api`;
+  return`${origin}/api`;
+}
+const API=resolveSignalApiBase();
 const PERIODS={
   week:{label:'Weekly',shortLabel:'Week',lens:'Use this when you want acceleration, novelty, and fast changes in attention breadth.'},
   month:{label:'Monthly',shortLabel:'Month',lens:'Use this when you want confirmation, category breadth, and persistent follow-through.'},
@@ -1703,19 +2117,36 @@ function getUsableClientCache(key){
   if(Date.now()-ts>clientCacheMaxAgeMs(key))return null;
   return cached;
 }
-function postEmbedMessage(type,payload={}){if(!EMBED_MODE||window.parent===window)return;try{window.parent.postMessage({source:'theme-workspace',type,payload},window.location.origin);}catch{}}
+function getPostMessageTargetOrigin(){return window.location.protocol==='file:'?'*':window.location.origin;}
+function postEmbedMessage(type,payload={}){if(!EMBED_MODE||window.parent===window)return;try{window.parent.postMessage({source:'theme-workspace',type,payload},getPostMessageTargetOrigin());}catch{}}
 function getLensContext(){return{theme:state.currentTheme||null,period:getCurrentPeriod(),evolutionParent:state.evolutionParent||null,followedThemes:state.myThemes.slice(0,20)};}
 function getMapLensFrame(){return document.getElementById('theme-map-lens');}
 function getGeoLensFrame(){return document.getElementById('geo-lens-frame');}
 let homeMapLensObserver=null;
+function isFileDashboard(){return window.location.protocol==='file:';}
+function resolveDashboardAssetSrc(src){
+  const value=String(src||'').trim();
+  if(!value||value==='about:blank'||/^(https?:|data:|blob:)/i.test(value))return value;
+  if(isFileDashboard()){
+    const base=API.replace(/\/api\/?$/,'');
+    return `${base}${value.startsWith('/')?'':'/'}${value}`;
+  }
+  return value;
+}
+function setMapLensFileFallback(frame){
+  if(!(frame instanceof HTMLIFrameElement))return;
+  frame.setAttribute('src','about:blank');
+  frame.srcdoc='<!doctype html><html><head><style>html,body{margin:0;height:100%;background:#081018;color:#dbeafe;font-family:Segoe UI,system-ui,sans-serif}body{display:grid;place-items:center}.box{max-width:560px;padding:24px;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:rgba(255,255,255,.04);line-height:1.55}.k{color:#c5ff6d;text-transform:uppercase;letter-spacing:.14em;font-size:11px;margin-bottom:8px}.m{color:#9cb0c3;font-size:13px;margin-top:8px}</style></head><body><div class="box"><div class="k">Map lens paused in file mode</div><strong>The signal dashboard data is loaded, but the embedded map module needs an HTTP app shell.</strong><div class="m">This fallback prevents file:// module CORS errors. Open the dashboard through the dev/static server to enable the interactive map lens.</div></div></body></html>';
+}
 function getHomeMapLensLiveSrc(frame){
   const liveSrc=frame.dataset.liveSrc||'/event-map-lens.html?embed=1';
   frame.dataset.liveSrc=liveSrc;
-  return liveSrc;
+  return resolveDashboardAssetSrc(liveSrc);
 }
 function loadHomeMapLens(){
   const frame=getMapLensFrame();
   if(!(frame instanceof HTMLIFrameElement))return;
+  if(isFileDashboard()){setMapLensFileFallback(frame);return;}
   const liveSrc=getHomeMapLensLiveSrc(frame);
   if(frame.getAttribute('src')===liveSrc)return;
   frame.addEventListener('load',()=>{pushMapLensContext();syncEmbeddedMapVisibility(currentSurface);},{once:true});
@@ -1758,8 +2189,14 @@ function ensureHomeMapLens(activeSurface){
 function ensureGeoLensFrame(activeSurface){
   const frame=getGeoLensFrame();
   if(!(frame instanceof HTMLIFrameElement))return;
-  const liveSrc=frame.dataset.liveSrc||frame.getAttribute('src')||'event-map-lens.html';
-  frame.dataset.liveSrc=liveSrc;
+  if(isFileDashboard()){
+    if(activeSurface==='geo')setMapLensFileFallback(frame);
+    else{frame.removeAttribute('srcdoc');frame.setAttribute('src','about:blank');}
+    return;
+  }
+  const rawSrc=frame.dataset.liveSrc||frame.getAttribute('src')||'event-map-lens.html';
+  frame.dataset.liveSrc=rawSrc;
+  const liveSrc=resolveDashboardAssetSrc(rawSrc);
   if(activeSurface==='geo'){
     if(frame.getAttribute('src')!==liveSrc){
       frame.setAttribute('src',liveSrc);
@@ -1775,7 +2212,7 @@ function postMapFrameVisibility(frameId,paused){
   if(frame instanceof HTMLIFrameElement&&frame.getAttribute('src')==='about:blank')return;
   if(!frame||!frame.contentWindow)return;
   try{
-    frame.contentWindow.postMessage({source:'theme-workspace',type:'wm-map-lens-visibility',payload:{paused:Boolean(paused)}},window.location.origin);
+    frame.contentWindow.postMessage({source:'theme-workspace',type:'wm-map-lens-visibility',payload:{paused:Boolean(paused)}},getPostMessageTargetOrigin());
   }catch{}
 }
 function syncEmbeddedMapVisibility(activeSurface){
@@ -1791,7 +2228,7 @@ function pushMapLensContext(){
   const frame=getMapLensFrame();
   if(!frame||!frame.contentWindow)return;
   try{
-    frame.contentWindow.postMessage({source:'theme-workspace',type:'wm-map-lens-context',payload:getLensContext()},window.location.origin);
+    frame.contentWindow.postMessage({source:'theme-workspace',type:'wm-map-lens-context',payload:getLensContext()},getPostMessageTargetOrigin());
   }catch{}
 }
 function emitEmbeddedContext(){postEmbedMessage('wm-theme-workspace-context',getLensContext());pushMapLensContext();}
@@ -1835,6 +2272,7 @@ async function applyEmbeddedContext(payload){
 }
 function updateShareUrl(){try{const url=new URL(window.location.href);if(state.currentTheme)url.searchParams.set('theme',state.currentTheme);else url.searchParams.delete('theme');url.searchParams.set('period',getCurrentPeriod());history.replaceState(null,'',url.toString());}catch{}emitEmbeddedContext();}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function decodeHtmlEntities(value){const el=document.createElement('textarea');el.innerHTML=String(value??'');return el.value;}
 function asArray(value){return Array.isArray(value)?value:value==null?[]:[value];}
 function normalizeTheme(value){return String(value||'').trim().toLowerCase();}
 function normalizeThemeList(values){return Array.from(new Set(asArray(values).map((value)=>normalizeTheme(value)).filter((value)=>value&&value!=='unknown')));}
@@ -1889,7 +2327,7 @@ function proofChip(level, extra = '') {
   const title = {
     e0: 'E0: Noise ??no excess return vs matched controls',
     e1: 'E1: Positive alpha but not statistically significant',
-    e2: 'E2: Statistically significant uplift (t-stat > 1.96)',
+    e2: 'E2: Quality-gated significant uplift (t-stat >= 2, enough controls)',
     e3: 'E3: Out-of-sample replication confirmed',
     e4: 'E4: Mechanism graph path verified',
   }[norm] || '';
@@ -2037,9 +2475,36 @@ function renderEntityCards(relatedEntities){
   const entities=asArray(relatedEntities?.entities);
   const pathways=asArray(relatedEntities?.pathways);
   if(!entities.length){
-    return pathways.map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.relationType||'pathway')}</strong><div class="meta-line">${escapeHtml(item.note||'Pending connector')}</div></div>`).join('')||'<div class="theme-empty">Entity and exposure mapping will appear once connector-backed entities are available.</div>';
+    return pathways.map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.relationType||'pathway')}</strong><div class="meta-line">${escapeHtml(item.note||'Pending connector')}</div></div>`).join('')||'<div class="compact-status"><span class="compact-status-dot"></span><span>Entity and exposure mapping will appear once connector-backed entities are available.</span></div>';
   }
-  const entityHtml=entities.slice(0,6).map((item)=>{
+  const visibleEntities=entities.slice(0,6);
+  const centerLabel=humanizeTheme(state.currentTheme||relatedEntities?.theme||'Selected Theme');
+  const avgConfidence=visibleEntities.reduce((sum,item)=>sum+(Number(item.confidence)||0),0)/Math.max(1,visibleEntities.length);
+  const totalFilings=visibleEntities.reduce((sum,item)=>sum+(Number(item.filingCount)||0),0);
+  const networkHtml=`
+    <div class="entity-network">
+      <div class="entity-network-center">
+        <div class="entity-network-label">Theme node</div>
+        <div class="entity-network-title">${escapeHtml(centerLabel)}</div>
+        <div class="entity-network-meta">${fmtWhole(visibleEntities.length)} linked entities | avg confidence ${fmt(avgConfidence,2)} | ${fmtWhole(totalFilings)} filings</div>
+      </div>
+      <div class="entity-network-spokes">
+        ${visibleEntities.map((item)=>{
+          const title=item.companyName||item.entityKey||item.ticker||'Entity';
+          const relation=item.relationType||'related';
+          const confidence=Number(item.confidence);
+          const confidenceSafe=Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):0.5;
+          const filings=item.filingCount!=null?fmtWhole(item.filingCount):'--';
+          const subline=[item.ticker&&item.ticker!==title?item.ticker:'',item.sectorHint||'',item.horizon||''].filter(Boolean).join(' | ');
+          return `<div class="entity-node" style="--confidence-pct:${Math.round(confidenceSafe*100)}%">
+            <div class="entity-node-head"><div><div class="entity-node-name">${escapeHtml(title)}</div>${subline?`<div class="entity-node-sub">${escapeHtml(subline)}</div>`:''}</div><span class="tag tag-neutral">${escapeHtml(relation)}</span></div>
+            <div class="entity-node-sub">confidence ${Number.isFinite(confidence)?fmt(confidence,2):'--'} | filings ${escapeHtml(filings)} | latest ${escapeHtml(fmtDate(item.latestFiledAt||item.updatedAt))}</div>
+            <div class="entity-edge-meter"><span></span></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  const entityHtml=visibleEntities.map((item)=>{
     const title=item.companyName||item.entityKey||item.ticker||'Entity';
     const relation=item.relationType||'related';
     const confidence=item.confidence!=null?fmt(item.confidence,2):'--';
@@ -2049,26 +2514,61 @@ function renderEntityCards(relatedEntities){
     return `<div class="brief-item"><div class="entity-card-head"><div><div class="entity-name">${escapeHtml(title)}</div>${subline?`<div class="meta-line" style="margin-top:4px">${escapeHtml(subline)}</div>`:''}</div><span class="tag tag-neutral">${escapeHtml(relation)}</span></div><div class="delta-kpi-row"><div class="brief-stat"><div class="brief-stat-label">Confidence</div><div class="brief-stat-value">${escapeHtml(confidence)}</div></div><div class="brief-stat"><div class="brief-stat-label">Filings</div><div class="brief-stat-value">${escapeHtml(filings)}</div></div><div class="brief-stat"><div class="brief-stat-label">Latest</div><div class="brief-stat-value">${escapeHtml(fmtDate(item.latestFiledAt||item.updatedAt))}</div></div></div><div class="meta-line">${escapeHtml(source)}${item.evidenceNote?` | ${item.evidenceNote}`:''}</div>${item.recentForms?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.recentForms,'tag-neutral',5)}</div>`:''}</div>`;
   }).join('');
   const pathwayHtml=pathways.length?`<div class="section-note">Pathways: ${pathways.slice(0,3).map((item)=>escapeHtml(item.note||item.relationType||'pathway')).join(' | ')}</div>`:'';
-  return `<div class="brief-entity-grid">${entityHtml}</div>${pathwayHtml}`;
+  return `${networkHtml}<details class="surface-drawer" style="margin-top:10px"><summary>Entity table details</summary><div class="brief-entity-grid" style="padding:12px">${entityHtml}</div></details>${pathwayHtml}`;
 }
 function renderAdjacentPathways(adjacentPathways){
   const items=asArray(adjacentPathways?.items||adjacentPathways);
   if(!items.length){
-    return '<div class="theme-empty">No adjacent pathways are available for this theme yet.</div>';
+    return '<div class="compact-status"><span class="compact-status-dot"></span><span>No adjacent pathways are available for this theme yet.</span></div>';
   }
-  return `<div class="brief-list">${items.slice(0,6).map((item)=>{
+  return `<div class="pathway-map">${items.slice(0,6).map((item)=>{
     const label=item?.label||item?.pathwayLabel||item?.themeLabel||item?.theme||'Adjacent pathway';
     const relationType=item?.relationType||item?.pathwayType||'adjacent';
     const transmissionOrder=item?.transmissionOrder?humanizeTheme(String(item.transmissionOrder).replace(/_/g,'-')):'--';
     const transmissionPath=Array.isArray(item?.transmissionPath)?item.transmissionPath.filter(Boolean).join(' ??'):String(item?.transmissionPath||item?.pathway||'').trim();
+    const pathParts=Array.isArray(item?.transmissionPath)?item.transmissionPath.filter(Boolean):String(item?.transmissionPath||item?.pathway||'').split(/>|→|->|=>/).map((part)=>part.trim()).filter(Boolean);
     const confidence=item?.confidence!=null?fmt(item.confidence,2):'--';
     const reason=item?.shortThesis||item?.thesis||item?.reason||item?.summary||item?.detail||'';
     const topSymbols=[
       ...asArray(item?.topSymbols).map((entry)=>typeof entry==='string'?entry:(entry?.symbol||entry?.ticker||entry?.label||'')),
       ...asArray(item?.assets).map((entry)=>typeof entry==='string'?entry:(entry?.symbol||entry?.ticker||entry?.label||'')),
     ].filter(Boolean).slice(0,6);
-    return `<div class="brief-item"><div class="entity-card-head"><div><div class="entity-name">${escapeHtml(label)}</div>${transmissionPath?`<div class="meta-line" style="margin-top:4px">${escapeHtml(transmissionPath)}</div>`:''}</div><span class="tag tag-neutral">${escapeHtml(relationType)}</span></div><div class="delta-kpi-row"><div class="brief-stat"><div class="brief-stat-label">Order</div><div class="brief-stat-value">${escapeHtml(transmissionOrder)}</div></div><div class="brief-stat"><div class="brief-stat-label">Confidence</div><div class="brief-stat-value">${escapeHtml(confidence)}</div></div></div>${reason?`<div class="brief-item-copy">${escapeHtml(reason)}</div>`:''}${topSymbols.length?`<div class="pill-row" style="margin-top:8px">${renderTags(topSymbols,'tag-neutral',6)}</div>`:''}</div>`;
+    const flow=pathParts.length?pathParts.map((part,index)=>`${index?'<span class="arrow">→</span>':''}<span>${escapeHtml(humanizeTheme(part))}</span>`).join(''):(transmissionPath?`<span>${escapeHtml(transmissionPath)}</span>`:'');
+    return `<div class="pathway-route"><div class="pathway-route-head"><div><div class="entity-name">${escapeHtml(label)}</div><div class="meta-line" style="margin-top:4px">Order ${escapeHtml(transmissionOrder)} | confidence ${escapeHtml(confidence)}</div></div><span class="tag tag-neutral">${escapeHtml(relationType)}</span></div>${flow?`<div class="pathway-flow">${flow}</div>`:''}${reason?`<div class="brief-item-copy" style="margin-top:8px">${escapeHtml(reason)}</div>`:''}${topSymbols.length?`<div class="pill-row" style="margin-top:8px">${renderTags(topSymbols,'tag-neutral',6)}</div>`:''}</div>`;
   }).join('')}</div>`;
+}
+function classifyWatchAction(text){
+  const first=String(text||'').trim().split(/\s+/)[0]?.toLowerCase()||'watch';
+  if(['monitor','check','track','watch','validate','compare','review'].includes(first))return first;
+  return 'watch';
+}
+function renderWatchNextChecklist(watchpoints){
+  const items=asArray(watchpoints);
+  if(!items.length)return '<div class="compact-status"><span class="compact-status-dot"></span><span>No watchpoints available yet.</span></div>';
+  return `<div class="watch-checklist">${items.slice(0,6).map((item)=>{
+    const text=readWatchpointText(item);
+    const action=classifyWatchAction(text);
+    const thresholds=Array.from(new Set(String(text).match(/[-+]?\d+(?:\.\d+)?%?|E\d|t\s*[>=]\s*\d+(?:\.\d+)?/gi)||[])).slice(0,4);
+    return `<div class="watch-task"><span class="watch-task-num"></span><div><span class="watch-task-action">${escapeHtml(action)}</span><div class="watch-task-copy">${escapeHtml(text)}</div>${thresholds.length?`<div class="watch-task-thresholds">${thresholds.map((value)=>`<span class="watch-threshold">${escapeHtml(value)}</span>`).join('')}</div>`:''}</div><span class="tag tag-neutral">next</span></div>`;
+  }).join('')}</div>`;
+}
+function renderRiskWatchouts(risks){
+  const items=asArray(risks);
+  if(!items.length)return '<div class="compact-status ok"><span class="compact-status-dot"></span><span>No explicit risks were generated for this theme.</span></div>';
+  return `<div class="risk-strip">${items.slice(0,5).map((item)=>`<div class="risk-item"><span class="risk-mark">!</span><div class="brief-item-copy">${escapeHtml(readRiskText(item))}</div></div>`).join('')}</div>`;
+}
+function renderNotebookHooks(notebookHooks={}){
+  const notebookTags=[...(notebookHooks.savedTags||[])];
+  const suggestedTags=(notebookHooks.suggestedTags||[]).filter((tag)=>!notebookTags.includes(tag));
+  const status=notebookHooks.pinned?'pinned':'workspace';
+  const noteState=notebookHooks.updatedAt?`Updated ${escapeHtml(fmtDateTime(notebookHooks.updatedAt))}`:'No saved note yet';
+  return `<details class="brief-section notebook-drawer">
+    <summary>
+      <div><div class="notebook-summary-title">Notebook Hooks</div><div class="notebook-summary-copy">${noteState}. Open only when you need analyst memo, tags, share, or export.</div></div>
+      <span class="badge">${status}</span>
+    </summary>
+    <div class="notebook-body"><div class="brief-list"><div class="brief-item"><strong>Saved note</strong><textarea id="theme-brief-note-input" class="note-textarea" placeholder="Add an analyst memo, thesis checkpoint, or follow-up question for this theme.">${escapeHtml(notebookHooks.noteMarkdown||'')}</textarea><div class="meta-line" style="margin-top:6px">${notebookHooks.updatedAt?`Updated ${escapeHtml(fmtDateTime(notebookHooks.updatedAt))}`:'No saved note yet.'}${notebookHooks.sharedAt?` | Shared ${escapeHtml(fmtDateTime(notebookHooks.sharedAt))}`:''}${notebookHooks.lastExportedAt?` | Exported ${escapeHtml(fmtDateTime(notebookHooks.lastExportedAt))}`:''}</div></div><div class="brief-item"><strong>Tags</strong><input id="theme-brief-tags-input" class="note-input" value="${escapeHtml(notebookTags.join(', '))}" placeholder="theme, catalyst, follow-up" /><div class="pill-row" style="margin-top:8px">${renderTags(notebookTags,'tag-growing',8)||''}${renderTags(suggestedTags,'tag-neutral',8)||'<span class="theme-empty">No tags</span>'}</div></div><div class="brief-item"><strong>Prompt seed</strong><div class="meta-line">${escapeHtml(notebookHooks.promptSeed||'No prompt seed available.')}</div><label class="meta-line" style="display:flex;align-items:center;gap:8px;margin-top:10px"><input id="theme-brief-pin-input" type="checkbox"${notebookHooks.pinned?' checked':''}/> Pin this theme in notebook workflows</label><div class="theme-actions" style="margin-top:10px"><button class="btn" onclick="saveThemeNotebook()">Save note</button><button class="btn" onclick="shareThemeNotebook()">Share link</button><button class="btn" onclick="unshareThemeNotebook()">Unshare</button><button class="btn" onclick="exportThemeBrief('markdown')">Export MD</button><button class="btn" onclick="exportThemeBrief('json')">Export JSON</button></div>${notebookHooks.shareUrl?`<div class="meta-line" style="margin-top:8px">Share URL: <a href="${escapeHtml(`${API.replace(/\/api$/,'')}${notebookHooks.shareUrl}`)}" target="_blank" rel="noreferrer">${escapeHtml(notebookHooks.shareUrl)}</a></div>`:''}${notebookHooks.exportCount?`<div class="meta-line" style="margin-top:6px">Exports ${escapeHtml(fmtWhole(notebookHooks.exportCount))}</div>`:''}</div></div></div>
+  </details>`;
 }
 function getSuggestedThemes(){
   const ordered=[];
@@ -2289,6 +2789,92 @@ function setPeriod(period){
   renderTabs();
   renderHorizonSummary();
   refreshTrendSurfaces();
+}
+let commandPaletteIndex = 0;
+function getCommandItems(){
+  const items = [
+    {id:'surface-home',kind:'surface',title:'Home',desc:'Return to the main signal scan and decision path.',shortcut:'G H',run:()=>switchSurface('home')},
+    {id:'surface-inbox',kind:'surface',title:'Decision Inbox',desc:'Review proposals, approvals, discovery triage, and E2 signals.',shortcut:'G I',run:()=>switchSurface('inbox')},
+    {id:'surface-investigate',kind:'surface',title:'Investigate',desc:'Open trend briefs, theme evolution, AI lab, and scenario tools.',shortcut:'G V',run:()=>switchSurface('investigate')},
+    {id:'surface-geo',kind:'surface',title:'Geo Lens',desc:'Open map-based event and regional pressure context.',shortcut:'G M',run:()=>switchSurface('geo')},
+    {id:'surface-ops',kind:'surface',title:'Ops',desc:'Check data freshness, runtime issues, budgets, and source health.',shortcut:'G O',run:()=>switchSurface('ops')},
+    {id:'action-evidence',kind:'action',title:'Open evidence drawer',desc:'Show metrics, citations, freshness, and action context for the selected item.',shortcut:'E',run:()=>openEvidenceDrawerFromSelected()},
+    {id:'action-regime-brief',kind:'action',title:'Refresh current regime brief',desc:'Load the deterministic current-regime report in Investigate.',shortcut:'',run:()=>{ switchSurface('investigate'); refreshCurrentRegimeBrief(false); }},
+    {id:'action-refresh',kind:'action',title:'Refresh dashboard data',desc:'Reload the current dashboard payloads without changing filters.',shortcut:'',run:()=>refreshAll()},
+  ];
+  Object.entries(PERIODS).forEach(([value, meta]) => {
+    items.push({id:`period-${value}`,kind:'period',title:`${meta.label} lens`,desc:meta.lens,shortcut:value===state.period?'active':'',run:()=>setPeriod(value)});
+  });
+  EVOLUTION_PARENTS.forEach((parent) => {
+    items.push({id:`lens-${parent.value}`,kind:'lens',title:`Evolution lens: ${parent.label}`,desc:'Changes Theme Evolution, Horizon Focus, and map context.',shortcut:parent.value===state.evolutionParent?'active':'',run:()=>{
+      state.evolutionParent = parent.value;
+      lsSet('evolution-parent', parent.value);
+      renderEvolutionSelect();
+      renderHorizonSummary();
+      refreshTrendSurfaces();
+    }});
+  });
+  if(state.currentTheme){
+    items.push({id:'theme-open-brief',kind:'theme',title:`Open brief: ${humanizeTheme(state.currentTheme)}`,desc:'Jump to the current Theme Brief card and refresh its evidence context.',shortcut:'',run:()=>openThemeBrief(state.currentTheme)});
+  }
+  return items;
+}
+function commandMatches(item, query){
+  const q = String(query||'').trim().toLowerCase();
+  if(!q)return true;
+  return [item.kind,item.title,item.desc,item.shortcut].some((part)=>String(part||'').toLowerCase().includes(q));
+}
+function renderCommandPalette(){
+  const input = document.getElementById('command-search');
+  const results = document.getElementById('command-results');
+  if(!input || !results)return;
+  const filtered = getCommandItems().filter((item)=>commandMatches(item,input.value)).slice(0, 24);
+  commandPaletteIndex = Math.max(0, Math.min(commandPaletteIndex, Math.max(0, filtered.length - 1)));
+  if(!filtered.length){
+    results.innerHTML = '<div class="meta-line" style="padding:18px;text-align:center">No matching command.</div>';
+    return;
+  }
+  results.innerHTML = filtered.map((item, idx)=>`
+    <button class="command-item${idx===commandPaletteIndex?' active':''}" type="button" data-command-id="${escapeHtml(item.id)}" onclick="executeCommand('${escapeHtml(item.id)}')">
+      <span class="command-kind">${escapeHtml(item.kind)}</span>
+      <span><span class="command-title">${escapeHtml(item.title)}</span><span class="command-desc">${escapeHtml(item.desc)}</span></span>
+      <span class="command-shortcut">${escapeHtml(item.shortcut||'')}</span>
+    </button>`).join('');
+}
+function openCommandPalette(seed=''){
+  const modal = document.getElementById('command-palette');
+  const backdrop = document.getElementById('command-backdrop');
+  const input = document.getElementById('command-search');
+  if(!modal || !backdrop || !input)return;
+  backdrop.classList.add('active');
+  modal.classList.add('active');
+  input.value = seed || '';
+  commandPaletteIndex = 0;
+  renderCommandPalette();
+  setTimeout(()=>input.focus(), 0);
+}
+function closeCommandPalette(){
+  document.getElementById('command-palette')?.classList.remove('active');
+  document.getElementById('command-backdrop')?.classList.remove('active');
+}
+function executeCommand(id){
+  const item = getCommandItems().find((entry)=>entry.id===id);
+  if(!item)return;
+  closeCommandPalette();
+  try{ item.run(); }catch(err){ console.warn('command failed', err); }
+}
+function installCommandPalette(){
+  if(window.__commandPaletteInstalled)return;
+  window.__commandPaletteInstalled = true;
+  const input = document.getElementById('command-search');
+  input?.addEventListener('input',()=>{ commandPaletteIndex = 0; renderCommandPalette(); });
+  input?.addEventListener('keydown',(ev)=>{
+    const filtered = getCommandItems().filter((item)=>commandMatches(item,input.value)).slice(0, 24);
+    if(ev.key==='ArrowDown'){ commandPaletteIndex = Math.min(filtered.length - 1, commandPaletteIndex + 1); renderCommandPalette(); ev.preventDefault(); }
+    if(ev.key==='ArrowUp'){ commandPaletteIndex = Math.max(0, commandPaletteIndex - 1); renderCommandPalette(); ev.preventDefault(); }
+    if(ev.key==='Enter' && filtered[commandPaletteIndex]){ executeCommand(filtered[commandPaletteIndex].id); ev.preventDefault(); }
+    if(ev.key==='Escape'){ closeCommandPalette(); ev.preventDefault(); }
+  });
 }
 async function f(url,cacheKey){
   try{
@@ -2521,12 +3107,289 @@ async function refreshTrendSurfaces(){
   await loadThemeBrief();
   await loadFollowedThemeBriefing();
 }
-// ?????? Surface Routing (P3) ????????????????????????????????????????????????????????????????????????????????????????????
+// ?????? Surface Routing (P3) ???????????????????????????????????????????????????????????????????????????????????????????? 
 let currentSurface = 'home';
 const VALID_SURFACES = ['home', 'inbox', 'investigate', 'geo', 'ops'];
+const SURFACE_CONTEXT = {
+  home: {
+    kicker: 'Signal workbench',
+    title: 'Home',
+    copy: 'Top-level cockpit, hot events, and pinned evidence-chain snapshots stay visible here.'
+  },
+  inbox: {
+    kicker: 'Review queue',
+    title: 'Decision Inbox',
+    copy: 'Use J/K to move, Space to peek, E for explanation, and the action buttons to simulate or review.'
+  },
+  investigate: {
+    kicker: 'Evidence drilldown',
+    title: 'Investigate',
+    copy: 'Theme briefs, trend stages, event engine panels, and AI analysis tools are grouped for deeper research.'
+  },
+  geo: {
+    kicker: 'Spatial lens',
+    title: 'Geo Lens',
+    copy: 'Use map filters and theme context to inspect country pressure, routes, and regional concentration.'
+  },
+  ops: {
+    kicker: 'Runtime control',
+    title: 'Ops',
+    copy: 'Automation budget, data freshness, runtime issues, and source health are reviewed from this surface.'
+  }
+};
+function updateSurfaceContext(name){
+  const ctx = SURFACE_CONTEXT[name] || SURFACE_CONTEXT.home;
+  const kicker = document.getElementById('surface-context-kicker');
+  const title = document.getElementById('surface-context-title');
+  const copy = document.getElementById('surface-context-copy');
+  if(kicker) kicker.textContent = ctx.kicker;
+  if(title) title.textContent = ctx.title;
+  if(copy) copy.textContent = ctx.copy;
+}
+function scrollToActiveSurface(name){
+  window.requestAnimationFrame(() => {
+    if(name === 'home'){
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const target = document.querySelector(`.surface[data-surface="${name}"]`);
+    if(!target) return;
+    const nav = document.getElementById('surface-nav');
+    const offset = (nav?.offsetHeight || 0) + 18;
+    const y = Math.max(0, window.scrollY + target.getBoundingClientRect().top - offset);
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  });
+}
+function dashboardLang(){return (window.__latticeCurrentLang || localStorage.getItem('lattice-lang') || 'en')==='ko'?'ko':'en';}
+function t(en,ko){return dashboardLang()==='ko'?(ko||en):en;}
+function readSmallText(root,selector,limit=180){
+  const value = root?.querySelector?.(selector)?.textContent || '';
+  return truncate(value.replace(/\s+/g,' ').trim(), limit);
+}
+function describeBriefMetric(label,value,summary={}){
+  const normalized = String(label||'').toLowerCase();
+  const diagnostics = summary?.diagnostics || {};
+  if(normalized.includes('lifecycle') || normalized.includes('단계')){
+    return t(
+      `Lifecycle stage classifies this theme from article volume and growth. Current value: ${value||'n/a'}.`,
+      `라이프사이클 단계는 기사량과 증가율로 테마의 성숙도를 분류합니다. 현재 값: ${value||'n/a'}.`,
+    );
+  }
+  if(normalized.includes('yoy') || normalized.includes('전년')){
+    const baseline = diagnostics.yearAgoComparableCount ?? diagnostics.yearAgoCount;
+    const suffix = Number.isFinite(Number(baseline))
+      ? t(` Year-ago comparable count: ${fmtWhole(baseline)}.`, ` 전년 동기 비교 기준: ${fmtWhole(baseline)}건.`)
+      : '';
+    return t(
+      `Year-over-year change versus the same period last year. Very high values usually mean the prior baseline was tiny, so treat this as a direction cue rather than effect size.${suffix}`,
+      `전년 동기 대비 변화율입니다. 값이 과도하게 크면 작년 기준값이 매우 작았다는 뜻일 수 있어, 효과 크기보다 방향 신호로 해석해야 합니다.${suffix}`,
+    );
+  }
+  if(normalized.includes('acceleration') || normalized.includes('가속')){
+    const prev = diagnostics.previousComparableCount ?? diagnostics.previousCount;
+    const suffix = Number.isFinite(Number(prev))
+      ? t(` Previous comparable count: ${fmtWhole(prev)}.`, ` 직전 비교 기준: ${fmtWhole(prev)}건.`)
+      : '';
+    return t(
+      `Acceleration compares recent growth against the previous window. It is volatile when the previous window was zero or near zero.${suffix}`,
+      `가속도는 최근 증가율이 직전 구간보다 얼마나 빨라졌는지 봅니다. 직전 구간이 0 또는 소수면 크게 튈 수 있습니다.${suffix}`,
+    );
+  }
+  if(normalized.includes('source diversity') || normalized.includes('소스')){
+    const raw = diagnostics.sourceDiversityRaw;
+    const suffix = Number.isFinite(Number(raw))
+      ? t(` Raw source signal: ${fmt(raw,2)}.`, ` 원시 소스 지표: ${fmt(raw,2)}.`)
+      : '';
+    return t(
+      `Source diversity measures how spread out the article supply is across sources. It does not prove that each article is relevant or high quality.${suffix}`,
+      `소스 다양성은 기사 공급이 여러 출처에 얼마나 분산됐는지 보는 지표입니다. 각 기사의 관련성이나 품질을 보장하지는 않습니다.${suffix}`,
+    );
+  }
+  return t(
+    `Theme summary metric. Value: ${value||'--'}. Hovered values are diagnostics, not an automated decision.`,
+    `테마 요약 지표입니다. 값: ${value||'--'}. 이 값은 자동 판단이 아니라 진단 보조값입니다.`,
+  );
+}
+function buildThemeSummaryDiagnostics(summary,meta={}){
+  if(!summary)return[];
+  const diagnostics = summary.diagnostics || {};
+  const rows = [];
+  const yoy = normalizePercent(summary.vsYearAgoPct);
+  const acceleration = normalizePercent(summary.acceleration);
+  const yearAgo = Number(diagnostics.yearAgoComparableCount ?? diagnostics.yearAgoCount);
+  const previous = Number(diagnostics.previousComparableCount ?? diagnostics.previousCount);
+  if(Number.isFinite(yoy) && Math.abs(yoy) >= 1000){
+    const baseline = Number.isFinite(yearAgo) ? fmtWhole(yearAgo) : t('very small','매우 작음');
+    rows.push({
+      level:'watch',
+      title:t('Base-effect warning','기준값 왜곡 경고'),
+      body:t(
+        `YoY is ${fmtPercent(yoy,0)} because the year-ago baseline is ${baseline}. Read this as "activity appeared from a tiny base", not as a clean quality jump of the same size.`,
+        `YoY가 ${fmtPercent(yoy,0)}로 보이는 이유는 전년 동기 기준이 ${baseline}이기 때문입니다. 품질이 같은 배율로 좋아졌다는 뜻이 아니라, 작은 기준값에서 활동량이 크게 늘었다는 신호로 봐야 합니다.`,
+      ),
+    });
+  }
+  if(Number.isFinite(acceleration) && Math.abs(acceleration) >= 150){
+    const baseline = Number.isFinite(previous) ? fmtWhole(previous) : t('near zero','0에 가까움');
+    rows.push({
+      level:'watch',
+      title:t('Acceleration volatility','가속도 변동성'),
+      body:t(
+        `Acceleration is ${fmtPercent(acceleration,0)} and the previous comparison base is ${baseline}. This is useful for triage, but too unstable to read as a precise trend strength.`,
+        `가속도가 ${fmtPercent(acceleration,0)}이고 직전 비교 기준은 ${baseline}입니다. 우선순위 판단에는 유용하지만 정밀한 추세 강도로 읽기에는 불안정합니다.`,
+      ),
+    });
+  }
+  const diversity = Number(summary.sourceDiversity);
+  if(Number.isFinite(diversity) && diversity >= 0.75){
+    rows.push({
+      level:'info',
+      title:t('Diversity is not quality','다양성은 품질 지표가 아님'),
+      body:t(
+        `Source diversity ${fmt(diversity,2)} means articles are distributed across many sources. It does not filter weak classifiers or duplicate shipping-market noise by itself.`,
+        `소스 다양성 ${fmt(diversity,2)}는 기사가 여러 출처에 분산됐다는 뜻입니다. 약한 분류기나 중복된 해운/시장 노이즈를 자동으로 제거했다는 뜻은 아닙니다.`,
+      ),
+    });
+  }
+  if(meta?.source || diagnostics.aggregateSource){
+    rows.push({
+      level:'info',
+      title:t('Provenance','출처/계산 경로'),
+      body:t(
+        `These values come from ${meta?.source || diagnostics.aggregateSource}. They are aggregate diagnostics for the current dashboard period, not hand-reviewed claims.`,
+        `이 값들은 ${meta?.source || diagnostics.aggregateSource}에서 온 현재 대시보드 기간의 집계 진단값입니다. 사람이 검토한 확정 주장으로 보면 안 됩니다.`,
+      ),
+    });
+  }
+  return rows;
+}
+function renderThemeSummaryStats(summary,meta={}){
+  if(!summary)return'';
+  const diagnostics = buildThemeSummaryDiagnostics(summary, meta);
+  const metricRows = [
+    {key:'lifecycle', label:t('Lifecycle','단계'), value:summary.lifecycleStage||'n/a', className:'metric-info'},
+    {key:'yoy', label:t('YoY','전년 대비'), value:fmtPercent(summary.vsYearAgoPct,0), className:Math.abs(normalizePercent(summary.vsYearAgoPct)||0)>=1000?'metric-watch':'metric-info'},
+    {key:'acceleration', label:t('Acceleration','가속도'), value:fmtPercent(summary.acceleration,0), className:Math.abs(normalizePercent(summary.acceleration)||0)>=150?'metric-watch':'metric-info'},
+    {key:'diversity', label:t('Source Diversity','소스 다양성'), value:fmt(summary.sourceDiversity,2), className:'metric-info'},
+  ];
+  return `<div class="brief-stats" style="margin-top:10px">${metricRows.map((metric)=>`<div class="brief-stat ${metric.className}" data-metric-key="${metric.key}" data-lattice-tip="${escapeHtml(describeBriefMetric(metric.label,metric.value,summary))}"><div class="brief-stat-label">${escapeHtml(metric.label)}</div><div class="brief-stat-value">${escapeHtml(metric.value)}</div></div>`).join('')}</div>${diagnostics.length?`<div class="metric-caveat-panel">${diagnostics.map((row)=>`<div class="metric-caveat-row ${row.level==='info'?'info':''}" data-lattice-tip="${escapeHtml(row.body)}"><span class="metric-caveat-mark">${row.level==='info'?'i':'!'}</span><div><strong>${escapeHtml(row.title)}</strong><div>${escapeHtml(row.body)}</div></div></div>`).join('')}</div>`:''}`;
+}
+function describeOperatorTooltip(el){
+  if(!el) return null;
+  if(el.closest('.evidence-row[data-chain]')) return null;
+  const explicit = el.getAttribute('data-lattice-tip') || el.getAttribute('data-native-title') || el.getAttribute('title');
+  if(explicit) return { title: t('Context','맥락'), body: explicit, meta: t('Hover tooltip | click behavior preserved','커서 설명 | 클릭 동작 유지') };
+  if(el.classList.contains('brief-stat')){
+    const label = readSmallText(el,'.brief-stat-label',60);
+    const value = readSmallText(el,'.brief-stat-value',80);
+    return { title: label || t('Brief metric','브리프 지표'), body: describeBriefMetric(label,value,{}), meta: t('Metric caveat available','지표 해석 주의') };
+  }
+  if(el.classList.contains('metric-caveat-row')) return { title: t('Metric caveat','지표 주의사항'), body: readSmallText(el,'div',240), meta: t('Explains abnormal-looking values','비정상적으로 큰 값의 해석') };
+  if(el.classList.contains('kpi-chip')) return { title: t('Market context','시장 맥락'), body: t('Live regime metric used as context for signal review. Values update through the KPI summary endpoint.','신호 검토에 쓰는 실시간 시장 레짐 지표입니다. KPI 요약 API를 통해 갱신됩니다.'), meta: t('Hover for details | no navigation','설명만 표시 | 이동 없음') };
+  if(el.classList.contains('tstrip-chunk')) return { title: t('Trust status','신뢰 상태'), body: t('Operational health signal. Click opens Ops with freshness, source, nowcast, and meta-model diagnostics.','운영 상태 신호입니다. 클릭하면 Ops에서 신선도, 출처, 나우캐스트, 메타 모델 진단을 봅니다.'), meta: t('Click: Ops','클릭: Ops') };
+  if(el.classList.contains('since-item')) return { title: t('Since last look','마지막 확인 이후 변화'), body: t('Delta from your local baseline. Reset updates the comparison point to the current dashboard state.','로컬 기준선 대비 변화입니다. reset을 누르면 현재 상태가 새 비교 기준이 됩니다.'), meta: t('Local browser baseline','브라우저 로컬 기준') };
+  if(el.classList.contains('ts-seg')) return { title: t('Theme spectrum','테마 스펙트럼'), body: t('Theme article pressure and lifecycle direction. Click opens the theme brief without losing the dashboard context.','테마별 기사 압력과 라이프사이클 방향입니다. 클릭하면 현재 맥락을 유지한 채 테마 브리프를 엽니다.'), meta: t('Click: theme brief','클릭: 테마 브리프') };
+  if(el.classList.contains('signal-card')) return { title: t('Actionable signal','실행 검토 신호'), body: t('Validated signal card. Click selects the card and populates the review item panel with proof metrics and citations.','검증된 신호 카드입니다. 클릭하면 검토 패널에 근거 지표와 인용을 채웁니다.'), meta: t('Click: select proof','클릭: 근거 선택') };
+  if(el.classList.contains('inbox-item')) return { title: t('Inbox item','인박스 항목'), body: t('Unified review row. Select it to preview payload, run simulation, accept, snooze, reject, or triage.','통합 검토 행입니다. 선택하면 페이로드 미리보기, 시뮬레이션, 승인, 보류, 거부, 분류를 할 수 있습니다.'), meta: 'J/K | Space' };
+  if(el.classList.contains('interactive-row')) return { title: t('Interactive row','상호작용 행'), body: t('Click drills into the underlying theme, entity, proposal, or evidence item while keeping this surface active.','클릭하면 현재 화면을 유지하면서 관련 테마, 엔티티, 제안, 근거 항목으로 드릴다운합니다.'), meta: t('Click: drilldown','클릭: 드릴다운') };
+  if(el.classList.contains('theme-chip')) return { title: t('Theme filter','테마 필터'), body: t('Selects the active theme and refreshes connected briefs, maps, and trend panels.','활성 테마를 선택하고 연결된 브리프, 지도, 추세 패널을 갱신합니다.'), meta: t('Click: filter theme','클릭: 테마 필터') };
+  if(el.classList.contains('regime-brief-generate-btn')) return { title: t('Synthesize regime brief','레짐 브리프 합성'), body: t('Calls Codex only as a narrative layer. If Codex fails, the deterministic DB-backed brief remains visible.','Codex를 서술 레이어로만 호출합니다. 실패해도 DB 기반 deterministic 브리프는 계속 표시됩니다.'), meta: t('Read-only synthesis','읽기 전용 합성') };
+  if(el.classList.contains('digest-generate-btn')) return { title: t('Generate digest','다이제스트 생성'), body: t('Starts the Codex-assisted weekly digest generation path. Use when the current briefing needs a fresh synthesis.','Codex 보조 주간 다이제스트 생성 경로를 시작합니다. 현재 브리핑에 새 종합이 필요할 때 사용합니다.'), meta: t('May call backend automation','백엔드 자동화 호출 가능') };
+  if(el.classList.contains('inbox-btn') || el.classList.contains('btn')) return { title: t('Action button','작업 버튼'), body: t('Runs the labeled dashboard action. Mutating backend actions remain routed through guardrails where configured.','표시된 대시보드 작업을 실행합니다. 백엔드 변경 작업은 설정된 안전장치를 거칩니다.'), meta: t('Keyboard shortcuts remain active','키보드 단축키 유지') };
+  if(el.classList.contains('surface-nav-btn')) return { title: t('Workspace surface','작업 화면'), body: t('Switches to a focused work surface. Non-home surfaces use a compact header so the active body is visible immediately.','집중 작업 화면으로 전환합니다. 홈이 아닌 화면은 본문이 바로 보이도록 압축 헤더를 사용합니다.'), meta: t('G chords also work','G 단축키 지원') };
+  if(el.classList.contains('card')) return { title: readSmallText(el,'.card-title',80) || t('Dashboard card','대시보드 카드'), body: readSmallText(el,'.desc-text',220) || t('Grouped dashboard module. Hover child controls for more specific actions.','관련 정보를 묶은 대시보드 모듈입니다. 내부 컨트롤에 커서를 올리면 더 구체적인 설명이 나옵니다.'), meta: t('Information block','정보 블록') };
+  if(el.classList.contains('section-block')) return { title: readSmallText(el,'.section-title,.card-title,h2,h3',90) || t('Dashboard section','대시보드 섹션'), body: readSmallText(el,'.section-subtitle,.desc-text,.meta-line',240) || t('Major workbench region. It groups related signal evidence, diagnostics, or operator actions for the active surface.','현재 화면의 신호 근거, 진단, 운영 작업을 묶은 주요 작업 영역입니다.'), meta: t('Surface module','화면 모듈') };
+  if(el.classList.contains('brief-section')) return { title: readSmallText(el,'.brief-section-title',80) || t('Brief section','브리프 섹션'), body: t('Theme dossier section. It separates claims, evidence, entities, risks, and watchpoints so review work is auditable.','테마 도시에 섹션입니다. 주장, 근거, 엔티티, 리스크, 관찰 포인트를 분리해 검토 과정을 추적 가능하게 합니다.'), meta: t('Theme brief','테마 브리프') };
+  if(el.classList.contains('brief-item')) return { title: readSmallText(el,'strong',90) || t('Evidence item','근거 항목'), body: readSmallText(el,'.brief-item-copy,.story-summary,.meta-line',220) || t('Evidence or claim row. Open links or citations when available to inspect the source.','근거 또는 주장 행입니다. 링크나 인용이 있으면 원문을 확인할 수 있습니다.'), meta: t('Review row','검토 행') };
+  if(el.classList.contains('stage-item')) return { title: t('Lifecycle stage','라이프사이클 단계'), body: t('Trend pyramid bucket. It groups themes by maturity so emerging, growing, mature, and fading signals are not mixed together.','추세 피라미드 단계입니다. 신생, 성장, 성숙, 약화 신호를 섞지 않도록 테마를 성숙도별로 묶습니다.'), meta: t('Trend pyramid','추세 피라미드') };
+  if(el.classList.contains('category-card') || el.classList.contains('story-card')) return { title: readSmallText(el,'.card-title,strong,.story-title',90) || t('Ranked item','순위 항목'), body: t('Ranked trend item. The displayed score is a triage cue; inspect evidence before treating it as a decision input.','순위가 매겨진 추세 항목입니다. 점수는 우선순위 신호이며, 의사결정 입력으로 쓰기 전 근거를 확인해야 합니다.'), meta: t('Click if interactive','상호작용 가능 시 클릭') };
+  if(el.classList.contains('snapshot-row')) return { title: readSmallText(el,'strong',90) || t('Diagnostic finding','진단 항목'), body: readSmallText(el,'.meta-line',220) || t('Operational or data-quality finding. Use it to decide whether a source, cache, or runtime issue needs attention.','운영 또는 데이터 품질 진단입니다. 소스, 캐시, 런타임 이슈 조치 여부를 판단할 때 씁니다.'), meta: t('Ops diagnostic','운영 진단') };
+  if(el.classList.contains('probe-sample-item')) return { title: t('Sample article','샘플 기사'), body: t('Representative sample from a source probe or AI analysis pass. It helps verify whether a proposed source is relevant before promotion.','소스 프로브 또는 AI 분석에서 뽑은 대표 샘플입니다. 소스를 승격하기 전 관련성을 확인하는 데 씁니다.'), meta: t('Source quality sample','소스 품질 샘플') };
+  if(el.classList.contains('runtime-issue-row')) return { title: t('Runtime issue','런타임 이슈'), body: t('Live operational issue row. Review severity, affected component, and latest observation before acting.','실시간 운영 이슈 행입니다. 조치 전 심각도, 영향 컴포넌트, 최신 관측값을 확인합니다.'), meta: t('Ops surface','Ops 화면') };
+  if(el.classList.contains('trust-chip')) return { title: t('Trust chip','신뢰 칩'), body: t('Freshness, provenance, and evidence-density indicator for the surrounding block.','주변 블록의 신선도, 출처, 근거 밀도를 나타냅니다.'), meta: t('Data quality context','데이터 품질 맥락') };
+  if(el.classList.contains('badge')) return { title: t('Status badge','상태 배지'), body: t('Compact status, count, or lens label for the adjacent module.','인접 모듈의 상태, 개수, 분석 렌즈를 압축 표시합니다.'), meta: t('Read with adjacent label','주변 라벨과 함께 해석') };
+  if(el.id === 'evolution-parent-select' || el.closest?.('.select-label')?.textContent?.toLowerCase?.().includes('evolution lens')){
+    return {
+      title: t('Evolution lens','진화 렌즈'),
+      body: t(
+        'Changes the parent theme used by the Theme Evolution panel. It refreshes the sub-theme share chart/table, updates Horizon Focus, and passes the parent context to the map lens. It does not change the currently selected Theme Brief until you click a sub-theme.',
+        'Theme Evolution 패널에서 볼 상위 테마군을 바꿉니다. 하위 테마 점유율 차트/테이블, Horizon Focus, 지도 렌즈의 상위 테마 맥락이 갱신됩니다. 단, 하위 테마를 직접 클릭하기 전까지 현재 선택된 Theme Brief는 바뀌지 않습니다.',
+      ),
+      meta: t('Affects evolution view, not every dashboard panel','진화 뷰 중심 변경, 전체 패널 필터 아님'),
+    };
+  }
+  if(el.matches('select')) return { title: t('Selector','선택 컨트롤'), body: t('Changes the active lens, period, or filter for this surface.','이 화면의 활성 렌즈, 기간, 필터를 바꿉니다.'), meta: t('Change refreshes connected data','변경 시 연결 데이터 갱신') };
+  if(el.classList.contains('select-label')) return { title: t('Control label','컨트롤 라벨'), body: t('Labels the adjacent dropdown or filter so the current analytical lens is explicit.','인접 드롭다운 또는 필터가 어떤 분석 렌즈인지 알려줍니다.'), meta: t('Form context','폼 맥락') };
+  if(el.classList.contains('surface-drawer')) return { title: t('Expandable drawer','확장 패널'), body: t('Opens secondary diagnostics without crowding the primary decision surface.','주요 판단 화면을 복잡하게 만들지 않고 보조 진단을 펼칩니다.'), meta: t('Click summary to toggle','요약 줄 클릭으로 열기/닫기') };
+  return null;
+}
+function installOperatorTooltips(){
+  if(window.__operatorTooltipsInstalled) return;
+  window.__operatorTooltipsInstalled = true;
+  const tooltip = document.createElement('div');
+  tooltip.className = 'operator-tooltip';
+  tooltip.setAttribute('role','tooltip');
+  tooltip.innerHTML = '<div class="operator-tooltip-title"></div><div class="operator-tooltip-body"></div><div class="operator-tooltip-meta"></div>';
+  document.body.appendChild(tooltip);
+  const titleEl = tooltip.querySelector('.operator-tooltip-title');
+  const bodyEl = tooltip.querySelector('.operator-tooltip-body');
+  const metaEl = tooltip.querySelector('.operator-tooltip-meta');
+  const selector = '[data-lattice-tip],[title],.kpi-chip,.tstrip-chunk,.since-item,.ts-seg,.signal-card,.inbox-item,.interactive-row[onclick],.theme-chip,.inbox-btn,.surface-nav-btn,.brief-stat,.metric-caveat-row,.card,.section-block,.brief-section,.brief-item,.stage-item,.category-card,.story-card,.snapshot-row,.probe-sample-item,.runtime-issue-row,.trust-chip,.badge,select,.select-label,.surface-drawer,.btn,.digest-generate-btn';
+  let activeTarget = null;
+  const hide = () => {
+    activeTarget = null;
+    tooltip.classList.remove('show');
+  };
+  const move = (x,y) => {
+    const margin = 16;
+    const rect = tooltip.getBoundingClientRect();
+    let left = x + 14;
+    let top = y + 14;
+    if(left + rect.width + margin > window.innerWidth) left = Math.max(margin, x - rect.width - 14);
+    if(top + rect.height + margin > window.innerHeight) top = Math.max(margin, y - rect.height - 14);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  };
+  const showFor = (target,x,y) => {
+    const tip = describeOperatorTooltip(target);
+    if(!tip){ hide(); return; }
+    if(target.hasAttribute('title')){
+      target.setAttribute('data-native-title', target.getAttribute('title') || '');
+      target.removeAttribute('title');
+    }
+    activeTarget = target;
+    titleEl.textContent = tip.title || 'Context';
+    bodyEl.textContent = tip.body || '';
+    metaEl.textContent = tip.meta || '';
+    tooltip.classList.add('show');
+    move(x,y);
+  };
+  document.addEventListener('pointerover', (ev) => {
+    const target = ev.target?.closest?.(selector);
+    if(!target || target === activeTarget) return;
+    showFor(target, ev.clientX, ev.clientY);
+  });
+  document.addEventListener('pointermove', (ev) => {
+    if(activeTarget) move(ev.clientX, ev.clientY);
+  });
+  document.addEventListener('pointerout', (ev) => {
+    if(!activeTarget) return;
+    if(ev.relatedTarget && activeTarget.contains(ev.relatedTarget)) return;
+    hide();
+  });
+  document.addEventListener('focusin', (ev) => {
+    const target = ev.target?.closest?.(selector);
+    if(!target) return;
+    const rect = target.getBoundingClientRect();
+    showFor(target, rect.left + Math.min(rect.width, 220), rect.bottom);
+  });
+  document.addEventListener('focusout', hide);
+}
 function applySurfaceSwitch(name){
   syncEmbeddedMapVisibility(name);
   currentSurface = name;
+  document.body.dataset.surface = name;
+  updateSurfaceContext(name);
   document.querySelectorAll('.surface').forEach(el => {
     el.classList.toggle('active', el.dataset.surface === name);
   });
@@ -2544,14 +3407,14 @@ function applySurfaceSwitch(name){
     // Propagate theme filter to geo lens iframe
     try {
       const frame = document.getElementById('geo-lens-frame');
-      if (frame && state.currentTheme) {
+      if (frame && state.currentTheme && !isFileDashboard()) {
         const url = new URL(frame.src, window.location.origin);
         url.searchParams.set('theme', state.currentTheme);
         if (frame.src !== url.toString()) frame.src = url.toString();
       }
     } catch {}
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  scrollToActiveSurface(name);
 }
 function switchSurface(name) {
   if (!VALID_SURFACES.includes(name)) return;
@@ -2577,6 +3440,10 @@ window.addEventListener('popstate', (ev) => {
   if (VALID_SURFACES.includes(name) && name !== currentSurface) switchSurface(name);
 });
 window.addEventListener('DOMContentLoaded', () => {
+  document.body.dataset.surface = currentSurface;
+  updateSurfaceContext(currentSurface);
+  installCommandPalette();
+  installOperatorTooltips();
   installHomeMapLazyLoad();
   syncEmbeddedMapVisibility(currentSurface);
   const hash = String(window.location.hash || '').slice(1);
@@ -3046,14 +3913,15 @@ function renderInboxPreview(item) {
 function renderSelectedProofCard(item) {
   const el = document.getElementById('selected-proof-card');
   if (!el) return;
+  window.__selectedProofItem = item || null;
   if (!item) {
     el.innerHTML = `
       <div class="cockpit-title-row">
-        <div class="cockpit-kicker">Selected Proof</div>
+        <div class="cockpit-kicker">Selected Review Item</div>
         <span class="badge">evidence chain</span>
       </div>
-      <div class="proof-title">Select an actionable signal or inbox item.</div>
-      <div class="proof-meta">This panel summarizes direction, uplift, t-stat, controls, citations, and freshness without opening the full dossier.</div>`;
+      <div class="proof-title">Select an actionable signal, inbox item, or discovery review.</div>
+      <div class="proof-meta">This panel summarizes the current item without opening the full dossier. Signal metrics appear when the selected item has validated E2 evidence.</div>`;
     return;
   }
   const fresh = item.updatedAt ? classifyFreshness(item.updatedAt, 48) : null;
@@ -3102,14 +3970,102 @@ function renderSelectedProofCard(item) {
 
   el.innerHTML = `
     <div class="cockpit-title-row">
-      <div class="cockpit-kicker">Selected Proof</div>
+      <div class="cockpit-kicker">Selected Review Item</div>
       <span class="badge">${escapeHtml(item.proofLevel || item.type || 'review')}</span>
     </div>
     <div class="proof-title">${titleText}</div>
     <div class="proof-meta">${metaText}</div>
     ${body}
     ${citations ? `<div class="signal-citations" style="margin-top:10px">${citations}</div>` : ''}
-    ${actionsHint}`;
+    ${actionsHint}
+    <button class="inbox-btn proof-open-drawer" onclick="openEvidenceDrawerFromSelected()">Open evidence drawer</button>`;
+}
+function findEvidenceItemById(id){
+  const target = String(id || '');
+  const e2 = Array.isArray(window.__lastE2Items) ? window.__lastE2Items : [];
+  const inbox = Array.isArray(inboxItems) ? inboxItems : [];
+  return e2.find((item)=>String(item.id)===target) || inbox.find((item)=>String(item.id)===target) || null;
+}
+function openEvidenceDrawerById(id){
+  const item = findEvidenceItemById(id);
+  if(item) openEvidenceDrawer(item);
+}
+function openEvidenceDrawerFromSelected(){
+  const item = window.__selectedProofItem || findEvidenceItemById(inboxSelectedId) || (Array.isArray(window.__lastE2Items) ? window.__lastE2Items[0] : null);
+  openEvidenceDrawer(item || null);
+}
+function formatDrawerValue(value, fallback='--'){
+  if(value == null || value === '') return fallback;
+  if(typeof value === 'number') return Number.isFinite(value) ? String(Math.round(value * 100) / 100) : fallback;
+  return String(value);
+}
+function buildDrawerSources(item){
+  const sources = Array.isArray(item?.sources) ? item.sources.slice(0, 8) : [];
+  if(!sources.length) return '<div class="meta-line">No article-level citations are attached to this item. Use the Theme Brief for broader source context.</div>';
+  return sources.map((src, idx)=>{
+    const title = escapeHtml(src.title || src.name || `Source ${idx+1}`);
+    const source = escapeHtml(src.source || src.publisher || 'unknown');
+    const date = src.publishedAt || src.date ? escapeHtml(fmtDate(src.publishedAt || src.date)) : '--';
+    const url = src.url ? `<a href="${escapeHtml(src.url)}" target="_blank" rel="noreferrer">${title}</a>` : title;
+    return `<div class="drawer-source"><strong>[${idx+1}] ${url}</strong><div class="meta-line">${source} | ${date}</div></div>`;
+  }).join('');
+}
+function buildDrawerPayload(item){
+  const payload = item?.payload || item?.raw || null;
+  if(!payload) return '<div class="meta-line">No additional payload attached.</div>';
+  return `<pre class="payload-preview">${escapeHtml(truncate(JSON.stringify(payload, null, 2), 1200))}</pre>`;
+}
+function openEvidenceDrawer(item){
+  const drawer = document.getElementById('evidence-drawer');
+  const backdrop = document.getElementById('evidence-drawer-backdrop');
+  const titleEl = document.getElementById('evidence-drawer-title');
+  const bodyEl = document.getElementById('evidence-drawer-body');
+  if(!drawer || !backdrop || !titleEl || !bodyEl)return;
+  if(!item){
+    titleEl.textContent = 'No item selected';
+    bodyEl.innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Next step</div><div class="meta-line">Select an actionable signal or inbox item first. The drawer will then show metrics, citations, freshness, and action context.</div></div>';
+  }else{
+    const fresh = item.updatedAt ? classifyFreshness(item.updatedAt, 48) : null;
+    const uplift = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '--';
+    const tStat = item.tStat != null && Number.isFinite(Number(item.tStat)) ? Number(item.tStat).toFixed(2) : '--';
+    const alpha = Number.isFinite(item.abnormalReturn) ? `${item.abnormalReturn >= 0 ? '+' : ''}${Number(item.abnormalReturn).toFixed(2)}%` : '--';
+    titleEl.textContent = truncate(item.title || item.symbol || item.theme || 'Selected item', 120);
+    bodyEl.innerHTML = `
+      <div class="drawer-section">
+        <div class="drawer-section-title">Decision context</div>
+        <div class="meta-line">${escapeHtml(item.type || 'review')} | ${escapeHtml(item.theme || item.source || 'workspace')} ${fresh ? '| ' + escapeHtml(fresh.label) : ''}</div>
+        ${item.whyVisible ? `<div class="desc-text">${escapeHtml(item.whyVisible)}</div>` : ''}
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Signal metrics</div>
+        <div class="drawer-metrics">
+          <div class="drawer-metric"><span>Direction</span><strong>${escapeHtml((item.direction || '--').toString().toUpperCase())}</strong></div>
+          <div class="drawer-metric"><span>Uplift</span><strong>${escapeHtml(uplift)}</strong></div>
+          <div class="drawer-metric"><span>t-stat</span><strong>${escapeHtml(tStat)}</strong></div>
+          <div class="drawer-metric"><span>Controls</span><strong>${escapeHtml(formatDrawerValue(item.matchedControls))}</strong></div>
+          <div class="drawer-metric"><span>Alpha</span><strong>${escapeHtml(alpha)}</strong></div>
+          <div class="drawer-metric"><span>Proof</span><strong>${escapeHtml(item.proofLevel || '--')}</strong></div>
+        </div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Citations</div>
+        ${buildDrawerSources(item)}
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Raw context</div>
+        ${buildDrawerPayload(item)}
+      </div>
+      <div class="drawer-actions">
+        <button class="inbox-btn" onclick="switchSurface('inbox');closeEvidenceDrawer()">Open Inbox</button>
+        ${item.theme ? `<button class="inbox-btn" onclick="openThemeBrief('${escapeHtml(normalizeTheme(item.theme))}');closeEvidenceDrawer()">Open Theme Brief</button>` : ''}
+      </div>`;
+  }
+  backdrop.classList.add('active');
+  drawer.classList.add('active');
+}
+function closeEvidenceDrawer(){
+  document.getElementById('evidence-drawer')?.classList.remove('active');
+  document.getElementById('evidence-drawer-backdrop')?.classList.remove('active');
 }
 function buildInboxActions(item) {
   if (item.type === 'proposal') {
@@ -3806,6 +4762,28 @@ function renderAiTimeline(){
   }
 }
 
+function formatUpliftGradeForPeek(u){
+  const promoted = u && u.evidenceGrade ? String(u.evidenceGrade) : '';
+  const raw = u && u.rawEvidenceGrade ? String(u.rawEvidenceGrade) : '';
+  if (promoted) return promoted;
+  if (raw) return `${raw}?`;
+  return '—';
+}
+
+function formatUpliftGateForPeek(u){
+  if (!u || !u.rawEvidenceGrade || u.evidenceGrade) return '';
+  const flags = Array.isArray(u.qualityFlags) ? u.qualityFlags : [];
+  const reason = flags.length ? flags.join(', ') : 'quality gate blocked';
+  return ` · <span class="muted">blocked: ${escapeHtml(reason)}</span>`;
+}
+
+function renderUpliftPeekRow(u){
+  const t = u?.tStat == null ? '—' : Number(u.tStat).toFixed(2);
+  const uplift = u?.uplift == null ? '—' : `${Number(u.uplift).toFixed(2)}%`;
+  const controls = u?.nControls == null ? '—' : String(u.nControls);
+  return `<div class="peek-row"><span class="peek-key">${escapeHtml(u?.symbol || 'asset')} ${escapeHtml(u?.horizon || '')}</span><span class="chain-symbol">${escapeHtml(formatUpliftGradeForPeek(u))}</span> · T=${escapeHtml(t)} · controls ${escapeHtml(controls)} · uplift ${escapeHtml(uplift)}${formatUpliftGateForPeek(u)}</div>`;
+}
+
 // Fabricate a peek for an event id not in the local hot-events list
 async function openEventPeekById(eventId){
   const overlay = ensurePeekOverlay();
@@ -3822,7 +4800,7 @@ async function openEventPeekById(eventId){
       <div class="peek-row"><span class="peek-key">theme</span>${ev.theme || '—'}</div>
       <div class="peek-row"><span class="peek-key">date</span>${String(ev.eventDate||'').slice(0,10)}</div>
       <div class="peek-row"><span class="peek-key">articles</span>${ev.articleCount} · ${ev.sourceCount} sources</div>
-      ${(data.uplift||[]).slice(0,3).map(u => `<div class="peek-row"><span class="peek-key">${u.symbol} ${u.horizon}</span><span class="chain-symbol">${u.evidenceGrade || '—'}</span> · T=${u.tStat?.toFixed(2) || '—'} · uplift ${u.uplift==null?'—':u.uplift.toFixed(2)+'%'}</div>`).join('')}
+      ${(data.uplift||[]).slice(0,3).map(renderUpliftPeekRow).join('')}
       <div class="peek-row" style="margin-top:10px">
         <button class="btn" onclick="loadEventNarrative(${ev.id})" style="font-size:10px">Generate narrative (Codex)</button>
         <button class="btn" onclick="loadSimilarEvents(${ev.id})" style="font-size:10px;margin-left:6px">Find similar</button>
@@ -3896,6 +4874,136 @@ async function loadSimilarEvents(eventId){
     `;
   } catch(e){
     slot.innerHTML = `<div class="peek-similar"><div>error: ${escapeHtml(e.message||String(e))}</div></div>`;
+  }
+}
+
+function fmtRegimeBriefNumber(value, digits=1){
+  const n = Number(value);
+  if(!Number.isFinite(n)) return 'n/a';
+  return Math.abs(n) >= 1000 ? numCompact(n) : n.toFixed(digits);
+}
+function renderRegimeBriefList(items){
+  const list = Array.isArray(items) ? items.filter(Boolean).slice(0,4) : [];
+  if(!list.length) return `<li>${escapeHtml(t('No current item.', '현재 항목이 없습니다.'))}</li>`;
+  return list.map(item => `<li>${escapeHtml(String(item))}</li>`).join('');
+}
+let currentRegimeBriefCodexPending = false;
+let currentRegimeBriefManualToken = 0;
+function renderCurrentRegimeBrief(data){
+  const body = document.getElementById('current-regime-brief-body');
+  const badge = document.getElementById('current-regime-badge');
+  if(!body) return;
+  if(!data?.ok){
+    body.innerHTML = `<div class="meta-line" style="padding:8px;color:var(--c-loss)">${escapeHtml(data?.error || 'current regime brief unavailable')}</div>`;
+    if(badge) badge.textContent = 'unavailable';
+    return;
+  }
+  const regime = data.regime || {};
+  const ev = data.evidence || {};
+  const stats = ev.eventStats || {};
+  const syn = data.synthesis || {};
+  const inputs = regime.inputs || {};
+  const topEvents = Array.isArray(ev.topEvents) ? ev.topEvents.slice(0,4) : [];
+  const transitions = Array.isArray(ev.transitions) ? ev.transitions.slice(0,3) : [];
+  const predictions = Array.isArray(ev.topPredictions) ? ev.topPredictions.slice(0,3) : [];
+  const mode = data.mode || 'deterministic';
+  if(badge) badge.textContent = mode;
+
+  const evidenceRows = [
+    ...topEvents.map(e => ({
+      tag: e.evidenceGrade || 'E2',
+      main: `${e.theme || 'theme'} -> ${e.symbol || 'asset'} | ${String(e.title || '').slice(0,80)}`,
+      metric: e.tStat == null ? 't n/a' : `t ${Number(e.tStat).toFixed(1)}`,
+    })),
+    ...transitions.map(tr => ({
+      tag: 'stage',
+      main: `${tr.theme || 'theme'}: ${tr.from || '?'} -> ${tr.to || '?'}`,
+      metric: String(tr.periodEnd || '').slice(0,10),
+    })),
+    ...predictions.map(p => ({
+      tag: 'pair',
+      main: `${p.theme || 'theme'} -> ${p.symbol || 'asset'}`,
+      metric: p.avgReturn == null ? 'n/a' : `${Number(p.avgReturn) > 0 ? '+' : ''}${Number(p.avgReturn).toFixed(1)}%`,
+    })),
+  ].slice(0,8);
+
+  const codexNote = data.codex?.attempted
+    ? (data.codex.ok
+      ? t('Codex synthesis succeeded; deterministic evidence is still shown below.', 'Codex 합성이 성공했습니다. 아래 근거는 여전히 DB 계산값입니다.')
+      : t('Codex synthesis failed, so this brief is using the deterministic fallback.', 'Codex 합성이 실패해서 deterministic fallback 브리프로 표시합니다.'))
+    : t('Deterministic brief. Codex is only used when you click synthesis.', 'Deterministic 브리프입니다. Codex는 합성 버튼을 눌렀을 때만 사용됩니다.');
+
+  body.innerHTML = `
+    <div class="regime-brief-panel">
+      <div>
+        <div class="regime-brief-head">
+          <div>
+            <div class="regime-brief-title">${escapeHtml(syn.headline || `${regime.current || 'balanced'} regime brief`)}</div>
+            <div class="regime-brief-meta">${escapeHtml(t('Current macro/event read', '현재 매크로/이벤트 판독'))} | ${new Date(data.generatedAt || Date.now()).toLocaleString()}</div>
+          </div>
+          <span class="regime-brief-mode">${escapeHtml(mode)}</span>
+        </div>
+        <div class="regime-brief-kpis">
+          <div class="regime-brief-kpi"><div class="lbl">${escapeHtml(t('Regime', '레짐'))}</div><div class="val">${escapeHtml(regime.current || 'n/a')}</div></div>
+          <div class="regime-brief-kpi"><div class="lbl">VIX</div><div class="val">${fmtRegimeBriefNumber(inputs.vix,1)}</div></div>
+          <div class="regime-brief-kpi"><div class="lbl">${escapeHtml(t('7d events', '7일 이벤트'))}</div><div class="val">${fmtRegimeBriefNumber(stats.events7d,0)}</div></div>
+          <div class="regime-brief-kpi"><div class="lbl">${escapeHtml(t('Confidence', '신뢰도'))}</div><div class="val">${regime.confidence == null ? 'n/a' : Math.round(Number(regime.confidence)*100) + '%'}</div></div>
+        </div>
+        <div class="regime-brief-section">
+          <h4>${escapeHtml(t('Executive summary', '핵심 요약'))}</h4>
+          <ul class="regime-brief-list">${renderRegimeBriefList(syn.executiveSummary)}</ul>
+        </div>
+        <div class="regime-brief-section">
+          <h4>${escapeHtml(t('Watch next', '다음 확인 항목'))}</h4>
+          <ul class="regime-brief-list">${renderRegimeBriefList(syn.watchlist)}</ul>
+        </div>
+      </div>
+      <div>
+        <div class="regime-brief-section" style="margin-top:0">
+          <h4>${escapeHtml(t('Market implications', '시장 함의'))}</h4>
+          <ul class="regime-brief-list">${renderRegimeBriefList(syn.marketImplications)}</ul>
+        </div>
+        <div class="regime-brief-section">
+          <h4>${escapeHtml(t('Risks / opportunities', '리스크 / 기회'))}</h4>
+          <ul class="regime-brief-list">${renderRegimeBriefList([...(syn.risks||[]), ...(syn.opportunities||[])].slice(0,5))}</ul>
+        </div>
+        <div class="regime-brief-section">
+          <h4>${escapeHtml(t('Evidence path', '근거 경로'))}</h4>
+          <div class="regime-brief-evidence">
+            ${evidenceRows.length ? evidenceRows.map(row => `
+              <div class="regime-evidence-row" title="${escapeHtml(row.main)}">
+                <span class="tag">${escapeHtml(row.tag)}</span>
+                <span class="main">${escapeHtml(row.main)}</span>
+                <span class="metric">${escapeHtml(row.metric)}</span>
+              </div>
+            `).join('') : `<div class="meta-line">${escapeHtml(t('No high-grade evidence rows in this window.', '이 구간에 고등급 근거 행이 없습니다.'))}</div>`}
+          </div>
+          <div class="regime-brief-note">${escapeHtml(codexNote)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+async function refreshCurrentRegimeBrief(useCodex=false){
+  const body = document.getElementById('current-regime-brief-body');
+  const badge = document.getElementById('current-regime-badge');
+  if(!body) return;
+  if(!useCodex && currentRegimeBriefCodexPending) return;
+  const manualToken = useCodex ? ++currentRegimeBriefManualToken : 0;
+  if(useCodex) currentRegimeBriefCodexPending = true;
+  if(badge) badge.textContent = useCodex ? 'codex pending' : 'deterministic';
+  body.innerHTML = `<div class="meta-line" style="padding:10px">${escapeHtml(useCodex ? t('Synthesizing with Codex. Deterministic fallback remains available...', 'Codex로 합성 중입니다. 실패해도 deterministic fallback이 표시됩니다...') : t('Loading deterministic current-regime brief...', 'Deterministic 현재 레짐 브리프를 불러오는 중입니다...'))}</div>`;
+  try {
+    const res = await fetch(`${API}/current-regime-brief?codex=${useCodex ? '1' : '0'}${useCodex ? '&refresh=1' : ''}`);
+    const data = await res.json();
+    if(useCodex && manualToken !== currentRegimeBriefManualToken) return;
+    if(!useCodex && currentRegimeBriefCodexPending) return;
+    if(useCodex) currentRegimeBriefCodexPending = false;
+    renderCurrentRegimeBrief(data);
+  } catch(e){
+    if(useCodex) currentRegimeBriefCodexPending = false;
+    body.innerHTML = `<div class="meta-line" style="padding:8px;color:var(--c-loss)">fetch error: ${escapeHtml(e?.message || String(e))}</div>`;
+    if(badge) badge.textContent = 'error';
   }
 }
 
@@ -4090,7 +5198,7 @@ async function refreshWeeklyDigest(){
     if(eta) eta.textContent = `${Math.round(elapsed/1000)}s elapsed`;
   }, 500);
   try {
-    const res = await fetch(`${API}/weekly-digest`);
+    const res = await fetch(`${API}/weekly-digest?refresh=1`);
     clearInterval(tick);
     const data = await res.json();
     if(!data.ok){ body.innerHTML = `<div class="meta-line" style="color:var(--c-loss);padding:8px">error: ${escapeHtml(data.error||'failed')}</div>`; return; }
@@ -4299,9 +5407,7 @@ async function showPeekForFocused(){
     const data = await res.json();
     if(!data.ok){ overlay.innerHTML = `<div class="peek-head">EVENT PEEK</div><div>not found</div>`; return; }
     const ev = data.event;
-    const upl = (data.uplift || []).slice(0, 3).map(u =>
-      `<div class="peek-row"><span class="peek-key">${u.symbol} ${u.horizon}</span><span class="chain-symbol">${u.evidenceGrade || '—'}</span> · T=${u.tStat?.toFixed(2) || '—'} · uplift ${u.uplift==null?'—':u.uplift.toFixed(2)+'%'}</div>`
-    ).join('') || '<div class="peek-row chain-none">no uplift data</div>';
+    const upl = (data.uplift || []).slice(0, 3).map(renderUpliftPeekRow).join('') || '<div class="peek-row chain-none">no uplift data</div>';
     const arts = (data.articles || []).slice(0, 4).map(a =>
       `<div class="peek-row" style="color:var(--text-soft)">• [${a.sourceId||'?'}] ${(a.title||'').slice(0,80)}</div>`
     ).join('');
@@ -4340,6 +5446,7 @@ function showHelpOverlay(){
   const overlay = ensurePeekOverlay();
   overlay.innerHTML = `
     <div class="peek-head"><span>KEYBOARD HELP</span><span style="color:var(--text-muted);font-size:10px">? to close</span></div>
+    <div class="peek-row"><span class="peek-key">Ctrl / Cmd K</span>open command search for surfaces, filters, and actions</div>
     <div class="peek-row"><span class="peek-key">J / K</span>navigate rows (hot events, inbox)</div>
     <div class="peek-row"><span class="peek-key">Space</span>peek event detail (uplift, hawkes, articles)</div>
     <div class="peek-row"><span class="peek-key">E</span>explain focused event (same as Space)</div>
@@ -4354,7 +5461,25 @@ function showHelpOverlay(){
   `;
   overlay.classList.add('active');
 }
+function isHelpKey(e){
+  return e.key === '?' || (e.shiftKey && (e.key === '/' || e.code === 'Slash'));
+}
+function focusSurfaceFilter(){
+  const surface = getActiveSurface();
+  const target = surface === 'inbox'
+    ? document.querySelector('#inbox-filter-bar .inbox-filter-chip.active') || document.querySelector('#inbox-filter-bar .inbox-filter-chip')
+    : document.querySelector('#evolution-parent-select') || document.querySelector('#period-tabs .tab.active');
+  if(!target) return false;
+  target.focus({ preventScroll: false });
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  return true;
+}
 function globalKeyHandler(e){
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){
+    openCommandPalette();
+    e.preventDefault();
+    return;
+  }
   // Skip when typing in input/textarea
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
@@ -4378,7 +5503,8 @@ function globalKeyHandler(e){
   if(e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp'){ moveFocus(-1); e.preventDefault(); return; }
   if(e.key === 'e' || e.key === 'E'){ showPeekForFocusedAny(); e.preventDefault(); return; }
   if(e.key === ' '){ togglePeekAny(); e.preventDefault(); return; }
-  if(e.key === '?'){ showHelpOverlay(); e.preventDefault(); return; }
+  if(isHelpKey(e)){ showHelpOverlay(); e.preventDefault(); return; }
+  if(e.key === '/' && !e.shiftKey){ if(focusSurfaceFilter()) e.preventDefault(); return; }
   if(e.key === 'Escape'){
     // Esc cascades: (1) close peek/help overlay first if open,
     //               (2) else clear row focus. This lets the user press
@@ -4498,19 +5624,31 @@ async function refreshTrustStrip(){
 
 // --- Hot Events row view (evidence-graded scan layout) ------------------
 function buildEvidenceChainText(ev){
-  const grade=ev.bestEvidenceGrade||'none';
+  const promotedGrade=ev.bestEvidenceGrade||'none';
+  const rawGrade=ev.rawEvidenceGrade||null;
+  const qualityFlags=Array.isArray(ev.qualityFlags)?ev.qualityFlags:[];
+  const gate=ev.qualityGate||{};
   const lines=[];
   lines.push(`<div class="chain-head">Evidence chain</div>`);
   lines.push(`<div>event #${ev.id} · ${escapeHtml(ev.theme||'')} · ${String(ev.eventDate||'').slice(0,10)}</div>`);
   lines.push(`<div class="chain-step">${ev.articleCount||0} articles · ${ev.sourceCount||0} sources · temp ${ev.temperature==null?'n/a':Number(ev.temperature).toFixed(2)}${ev.isSurge?' 🔥 surge':''}</div>`);
   if(ev.upliftRows&&ev.upliftRows>0){
     const upl=ev.maxAbsUplift==null?'n/a':`${ev.maxAbsUplift.toFixed(2)}%`;
+    const rawUpl=ev.rawMaxAbsUplift==null?'n/a':`${Number(ev.rawMaxAbsUplift).toFixed(2)}%`;
     const t=ev.maxAbsTStat==null?'n/a':Number(ev.maxAbsTStat).toFixed(2);
+    const rawT=ev.rawMaxAbsTStat==null?'n/a':Number(ev.rawMaxAbsTStat).toFixed(2);
+    const controls=ev.minStrongControls==null?'n/a':`${ev.minStrongControls}/${gate.minControlsRequired||8}`;
     lines.push(`<div class="chain-step">${ev.upliftRows} uplift rows · max|uplift| ${upl} · max|t| ${t}</div>`);
-    lines.push(`<div class="chain-step">grade resolved: <strong>${grade}</strong> (rule: E2=alpha+independence; E3/E4 = doc-defined but absent in prod data)</div>`);
+    if(rawGrade && rawGrade!==promotedGrade){
+      lines.push(`<div class="chain-step">raw grade: <strong>${rawGrade}</strong> quarantined · raw max|uplift| ${rawUpl} · raw max|t| ${rawT}</div>`);
+      lines.push(`<div class="chain-step chain-none">promotion blocked: ${qualityFlags.length?qualityFlags.map(escapeHtml).join(', '):'quality gate'}</div>`);
+    } else {
+      lines.push(`<div class="chain-step">promoted grade: <strong>${promotedGrade}</strong> · max|uplift| ${upl} · max|t| ${t}</div>`);
+    }
+    lines.push(`<div class="chain-step">gate: promoted rows ${ev.promotedUpliftRows||0} · controls ${controls} · market relevance ${ev.marketRelevantArticles||0}/${ev.knownMarketRelevanceArticles||0}</div>`);
   } else {
     lines.push(`<div class="chain-step chain-none">no uplift rows yet — matched_controls may not have been built for this event</div>`);
-    lines.push(`<div class="chain-step">grade: ${grade}</div>`);
+    lines.push(`<div class="chain-step">grade: ${promotedGrade}</div>`);
   }
   lines.push(`<div style="margin-top:6px;color:var(--text-muted);font-size:10px">Press <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">Space</kbd> or <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">E</kbd> for full drill · <kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">J</kbd>/<kbd style="padding:0 3px;border:1px solid var(--border-dim);border-radius:2px;font-family:inherit">K</kbd> to move</div>`);
   return lines.join('');
@@ -4573,8 +5711,10 @@ async function refreshHotEventsRows(){
     row.addEventListener('mouseleave', () => {
       document.querySelectorAll('.evidence-row.theme-group').forEach(r => r.classList.remove('theme-group'));
     });
-    const gradeLabel=ev.bestEvidenceGrade||'—';
-    const title=escapeHtml(ev.title||'(untitled)');
+    const hasRawDemoted=ev.rawEvidenceGrade&&!ev.bestEvidenceGrade;
+    if(hasRawDemoted) row.classList.add('quality-warning');
+    const gradeLabel=ev.bestEvidenceGrade||(hasRawDemoted?`${ev.rawEvidenceGrade}?`:'—');
+    const title=escapeHtml(decodeHtmlEntities(ev.title||'(untitled)'));
     const theme=escapeHtml(ev.theme||'—');
     const t=ev.maxAbsTStat==null?'—':Number(ev.maxAbsTStat).toFixed(2);
     const uplift=ev.maxAbsUplift==null?'—':`${ev.maxAbsUplift.toFixed(1)}%`;
@@ -4611,7 +5751,7 @@ async function refreshAll(){
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
     refreshTrustStrip(),refreshHotEventsRows(),refreshSinceStrip(),refreshThemeSpectrum(),
-    refreshAiTimeline(),refreshCorrelationBreaks(),refreshAssetDossier(),
+    refreshAiTimeline(),refreshCorrelationBreaks(),refreshAssetDossier(),refreshCurrentRegimeBrief(false),
   ]);
   if (typeof initScenarioLab === 'function') initScenarioLab();
   ensureCurrentTheme();
@@ -4809,6 +5949,7 @@ async function loadCodexQuality(){
     return;
   }
   const warnings=asArray(data.recentValidationWarnings?.length?data.recentValidationWarnings:data.lastWarnings).filter(Boolean);
+  const wrapper=data.jsonWrapper||{};
   let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
   html+=`<div class="meta-line" style="margin-bottom:8px"><span class="tag ${qualityClass(data.parseSuccessRate)}">Parse success ${pct(data.parseSuccessRate,0)}</span> Avg confidence ${pct(data.avgConfidence,0)}</div>`;
   html+=`
@@ -4816,9 +5957,13 @@ async function loadCodexQuality(){
       <div class="kpi"><div class="kpi-value">${fmtWhole(data.totalCalls||0)}</div><div class="meta-line">Total calls</div></div>
       <div class="kpi"><div class="kpi-value">${fmtWhole(data.parseSuccess||0)} / ${fmtWhole(data.parseFail||0)}</div><div class="meta-line">Success / fail</div></div>
       <div class="kpi"><div class="kpi-value">${fmtWhole(data.validationErrors||0)}</div><div class="meta-line">Validation errors</div></div>
+      <div class="kpi"><div class="kpi-value">${pct(wrapper.parseSuccessRate||0,0)}</div><div class="meta-line">JSON wrapper</div></div>
     </div>
   `;
   html+=`<div class="detail-block"><div><strong>Recent execution context</strong></div><div class="meta-line" style="margin-top:8px">Last call ${fmtDateTime(data.lastCallAt)} | recent audit rows ${fmtWhole(data.recentAuditEntries||0)}</div>`;
+  if(wrapper.totalCalls){
+    html+=`<div class="meta-line" style="margin-top:6px">JSON wrapper ${fmtWhole(wrapper.parseSuccess||0)} / ${fmtWhole(wrapper.totalCalls||0)} parsed | latest ${escapeHtml(wrapper.latestLabel||'n/a')} on ${escapeHtml(wrapper.latestModel||'n/a')} | attempts ${fmtWhole(wrapper.latestAttempts||0)}</div>`;
+  }
   if(warnings.length){
     html+='<div class="pill-row" style="margin-top:8px">';
     warnings.slice(0,6).forEach((warning)=>{html+=`<span class="tag tag-neutral">${escapeHtml(truncate(readLabel(warning),88))}</span>`;});
@@ -5045,7 +6190,7 @@ async function loadThemeBrief(){
     // SLA 168h (7d) so suggested themes don't show as "Stale" between manual reviews.
     slaHours: 168,
   });
-  html+=`<div class="info-note"><div class="brief-hero"><div><strong>${escapeHtml(data.label||humanizeTheme(state.currentTheme))}</strong><div class="meta-line" style="margin-top:4px">${escapeHtml(data.categoryLabel||data.category||'Theme')} | ${escapeHtml(data.parentTheme||'parent unavailable')} | ${escapeHtml(PERIODS[getCurrentPeriod()].label)} lens</div>${previousViewedAt?`<div class="meta-line" style="margin-top:4px">Previous view ${escapeHtml(fmtDateTime(previousViewedAt))}</div>`:'<div class="meta-line" style="margin-top:4px">First view in this browser workspace</div>'}</div><div class="theme-actions"><button class="btn" onclick="${followed?`unfollowTheme('${state.currentTheme}')`:`followTheme('${state.currentTheme}')`}">${followed?'Unfollow':'Follow'}</button><button class="btn" onclick="${muted?`unmuteTheme('${state.currentTheme}')`:`muteTheme('${state.currentTheme}')`}">${muted?'Unmute':'Mute'}</button></div></div>${data.summary?`<div class="brief-stats" style="margin-top:10px"><div class="brief-stat"><div class="brief-stat-label">Lifecycle</div><div class="brief-stat-value">${escapeHtml(data.summary.lifecycleStage||'n/a')}</div></div><div class="brief-stat"><div class="brief-stat-label">YoY</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.vsYearAgoPct,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Acceleration</div><div class="brief-stat-value">${escapeHtml(fmtPercent(data.summary.acceleration,0))}</div></div><div class="brief-stat"><div class="brief-stat-label">Source Diversity</div><div class="brief-stat-value">${escapeHtml(fmt(data.summary.sourceDiversity,2))}</div></div></div>`:''}</div>`;
+  html+=`<div class="info-note"><div class="brief-hero"><div><strong>${escapeHtml(data.label||humanizeTheme(state.currentTheme))}</strong><div class="meta-line" style="margin-top:4px">${escapeHtml(data.categoryLabel||data.category||'Theme')} | ${escapeHtml(data.parentTheme||'parent unavailable')} | ${escapeHtml(PERIODS[getCurrentPeriod()].label)} lens</div>${previousViewedAt?`<div class="meta-line" style="margin-top:4px">Previous view ${escapeHtml(fmtDateTime(previousViewedAt))}</div>`:'<div class="meta-line" style="margin-top:4px">First view in this browser workspace</div>'}</div><div class="theme-actions"><button class="btn" onclick="${followed?`unfollowTheme('${state.currentTheme}')`:`followTheme('${state.currentTheme}')`}">${followed?'Unfollow':'Follow'}</button><button class="btn" onclick="${muted?`unmuteTheme('${state.currentTheme}')`:`muteTheme('${state.currentTheme}')`}">${muted?'Unmute':'Mute'}</button></div></div>${renderThemeSummaryStats(data.summary,data.meta||{source:data.source})}</div>`;
   html+='<div class="brief-grid" style="margin-top:12px">';
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">What Changed</div><span class="badge">${fmtWhole((sections.whatChanged||[]).length)} claim${(sections.whatChanged||[]).length===1?'':'s'}</span></div><div class="brief-list">${(sections.whatChanged||[]).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.title||'Update')}</strong><div class="brief-item-copy">${escapeHtml(item.detail||'')}</div>${item.evidenceClasses?.length?`<div class="pill-row" style="margin-top:8px">${renderTags(item.evidenceClasses.map((entry)=>entry.label||entry.evidenceClass||entry),'tag-neutral',5)}</div>`:''}</div>`).join('')||'<div class="theme-empty">No structural changes recorded yet.</div>'}</div></div>`;
   const deltaSince=data.deltaSinceLastVisit||null;
@@ -5080,12 +6225,9 @@ async function loadThemeBrief(){
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Subtopic Movement</div><span class="badge">${escapeHtml(humanizeTheme(data.parentTheme||'theme'))}</span></div>${selectedMovement?`<div class="brief-item"><strong>${escapeHtml(selectedMovement.label||selectedMovement.theme)}</strong><div class="meta-line">Rank ${fmtWhole(selectedMovement.rank||0)} | share ${pct(selectedMovement.lastSharePct,0)} | delta ${fmtPercent(selectedMovement.deltaSharePct,1)}</div></div>`:''}<div class="brief-list">${peers.slice(0,5).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.theme)}</strong><div class="meta-line">Share ${pct(item.lastSharePct,0)} | delta ${fmtPercent(item.deltaSharePct,1)} | rank ${fmtWhole(item.rank||0)}</div></div>`).join('')||'<div class="theme-empty">Subtopic movement is not available yet.</div>'}</div></div>`;
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Related Entities</div><span class="badge">${fmtWhole((sections.relatedEntities?.entities||[]).length)} linked</span></div>${renderEntityCards(sections.relatedEntities)}</div>`;
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Adjacent Pathways</div><span class="badge">${fmtWhole(asArray(sections.adjacentPathways?.items||sections.adjacentPathways).length)} routes</span></div>${renderAdjacentPathways(sections.adjacentPathways)}</div>`;
-  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Risks</div><span class="badge">${fmtWhole((sections.risks||[]).length)} watchouts</span></div><div class="brief-list">${(sections.risks||[]).map((item)=>`<div class="brief-item"><div class="brief-item-copy">${escapeHtml(readRiskText(item))}</div></div>`).join('')||'<div class="theme-empty">No explicit risks were generated for this theme.</div>'}</div></div>`;
-  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Watch Next</div><span class="badge">${fmtWhole((sections.watchpoints||[]).length)} prompts</span></div><div class="brief-list">${(sections.watchpoints||[]).map((item)=>`<div class="brief-item"><div class="brief-item-copy">${escapeHtml(readWatchpointText(item))}</div></div>`).join('')||'<div class="theme-empty">No watchpoints available yet.</div>'}</div></div>`;
-  const notebookHooks=sections.notebookHooks||{};
-  const notebookTags=[...(notebookHooks.savedTags||[])];
-  const suggestedTags=(notebookHooks.suggestedTags||[]).filter((tag)=>!notebookTags.includes(tag));
-  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Notebook Hooks</div><span class="badge">${notebookHooks.pinned?'pinned':'workspace'}</span></div><div class="brief-list"><div class="brief-item"><strong>Saved note</strong><textarea id="theme-brief-note-input" class="note-textarea" placeholder="Add an analyst memo, thesis checkpoint, or follow-up question for this theme.">${escapeHtml(notebookHooks.noteMarkdown||'')}</textarea><div class="meta-line" style="margin-top:6px">${notebookHooks.updatedAt?`Updated ${escapeHtml(fmtDateTime(notebookHooks.updatedAt))}`:'No saved note yet.'}${notebookHooks.sharedAt?` | Shared ${escapeHtml(fmtDateTime(notebookHooks.sharedAt))}`:''}${notebookHooks.lastExportedAt?` | Exported ${escapeHtml(fmtDateTime(notebookHooks.lastExportedAt))}`:''}</div></div><div class="brief-item"><strong>Tags</strong><input id="theme-brief-tags-input" class="note-input" value="${escapeHtml(notebookTags.join(', '))}" placeholder="theme, catalyst, follow-up" /><div class="pill-row" style="margin-top:8px">${renderTags(notebookTags,'tag-growing',8)||''}${renderTags(suggestedTags,'tag-neutral',8)||'<span class="theme-empty">No tags</span>'}</div></div><div class="brief-item"><strong>Prompt seed</strong><div class="meta-line">${escapeHtml(notebookHooks.promptSeed||'No prompt seed available.')}</div><label class="meta-line" style="display:flex;align-items:center;gap:8px;margin-top:10px"><input id="theme-brief-pin-input" type="checkbox"${notebookHooks.pinned?' checked':''}/> Pin this theme in notebook workflows</label><div class="theme-actions" style="margin-top:10px"><button class="btn" onclick="saveThemeNotebook()">Save note</button><button class="btn" onclick="shareThemeNotebook()">Share link</button><button class="btn" onclick="unshareThemeNotebook()">Unshare</button><button class="btn" onclick="exportThemeBrief('markdown')">Export MD</button><button class="btn" onclick="exportThemeBrief('json')">Export JSON</button></div>${notebookHooks.shareUrl?`<div class="meta-line" style="margin-top:8px">Share URL: <a href="${escapeHtml(`${API.replace(/\/api$/,'')}${notebookHooks.shareUrl}`)}" target="_blank" rel="noreferrer">${escapeHtml(notebookHooks.shareUrl)}</a></div>`:''}${notebookHooks.exportCount?`<div class="meta-line" style="margin-top:6px">Exports ${escapeHtml(fmtWhole(notebookHooks.exportCount))}</div>`:''}</div></div></div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Risks</div><span class="badge">${fmtWhole((sections.risks||[]).length)} watchouts</span></div>${renderRiskWatchouts(sections.risks)}</div>`;
+  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Watch Next</div><span class="badge">${fmtWhole((sections.watchpoints||[]).length)} prompts</span></div>${renderWatchNextChecklist(sections.watchpoints)}</div>`;
+  html+=renderNotebookHooks(sections.notebookHooks||{});
   html+='</div>';
   el.innerHTML=html;
   renderMyThemes();
@@ -5448,7 +6590,7 @@ function pickActionableSignals(signals,limit=6){
   const symbolCounts=new Map();
   const candidates=signals
     .filter((signal)=>String(signal?.evidence_grade||signal?.evidenceGrade||'').toUpperCase()==='E2')
-    .filter((signal)=>Number(signal?.t_stat||signal?.tStat||0)>=1.96)
+    .filter((signal)=>Number(signal?.t_stat||signal?.tStat||0)>=2)
     .sort((a,b)=>{
       const aScore=Math.abs(Number(a?.uplift||0))*0.6+Math.abs(Number(a?.t_stat||0))*0.4;
       const bScore=Math.abs(Number(b?.uplift||0))*0.6+Math.abs(Number(b?.t_stat||0))*0.4;
@@ -5517,11 +6659,11 @@ function normalizeSignalToReviewItem(s, idx = 0) {
     tStat,
     abnormalReturn: abnormal,
     forwardReturn: Number(s.forward_return_pct) || 0,
-    matchedControls: Number(s.matched_controls_count || s.control_count) || 5,
+    matchedControls: Number(s.n_controls || s.nControls || s.matched_controls_count || s.control_count) || null,
     sourceCount: Number(s.source_count) || null,
     updatedAt: s.updated_at || s.computed_at || null,
     decisionState: s.decision_state || 'pending',
-    whyVisible: tStat ? `t-stat ${tStat.toFixed(2)} exceeds E2 threshold (1.96)` : 'E2 evidence grade',
+    whyVisible: tStat ? `promoted E2: t-stat ${tStat.toFixed(2)} with quality gates passed` : 'promoted E2 evidence grade',
     sources: Array.isArray(s.sources) ? s.sources : [],
     raw: s,
   };
@@ -5556,10 +6698,13 @@ function renderReviewItemCard(item) {
       <span>Uplift: <strong>${upliftStr}</strong></span>
       <span>t-stat: <strong>${tStatStr}</strong></span>
       ${alphaStr ? `<span>Alpha: <strong>${alphaStr}</strong></span>` : ''}
-      <span>Controls: <strong>${item.matchedControls}</strong></span>
+      <span>Controls: <strong>${item.matchedControls ?? '--'}</strong></span>
     </div>
     ${item.title ? `<div style="font-size:10px;color:var(--muted);line-height:1.4">${escapeHtml(item.title.slice(0,140))}</div>` : ''}
     ${citationsHtml}
+    <div class="drawer-actions" style="margin-top:8px">
+      <button class="inbox-btn" onclick="event.stopPropagation();openEvidenceDrawerById('${escapeHtml(item.id)}')">Evidence</button>
+    </div>
     ${(() => {
       const p = item.payload || {};
       const probeTags = [];
@@ -6025,7 +7170,7 @@ async function loadProposalInbox(){
   if(approvalEl)approvalEl.innerHTML=approvalHtml;
 }
 async function loadPending(){
-  const {data,cached,cachedAt}=await f(`${API}/pending`,'pending');
+  const {data,cached,cachedAt}=await f(`${API}/pending?limit=20`,'pending');
   const el=document.getElementById('pending');
   const items=Array.isArray(data)?data:parseList(data,['items','pending']);
   if(!items.length){
@@ -6039,7 +7184,7 @@ async function loadPending(){
   el.innerHTML=html;
 }
 async function loadRegime(){
-  const {data,cached,cachedAt}=await f(`${API}/regime//`,'regime');
+  const {data,cached,cachedAt}=await f(`${API}/regime`,'regime');
   const el=document.getElementById('regime');
   const rows=Array.isArray(data)?data:[];
   if(!rows.length){
@@ -6203,11 +7348,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Analytics Section: KPI + Charts (Event Decision Engine)
-const NAS_API = 'http://localhost:46200/api';
+const NAS_API = API;
 
 async function refreshKPI() {
   try {
-    const r = await fetch(NAS_API + '/../api/kpi-summary').then(r => r.ok ? r.json() : null).catch(() => null);
+    const r = await fetch(NAS_API + '/kpi-summary').then(r => r.ok ? r.json() : null).catch(() => null);
     // Fallback: try signals from event-dashboard API
     const signals = r || await fetch(API + '/signals').then(r => r.ok ? r.json() : null).catch(() => null);
     if (!signals) return;
@@ -6584,8 +7729,8 @@ async function refreshSourceCredibility() {
 // Language Toggle (EN/KO)
 const I18N = {
   'kpi-desc': {
-    en: 'Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of statistically validated signals (E2 = matched-control uplift with t > 1.96).',
-    ko: '시장 스냅샷입니다. VIX(공포 지수), 위험 점수, 현재 레짐 상태, 장단기 금리차, 유가, 달러 강도, 통계적으로 검증된 신호 수를 보여줍니다. E2는 matched-control uplift t 값이 1.96을 넘는 신호입니다.',
+    en: 'Market snapshot: VIX (fear gauge), composite risk score, current regime state, yield curve spread, oil price, dollar strength, and count of quality-gated validated signals (promoted E2 = matched-control uplift with t >= 2 and enough controls).',
+    ko: '시장 스냅샷입니다. VIX(공포 지수), 위험 점수, 현재 레짐 상태, 장단기 금리차, 유가, 달러 강도, 품질 게이트를 통과한 검증 신호 수를 보여줍니다. 승격 E2는 matched-control uplift t 값이 2 이상이고 충분한 대조군이 있는 신호입니다.',
   },
   'status-desc': {
     en: 'System health: API connections, data pipeline status, and collection freshness. Green = all systems operational.',
@@ -6596,8 +7741,8 @@ const I18N = {
     ko: '현재 분석 구간입니다. Weekly는 빠르게 움직이는 신호, Monthly는 확인된 추세, Quarterly는 구조적 변화를 봅니다.',
   },
   'evidence-desc': {
-    en: 'Classifies all event-asset pairs by statistical strength. E0 = noise (no excess return vs market). E1 = positive alpha. E2 = statistically significant uplift vs matched control days (t > 1.96). More E2 = more genuine signals.',
-    ko: '모든 이벤트-자산 쌍을 통계 강도로 분류합니다. E0는 노이즈, E1은 양의 알파, E2는 대조군 대비 통계적으로 유의한 uplift를 뜻합니다. E2가 많을수록 진짜 신호가 많다는 의미입니다.',
+    en: 'Classifies event-asset pairs by statistical strength after promotion gates. E0 = noise. E1 = positive alpha. Promoted E2 = statistically significant uplift with enough matched controls and no low-relevance block.',
+    ko: '이벤트-자산 쌍을 품질 게이트 이후 통계 강도로 분류합니다. E0는 노이즈, E1은 양의 알파, 승격 E2는 충분한 대조군과 관련성 검사를 통과한 통계적 uplift입니다.',
   },
   'alpha-decay-desc': {
     en: 'Shows how excess return (alpha) diminishes over time for each news theme. Short bars that shrink = fast-fading signal. Bars that persist = durable edge. Measured at 1-week, 2-week, and 1-month horizons.',
@@ -6625,11 +7770,30 @@ const I18N = {
   },
 };
 
-let currentLang = localStorage.getItem('lattice-lang') || 'en';
+let currentLang = window.__latticeCurrentLang || localStorage.getItem('lattice-lang') || 'en';
+window.__latticeCurrentLang = currentLang;
+let languageRefreshTimer = null;
+const KO_I18N_OVERRIDES = {
+  'kpi-desc': '시장 스냅샷입니다. VIX, 복합 위험 점수, 현재 레짐, 금리 스프레드, 유가, 달러 강도, 품질 게이트를 통과한 검증 신호 수를 보여줍니다. 승격 E2는 matched-control uplift의 t값이 2 이상이고 충분한 대조군이 있는 신호입니다.',
+  'status-desc': '시스템 상태입니다. API 연결, 데이터 파이프라인, 수집 신선도를 요약합니다. 초록색이면 핵심 시스템이 정상 동작 중입니다.',
+  'horizon-desc': '현재 분석 기간입니다. Weekly는 빠르게 움직이는 신호, Monthly는 확인된 추세, Quarterly는 구조적 변화를 봅니다.',
+  'evidence-desc': '이벤트-자산 쌍을 품질 게이트 이후 통계적 강도로 분류합니다. E0는 노이즈, E1은 양의 알파, 승격 E2는 충분한 대조군과 관련성 검사를 통과한 통계적 상승입니다.',
+  'alpha-decay-desc': '뉴스 테마별 초과수익 알파가 시간이 지나며 얼마나 줄어드는지 보여줍니다. 빨리 줄면 단기 신호, 오래 유지되면 지속성이 있는 신호입니다.',
+  'hawkes-desc': '테마와 월별 Hawkes 강도입니다. 밝거나 붉을수록 뉴스가 더 많은 뉴스를 부르는 연쇄 이벤트 구간입니다.',
+  'corr-desc': '시장 신호 간 90일 롤링 상관관계입니다. 초록은 함께 움직임, 빨강은 반대 움직임입니다. 상관이 높으면 분산 효과가 약합니다.',
+  'regime-desc': 'VIX 기반 과거 시장 레짐입니다. 빨강은 위기, 주황은 위험회피, 파랑은 균형, 초록은 위험선호 구간입니다.',
+  'calib-desc': '모델 확신 점수와 실제 초과수익의 산점도입니다. 대각선에 가까울수록 보정이 잘 된 상태입니다.',
+  'source-desc': '뉴스 출처별 신뢰 점수입니다. 해당 출처의 기사와 실제 자산 반응이 얼마나 잘 맞았는지 기준으로 계산합니다.',
+};
+Object.entries(KO_I18N_OVERRIDES).forEach(([key, value]) => {
+  I18N[key] = { ...(I18N[key] || {}), ko: value };
+});
 
 function applyLanguage(lang) {
   currentLang = lang;
+  window.__latticeCurrentLang = lang;
   localStorage.setItem('lattice-lang', lang);
+  document.documentElement.lang = lang === 'ko' ? 'ko' : 'en';
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (I18N[key] && I18N[key][lang]) {
@@ -6639,6 +7803,19 @@ function applyLanguage(lang) {
   document.querySelectorAll('.lang-toggle button').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
   });
+  if (window.__latticeLanguageInitialized) {
+    clearTimeout(languageRefreshTimer);
+    languageRefreshTimer = setTimeout(() => {
+      try {
+        renderWorkspaceFocus?.();
+        if (state?.currentTheme) loadThemeBrief?.();
+        loadFollowedThemeBriefing?.();
+      } catch (err) {
+        console.warn('localized dynamic refresh failed', err);
+      }
+    }, 0);
+  }
+  window.__latticeLanguageInitialized = true;
 }
 
 document.getElementById('lang-toggle').addEventListener('click', e => {

@@ -22,7 +22,7 @@ PG = {
     "host": os.environ.get("PG_HOST", "192.168.0.2"),
     "port": int(os.environ.get("PG_PORT", 5433)),
     "user": os.environ.get("PG_USER", "postgres"),
-    "password": os.environ.get("PG_PASSWORD", os.environ.get("PGPASSWORD", "lattice1234")),
+    "password": require_pg_password(),
     "dbname": os.environ.get("PG_DATABASE", "lattice"),
 }
 

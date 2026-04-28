@@ -816,11 +816,15 @@ function buildTrendWindow(periodType) {
 }
 
 function mapTrendSnapshotRow(row, periodType) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const comparisonCounts = metadata.comparisonCounts && typeof metadata.comparisonCounts === 'object'
+    ? metadata.comparisonCounts
+    : {};
   const currentCount = Number(row.article_count ?? row.current_count ?? 0);
-  const previousCount = Number(row.previous_count ?? 0);
+  const previousCount = Number(row.previous_count ?? comparisonCounts.previous ?? 0);
   const olderCount = Number(row.older_count ?? 0);
-  const yearAgoCount = Number(row.year_ago_count ?? 0);
-  const threeYearAgoCount = Number(row.three_year_ago_count ?? 0);
+  const yearAgoCount = Number(row.year_ago_count ?? comparisonCounts.yearAgo ?? 0);
+  const threeYearAgoCount = Number(row.three_year_ago_count ?? comparisonCounts.threeYearAgo ?? 0);
   const vsPreviousPct = Number.isFinite(Number(row.vs_previous_period_pct))
     ? Number(row.vs_previous_period_pct)
     : percentageDelta(currentCount, previousCount);
@@ -844,7 +848,7 @@ function mapTrendSnapshotRow(row, periodType) {
   ).toLowerCase();
   const theme = normalizeTheme(row.theme || row.sub_theme || 'unknown');
   const category = inferCategory(theme, row.category);
-  const sourceDiversityRaw = Number(row.source_diversity ?? row.current_source_count ?? 0);
+  const sourceDiversityRaw = Number(row.unique_sources ?? row.current_source_count ?? row.source_diversity ?? 0);
   const sourceDiversity = row.source_diversity != null
     ? Number(row.source_diversity)
     : round(clamp(sourceDiversityRaw / 12, 0, 1), 4);
@@ -943,7 +947,9 @@ async function loadTrendSnapshotFromAggregate(safeQuery, periodType, limit) {
         lifecycle_stage,
         trend_acceleration,
         source_diversity,
+        unique_sources,
         geographic_spread,
+        metadata,
         computed_at,
         ROW_NUMBER() OVER (PARTITION BY theme, period_type ORDER BY period_start DESC, computed_at DESC) AS rn
       FROM theme_trend_aggregates
@@ -964,7 +970,9 @@ async function loadTrendSnapshotFromAggregate(safeQuery, periodType, limit) {
       current.lifecycle_stage,
       current.trend_acceleration,
       current.source_diversity,
+      current.unique_sources,
       current.geographic_spread,
+      current.metadata,
       previous.lifecycle_stage AS previous_lifecycle_stage
     FROM ranked current
     LEFT JOIN ranked previous
@@ -3847,6 +3855,22 @@ export async function buildThemeBriefPayload(themeParam, safeQuery, params = new
         acceleration: snapshot.acceleration,
         sourceDiversity: snapshot.sourceDiversity,
         geographicSpread: snapshot.geographicSpread,
+        diagnostics: {
+          aggregateSource: source,
+          periodType,
+          periodStart: snapshot.periodStart,
+          periodEnd: snapshot.periodEnd,
+          articleCount: snapshot.articleCount,
+          previousCount: snapshot.previousCount,
+          yearAgoCount: snapshot.yearAgoCount,
+          threeYearAgoCount: snapshot.threeYearAgoCount,
+          previousComparableCount: snapshot.previousCount,
+          yearAgoComparableCount: snapshot.yearAgoCount,
+          sourceDiversityRaw: snapshot.sourceDiversityRaw,
+          sourceDiversityMethod: 'aggregate_source_distribution',
+          baseEffect: Math.abs(Number(snapshot.vsYearAgoPct || 0)) >= 1000,
+          volatileAcceleration: Math.abs(Number(snapshot.acceleration || 0)) >= 150,
+        },
         evidenceClasses: dedupeEvidenceClasses([buildEvidenceClassRef('trend_snapshot', { count: 1 })]),
         provenance: dedupeProvenance([
           buildProvenanceRef('trend_snapshot', `${label} summary baseline`, {

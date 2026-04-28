@@ -17,7 +17,13 @@
  * 모든 함수는 read-only SELECT만 수행. Write는 proposal-executor 경유.
  */
 
+import path from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { HOT_EVENTS_MIN_PROMOTION_CONTROLS, buildHotEventQualityFlags } from './event-intelligence-builder.mjs';
+
 const DEFAULT_TIMELINE_DAYS = 90;
+const WEEKLY_DIGEST_CACHE_TTL_MS = Number(process.env.WEEKLY_DIGEST_CACHE_TTL_MS || 6 * 60 * 60 * 1000);
+const WEEKLY_DIGEST_CACHE_FILE = path.resolve('data', 'event-dashboard-cache', 'weekly-ai-digest.json');
 
 async function tableExists(executor, t) {
   const { rows } = await executor.query(`SELECT to_regclass($1) AS oid`, [`public.${t}`]);
@@ -41,12 +47,49 @@ export async function buildEventTimelinePayload(pool, { days = DEFAULT_TIMELINE_
          WHERE ce.event_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
            AND ($2::text IS NULL OR LOWER(ce.theme) = LOWER($2))
       ),
+      article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      ),
       upl AS (
         SELECT eu.canonical_event_id,
-               MAX(eu.evidence_grade) AS best_grade,
-               MAX(ABS(COALESCE(eu.t_stat, 0))) AS max_abs_t,
-               MAX(ABS(COALESCE(eu.uplift, 0))) AS max_abs_uplift
+               MAX(eu.evidence_grade) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                   AND NOT (
+                     COALESCE(aq.known_market_relevance_articles, 0) > 0
+                     AND COALESCE(aq.market_relevant_articles, 0) = 0
+                     AND COALESCE(aq.low_relevance_articles, 0) > 0
+                   )
+               ) AS best_grade,
+               MAX(ABS(COALESCE(eu.t_stat, 0))) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                   AND NOT (
+                     COALESCE(aq.known_market_relevance_articles, 0) > 0
+                     AND COALESCE(aq.market_relevant_articles, 0) = 0
+                     AND COALESCE(aq.low_relevance_articles, 0) > 0
+                   )
+               ) AS max_abs_t,
+               MAX(ABS(COALESCE(eu.uplift, 0))) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                   AND NOT (
+                     COALESCE(aq.known_market_relevance_articles, 0) > 0
+                     AND COALESCE(aq.market_relevant_articles, 0) = 0
+                     AND COALESCE(aq.low_relevance_articles, 0) > 0
+                   )
+               ) AS max_abs_uplift
           FROM event_uplift eu
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
          GROUP BY eu.canonical_event_id
       ),
       haw AS (
@@ -183,10 +226,49 @@ export async function buildEventNarrativePayload(pool, { eventId, forceRefresh =
 
   const upliftRes = await pool.query(
     `
-    SELECT symbol, horizon, uplift, t_stat, evidence_grade, n_controls
-      FROM event_uplift
-     WHERE canonical_event_id = $1
-     ORDER BY ABS(COALESCE(t_stat, 0)) DESC NULLS LAST
+    WITH article_quality AS (
+      SELECT aem.canonical_event_id,
+             COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+             COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+             COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+        FROM article_event_map aem
+        JOIN articles a ON a.id = aem.article_id
+       WHERE aem.canonical_event_id = $1
+       GROUP BY aem.canonical_event_id
+    )
+    SELECT eu.symbol, eu.horizon, eu.uplift, eu.t_stat,
+           eu.evidence_grade AS raw_evidence_grade,
+           CASE
+             WHEN eu.evidence_grade IN ('E2','E3','E4')
+              AND (
+                ABS(COALESCE(eu.t_stat, 0)) < 2
+                OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                OR (
+                  COALESCE(aq.known_market_relevance_articles, 0) > 0
+                  AND COALESCE(aq.market_relevant_articles, 0) = 0
+                  AND COALESCE(aq.low_relevance_articles, 0) > 0
+                )
+              ) THEN NULL
+             ELSE eu.evidence_grade
+           END AS promoted_grade,
+           eu.n_controls,
+           COALESCE(aq.known_market_relevance_articles, 0) AS known_market_relevance_articles,
+           COALESCE(aq.market_relevant_articles, 0) AS market_relevant_articles,
+           COALESCE(aq.low_relevance_articles, 0) AS low_relevance_articles,
+           (
+             eu.evidence_grade IN ('E2','E3','E4')
+             AND COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+           ) AS controls_blocked,
+           (
+             eu.evidence_grade IN ('E2','E3','E4')
+             AND COALESCE(aq.known_market_relevance_articles, 0) > 0
+             AND COALESCE(aq.market_relevant_articles, 0) = 0
+             AND COALESCE(aq.low_relevance_articles, 0) > 0
+           ) AS relevance_blocked
+      FROM event_uplift eu
+      LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
+     WHERE eu.canonical_event_id = $1
+     ORDER BY ABS(COALESCE(eu.t_stat, 0)) DESC NULLS LAST
      LIMIT 6
     `,
     [id],
@@ -235,7 +317,15 @@ export async function buildEventNarrativePayload(pool, { eventId, forceRefresh =
       horizon: u.horizon,
       uplift: u.uplift == null ? null : Number(u.uplift),
       tStat: u.t_stat == null ? null : Number(u.t_stat),
-      evidenceGrade: u.evidence_grade,
+      rawEvidenceGrade: u.raw_evidence_grade,
+      evidenceGrade: u.promoted_grade,
+      nControls: u.n_controls == null ? null : Number(u.n_controls),
+      qualityFlags: buildHotEventQualityFlags({
+        raw_evidence_grade: u.raw_evidence_grade,
+        promoted_grade: u.promoted_grade,
+        controls_blocked: u.controls_blocked,
+        relevance_blocked: u.relevance_blocked,
+      }),
     })),
     generatedAt: new Date().toISOString(),
   };
@@ -260,9 +350,17 @@ function buildNarrativePrompt({ event, articles, uplift }) {
     `[${i + 1}] (${a.source || '?'} · ${String(a.published_at || '').slice(0, 10)}) ${a.title || ''}`,
   ).join('\n');
   const upliftLines = uplift.length
-    ? uplift.map((u) => `  ${u.symbol} ${u.horizon} uplift=${u.uplift} t=${u.t_stat} grade=${u.evidence_grade} n=${u.n_controls}`).join('\n')
+    ? uplift.map((u) => {
+        const promoted = u.promoted_grade || null;
+        const raw = u.raw_evidence_grade || null;
+        const gradeLabel = promoted || (raw ? `${raw} quarantined` : 'none');
+        const gate = raw && !promoted
+          ? ' quality_gate=blocked_do_not_treat_as_validated_evidence'
+          : ' quality_gate=passed_or_not_required';
+        return `  ${u.symbol} ${u.horizon} uplift=${u.uplift} t=${u.t_stat} grade=${gradeLabel} n=${u.n_controls}${gate}`;
+      }).join('\n')
     : '  (no uplift labeled yet)';
-  return `You are a financial intelligence analyst. Summarize this event in 2-3 short paragraphs grounded in the provided articles. Keep it analytical, factual, and specific about market implications.
+  return `You are a financial intelligence analyst. Summarize this event in 2-3 short paragraphs grounded in the provided articles. Keep it analytical, factual, and specific about market implications. Only cite promoted uplift grades as validated market evidence. If a raw grade is quarantined, describe it as an unvalidated hint or omit it.
 
 EVENT
 - id: ${event.id}
@@ -332,13 +430,59 @@ export async function buildSimilarEventsPayload(pool, { eventId, limit = 6 } = {
        GROUP BY canonical_event_id
        ORDER BY sim DESC
        LIMIT $3::int
+    ),
+    article_quality AS (
+      SELECT aem.canonical_event_id,
+             COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+             COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+             COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+        FROM article_event_map aem
+        JOIN articles a ON a.id = aem.article_id
+       GROUP BY aem.canonical_event_id
+    ),
+    uplift_qualified AS (
+      SELECT eu.canonical_event_id,
+             MAX(eu.evidence_grade) FILTER (
+               WHERE eu.evidence_grade IN ('E2','E3','E4')
+                 AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                 AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                 AND NOT (
+                   COALESCE(aq.known_market_relevance_articles, 0) > 0
+                   AND COALESCE(aq.market_relevant_articles, 0) = 0
+                   AND COALESCE(aq.low_relevance_articles, 0) > 0
+                 )
+             ) AS best_grade,
+             MAX(ABS(eu.t_stat)) FILTER (
+               WHERE eu.evidence_grade IN ('E2','E3','E4')
+                 AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                 AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                 AND NOT (
+                   COALESCE(aq.known_market_relevance_articles, 0) > 0
+                   AND COALESCE(aq.market_relevant_articles, 0) = 0
+                   AND COALESCE(aq.low_relevance_articles, 0) > 0
+                 )
+             ) AS max_abs_t,
+             MAX(ABS(eu.uplift)) FILTER (
+               WHERE eu.evidence_grade IN ('E2','E3','E4')
+                 AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                 AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                 AND NOT (
+                   COALESCE(aq.known_market_relevance_articles, 0) > 0
+                   AND COALESCE(aq.market_relevant_articles, 0) = 0
+                   AND COALESCE(aq.low_relevance_articles, 0) > 0
+                 )
+             ) AS max_abs_uplift
+        FROM event_uplift eu
+        LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
+       GROUP BY eu.canonical_event_id
     )
     SELECT ce.id, ce.theme, ce.representative_title AS title, ce.event_date,
            ce.article_count, b.sim AS similarity,
-           (SELECT MAX(evidence_grade) FROM event_uplift eu WHERE eu.canonical_event_id = ce.id) AS best_grade,
-           (SELECT MAX(ABS(t_stat)) FROM event_uplift eu WHERE eu.canonical_event_id = ce.id) AS max_abs_t,
-           (SELECT MAX(ABS(uplift)) FROM event_uplift eu WHERE eu.canonical_event_id = ce.id) AS max_abs_uplift
+           uq.best_grade,
+           uq.max_abs_t,
+           uq.max_abs_uplift
       FROM best b JOIN canonical_events ce ON ce.id = b.canonical_event_id
+      LEFT JOIN uplift_qualified uq ON uq.canonical_event_id = ce.id
      ORDER BY b.sim DESC
     `,
     [seedEmbedding, id, safeLimit],
@@ -433,6 +577,373 @@ function classifyRegime({ vix, yieldSpread, oilPrice }) {
 }
 
 /* ============================================================ */
+/* P1-1b: Current Regime Brief                                  */
+/* ============================================================ */
+export async function buildCurrentRegimeBriefPayload(pool, { useCodex = false, forceRefresh = false } = {}) {
+  const [latestSignals, eventStats, topUplift, transitions] = await Promise.all([
+    pool.query(
+      `
+      SELECT DISTINCT ON (signal_name)
+             signal_name, value, ts
+        FROM signal_history
+       WHERE signal_name IN ('vix', 'yieldSpread', 'oilPrice', 'dollarIndex', 'hyCreditSpread', 'marketStress')
+       ORDER BY signal_name, ts DESC
+      `,
+    ).catch(() => ({ rows: [] })),
+    pool.query(
+      `
+      SELECT
+        COUNT(*) FILTER (WHERE event_date >= CURRENT_DATE - INTERVAL '7 days')::int AS events_7d,
+        COALESCE(SUM(article_count) FILTER (WHERE event_date >= CURRENT_DATE - INTERVAL '7 days'), 0)::int AS articles_7d,
+        COUNT(DISTINCT theme) FILTER (WHERE event_date >= CURRENT_DATE - INTERVAL '7 days')::int AS themes_7d,
+        COUNT(*)::int AS events_30d,
+        COALESCE(SUM(article_count), 0)::int AS articles_30d,
+        COUNT(DISTINCT theme)::int AS themes_30d
+      FROM canonical_events
+      WHERE event_date >= CURRENT_DATE - INTERVAL '30 days'
+      `,
+    ).catch(() => ({ rows: [{}] })),
+    pool.query(
+      `
+      WITH article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      )
+      SELECT ce.id, ce.theme, ce.representative_title AS title, ce.event_date,
+             ce.article_count, ce.source_count,
+             eu.symbol, eu.horizon, eu.uplift, eu.t_stat, eu.n_controls, eu.evidence_grade
+        FROM event_uplift eu
+        JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+        LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.id
+       WHERE ce.event_date >= CURRENT_DATE - INTERVAL '30 days'
+         AND eu.evidence_grade = 'E2'
+         AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+         AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+         AND NOT (
+           COALESCE(aq.known_market_relevance_articles, 0) > 0
+           AND COALESCE(aq.market_relevant_articles, 0) = 0
+           AND COALESCE(aq.low_relevance_articles, 0) > 0
+         )
+       ORDER BY ABS(COALESCE(eu.t_stat, 0)) DESC NULLS LAST,
+                ce.event_date DESC
+       LIMIT 10
+      `,
+    ).catch(() => ({ rows: [] })),
+    pool.query(
+      `
+      SELECT theme, lifecycle_stage, previous_lifecycle_stage, period_end
+        FROM theme_trend_aggregates
+       WHERE period_end >= CURRENT_DATE - INTERVAL '30 days'
+         AND previous_lifecycle_stage IS NOT NULL
+         AND lifecycle_stage <> previous_lifecycle_stage
+       ORDER BY period_end DESC
+       LIMIT 10
+      `,
+    ).catch(() => ({ rows: [] })),
+  ]);
+
+  const signalMap = Object.fromEntries(latestSignals.rows.map((row) => [
+    row.signal_name,
+    {
+      value: row.value == null ? null : Number(row.value),
+      ts: row.ts,
+    },
+  ]));
+  const inputs = {
+    vix: signalMap.vix?.value ?? null,
+    yieldSpread: signalMap.yieldSpread?.value ?? null,
+    oilPrice: signalMap.oilPrice?.value ?? null,
+    dollarIndex: signalMap.dollarIndex?.value ?? null,
+    hyCreditSpread: signalMap.hyCreditSpread?.value ?? null,
+    marketStress: signalMap.marketStress?.value ?? null,
+  };
+  const currentRegime = classifyRegime(inputs);
+  const scenario = await buildRegimeScenarioPayload(pool, {
+    vix: inputs.vix,
+    yieldSpread: inputs.yieldSpread,
+    oilPrice: inputs.oilPrice,
+  }).catch(() => ({
+    ok: false,
+    targetRegime: currentRegime,
+    predictions: [],
+    summary: { totalPairs: 0, posAvg: 0, negAvg: 0 },
+  }));
+
+  const stats = eventStats.rows[0] || {};
+  const topEvents = topUplift.rows.map((row) => ({
+    id: Number(row.id),
+    theme: row.theme,
+    title: row.title,
+    eventDate: row.event_date,
+    articleCount: Number(row.article_count ?? 0),
+    sourceCount: Number(row.source_count ?? 0),
+    symbol: row.symbol,
+    horizon: row.horizon,
+    uplift: row.uplift == null ? null : Number(row.uplift),
+    tStat: row.t_stat == null ? null : Number(row.t_stat),
+    nControls: row.n_controls == null ? null : Number(row.n_controls),
+    evidenceGrade: row.evidence_grade,
+  }));
+  const lifecycleTransitions = transitions.rows.map((row) => ({
+    theme: row.theme,
+    from: row.previous_lifecycle_stage,
+    to: row.lifecycle_stage,
+    periodEnd: row.period_end,
+  }));
+  const topPredictions = (scenario.predictions || []).slice(0, 8);
+  const deterministic = buildDeterministicRegimeBrief({
+    currentRegime,
+    inputs,
+    signalMap,
+    stats,
+    topEvents,
+    transitions: lifecycleTransitions,
+    topPredictions,
+  });
+
+  let codex = { attempted: false, ok: false };
+  let synthesis = deterministic.synthesis;
+  if (useCodex) {
+    codex = { attempted: true, ok: false };
+    try {
+      const prompt = buildCurrentRegimeBriefPrompt({
+        currentRegime,
+        inputs,
+        stats,
+        topEvents,
+        transitions: lifecycleTransitions,
+        topPredictions,
+      });
+      const { runCodexJsonPrompt } = await import('./codex-json.mjs');
+      const result = await runCodexJsonPrompt(prompt, 100_000, {
+        label: 'current-regime-brief',
+        forceRefresh: Boolean(forceRefresh),
+      });
+      if (result.parsed && typeof result.parsed === 'object') {
+        synthesis = mergeCodexRegimeSynthesis(synthesis, result.parsed);
+        codex = { attempted: true, ok: true };
+      } else {
+        codex = {
+          attempted: true,
+          ok: false,
+          error: 'codex output not JSON',
+          message: String(result.message || result.stderr || '').slice(0, 600),
+        };
+      }
+    } catch (err) {
+      codex = {
+        attempted: true,
+        ok: false,
+        error: String(err?.message || err).slice(0, 600),
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    mode: codex.ok ? 'codex+deterministic' : 'deterministic',
+    codex,
+    regime: {
+      current: currentRegime,
+      confidence: deterministic.confidence,
+      inputs,
+      drivers: deterministic.drivers,
+    },
+    synthesis,
+    evidence: {
+      eventStats: {
+        events7d: Number(stats.events_7d ?? 0),
+        articles7d: Number(stats.articles_7d ?? 0),
+        themes7d: Number(stats.themes_7d ?? 0),
+        events30d: Number(stats.events_30d ?? 0),
+        articles30d: Number(stats.articles_30d ?? 0),
+        themes30d: Number(stats.themes_30d ?? 0),
+      },
+      latestSignals: Object.fromEntries(Object.entries(signalMap).map(([name, item]) => [
+        name,
+        { value: item.value, ts: item.ts },
+      ])),
+      topEvents,
+      transitions: lifecycleTransitions,
+      topPredictions,
+      scenarioSummary: scenario.summary || {},
+    },
+    provenance: [
+      'signal_history.latest(vix,yieldSpread,oilPrice,dollarIndex,hyCreditSpread,marketStress)',
+      'canonical_events.30d aggregate',
+      `event_uplift.promoted_E2 last 30d (n_controls>=${HOT_EVENTS_MIN_PROMOTION_CONTROLS})`,
+      'theme_trend_aggregates lifecycle transitions',
+      'regime_conditional_impact scenario pairs',
+      codex.attempted ? 'optional Codex synthesis' : 'deterministic synthesis only',
+    ],
+  };
+}
+
+function buildDeterministicRegimeBrief({ currentRegime, inputs, signalMap, stats, topEvents, transitions, topPredictions }) {
+  const availableSignals = ['vix', 'yieldSpread', 'oilPrice'].filter((key) => Number.isFinite(inputs[key]));
+  const confidence = Math.min(0.95, 0.45 + availableSignals.length * 0.14 + Math.min(0.18, topEvents.length * 0.02));
+  const drivers = [];
+  if (Number.isFinite(inputs.vix)) {
+    if (inputs.vix > 30) drivers.push(`VIX ${inputs.vix.toFixed(1)} is in crisis territory.`);
+    else if (inputs.vix > 22) drivers.push(`VIX ${inputs.vix.toFixed(1)} is elevated.`);
+    else if (inputs.vix < 15) drivers.push(`VIX ${inputs.vix.toFixed(1)} supports a risk-on read.`);
+    else drivers.push(`VIX ${inputs.vix.toFixed(1)} is consistent with a balanced tape.`);
+  }
+  if (Number.isFinite(inputs.yieldSpread)) {
+    drivers.push(`Yield spread latest value is ${inputs.yieldSpread.toFixed(2)}.`);
+  }
+  if (Number.isFinite(inputs.oilPrice)) {
+    drivers.push(`Oil latest value is ${inputs.oilPrice.toFixed(1)}.`);
+  }
+  if (Number.isFinite(inputs.marketStress)) {
+    drivers.push(`Market stress channel is ${inputs.marketStress.toFixed(2)}.`);
+  }
+  if (!drivers.length) drivers.push('Macro signal coverage is thin; regime label is low-confidence.');
+
+  const events7d = Number(stats.events_7d ?? 0);
+  const articles7d = Number(stats.articles_7d ?? 0);
+  const themes7d = Number(stats.themes_7d ?? 0);
+  const strongest = topEvents[0];
+  const transition = transitions[0];
+  const positives = topPredictions.filter((row) => (row.avgReturn ?? 0) > 0).slice(0, 3);
+  const negatives = topPredictions.filter((row) => (row.avgReturn ?? 0) < 0).slice(0, 3);
+  const signalAge = Object.entries(signalMap)
+    .filter(([, item]) => item?.ts)
+    .map(([name, item]) => `${name}: ${String(item.ts).slice(0, 10)}`)
+    .slice(0, 4)
+    .join(', ');
+
+  const executiveSummary = [
+    `Current regime reads as ${currentRegime} from the latest macro signal set.`,
+    `The last 7 days contain ${events7d} canonical events across ${themes7d} themes and ${articles7d} linked articles.`,
+    strongest
+      ? `Strongest E2 evidence currently links ${strongest.theme} to ${strongest.symbol} (${formatSigned(strongest.uplift)} uplift, t=${formatMaybe(strongest.tStat)}).`
+      : 'No high-grade E2 event impact row is available in the last 30 days.',
+  ];
+  const marketImplications = [
+    positives.length
+      ? `Positive scenario leaders: ${positives.map((p) => `${p.symbol}/${p.theme} ${formatSigned(p.avgReturn)}`).join(', ')}.`
+      : 'No positive regime-conditioned pairs cleared the current sample filter.',
+    negatives.length
+      ? `Downside-sensitive pairs: ${negatives.map((p) => `${p.symbol}/${p.theme} ${formatSigned(p.avgReturn)}`).join(', ')}.`
+      : 'No negative regime-conditioned pairs cleared the current sample filter.',
+  ];
+  const watchlist = [
+    transition ? `Watch ${transition.theme}: lifecycle moved ${transition.from} -> ${transition.to}.` : 'Watch lifecycle transitions; no fresh transition dominates this window.',
+    strongest ? `Recheck evidence for ${strongest.symbol} if the ${strongest.theme} cluster keeps adding sources.` : 'Prioritize new E2-grade events before acting on weak clusters.',
+    signalAge ? `Confirm signal freshness (${signalAge}).` : 'Refresh macro signal channels before using this brief operationally.',
+  ];
+  const risks = [
+    confidence < 0.7 ? 'Regime confidence is limited by incomplete or stale macro inputs.' : 'Regime confidence is moderate, but this is still a decision-support brief, not an execution signal.',
+    'Event evidence can be duplicated by syndication or source clustering; validate citations before escalation.',
+  ];
+  const opportunities = [
+    topEvents.length ? `Use the ${topEvents.length} recent E2 rows as the first investigation queue.` : 'Backfill event impacts before relying on opportunity ranking.',
+    transitions.length ? `${transitions.length} lifecycle transitions can seed the next thematic watchlist.` : 'Low lifecycle churn suggests focusing on anomaly and correlation-break surfaces.',
+  ];
+
+  return {
+    confidence,
+    drivers,
+    synthesis: {
+      headline: `${titleCase(currentRegime)} regime brief`,
+      executiveSummary,
+      marketImplications,
+      watchlist,
+      risks,
+      opportunities,
+    },
+  };
+}
+
+function buildCurrentRegimeBriefPrompt({ currentRegime, inputs, stats, topEvents, transitions, topPredictions }) {
+  const eventLines = topEvents.slice(0, 6).map((e) =>
+    `  - ${e.theme}/${e.symbol}: uplift=${e.uplift} t=${e.tStat} title="${String(e.title || '').slice(0, 90)}"`,
+  ).join('\n') || '  - none';
+  const transitionLines = transitions.slice(0, 6).map((t) =>
+    `  - ${t.theme}: ${t.from} -> ${t.to}`,
+  ).join('\n') || '  - none';
+  const predictionLines = topPredictions.slice(0, 8).map((p) =>
+    `  - ${p.theme}/${p.symbol}: avgReturn=${p.avgReturn} hitRate=${p.hitRate} sample=${p.sampleSize}`,
+  ).join('\n') || '  - none';
+
+  return `You are producing a current market-regime intelligence brief for a signal-first decision-support dashboard.
+
+Do not invent data. Use only the supplied context. If evidence is weak, say so.
+
+CURRENT REGIME: ${currentRegime}
+INPUTS: ${JSON.stringify(inputs)}
+EVENT STATS: ${JSON.stringify(stats)}
+
+TOP E2 EVENT IMPACTS
+${eventLines}
+
+LIFECYCLE TRANSITIONS
+${transitionLines}
+
+REGIME-CONDITIONED PAIRS
+${predictionLines}
+
+Output ONLY a single JSON object:
+{
+  "headline": "under 110 chars",
+  "executiveSummary": ["2-4 bullets"],
+  "marketImplications": ["1-3 bullets"],
+  "watchlist": ["2-4 bullets"],
+  "risks": ["1-3 bullets"],
+  "opportunities": ["1-3 bullets"]
+}`;
+}
+
+function mergeCodexRegimeSynthesis(fallback, parsed) {
+  return {
+    headline: sanitizeOneLine(parsed.headline, fallback.headline, 120),
+    executiveSummary: sanitizeStringList(parsed.executiveSummary, fallback.executiveSummary, 4, 220),
+    marketImplications: sanitizeStringList(parsed.marketImplications, fallback.marketImplications, 4, 220),
+    watchlist: sanitizeStringList(parsed.watchlist, fallback.watchlist, 4, 220),
+    risks: sanitizeStringList(parsed.risks, fallback.risks, 4, 220),
+    opportunities: sanitizeStringList(parsed.opportunities, fallback.opportunities, 4, 220),
+  };
+}
+
+function sanitizeStringList(value, fallback, maxItems, maxLen) {
+  if (!Array.isArray(value)) return fallback;
+  const out = value
+    .map((item) => sanitizeOneLine(item, '', maxLen))
+    .filter(Boolean)
+    .slice(0, maxItems);
+  return out.length ? out : fallback;
+}
+
+function sanitizeOneLine(value, fallback, maxLen) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  return text ? text.slice(0, maxLen) : fallback;
+}
+
+function titleCase(value) {
+  return String(value || '')
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function formatMaybe(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : 'n/a';
+}
+
+function formatSigned(value) {
+  if (!Number.isFinite(value)) return 'n/a';
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+/* ============================================================ */
 /* P1-2: Asset Dossier                                          */
 /* ============================================================ */
 export async function buildAssetDossierPayload(pool, { symbol }) {
@@ -453,24 +964,86 @@ export async function buildAssetDossierPayload(pool, { symbol }) {
     ).catch(() => ({ rows: [] })),
     pool.query(
       `
+      WITH article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      ),
+      qualified AS (
+        SELECT eu.*,
+               CASE
+                 WHEN eu.evidence_grade IN ('E2','E3','E4')
+                  AND (
+                    ABS(COALESCE(eu.t_stat, 0)) < 2
+                    OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                    OR (
+                      COALESCE(aq.known_market_relevance_articles, 0) > 0
+                      AND COALESCE(aq.market_relevant_articles, 0) = 0
+                      AND COALESCE(aq.low_relevance_articles, 0) > 0
+                    )
+                  ) THEN NULL
+                 ELSE eu.evidence_grade
+               END AS promoted_grade
+          FROM event_uplift eu
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
+         WHERE eu.symbol = $1
+      )
       SELECT COUNT(*)::int AS total,
-             COUNT(*) FILTER (WHERE evidence_grade = 'E2')::int AS e2,
-             COUNT(*) FILTER (WHERE evidence_grade = 'E1')::int AS e1,
-             COUNT(*) FILTER (WHERE evidence_grade = 'E0')::int AS e0,
-             AVG(uplift) FILTER (WHERE evidence_grade = 'E2') AS avg_e2_uplift,
-             AVG(ABS(t_stat)) FILTER (WHERE evidence_grade = 'E2') AS avg_e2_t
-        FROM event_uplift
-       WHERE symbol = $1
+             COUNT(*) FILTER (WHERE promoted_grade = 'E2')::int AS e2,
+             COUNT(*) FILTER (WHERE promoted_grade = 'E1')::int AS e1,
+             COUNT(*) FILTER (WHERE promoted_grade = 'E0')::int AS e0,
+             AVG(uplift) FILTER (WHERE promoted_grade = 'E2') AS avg_e2_uplift,
+             AVG(ABS(t_stat)) FILTER (WHERE promoted_grade = 'E2') AS avg_e2_t
+        FROM qualified
       `,
       [sym],
     ).catch(() => ({ rows: [] })),
     pool.query(
       `
+      WITH article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      )
       SELECT ce.id, ce.theme, ce.representative_title AS title, ce.event_date,
-             eu.evidence_grade, eu.uplift, eu.t_stat, eu.horizon
-        FROM event_uplift eu
+             CASE
+               WHEN eu.evidence_grade IN ('E2','E3','E4')
+                AND (
+                  ABS(COALESCE(eu.t_stat, 0)) < 2
+                  OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                  OR (
+                    COALESCE(aq.known_market_relevance_articles, 0) > 0
+                    AND COALESCE(aq.market_relevant_articles, 0) = 0
+                    AND COALESCE(aq.low_relevance_articles, 0) > 0
+                  )
+                ) THEN NULL
+               ELSE eu.evidence_grade
+             END AS evidence_grade,
+             eu.uplift, eu.t_stat, eu.n_controls, eu.horizon
+       FROM event_uplift eu
         JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+        LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.id
        WHERE eu.symbol = $1
+         AND NOT (
+           eu.evidence_grade IN ('E2','E3','E4')
+           AND (
+             ABS(COALESCE(eu.t_stat, 0)) < 2
+             OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+             OR (
+               COALESCE(aq.known_market_relevance_articles, 0) > 0
+               AND COALESCE(aq.market_relevant_articles, 0) = 0
+               AND COALESCE(aq.low_relevance_articles, 0) > 0
+             )
+           )
+         )
        ORDER BY ce.event_date DESC
        LIMIT 8
       `,
@@ -524,6 +1097,16 @@ export async function buildAssetDossierPayload(pool, { symbol }) {
 /* P2-1: Weekly AI Digest via Codex                              */
 /* ============================================================ */
 export async function buildWeeklyDigestPayload(pool, { forceRefresh = false } = {}) {
+  const cached = await readWeeklyDigestCache();
+  if (cached && !forceRefresh && isFreshWeeklyDigestCache(cached)) {
+    return {
+      ...cached,
+      ok: true,
+      cached: true,
+      cacheTtlMs: WEEKLY_DIGEST_CACHE_TTL_MS,
+    };
+  }
+
   // 7d aggregate of what changed
   const [events7d, transitions, topUplift, signals] = await Promise.all([
     pool.query(
@@ -549,11 +1132,28 @@ export async function buildWeeklyDigestPayload(pool, { forceRefresh = false } = 
     ).catch(() => ({ rows: [] })),
     pool.query(
       `
+      WITH article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      )
       SELECT ce.representative_title AS title, ce.theme, ce.event_date,
-             eu.symbol, eu.uplift, eu.t_stat, eu.evidence_grade
+             eu.symbol, eu.uplift, eu.t_stat, eu.n_controls, eu.evidence_grade
         FROM event_uplift eu JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+        LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.id
        WHERE ce.event_date >= CURRENT_DATE - INTERVAL '30 days'
-         AND eu.evidence_grade = 'E2' AND ABS(eu.t_stat) >= 2
+         AND eu.evidence_grade = 'E2'
+         AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+         AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+         AND NOT (
+           COALESCE(aq.known_market_relevance_articles, 0) > 0
+           AND COALESCE(aq.market_relevant_articles, 0) = 0
+           AND COALESCE(aq.low_relevance_articles, 0) > 0
+         )
        ORDER BY ABS(eu.t_stat) DESC
        LIMIT 6
       `,
@@ -577,19 +1177,55 @@ export async function buildWeeklyDigestPayload(pool, { forceRefresh = false } = 
     signals: signals.rows,
   });
 
+  const deterministicPayload = {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    window: '7 days',
+    stats: events7d.rows[0] || {},
+    transitions: transitions.rows,
+    topUplift: topUplift.rows,
+    signals: signals.rows,
+    digest: buildDeterministicWeeklyDigest({
+      stats: events7d.rows[0] || {},
+      transitions: transitions.rows,
+      topUplift: topUplift.rows,
+      signals: signals.rows,
+    }),
+    codex: {
+      attempted: false,
+      reason: forceRefresh ? 'pre-codex fallback' : 'use refresh=1 to request Codex synthesis',
+    },
+  };
+
+  if (!forceRefresh) {
+    await writeWeeklyDigestCache(deterministicPayload).catch(() => {});
+    return deterministicPayload;
+  }
+
   const { runCodexJsonPrompt } = await import('./codex-json.mjs');
   const result = await runCodexJsonPrompt(prompt, 120_000, { label: 'weekly-digest' });
 
   if (!result.parsed) {
+    if (cached) {
+      return {
+        ...cached,
+        ok: true,
+        cached: true,
+        stale: true,
+        refreshError: 'codex output not JSON',
+        cacheTtlMs: WEEKLY_DIGEST_CACHE_TTL_MS,
+      };
+    }
     return {
-      ok: false,
+      ...deterministicPayload,
+      codex: { attempted: true, ok: false },
       error: 'codex output not JSON',
       stderr: String(result.stderr || '').slice(0, 400),
       message: String(result.message || '').slice(0, 600),
     };
   }
 
-  return {
+  const payload = {
     ok: true,
     generatedAt: new Date().toISOString(),
     window: '7 days',
@@ -598,13 +1234,16 @@ export async function buildWeeklyDigestPayload(pool, { forceRefresh = false } = 
     topUplift: topUplift.rows,
     signals: signals.rows,
     digest: result.parsed,
+    codex: { attempted: true, ok: true },
   };
+  await writeWeeklyDigestCache(payload).catch(() => {});
+  return payload;
 }
 
 function buildDigestPrompt({ window, stats, transitions, topUplift, signals }) {
   const tLines = transitions.map((t) => `  ${t.theme}: ${t.n} transitions`).join('\n') || '  (none)';
   const uLines = topUplift.slice(0, 5).map((u) =>
-    `  ${u.symbol} (${u.theme}): uplift=${u.uplift} t=${u.t_stat} · "${(u.title || '').slice(0, 60)}"`,
+    `  ${u.symbol} (${u.theme}): uplift=${u.uplift} t=${u.t_stat} - "${(u.title || '').slice(0, 60)}"`,
   ).join('\n') || '  (none)';
   const sLines = signals.map((s) => `  ${s.signal_name}: ${Number(s.avg_val).toFixed(2)} (latest ${String(s.latest).slice(0, 10)})`).join('\n');
 
@@ -634,6 +1273,79 @@ Output ONLY a single JSON object (no markdown):
   "watch_next": "2-3 sentences on what to monitor next",
   "top_tickers": ["SYM1","SYM2","SYM3"]
 }`;
+}
+
+async function readWeeklyDigestCache() {
+  try {
+    const raw = await readFile(WEEKLY_DIGEST_CACHE_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeWeeklyDigestCache(payload) {
+  await mkdir(path.dirname(WEEKLY_DIGEST_CACHE_FILE), { recursive: true });
+  await writeFile(WEEKLY_DIGEST_CACHE_FILE, JSON.stringify(payload, null, 2), 'utf8');
+}
+
+function isFreshWeeklyDigestCache(payload) {
+  const ts = Date.parse(payload?.generatedAt || '');
+  return Number.isFinite(ts) && Date.now() - ts <= WEEKLY_DIGEST_CACHE_TTL_MS;
+}
+
+function buildDeterministicWeeklyDigest({ stats, transitions, topUplift, signals }) {
+  const topTransition = transitions[0];
+  const topSignal = signals
+    .map((signal) => ({
+      name: String(signal.signal_name || ''),
+      avg: Number(signal.avg_val),
+      latest: signal.latest,
+    }))
+    .filter((signal) => Number.isFinite(signal.avg))
+    .sort((a, b) => Math.abs(b.avg) - Math.abs(a.avg))[0];
+  const topEvidence = topUplift[0];
+  const tickers = Array.from(new Set(topUplift.map((row) => String(row.symbol || '').trim()).filter(Boolean))).slice(0, 5);
+  const eventCount = Number(stats?.new_events || 0);
+  const themeCount = Number(stats?.themes || 0);
+  const articleCount = Number(stats?.total_articles || 0);
+
+  const headlineParts = [];
+  if (eventCount > 0) headlineParts.push(`${eventCount} new events`);
+  if (themeCount > 0) headlineParts.push(`${themeCount} themes`);
+  if (topTransition?.theme) headlineParts.push(`${topTransition.theme} lifecycle shift`);
+  const headline = headlineParts.length
+    ? `Weekly signal scan: ${headlineParts.join(', ')}`
+    : 'Weekly signal scan: no material event expansion detected';
+
+  const regime = topSignal
+    ? `${topSignal.name} led the macro tape`
+    : topTransition?.theme
+      ? `${topTransition.theme} transition-led regime`
+      : 'quiet evidence regime';
+
+  const transitionText = topTransition?.theme
+    ? `${topTransition.theme} recorded ${topTransition.n} lifecycle transitions.`
+    : 'No lifecycle transitions cleared the weekly threshold.';
+  const evidenceText = topEvidence
+    ? `Top quality-gated uplift was ${topEvidence.symbol || 'unknown'} in ${topEvidence.theme || 'unknown'} with t=${Number(topEvidence.t_stat || 0).toFixed(2)}.`
+    : 'No quality-gated E2 uplift rows cleared the promotion controls.';
+  const signalText = topSignal
+    ? `${topSignal.name} averaged ${topSignal.avg.toFixed(2)} over the window.`
+    : 'Macro signal coverage was limited for this window.';
+
+  return {
+    headline,
+    regime,
+    what_changed: `${articleCount} articles mapped into ${eventCount} canonical events across ${themeCount} themes. ${transitionText}`,
+    watch_next: `${evidenceText} ${signalText}`,
+    top_tickers: tickers,
+    mode: 'deterministic',
+    weekEnding: new Date().toISOString().slice(0, 10),
+    summary: `${transitionText} ${evidenceText}`,
+    watchlist: tickers,
+  };
 }
 
 /* ============================================================ */
@@ -695,7 +1407,7 @@ export async function buildCorrelationBreaksPayload(pool) {
       if (c30 == null || c90 == null) continue;
       const delta = c30 - c90;
       breaks.push({
-        pair: `${a}×${b}`,
+        pair: `${a} x ${b}`,
         corr30d: c30,
         corr90d: c90,
         delta,
@@ -720,4 +1432,5 @@ export const _internals = {
   classifyRegime,
   buildNarrativePrompt,
   buildDigestPrompt,
+  buildCurrentRegimeBriefPrompt,
 };

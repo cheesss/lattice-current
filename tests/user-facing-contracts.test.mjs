@@ -1,0 +1,167 @@
+import assert from 'node:assert/strict';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import test from 'node:test';
+
+const ROOT = process.cwd();
+
+async function read(relPath) {
+  return readFile(path.join(ROOT, relPath), 'utf8');
+}
+
+async function listFiles(relDir, extensions) {
+  const dir = path.join(ROOT, relDir);
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const relPath = `${relDir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      files.push(...await listFiles(relPath, extensions));
+    } else if (extensions.some((ext) => entry.name.endsWith(ext))) {
+      files.push(relPath);
+    }
+  }
+  return files;
+}
+
+const USER_FACING_EVIDENCE_FILES = [
+  'api/event-uplift-grades.js',
+  'api/kpi-summary.js',
+  'scripts/event-dashboard-api.mjs',
+  'scripts/_shared/ai-analysis-builder.mjs',
+  'scripts/_shared/event-decision-alerts.mjs',
+  'scripts/_shared/event-intelligence-builder.mjs',
+];
+
+test('user-facing evidence routes must gate raw E2/E3/E4 before promotion', async () => {
+  for (const relPath of USER_FACING_EVIDENCE_FILES) {
+    const source = await read(relPath);
+    if (!source.includes('event_uplift')) continue;
+    assert.match(
+      source,
+      /HOT_EVENTS_MIN_PROMOTION_CONTROLS|MIN_PROMOTION_CONTROLS/,
+      `${relPath} reads event_uplift but does not reference the promotion-control threshold`,
+    );
+    assert.match(
+      source,
+      /n_controls/,
+      `${relPath} reads event_uplift but does not gate/report matched controls`,
+    );
+    assert.match(
+      source,
+      /market_relevance/,
+      `${relPath} reads event_uplift but does not gate/report market relevance`,
+    );
+  }
+});
+
+test('serverless user-facing APIs must not fall back to hardcoded NAS passwords', async () => {
+  const apiFiles = (await readdir(path.join(ROOT, 'api')))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => `api/${name}`);
+  for (const relPath of apiFiles) {
+    const source = await read(relPath);
+    assert.equal(source.includes('lattice1234'), false, `${relPath} contains a hardcoded NAS password fallback`);
+  }
+});
+
+test('runtime scripts must not contain the old hardcoded NAS password', async () => {
+  const files = [
+    ...await listFiles('api', ['.js']),
+    ...await listFiles('scripts', ['.mjs', '.js', '.py']),
+    ...await listFiles('src', ['.ts', '.tsx', '.js']),
+  ];
+  for (const relPath of files) {
+    const source = await read(relPath);
+    assert.equal(source.includes('lattice1234'), false, `${relPath} contains the old hardcoded NAS password`);
+  }
+});
+
+test('locale JSON files must parse cleanly before runtime language loading', async () => {
+  const localeFiles = (await readdir(path.join(ROOT, 'src/locales')))
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => `src/locales/${name}`);
+  for (const relPath of localeFiles) {
+    const source = await read(relPath);
+    assert.doesNotThrow(() => JSON.parse(source), `${relPath} is invalid JSON`);
+  }
+});
+
+test('dashboard peek must render raw blocked grades differently from promoted grades', async () => {
+  const source = await read('event-dashboard.html');
+  assert.match(source, /formatUpliftGradeForPeek/, 'event peek should use the raw/promoted grade formatter');
+  assert.match(source, /rawEvidenceGrade/, 'event peek should inspect rawEvidenceGrade');
+  assert.match(source, /blocked:/, 'event peek should surface blocked raw-grade reasons');
+});
+
+test('primary dashboard and locale files must not expose known mojibake separators', async () => {
+  for (const relPath of ['event-dashboard.html', 'src/locales/en.json', 'src/locales/ko.json', 'scripts/_shared/ai-analysis-builder.mjs']) {
+    const source = await read(relPath);
+    for (const token of ['\uCA0C', '\uD69E', '\uFFFD']) {
+      assert.equal(source.includes(token), false, `${relPath} still contains mojibake separator text`);
+    }
+  }
+});
+
+test('serverless KPI summary must query latest signal values per signal, not by global timestamp', async () => {
+  const source = await read('api/kpi-summary.js');
+  assert.match(source, /FROM signal_history sh/, 'KPI signal query should alias the outer signal_history table');
+  assert.match(source, /FROM signal_history sh2/, 'KPI signal query should use a separate inner alias');
+  assert.match(source, /sh2\.signal_name = sh\.signal_name/, 'KPI latest-signal subquery must correlate by signal name');
+});
+
+test('regime timeline routes must de-duplicate intraday VIX rows by date', async () => {
+  for (const relPath of ['api/regime-timeline.js', 'scripts/event-dashboard-api.mjs']) {
+    const source = await read(relPath);
+    assert.match(source, /DISTINCT ON \(DATE\(ts\)\)/, `${relPath} should select one VIX row per date`);
+    assert.match(source, /ORDER BY DATE\(ts\), ts DESC/, `${relPath} should use the latest VIX sample per date`);
+  }
+});
+
+test('dashboard surfaces must resolve API base dynamically for local and deployed modes', async () => {
+  const dashboard = await read('event-dashboard.html');
+  const mapLens = await read('src/theme-map-lens.ts');
+  assert.match(dashboard, /function resolveSignalApiBase\(\)/, 'dashboard should not hardcode only localhost API base');
+  assert.match(mapLens, /function resolveSignalApiBase\(\)/, 'map lens should not hardcode only localhost API base');
+  assert.equal(dashboard.includes("const API='http://localhost:46200/api'"), false);
+  assert.equal(dashboard.includes("const NAS_API = 'http://localhost:46200/api'"), false);
+  assert.equal(mapLens.includes("const API = 'http://localhost:46200/api'"), false);
+});
+
+test('user-facing event uplift routes must bound the historical evidence window', async () => {
+  for (const relPath of ['api/event-uplift-grades.js', 'scripts/event-dashboard-api.mjs']) {
+    const source = await read(relPath);
+    assert.match(source, /EVIDENCE_GRADE_WINDOW_DAYS/, `${relPath} should expose a bounded UI evidence window`);
+    assert.match(source, /event_date >= CURRENT_DATE - INTERVAL/, `${relPath} should bound event_uplift UI reads by event_date`);
+  }
+});
+
+test('weekly digest endpoint must be cache-first unless explicit refresh is requested', async () => {
+  const source = await read('scripts/_shared/ai-analysis-builder.mjs');
+  const dashboard = await read('event-dashboard.html');
+  assert.match(source, /WEEKLY_DIGEST_CACHE_TTL_MS/, 'weekly digest should define a freshness window');
+  assert.match(source, /if \(cached && !forceRefresh && isFreshWeeklyDigestCache\(cached\)\)/, 'weekly digest should serve fresh cache without Codex');
+  assert.match(source, /if \(!forceRefresh\)/, 'weekly digest default path should not call Codex');
+  assert.match(source, /buildDeterministicWeeklyDigest/, 'weekly digest should have a deterministic non-Codex fallback');
+  assert.match(dashboard, /weekly-digest\?refresh=1/, 'manual Generate via Codex button should explicitly request refresh');
+});
+
+test('dashboard API reads should avoid broken URLs and unscoped hot-event aggregation', async () => {
+  const dashboard = await read('event-dashboard.html');
+  const api = await read('scripts/event-dashboard-api.mjs');
+  const hotEvents = await read('scripts/_shared/event-intelligence-builder.mjs');
+  assert.equal(dashboard.includes('/regime//'), false, 'dashboard should not call a double-slash regime URL');
+  assert.match(hotEvents, /JOIN recent_events re ON re\.id = aem\.canonical_event_id/, 'hot events should scope article quality to candidate events');
+  assert.match(hotEvents, /JOIN recent_events re ON re\.id = eu\.canonical_event_id/, 'hot events should scope uplift aggregation to candidate events');
+  assert.match(api, /WITH topic_keywords\(topic, keyword\) AS/, 'trends endpoint should scan topics in one grouped query');
+  assert.equal(api.match(/FROM articles WHERE \$\{cond\}/)?.length || 0, 0, 'trends endpoint should not run sequential per-topic article scans');
+});
+
+test('dashboard should not download unbounded pending validation payloads', async () => {
+  const dashboard = await read('event-dashboard.html');
+  const api = await read('scripts/event-dashboard-api.mjs');
+  assert.match(dashboard, /\/pending\?limit=20/, 'dashboard should request a bounded pending page');
+  assert.match(api, /Math\.min\(200, Number\(params\.get\('limit'\)\)/, 'pending endpoint should clamp caller-provided limit');
+  assert.match(api, /LIMIT \$1/, 'pending endpoint should apply SQL LIMIT');
+  assert.match(api, /PARTITION BY COALESCE\(symbol, ''\), COALESCE\(theme, ''\)/, 'pending endpoint should collapse duplicate symbol/theme rows for the dashboard overview');
+});

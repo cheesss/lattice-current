@@ -21,6 +21,7 @@ import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
 import { buildFreshnessAudit } from './audit-data-freshness.mjs';
 import { buildNowcastStatusPayload } from './_shared/nowcast-status-builder.mjs';
 import {
+  HOT_EVENTS_MIN_PROMOTION_CONTROLS,
   buildHotEventsPayload,
   buildMetaModelHealthPayload,
   buildExplainEventPayload,
@@ -32,6 +33,7 @@ import {
   buildEventNarrativePayload,
   buildSimilarEventsPayload,
   buildRegimeScenarioPayload,
+  buildCurrentRegimeBriefPayload,
   buildAssetDossierPayload,
   buildWeeklyDigestPayload,
   buildCorrelationBreaksPayload,
@@ -142,6 +144,7 @@ loadOptionalEnvFile();
 
 const { Pool } = pg;
 const PORT = Number(process.env.DASHBOARD_PORT || 46200);
+const EVIDENCE_GRADE_WINDOW_DAYS = 365;
 const AUDIT_DIR = path.resolve('data', 'audits');
 const DATA_FRESHNESS_AUDIT_TTL_MS = Number(process.env.DATA_FRESHNESS_AUDIT_TTL_MS || 5 * 60 * 1000);
 const SERVER_CACHE_FALLBACK_TTL_MS = Number(process.env.DASHBOARD_CACHE_FALLBACK_TTL_MS || 60 * 60 * 1000);
@@ -647,6 +650,15 @@ async function buildMapLensOverlayPayload(params) {
       LIMIT 180
     `, [days]),
     safeQuery(`
+      WITH article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      )
       SELECT
         ce.id AS canonical_event_id,
         ce.theme,
@@ -656,10 +668,19 @@ async function buildMapLensOverlayPayload(params) {
         eu.horizon,
         eu.uplift,
         eu.t_stat,
+        eu.n_controls,
         eu.evidence_grade
       FROM event_uplift eu
       JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+      LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.id
       WHERE eu.evidence_grade = 'E2'
+        AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+        AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+        AND NOT (
+          COALESCE(aq.known_market_relevance_articles, 0) > 0
+          AND COALESCE(aq.market_relevant_articles, 0) = 0
+          AND COALESCE(aq.low_relevance_articles, 0) > 0
+        )
         AND ce.event_date >= CURRENT_DATE - ($1 * INTERVAL '1 day')
       ORDER BY ABS(COALESCE(eu.uplift, 0)) DESC, ABS(COALESCE(eu.t_stat, 0)) DESC, ce.event_date DESC
       LIMIT 80
@@ -1504,6 +1525,17 @@ async function buildCodexQuality() {
     // best-effort metrics hydration
   }
 
+  let promptMetrics = { prompts: {}, history: [] };
+  try {
+    const promptMetricsPath = path.resolve('data', 'codex-prompt-metrics.json');
+    if (existsSync(promptMetricsPath)) {
+      const parsed = JSON.parse(await readFile(promptMetricsPath, 'utf8'));
+      if (parsed && typeof parsed === 'object') promptMetrics = parsed;
+    }
+  } catch {
+    // best-effort prompt wrapper metrics hydration
+  }
+
   const auditDirs = [
     path.resolve('data', 'automation', 'codex-audit'),
     path.resolve('codex-audit'),
@@ -1545,6 +1577,12 @@ async function buildCodexQuality() {
   const avgConfidence = Number(persistedMetrics.avgConfidence || 0) > 0
     ? Number(persistedMetrics.avgConfidence)
     : auditAvgConfidence;
+  const promptEntries = Object.values(promptMetrics.prompts || {}).filter((entry) => entry && typeof entry === 'object');
+  const wrapperTotalCalls = promptEntries.reduce((sum, entry) => sum + Number(entry.totalCalls || 0), 0);
+  const wrapperParseSuccess = promptEntries.reduce((sum, entry) => sum + Number(entry.parseSuccessCount || 0), 0);
+  const wrapperParseFail = promptEntries.reduce((sum, entry) => sum + Number(entry.parseFailCount || 0), 0);
+  const promptHistory = Array.isArray(promptMetrics.history) ? promptMetrics.history : [];
+  const latestPrompt = promptHistory[0] || null;
 
   return {
     totalCalls,
@@ -1557,6 +1595,18 @@ async function buildCodexQuality() {
     lastWarnings: Array.isArray(persistedMetrics.lastWarnings) ? persistedMetrics.lastWarnings : [],
     recentAuditEntries: auditEntries.length,
     recentValidationWarnings: auditValidationWarnings.slice(-10),
+    jsonWrapper: {
+      totalCalls: wrapperTotalCalls,
+      parseSuccess: wrapperParseSuccess,
+      parseFail: wrapperParseFail,
+      parseSuccessRate: wrapperTotalCalls > 0 ? Number((wrapperParseSuccess / wrapperTotalCalls).toFixed(4)) : 0,
+      latestLabel: latestPrompt?.label || null,
+      latestModel: latestPrompt?.model || null,
+      latestFailureKind: latestPrompt?.failureKind || null,
+      latestAttempts: Number(latestPrompt?.attempts || 0),
+      latestParsed: latestPrompt ? Boolean(latestPrompt.parsed) : null,
+      latestAt: latestPrompt?.at || null,
+    },
   };
 }
 
@@ -2400,6 +2450,19 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       }
     }
 
+    if (segments[0] === 'api' && segments[1] === 'current-regime-brief') {
+      try {
+        const payload = await buildCurrentRegimeBriefPayload(getPool(), {
+          useCodex: params.get('codex') === '1',
+          forceRefresh: params.get('refresh') === '1',
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 500);
+      } catch (err) {
+        logger.warn('current-regime-brief failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     if (segments[0] === 'api' && segments[1] === 'asset-dossier' && segments[2]) {
       try {
         const payload = await buildAssetDossierPayload(getPool(), { symbol: segments[2] });
@@ -2847,23 +2910,40 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         'Biotech/Gene': ['biotech', 'CRISPR', 'mRNA'],
         Renewable: ['solar', 'renewable', 'hydrogen'],
       };
-      const results = [];
-      for (const [name, kws] of Object.entries(topics)) {
-        const cond = kws.map((_, i) => `title ILIKE $${i + 1}`).join(' OR ');
-        const r = await safeQuery(
-          `SELECT DATE_TRUNC('month', published_at)::date AS month, COUNT(*) AS n
-           FROM articles WHERE ${cond}
-           GROUP BY month ORDER BY month`,
-          kws.map((k) => `%${k}%`),
-        );
-        const counts = r.rows.map((row) => ({ month: row.month, n: Number(row.n) }));
+      const pairs = Object.entries(topics).flatMap(([name, keywords]) => keywords.map((keyword) => [name, keyword]));
+      const valuesSql = pairs.map((_, index) => `($${index * 2 + 1}::text, $${index * 2 + 2}::text)`).join(', ');
+      const r = await safeQuery(
+        `
+        WITH topic_keywords(topic, keyword) AS (VALUES ${valuesSql}),
+        monthly AS (
+          SELECT tk.topic AS name,
+                 DATE_TRUNC('month', a.published_at)::date AS month,
+                 COUNT(DISTINCT a.id)::int AS n
+            FROM articles a
+            JOIN topic_keywords tk ON a.title ILIKE ('%' || tk.keyword || '%')
+           WHERE a.published_at >= CURRENT_DATE - INTERVAL '5 years'
+           GROUP BY tk.topic, DATE_TRUNC('month', a.published_at)::date
+        )
+        SELECT name, month, n
+          FROM monthly
+         ORDER BY name, month
+        `,
+        pairs.flat(),
+      );
+      const byTopic = new Map(Object.keys(topics).map((name) => [name, []]));
+      for (const row of r.rows) {
+        const bucket = byTopic.get(row.name) || [];
+        bucket.push({ month: row.month, n: Number(row.n) });
+        byTopic.set(row.name, bucket);
+      }
+      const results = Array.from(byTopic.entries()).map(([name, counts]) => {
         const recent = counts.slice(-3);
         const prev = counts.slice(-6, -3);
         const recentAvg = recent.length ? recent.reduce((sum, row) => sum + row.n, 0) / recent.length : 0;
         const prevAvg = prev.length ? prev.reduce((sum, row) => sum + row.n, 0) / prev.length : 0;
         const momentum = prevAvg > 0 ? ((recentAvg - prevAvg) / prevAvg) * 100 : 0;
-        results.push({ name, momentum, recentAvg, total: counts.reduce((sum, row) => sum + row.n, 0), timeline: counts });
-      }
+        return { name, momentum, recentAvg, total: counts.reduce((sum, row) => sum + row.n, 0), timeline: counts };
+      });
       return buildJsonResponse(results);
     }
 
@@ -2904,20 +2984,36 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'pending') {
+      const limit = Math.max(1, Math.min(200, Number(params.get('limit')) || 50));
       const r = await safeQuery(`
-        SELECT
-          article_id AS "articleId",
-          theme,
-          symbol,
-          entry_price AS "entryPrice",
-          published_at AS "publishedAt",
-          target_date AS "targetDate",
-          GREATEST(0, (target_date::date - CURRENT_DATE)::int) AS "daysRemaining"
-        FROM pending_outcomes
-        WHERE status IN ('pending', 'waiting')
-        ORDER BY target_date ASC
+        WITH ranked AS (
+          SELECT
+            article_id AS "articleId",
+            theme,
+            symbol,
+            entry_price AS "entryPrice",
+            published_at AS "publishedAt",
+            target_date AS "targetDate",
+            GREATEST(0, (target_date::date - CURRENT_DATE)::int) AS "daysRemaining",
+            ROW_NUMBER() OVER (
+              PARTITION BY COALESCE(symbol, ''), COALESCE(theme, '')
+              ORDER BY target_date ASC, published_at DESC NULLS LAST
+            ) AS rn
+          FROM pending_outcomes
+          WHERE status IN ('pending', 'waiting')
+        )
+        SELECT "articleId", theme, symbol, "entryPrice", "publishedAt", "targetDate", "daysRemaining"
+          FROM ranked
+         WHERE rn = 1
+         ORDER BY "targetDate" ASC
+        LIMIT $1
+      `, [limit]);
+      const countRes = await safeQuery(`
+        SELECT COUNT(DISTINCT (COALESCE(symbol, ''), COALESCE(theme, '')))::int AS total
+          FROM pending_outcomes
+         WHERE status IN ('pending', 'waiting')
       `);
-      return buildJsonResponse({ items: r.rows });
+      return buildJsonResponse({ items: r.rows, total: Number(countRes.rows[0]?.total || r.rows.length), limit });
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-latest') {
@@ -2961,36 +3057,106 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     // ── /api/event-uplift-grades ──
     if (segments[0] === 'api' && segments[1] === 'event-uplift-grades') {
-      const r = await safeQuery(`
-        WITH ranked_uplift AS (
-          SELECT
-            eu.canonical_event_id,
-            eu.evidence_grade,
-            eu.uplift,
-            eu.t_stat,
-            ce.theme,
-            ce.representative_title AS title,
-            ce.event_date AS updated_at,
-            lo.symbol,
-            lo.forward_return_pct,
-            lo.abnormal_return,
-            art.sources,
-            ROW_NUMBER() OVER (
-              PARTITION BY eu.canonical_event_id
-              ORDER BY ABS(COALESCE(lo.abnormal_return, eu.uplift, 0)) DESC,
-                       ABS(COALESCE(eu.uplift, 0)) DESC,
-                       ABS(COALESCE(eu.t_stat, 0)) DESC
-            ) AS event_rank
-          FROM event_uplift eu
-          JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+      const summaryRes = await safeQuery(`
+        WITH uplift_candidates AS (
+          SELECT eu.*
+            FROM event_uplift eu
+            JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+           WHERE eu.evidence_grade IS NOT NULL
+             AND ce.event_date >= CURRENT_DATE - INTERVAL '${EVIDENCE_GRADE_WINDOW_DAYS} days'
+        ),
+        candidate_event_ids AS (
+          SELECT DISTINCT canonical_event_id AS id
+            FROM uplift_candidates
+        ),
+        article_quality AS (
+          SELECT aem.canonical_event_id,
+                 COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+            FROM article_event_map aem
+            JOIN candidate_event_ids cei ON cei.id = aem.canonical_event_id
+            JOIN articles a ON a.id = aem.article_id
+           GROUP BY aem.canonical_event_id
+        ),
+        gated AS (
+          SELECT eu.evidence_grade AS raw_evidence_grade,
+            CASE
+              WHEN eu.evidence_grade IN ('E2','E3','E4')
+               AND (
+                 ABS(COALESCE(eu.t_stat, 0)) < 2
+                 OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                 OR (
+                   COALESCE(aq.known_market_relevance_articles, 0) > 0
+                   AND COALESCE(aq.market_relevant_articles, 0) = 0
+                   AND COALESCE(aq.low_relevance_articles, 0) > 0
+                 )
+               ) THEN NULL
+              ELSE eu.evidence_grade
+            END AS evidence_grade,
+            eu.uplift
+          FROM uplift_candidates eu
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
+        )
+        SELECT evidence_grade,
+               COUNT(*)::int AS count,
+               AVG(COALESCE(uplift, 0)) AS avg_uplift,
+               COUNT(*) FILTER (WHERE raw_evidence_grade IS NOT NULL AND evidence_grade IS NULL)::int AS quarantined
+          FROM gated
+         GROUP BY evidence_grade
+         ORDER BY evidence_grade DESC NULLS LAST
+      `);
+
+      const liveSignalWindowDays = 30;
+      const signalsRes = await safeQuery(`
+        WITH candidate_events AS (
+          SELECT eu.canonical_event_id,
+                 eu.evidence_grade,
+                 eu.uplift,
+                 eu.t_stat,
+                 eu.n_controls,
+                 ce.theme,
+                 ce.representative_title AS title,
+                 ce.event_date AS updated_at
+            FROM event_uplift eu
+            JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+           WHERE eu.evidence_grade = 'E2'
+             AND ce.event_date >= CURRENT_DATE - INTERVAL '${liveSignalWindowDays} days'
+             AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+             AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+        ),
+        article_quality AS (
+          SELECT aem.canonical_event_id,
+                 COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+            FROM article_event_map aem
+            JOIN candidate_events ce ON ce.canonical_event_id = aem.canonical_event_id
+            JOIN articles a ON a.id = aem.article_id
+           GROUP BY aem.canonical_event_id
+        )
+        SELECT ce.canonical_event_id,
+               ce.evidence_grade,
+               ce.uplift,
+               ce.t_stat,
+               ce.n_controls,
+               ce.theme,
+               ce.title,
+               ce.updated_at,
+               lo.symbol,
+               lo.forward_return_pct,
+               lo.abnormal_return,
+               art.sources
+          FROM candidate_events ce
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.canonical_event_id
           LEFT JOIN LATERAL (
             SELECT lo2.symbol, lo2.forward_return_pct, lo2.abnormal_return
-            FROM labeled_outcomes lo2
-            WHERE lo2.canonical_event_id = eu.canonical_event_id
-              AND lo2.symbol != 'SPY'
-              AND lo2.abnormal_return IS NOT NULL
-            ORDER BY ABS(lo2.abnormal_return) DESC
-            LIMIT 1
+              FROM labeled_outcomes lo2
+             WHERE lo2.canonical_event_id = ce.canonical_event_id
+               AND lo2.symbol != 'SPY'
+               AND lo2.abnormal_return IS NOT NULL
+             ORDER BY ABS(lo2.abnormal_return) DESC
+             LIMIT 1
           ) lo ON true
           LEFT JOIN LATERAL (
             SELECT json_agg(
@@ -3003,50 +3169,37 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             ) AS sources
             FROM (
               SELECT a.title, a.url, a.source, a.published_at
-              FROM article_event_map aem
-              JOIN articles a ON a.id = aem.article_id
-              WHERE aem.canonical_event_id = eu.canonical_event_id
-                AND a.title IS NOT NULL
-              ORDER BY a.published_at DESC
-              LIMIT 3
+                FROM article_event_map aem
+                JOIN articles a ON a.id = aem.article_id
+               WHERE aem.canonical_event_id = ce.canonical_event_id
+                 AND a.title IS NOT NULL
+               ORDER BY a.published_at DESC
+               LIMIT 3
             ) sub
           ) art ON true
-          WHERE eu.evidence_grade IS NOT NULL
-        )
-        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, updated_at, symbol, forward_return_pct, abnormal_return, sources
-        FROM ranked_uplift
-        WHERE event_rank = 1
-        ORDER BY evidence_grade DESC, ABS(uplift) DESC
-        LIMIT 50000
+         WHERE NOT (
+           COALESCE(aq.known_market_relevance_articles, 0) > 0
+           AND COALESCE(aq.market_relevant_articles, 0) = 0
+           AND COALESCE(aq.low_relevance_articles, 0) > 0
+         )
+         ORDER BY ABS(COALESCE(ce.uplift, 0)) * 0.6 + ABS(COALESCE(ce.t_stat, 0)) * 0.4 DESC
+         LIMIT 100
       `);
-      // Separate: summary for chart + top signals for queue
-      const grades = r.rows;
-      const summary = {};
-      for (const row of grades) {
-        const g = row.evidence_grade;
-        if (!summary[g]) summary[g] = { grade: g, count: 0, totalUplift: 0 };
-        summary[g].count++;
-        summary[g].totalUplift += Number(row.uplift || 0);
-      }
-      for (const s of Object.values(summary)) {
-        s.avgUplift = s.count > 0 ? Number((s.totalUplift / s.count).toFixed(4)) : 0;
-      }
-      const liveSignalWindowDays = 30;
-      const recentCutoff = Date.now() - (liveSignalWindowDays * 24 * 60 * 60 * 1000);
+      const summaryRows = summaryRes.rows || [];
+      const rawRows = summaryRows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+      const quarantinedCount = summaryRows.reduce((sum, row) => sum + Number(row.quarantined || 0), 0);
+      const summary = summaryRows
+        .filter((row) => row.evidence_grade)
+        .map((row) => ({
+          grade: row.evidence_grade,
+          count: Number(row.count || 0),
+          totalUplift: Number(row.avg_uplift || 0) * Number(row.count || 0),
+          avgUplift: Number(Number(row.avg_uplift || 0).toFixed(4)),
+        }));
       const symbolCounts = new Map();
       const seenTitles = new Set();
       const actionableSignals = [];
-      for (const row of grades
-        .filter((item) => {
-          if (String(item.evidence_grade || '').toUpperCase() !== 'E2') return false;
-          const updatedAt = item.updated_at ? Date.parse(item.updated_at) : NaN;
-          return Number.isFinite(updatedAt) && updatedAt >= recentCutoff;
-        })
-        .sort((a, b) => {
-          const aScore = Math.abs(Number(a.uplift || 0)) * 0.6 + Math.abs(Number(a.t_stat || 0)) * 0.4;
-          const bScore = Math.abs(Number(b.uplift || 0)) * 0.6 + Math.abs(Number(b.t_stat || 0)) * 0.4;
-          return bScore - aScore;
-        })) {
+      for (const row of signalsRes.rows || []) {
         const titleKey = normalizeSignalQueueTitle(row.title);
         const symbolKey = String(row.symbol || 'unknown').toUpperCase();
         if (titleKey && seenTitles.has(titleKey)) continue;
@@ -3057,10 +3210,15 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         if (actionableSignals.length >= 20) break;
       }
       return buildJsonResponse({
-        grades: Object.values(summary),
+        grades: summary,
         signals: actionableSignals,
         meta: {
           liveSignalWindowDays,
+          minPromotionControls: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
+          evidenceGradeWindowDays: EVIDENCE_GRADE_WINDOW_DAYS,
+          rawRows,
+          promotedRows: summary.reduce((sum, row) => sum + Number(row.count || 0), 0),
+          quarantinedRows: quarantinedCount,
         },
       });
     }
@@ -3140,12 +3298,20 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     if (segments[0] === 'api' && segments[1] === 'regime-timeline') {
       const days = Math.max(1, Math.min(3650, Number(params.get('days')) || 365));
       const r = await safeQuery(`
-        WITH daily_regime AS (
-          SELECT DATE(ts) as d, value as vix,
-            CASE WHEN value > 25 THEN 'risk-off'
-                 WHEN value < 18 THEN 'risk-on'
+        WITH daily_vix AS (
+          SELECT DISTINCT ON (DATE(ts))
+                 DATE(ts) AS d,
+                 value AS vix
+            FROM signal_history
+           WHERE signal_name='vix' AND ts >= NOW() - ($1 || ' days')::interval
+           ORDER BY DATE(ts), ts DESC
+        ),
+        daily_regime AS (
+          SELECT d, vix,
+            CASE WHEN vix > 25 THEN 'risk-off'
+                 WHEN vix < 18 THEN 'risk-on'
                  ELSE 'balanced' END AS regime
-          FROM signal_history WHERE signal_name='vix' AND ts >= NOW() - ($1 || ' days')::interval
+          FROM daily_vix
         )
         SELECT d, regime, vix FROM daily_regime ORDER BY d
       `, [String(days)]);

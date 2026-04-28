@@ -96,7 +96,28 @@ type MapLensOverlayPayload = {
   transmissionArcs: MapLensTransmissionArc[];
 };
 
-const API = 'http://localhost:46200/api';
+const SIGNAL_API_PORT = '46200';
+
+function normalizeApiBase(raw: string | null | undefined): string {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  return value.replace(/\/+$/, '').replace(/\/api$/, '/api');
+}
+
+function resolveSignalApiBase(): string {
+  if (typeof window === 'undefined') return `http://localhost:${SIGNAL_API_PORT}/api`;
+  const params = new URLSearchParams(window.location.search || '');
+  const explicit = normalizeApiBase(params.get('api') || window.localStorage.getItem('lattice:signal-api-base'));
+  if (explicit) return explicit;
+  if (window.location.protocol === 'file:') return `http://localhost:${SIGNAL_API_PORT}/api`;
+  const host = window.location.hostname || 'localhost';
+  const origin = window.location.origin;
+  if (window.location.port === SIGNAL_API_PORT) return `${origin}/api`;
+  if (host === 'localhost' || host === '127.0.0.1') return `http://${host}:${SIGNAL_API_PORT}/api`;
+  return `${origin}/api`;
+}
+
+const API = resolveSignalApiBase();
 const REFRESH_MS = 180_000;
 const OVERLAY_COLLAPSE_KEY = 'theme-map-lens:overlay-collapsed';
 const PERIOD_LABELS: Record<LensContext['period'], string> = {

@@ -17,6 +17,7 @@
 
 const HOT_EVENTS_LIMIT = 10;
 const HOT_EVENTS_LOOKBACK_DAYS = 7;
+export const HOT_EVENTS_MIN_PROMOTION_CONTROLS = 8;
 const EXPLAIN_EVENT_ARTICLE_LIMIT = 12;
 const EXPLAIN_EVENT_SYMBOL_LIMIT = 10;
 const SOURCE_DIVERSITY_WINDOW_HOURS = 24;
@@ -34,6 +35,72 @@ async function tableExists(executor, tableName) {
 }
 
 /* ===================== get_hot_events ===================== */
+
+function asBoolean(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+export function buildHotEventQualityFlags(row = {}) {
+  const flags = [];
+  const rawGrade = row.raw_best_grade || row.raw_evidence_grade || row.best_grade || null;
+  const promotedGrade = row.promoted_grade || null;
+  const controlsBlocked = asBoolean(row.controls_blocked);
+  const relevanceBlocked = asBoolean(row.relevance_blocked);
+
+  if (rawGrade && !promotedGrade) {
+    flags.push('raw-grade-not-promoted');
+  }
+  if (controlsBlocked) {
+    flags.push('low-control-count');
+  }
+  if (relevanceBlocked) {
+    flags.push('low-market-relevance');
+  }
+  if (Number(row.article_count ?? 0) < 2) {
+    flags.push('single-article');
+  }
+  if (Number(row.source_count ?? 0) < 2) {
+    flags.push('single-source');
+  }
+  return flags;
+}
+
+export function normalizeHotEventRow(row = {}) {
+  const qualityFlags = buildHotEventQualityFlags(row);
+  const promotedGrade = row.promoted_grade || null;
+  const rawGrade = row.raw_best_grade || row.raw_evidence_grade || row.best_grade || null;
+
+  return {
+    id: Number(row.id),
+    theme: row.theme,
+    title: row.representative_title,
+    eventDate: row.event_date,
+    articleCount: Number(row.article_count ?? 0),
+    sourceCount: Number(row.source_count ?? 0),
+    temperature: row.temperature == null ? null : Number(row.temperature),
+    isSurge: Boolean(row.is_surge),
+    bestEvidenceGrade: promotedGrade,
+    rawEvidenceGrade: rawGrade,
+    upliftRows: Number(row.uplift_rows ?? 0),
+    promotedUpliftRows: Number(row.promoted_uplift_rows ?? 0),
+    maxAbsUplift: row.rank_abs_uplift == null ? null : Number(row.rank_abs_uplift),
+    rawMaxAbsUplift: row.raw_max_abs_uplift == null ? null : Number(row.raw_max_abs_uplift),
+    maxAbsTStat: row.rank_abs_t == null ? null : Number(row.rank_abs_t),
+    rawMaxAbsTStat: row.raw_max_abs_t == null ? null : Number(row.raw_max_abs_t),
+    minStrongControls: row.min_strong_controls == null ? null : Number(row.min_strong_controls),
+    maxStrongControls: row.max_strong_controls == null ? null : Number(row.max_strong_controls),
+    marketRelevantArticles: Number(row.market_relevant_articles ?? 0),
+    knownMarketRelevanceArticles: Number(row.known_market_relevance_articles ?? 0),
+    lowRelevanceArticles: Number(row.low_relevance_articles ?? 0),
+    qualityFlags,
+    promotionEligible: ['E2', 'E3', 'E4'].includes(String(promotedGrade || '').toUpperCase()),
+    qualityGate: {
+      minControlsRequired: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
+      controlsBlocked: asBoolean(row.controls_blocked),
+      relevanceBlocked: asBoolean(row.relevance_blocked),
+    },
+  };
+}
 
 export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lookbackDays = HOT_EVENTS_LOOKBACK_DAYS } = {}) {
   const client = pool;
@@ -100,56 +167,126 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
          WHERE event_date >= CURRENT_DATE - ($2::int * INTERVAL '1 day')
          GROUP BY theme, event_date
       ),
+      article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*)::int AS mapped_articles,
+               COUNT(DISTINCT COALESCE(NULLIF(a.publisher_group, ''), NULLIF(a.source, '')))::int AS publisher_groups,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN recent_events re ON re.id = aem.canonical_event_id
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      ),
       uplift_agg AS (
         SELECT eu.canonical_event_id,
-               MAX(eu.evidence_grade)                                       AS best_grade,
-               COUNT(*)::int                                                AS uplift_rows,
-               MAX(ABS(COALESCE(eu.uplift, 0)))                             AS max_abs_uplift,
-               MAX(ABS(COALESCE(eu.t_stat, 0)))                             AS max_abs_t
+               MAX(eu.evidence_grade) AS raw_best_grade,
+               MAX(eu.evidence_grade) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+               ) AS control_qualified_grade,
+               COUNT(*)::int AS uplift_rows,
+               COUNT(*) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+               )::int AS strong_uplift_rows,
+               COUNT(*) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+               )::int AS promoted_uplift_rows,
+               MAX(ABS(COALESCE(eu.uplift, 0))) AS raw_max_abs_uplift,
+               MAX(ABS(COALESCE(eu.t_stat, 0))) AS raw_max_abs_t,
+               MAX(ABS(COALESCE(eu.uplift, 0))) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+               ) AS promoted_max_abs_uplift,
+               MAX(ABS(COALESCE(eu.t_stat, 0))) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+                   AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+               ) AS promoted_max_abs_t,
+               MIN(NULLIF(eu.n_controls, 0)) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+               ) AS min_strong_controls,
+               MAX(NULLIF(eu.n_controls, 0)) FILTER (
+                 WHERE eu.evidence_grade IN ('E2','E3','E4')
+                   AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+               ) AS max_strong_controls
           FROM event_uplift eu
+          JOIN recent_events re ON re.id = eu.canonical_event_id
          GROUP BY eu.canonical_event_id
+      ),
+      ranked AS (
+        SELECT re.id,
+               re.theme,
+               re.representative_title,
+               re.event_date,
+               re.article_count,
+               re.source_count,
+               h.temperature,
+               h.is_surge,
+               ua.raw_best_grade,
+               CASE
+                 WHEN ua.control_qualified_grade IS NULL THEN NULL
+                 WHEN COALESCE(aq.known_market_relevance_articles, 0) > 0
+                  AND COALESCE(aq.market_relevant_articles, 0) = 0
+                  AND COALESCE(aq.low_relevance_articles, 0) > 0 THEN NULL
+                 ELSE ua.control_qualified_grade
+               END AS promoted_grade,
+               ua.uplift_rows,
+               ua.strong_uplift_rows,
+               ua.promoted_uplift_rows,
+               ua.raw_max_abs_uplift,
+               ua.raw_max_abs_t,
+               CASE
+                 WHEN ua.control_qualified_grade IS NULL THEN NULL
+                 WHEN COALESCE(aq.known_market_relevance_articles, 0) > 0
+                  AND COALESCE(aq.market_relevant_articles, 0) = 0
+                  AND COALESCE(aq.low_relevance_articles, 0) > 0 THEN NULL
+                 ELSE ua.promoted_max_abs_uplift
+               END AS rank_abs_uplift,
+               CASE
+                 WHEN ua.control_qualified_grade IS NULL THEN NULL
+                 WHEN COALESCE(aq.known_market_relevance_articles, 0) > 0
+                  AND COALESCE(aq.market_relevant_articles, 0) = 0
+                  AND COALESCE(aq.low_relevance_articles, 0) > 0 THEN NULL
+                 ELSE ua.promoted_max_abs_t
+               END AS rank_abs_t,
+               ua.min_strong_controls,
+               ua.max_strong_controls,
+               COALESCE(aq.known_market_relevance_articles, 0) AS known_market_relevance_articles,
+               COALESCE(aq.market_relevant_articles, 0) AS market_relevant_articles,
+               COALESCE(aq.low_relevance_articles, 0) AS low_relevance_articles,
+               (COALESCE(ua.strong_uplift_rows, 0) > 0 AND COALESCE(ua.promoted_uplift_rows, 0) = 0) AS controls_blocked,
+               (COALESCE(aq.known_market_relevance_articles, 0) > 0
+                AND COALESCE(aq.market_relevant_articles, 0) = 0
+                AND COALESCE(aq.low_relevance_articles, 0) > 0) AS relevance_blocked
+          FROM recent_events re
+          LEFT JOIN hawkes h          ON h.theme = re.theme AND h.event_date = re.event_date
+          LEFT JOIN uplift_agg ua     ON ua.canonical_event_id = re.id
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = re.id
       )
-      SELECT re.id,
-             re.theme,
-             re.representative_title,
-             re.event_date,
-             re.article_count,
-             re.source_count,
-             h.temperature,
-             h.is_surge,
-             ua.best_grade,
-             ua.uplift_rows,
-             ua.max_abs_uplift,
-             ua.max_abs_t
-        FROM recent_events re
-        LEFT JOIN hawkes h     ON h.theme = re.theme AND h.event_date = re.event_date
-        LEFT JOIN uplift_agg ua ON ua.canonical_event_id = re.id
+      SELECT *
+        FROM ranked
        ORDER BY
-         CASE WHEN ua.best_grade IN ('E4','E3') THEN 0
-              WHEN ua.best_grade IN ('E2','E1') THEN 1
+         CASE WHEN promoted_grade IN ('E4','E3') THEN 0
+              WHEN promoted_grade IN ('E2','E1') THEN 1
               ELSE 2 END,
-         COALESCE(ua.max_abs_t, 0) DESC,
-         COALESCE(h.temperature, 0) DESC,
-         re.article_count DESC
+         COALESCE(rank_abs_t, 0) DESC,
+         COALESCE(temperature, 0) DESC,
+         event_date DESC,
+         article_count DESC
        LIMIT $1::int
       `,
       [safeLimit, safeLookback],
     );
 
-    const events = rows.map((r) => ({
-      id: Number(r.id),
-      theme: r.theme,
-      title: r.representative_title,
-      eventDate: r.event_date,
-      articleCount: Number(r.article_count ?? 0),
-      sourceCount: Number(r.source_count ?? 0),
-      temperature: r.temperature == null ? null : Number(r.temperature),
-      isSurge: Boolean(r.is_surge),
-      bestEvidenceGrade: r.best_grade || null,
-      upliftRows: Number(r.uplift_rows ?? 0),
-      maxAbsUplift: r.max_abs_uplift == null ? null : Number(r.max_abs_uplift),
-      maxAbsTStat: r.max_abs_t == null ? null : Number(r.max_abs_t),
-    }));
+    const events = rows.map(normalizeHotEventRow);
 
     const gradeCounts = { E4: 0, E3: 0, E2: 0, E1: 0, E0: 0, none: 0 };
     for (const ev of events) {
@@ -164,6 +301,10 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
       available: true,
       lookbackDays: safeLookback,
       limit: safeLimit,
+      qualityGate: {
+        minControlsRequired: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
+        note: 'Raw E2/E3/E4 grades are promoted only when the uplift row has enough matched controls and is not market-relevance blocked.',
+      },
       totalReturned: events.length,
       gradeCounts,
       surgeCount: events.filter((e) => e.isSurge).length,
@@ -330,12 +471,50 @@ export async function buildExplainEventPayload(pool, { eventId }) {
       ).catch(() => ({ rows: [] })),
       client.query(
         `
-        SELECT symbol, horizon, uplift, t_stat, evidence_grade,
-               event_alpha, control_avg_return, n_controls
-          FROM event_uplift
-         WHERE canonical_event_id = $1
-         ORDER BY ABS(COALESCE(t_stat, 0)) DESC NULLS LAST,
-                  ABS(COALESCE(uplift, 0)) DESC NULLS LAST
+        WITH article_quality AS (
+          SELECT aem.canonical_event_id,
+                 COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+            FROM article_event_map aem
+            JOIN articles a ON a.id = aem.article_id
+           WHERE aem.canonical_event_id = $1
+           GROUP BY aem.canonical_event_id
+        )
+        SELECT eu.symbol, eu.horizon, eu.uplift, eu.t_stat,
+               eu.evidence_grade AS raw_evidence_grade,
+               CASE
+                 WHEN eu.evidence_grade IN ('E2','E3','E4')
+                  AND (
+                    ABS(COALESCE(eu.t_stat, 0)) < 2
+                    OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                    OR (
+                      COALESCE(aq.known_market_relevance_articles, 0) > 0
+                      AND COALESCE(aq.market_relevant_articles, 0) = 0
+                      AND COALESCE(aq.low_relevance_articles, 0) > 0
+                    )
+                  ) THEN NULL
+                 ELSE eu.evidence_grade
+               END AS promoted_grade,
+               eu.event_alpha, eu.control_avg_return, eu.n_controls,
+               COALESCE(aq.known_market_relevance_articles, 0) AS known_market_relevance_articles,
+               COALESCE(aq.market_relevant_articles, 0) AS market_relevant_articles,
+               COALESCE(aq.low_relevance_articles, 0) AS low_relevance_articles,
+               (
+                 eu.evidence_grade IN ('E2','E3','E4')
+                 AND COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+               ) AS controls_blocked,
+               (
+                 eu.evidence_grade IN ('E2','E3','E4')
+                 AND COALESCE(aq.known_market_relevance_articles, 0) > 0
+                 AND COALESCE(aq.market_relevant_articles, 0) = 0
+                 AND COALESCE(aq.low_relevance_articles, 0) > 0
+               ) AS relevance_blocked
+          FROM event_uplift eu
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
+         WHERE eu.canonical_event_id = $1
+         ORDER BY ABS(COALESCE(eu.t_stat, 0)) DESC NULLS LAST,
+                  ABS(COALESCE(eu.uplift, 0)) DESC NULLS LAST
          LIMIT $2
         `,
         [id, EXPLAIN_EVENT_SYMBOL_LIMIT],
@@ -398,14 +577,37 @@ export async function buildExplainEventPayload(pool, { eventId }) {
         url: a.url,
       })),
       uplift: upliftRes.rows.map((u) => ({
+        ...(() => {
+          const qualityFlags = buildHotEventQualityFlags({
+            raw_evidence_grade: u.raw_evidence_grade,
+            promoted_grade: u.promoted_grade,
+            controls_blocked: u.controls_blocked,
+            relevance_blocked: u.relevance_blocked,
+            article_count: event.article_count,
+            source_count: event.source_count,
+          });
+          return {
+            rawEvidenceGrade: u.raw_evidence_grade,
+            evidenceGrade: u.promoted_grade,
+            qualityFlags,
+            promotionEligible: ['E2', 'E3', 'E4'].includes(String(u.promoted_grade || '').toUpperCase()),
+            qualityGate: {
+              minControlsRequired: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
+              controlsBlocked: asBoolean(u.controls_blocked),
+              relevanceBlocked: asBoolean(u.relevance_blocked),
+            },
+          };
+        })(),
         symbol: u.symbol,
         horizon: u.horizon,
         uplift: u.uplift == null ? null : Number(u.uplift),
         tStat: u.t_stat == null ? null : Number(u.t_stat),
-        evidenceGrade: u.evidence_grade,
         eventAlphaMean: u.event_alpha == null ? null : Number(u.event_alpha),
         controlAlphaMean: u.control_avg_return == null ? null : Number(u.control_avg_return),
         nControls: u.n_controls == null ? null : Number(u.n_controls),
+        marketRelevantArticles: Number(u.market_relevant_articles ?? 0),
+        knownMarketRelevanceArticles: Number(u.known_market_relevance_articles ?? 0),
+        lowRelevanceArticles: Number(u.low_relevance_articles ?? 0),
       })),
       controls: controlsRes.rows.map((c) => ({
         controlDate: c.control_date,

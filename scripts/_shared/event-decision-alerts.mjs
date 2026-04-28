@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import pg from 'pg';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './nas-runtime.mjs';
+import { HOT_EVENTS_MIN_PROMOTION_CONTROLS } from './event-intelligence-builder.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -29,10 +30,9 @@ const DEFAULT_SINCE_HOURS = 24;
 const DEFAULT_T_THRESHOLD = 2.0;
 const DEFAULT_MAX_ALERTS = 20;
 const STATE_RETENTION_DAYS = 14;
-// E2 is the actual "statistically significant" grade in production event_uplift
-// data. E3/E4 are defined in docs but not yet produced by the current
-// incremental_event_engine pipeline (confirmed empty 2026-04-23). We still
-// accept them for forward compatibility, but the live filter must include E2.
+// E2 is the current statistically significant production grade, but it is only
+// actionable after the promotion gate below: |t| >= 2, enough matched controls,
+// and no low-market-relevance block. E3/E4 are kept for future validation layers.
 const DEFAULT_HIGH_GRADES = ['E2', 'E3', 'E4'];
 
 async function loadState() {
@@ -74,6 +74,15 @@ export async function queryHighUpliftCandidates(pool, { sinceHours = DEFAULT_SIN
   const gradeList = Array.isArray(grades) && grades.length ? grades : DEFAULT_HIGH_GRADES;
   const { rows } = await pool.query(
     `
+    WITH article_quality AS (
+      SELECT aem.canonical_event_id,
+             COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+             COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+             COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+        FROM article_event_map aem
+        JOIN articles a ON a.id = aem.article_id
+       GROUP BY aem.canonical_event_id
+    )
     SELECT eu.canonical_event_id,
            eu.symbol,
            eu.horizon,
@@ -86,8 +95,15 @@ export async function queryHighUpliftCandidates(pool, { sinceHours = DEFAULT_SIN
            ce.event_date
       FROM event_uplift eu
       JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+      LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.id
      WHERE eu.evidence_grade = ANY($4::text[])
        AND ABS(COALESCE(eu.t_stat, 0)) >= $2
+       AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+       AND NOT (
+         COALESCE(aq.known_market_relevance_articles, 0) > 0
+         AND COALESCE(aq.market_relevant_articles, 0) = 0
+         AND COALESCE(aq.low_relevance_articles, 0) > 0
+       )
        AND ce.event_date >= (NOW() - ($1 || ' hours')::interval)::date
      ORDER BY eu.evidence_grade DESC,
               ABS(COALESCE(eu.t_stat, 0)) DESC,

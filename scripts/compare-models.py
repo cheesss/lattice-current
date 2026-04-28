@@ -7,6 +7,7 @@ Purged walk-forward (event_id group split) 동일 조건 비교.
 """
 
 import sys
+import os
 from datetime import datetime, timedelta
 from datetime import date as date_type
 
@@ -33,9 +34,26 @@ try:
 except ImportError:
     HAS_TORCH = False
 
+
+
+def require_pg_password():
+    password = (
+        os.environ.get("PG_PASSWORD")
+        or os.environ.get("PGPASSWORD")
+        or os.environ.get("INTEL_PG_PASSWORD")
+        or os.environ.get("NAS_PG_PASSWORD")
+    )
+    if not password:
+        raise RuntimeError(
+            "Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, "
+            "INTEL_PG_PASSWORD, or NAS_PG_PASSWORD."
+        )
+    return password
+
+
 PG_CONFIG = {
     "host": "192.168.0.2", "port": 5433,
-    "dbname": "lattice", "user": "postgres", "password": "lattice1234",
+    "dbname": "lattice", "user": "postgres", "password": require_pg_password(),
 }
 
 FEATURES = [
