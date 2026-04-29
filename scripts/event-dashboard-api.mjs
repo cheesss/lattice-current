@@ -40,6 +40,13 @@ import {
 } from './_shared/ai-analysis-builder.mjs';
 import { getBudgetStatus } from './_shared/automation-budget.mjs';
 import { getRecentAutomationActions } from './_shared/automation-audit.mjs';
+import {
+  ensureInboxAuditSchema,
+  recordInboxAction,
+  recentInboxActions,
+  newRequestId,
+  hashRequestBody,
+} from './_shared/inbox-audit.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
   getPendingApprovals,
@@ -2315,20 +2322,62 @@ async function reviewCodexProposal(proposalId, body = {}) {
   if (!decision) {
     return buildJsonResponse({ error: 'decision must be accept or reject' }, 400);
   }
+  const requestId = newRequestId();
+  const bodyHash = hashRequestBody(body);
+  const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
+
+  // Capture prev state before mutation so audit log records the transition
+  // accurately even if the review function returns the post-state only.
+  let prevState = null;
+  try {
+    const { rows } = await getPool().query(
+      `SELECT status FROM codex_proposals WHERE id = $1 LIMIT 1`,
+      [Number(proposalId)],
+    );
+    prevState = rows[0]?.status ?? null;
+  } catch {
+    // Non-fatal — audit will record null prev_state.
+  }
+
   try {
     const reviewed = await reviewCodexProposalById(getPool(), proposalId, decision, {
-      reviewer: String(body.reviewer || 'theme-dashboard').slice(0, 120),
+      reviewer,
       reason: String(body.reason || ''),
       dryRun: body.dryRun === true,
     });
     const proposal = reviewed?.proposal || {};
+    const nextState = String(reviewed.status || proposal.status || 'pending');
+
+    // Audit. Best-effort: failure to write must not break the user action.
+    if (!body.dryRun) {
+      try {
+        await recordInboxAction(getPool(), {
+          itemType: 'proposal',
+          itemId: String(proposalId),
+          prevState,
+          nextState,
+          decision,
+          reviewer,
+          requestId,
+          bodyHash,
+          note: body.reason ? String(body.reason) : null,
+        });
+      } catch (auditErr) {
+        logger.warn('inbox audit write failed', {
+          itemType: 'proposal',
+          itemId: String(proposalId),
+          error: String(auditErr?.message || auditErr),
+        });
+      }
+    }
+
     return buildJsonResponse({
       proposal: {
         id: Number(proposal.id || proposalId),
         proposal_type: String(proposal.proposal_type || proposal.proposalType || 'proposal'),
         proposalType: String(proposal.proposal_type || proposal.proposalType || 'proposal'),
         payload: proposal.payload || {},
-        status: String(reviewed.status || proposal.status || 'pending'),
+        status: nextState,
         result: reviewed.result ?? proposal.result ?? null,
         created_at: proposal.created_at || proposal.createdAt || null,
         createdAt: proposal.created_at || proposal.createdAt || null,
@@ -2336,11 +2385,12 @@ async function reviewCodexProposal(proposalId, body = {}) {
         executedAt: proposal.executed_at || proposal.executedAt || null,
         alreadyFinal: Boolean(reviewed.alreadyFinal),
       },
+      audit: { requestId },
     });
   } catch (error) {
     const message = String(error?.message || error || 'proposal review failed');
     const status = /not found/i.test(message) ? 404 : 500;
-    return buildJsonResponse({ error: message }, status);
+    return buildJsonResponse({ error: message, audit: { requestId } }, status);
   }
 }
 
@@ -2349,18 +2399,45 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
   if (!decision) {
     return buildJsonResponse({ error: 'decision must be accept or reject' }, 400);
   }
+  const requestId = newRequestId();
+  const bodyHash = hashRequestBody(body);
   const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
   const approval = await loadApprovalById(getPool(), queueId);
   if (!approval) {
-    return buildJsonResponse({ error: 'approval queue item not found' }, 404);
+    return buildJsonResponse({ error: 'approval queue item not found', audit: { requestId } }, 404);
   }
 
-  const currentStatus = String(approval.status || '').trim().toLowerCase();
-  if (['approved', 'rejected', 'executed'].includes(currentStatus)) {
+  const prevState = String(approval.status || 'pending').toLowerCase();
+
+  // Best-effort audit helper used by every return path below.
+  const writeAudit = async (nextState, note) => {
+    try {
+      await recordInboxAction(getPool(), {
+        itemType: 'approval',
+        itemId: String(queueId),
+        prevState,
+        nextState,
+        decision,
+        reviewer,
+        requestId,
+        bodyHash,
+        note: note || (body.reason ? String(body.reason) : null),
+      });
+    } catch (auditErr) {
+      logger.warn('inbox audit write failed', {
+        itemType: 'approval',
+        itemId: String(queueId),
+        error: String(auditErr?.message || auditErr),
+      });
+    }
+  };
+
+  if (['approved', 'rejected', 'executed'].includes(prevState)) {
     return buildJsonResponse({
       approval,
       execution: null,
       alreadyFinal: true,
+      audit: { requestId },
     });
   }
 
@@ -2370,10 +2447,12 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       reviewer,
       note: body.reason ? String(body.reason) : 'Rejected in proposal inbox',
     });
+    await writeAudit('rejected');
     return buildJsonResponse({
       approval: reviewed,
       execution: null,
       alreadyFinal: false,
+      audit: { requestId },
     });
   }
 
@@ -2391,11 +2470,14 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
     });
 
     if (body.dryRun === true) {
+      // No state change → no audit row (dry-runs are intentionally not audited
+      // as taken actions; they'd flood the log without representing a decision).
       return buildJsonResponse({
         approval,
         execution,
         dryRun: true,
         alreadyFinal: false,
+        audit: { requestId, dryRun: true },
       });
     }
 
@@ -2406,12 +2488,14 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
         reviewer,
         note: skipNote,
       });
+      await writeAudit('needs-fix', skipNote);
       return buildJsonResponse({
         approval: reviewed,
         execution,
         alreadyFinal: false,
         skipped: true,
         needsFix: true,
+        audit: { requestId },
       });
     }
 
@@ -2423,16 +2507,19 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       reviewer,
       note,
     });
+    await writeAudit('executed', note);
     return buildJsonResponse({
       approval: reviewed,
       execution,
       alreadyFinal: false,
+      audit: { requestId },
     });
   } catch (error) {
     const message = String(error?.message || error || 'approval execution failed');
     return buildJsonResponse({
       error: message,
       approval,
+      audit: { requestId },
     }, /not found/i.test(message) ? 404 : 500);
   }
 }
@@ -2942,11 +3029,77 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     if (segments[0] === 'api' && segments[1] === 'discovery-triage') {
       if (method === 'POST' && segments[2] === 'review') {
-        return buildJsonResponse(withMeta(await applyDiscoveryTriageDecision({ query: safeQuery }, body), {
+        const requestId = newRequestId();
+        const bodyHash = hashRequestBody(body);
+        const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
+        const topicId = body.topicId || body.topic_id || body.id;
+        // Capture pre-decision promotion_state for accurate audit transition.
+        let prevState = null;
+        if (topicId) {
+          try {
+            const { rows } = await getPool().query(
+              `SELECT promotion_state FROM discovery_topics WHERE id = $1 LIMIT 1`,
+              [String(topicId)],
+            );
+            prevState = rows[0]?.promotion_state ?? null;
+          } catch {
+            // Non-fatal — audit will record null prev_state.
+          }
+        }
+        const result = await applyDiscoveryTriageDecision({ query: safeQuery }, body);
+        const nextState = result?.topic?.promotion_state
+          ?? result?.promotion_state
+          ?? body.decision
+          ?? null;
+        if (topicId) {
+          try {
+            await recordInboxAction(getPool(), {
+              itemType: 'discovery',
+              itemId: String(topicId),
+              prevState,
+              nextState: nextState ? String(nextState) : null,
+              decision: String(body.decision || '').slice(0, 64) || null,
+              reviewer,
+              requestId,
+              bodyHash,
+              note: body.reason ? String(body.reason) : null,
+            });
+          } catch (auditErr) {
+            logger.warn('inbox audit write failed', {
+              itemType: 'discovery',
+              itemId: String(topicId),
+              error: String(auditErr?.message || auditErr),
+            });
+          }
+        }
+        return buildJsonResponse(withMeta({ ...result, audit: { requestId } }, {
           cacheable: false,
         }));
       }
       return buildJsonResponse(await buildDiscoveryTriagePayload(safeQuery, params));
+    }
+
+    // ── /api/inbox/audit (S-Level §Phase 2) ──
+    // Recent operator decisions across all 4 inbox item types. Useful for
+    // history views, dispute resolution, and verifying that an action was
+    // actually written through.
+    //
+    // Optional filters:
+    //   ?type=discovery|approval|proposal|e2_signal
+    //   ?id=<item id>
+    //   ?limit=<int, max 500, default 100>
+    if (segments[0] === 'api' && segments[1] === 'inbox' && segments[2] === 'audit') {
+      try {
+        const rows = await recentInboxActions(getPool(), {
+          itemType: params.get('type'),
+          itemId: params.get('id'),
+          limit: Number(params.get('limit') || 100),
+        });
+        return buildJsonResponse({ ok: true, count: rows.length, entries: rows });
+      } catch (err) {
+        logger.warn('inbox/audit route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
     }
 
     if (segments[0] === 'api' && segments[1] === 'followed-theme-briefing') {
