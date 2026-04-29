@@ -1,4 +1,0 @@
-RangeError: Invalid time value
-    at Date.toISOString (<anonymous>)
-    at runGdeltArticlesBackfill (file:///C:/Users/chohj/Documents/Playground/lattice-current-fix/scripts/fetch-gdelt-articles.mjs:80:57)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

@@ -834,6 +834,9 @@ export default defineConfig({
     },
   },
   server: {
+    // host '0.0.0.0' binds both IPv4 and IPv6 — without this, vite defaults to ::1 only,
+    // causing IPv4 'localhost' or '127.0.0.1' connections to take 21s due to OS fallback.
+    host: '0.0.0.0',
     port: 3000,
     open: !isE2E,
     hmr: isE2E ? false : undefined,

@@ -1,6 +1,0 @@
-{
-  "event_count_at_last_train": 59389,
-  "model_version": "meta-v1-20260411-0710",
-  "brier_at_last_train": 0.215975,
-  "trained_at": "2026-04-12T15:39:44.106798"
-}
