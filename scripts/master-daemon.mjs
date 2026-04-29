@@ -41,10 +41,10 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const { Client } = pg;
-const ONCE = process.argv.includes('--once');
 const TASK_ONLY = process.argv.includes('--task')
   ? process.argv[process.argv.indexOf('--task') + 1]
   : null;
+const ONCE = process.argv.includes('--once') || Boolean(TASK_ONLY);
 
 const CIRCUIT_BREAKER_FAILS = Number(process.env.DAEMON_CIRCUIT_BREAKER_FAILS || 3);
 const CIRCUIT_BREAKER_COOLDOWN_MS = Number(process.env.DAEMON_CIRCUIT_BREAKER_COOLDOWN_MS || (30 * 60 * 1000));
@@ -176,6 +176,12 @@ function listRunningNodeProcesses(scriptFragment) {
   }
 }
 
+function findPersistentMasterDaemonPeers() {
+  return listRunningNodeProcesses('master-daemon\\.mjs')
+    .filter((row) => !/(^|\s)--task(\s|=|$)/.test(row.commandLine))
+    .filter((row) => !/(^|\s)--once(\s|$)/.test(row.commandLine));
+}
+
 function shouldRun(taskName, intervalMs, state) {
   if (runningTasks.has(taskName)) {
     log(`  skip ${taskName}: previous run still in progress`);
@@ -300,10 +306,85 @@ async function taskTrainMetaModel() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskEventEngineIncremental() {
+  log('>> event-engine-incremental: materializing recent articles into canonical_events and event_features');
+  const result = run('node scripts/incremental-event-engine-fast.mjs --skip-controls', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+/**
+ * S-Level §Phase 3: stale feature/prediction repair.
+ *
+ * Hourly task-event-engine-incremental processes new articles. This 4h task is
+ * a dedicated detector + repair pass for rows where:
+ *   event_features.computed_at < latest article published_at for that event
+ *
+ * If any are detected, run incremental-event-engine-fast to upsert. The event
+ * engine is already idempotent and pipeline-lock-guarded, so collision with
+ * the hourly task is safe (one will wait for the other to release the lock).
+ *
+ * Threshold: trigger repair if stale count > 0 OR features lag latest article
+ * date by >= 1 day. Below threshold, log only.
+ */
+async function taskRepairStaleFeatures() {
+  log('>> repair-stale-features: detecting and re-upserting stale event_features rows');
+  let staleCount = 0;
+  let lagDays = 0;
+  try {
+    const { Client } = await import('pg');
+    const { resolveNasPgConfig } = await import('./_shared/nas-runtime.mjs');
+    const client = new Client(resolveNasPgConfig());
+    await client.connect();
+    try {
+      const { rows } = await client.query(`
+        WITH event_latest AS (
+          SELECT aem.canonical_event_id,
+                 MAX(a.published_at) AS latest_article_at
+            FROM article_event_map aem
+            JOIN articles a ON a.id = aem.article_id
+           GROUP BY aem.canonical_event_id
+        ),
+        feature_status AS (
+          SELECT ef.canonical_event_id,
+                 ef.computed_at,
+                 el.latest_article_at,
+                 (el.latest_article_at IS NOT NULL
+                   AND ef.computed_at IS NOT NULL
+                   AND el.latest_article_at > ef.computed_at) AS is_stale
+            FROM event_features ef
+            LEFT JOIN event_latest el ON el.canonical_event_id = ef.canonical_event_id
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE is_stale)::int AS stale_count,
+          COALESCE(EXTRACT(EPOCH FROM (MAX(latest_article_at) - MIN(computed_at) FILTER (WHERE is_stale))) / 86400, 0) AS lag_days
+        FROM feature_status
+      `);
+      staleCount = Number(rows[0]?.stale_count ?? 0);
+      lagDays = Number(rows[0]?.lag_days ?? 0);
+    } finally {
+      await client.end();
+    }
+  } catch (err) {
+    return { ok: false, error: `stale detector failed: ${String(err?.message || err)}` };
+  }
+
+  log(`   stale event_features rows: ${staleCount}, max lag (days): ${lagDays.toFixed(2)}`);
+
+  if (staleCount === 0 && lagDays < 1) {
+    return { ok: true };
+  }
+
+  log(`   triggering incremental-event-engine-fast to repair ${staleCount} stale rows (lag ${lagDays.toFixed(2)}d)`);
+  const result = run('node scripts/incremental-event-engine-fast.mjs --skip-controls', 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskMetaModelInfer() {
-  log('>> meta-model-infer: run pending events through meta-model-server :8100, write to model_predictions');
+  log('>> meta-model-infer: refresh event features, then run missing event/symbol/horizon pairs through meta-model-server :8100');
   // META_INFER_LIMIT, META_MODEL_URL, META_INFER_BATCH inherited from process.env.
-  const result = run('node --import tsx scripts/meta-model-infer.mjs', 600_000);
+  const refresh = run('node scripts/incremental-event-engine-fast.mjs --skip-controls', 300_000);
+  if (!refresh.ok) return { ok: false, error: refresh.error };
+  const result = run('node --import tsx scripts/meta-model-infer.mjs', 900_000);
   return { ok: result.ok, error: result.error };
 }
 
@@ -673,7 +754,7 @@ async function taskCoverageGapAnalysis() {
 
 async function taskSourceSelfHeal() {
   log('>> source-self-heal: validating and activating approved healing candidates');
-  const result = run('node --import tsx scripts/self-heal-sources.mjs --limit 8', 600_000);
+  const result = run('node --import tsx scripts/self-heal-sources.mjs --limit 1', 300_000);
   return { ok: result.ok, error: result.error };
 }
 
@@ -836,6 +917,12 @@ const TASKS = {
   // if inlined here. Keep it OUT of TASKS — verify it's running via process check.
   'build-market-returns': { interval: HOUR_6_MS, fn: taskBuildMarketReturns },
   'train-meta-model': { interval: WEEK_1_MS, fn: taskTrainMetaModel },
+  'event-engine-incremental': { interval: HOUR_1_MS, fn: taskEventEngineIncremental },
+  // S-Level §Phase 3: dedicated 4-hour stale-row repair pass. Detects feature
+  // rows whose computed_at predates the event's latest article and upserts via
+  // incremental-event-engine-fast (idempotent, pipeline-lock-guarded so it
+  // safely overlaps with the hourly task).
+  'repair-stale-features': { interval: 4 * HOUR_1_MS, fn: taskRepairStaleFeatures },
   'meta-model-infer': { interval: HOUR_2_MS, fn: taskMetaModelInfer },
   ...(RATES_NOWCAST_ENABLED
     ? { 'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast } }
@@ -899,8 +986,9 @@ async function main() {
   }
   process.stderr.write('  15min: market quote refresh, db health\n');
   process.stderr.write('  30min: article check, dashboard health\n');
-  process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, auto-pipeline-sensitivity, sensitivity refresh\n');
-  process.stderr.write('  2h:    auto-pipeline-labels, refresh-event-market-transmission\n');
+  process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, event-engine-incremental, auto-pipeline-sensitivity, sensitivity refresh\n');
+  process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission\n');
+  process.stderr.write('  4h:    repair-stale-features (dedicated event_features stale detector + repair)\n');
     process.stderr.write('  6h:    signal refresh, master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
   process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');
     process.stderr.write('  daily: FRED backfill, pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
@@ -931,6 +1019,14 @@ async function main() {
   if (TASK_ONLY && !TASKS[TASK_ONLY]) {
     process.stderr.write(`Unknown task: ${TASK_ONLY}\nAvailable: ${Object.keys(TASKS).join(', ')}\n`);
     process.exit(1);
+  }
+
+  if (!ONCE) {
+    const peers = findPersistentMasterDaemonPeers();
+    if (peers.length > 0) {
+      process.stderr.write(`master-daemon already running (pid ${peers[0].pid}); refusing duplicate persistent daemon\n`);
+      process.exit(0);
+    }
   }
 
   await runAllTasks(state);
