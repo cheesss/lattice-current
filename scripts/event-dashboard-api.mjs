@@ -1311,6 +1311,181 @@ async function buildDataQuality() {
   return computeDataQualityMetrics(getPool());
 }
 
+// ── /api/ops/status (S-Level Phase 7 minimal) ─────────────────────────────
+// Single-pane operator health: services, freshness, model, recent issues.
+// Designed to be the canonical "is the system healthy" endpoint.
+
+const OPS_DAEMON_STATE_PATH = path.resolve('data', 'daemon-state.json');
+const OPS_ACCUMULATOR_STATE_PATH = path.resolve('data', 'historical', 'accumulator-state.json');
+const OPS_ALERTS_PATH = path.resolve('data', 'alerts.json');
+const OPS_META_MODEL_URL = process.env.META_MODEL_URL || 'http://127.0.0.1:8100';
+const OPS_DAEMON_FRESH_MS = 10 * 60 * 1000;       // 10 min
+const OPS_ACCUMULATOR_FRESH_MS = 30 * 60 * 1000;  // 30 min
+const OPS_HTTP_PROBE_TIMEOUT_MS = 1500;
+const OPS_RECENT_ISSUE_LIMIT = 10;
+
+async function probeFileService(stateFilePath, freshThresholdMs) {
+  try {
+    const { stat: statFn } = await import('node:fs/promises');
+    const s = await statFn(stateFilePath);
+    const ageMs = Date.now() - s.mtimeMs;
+    return {
+      status: ageMs <= freshThresholdMs ? 'ok' : 'stale',
+      lastTickAt: new Date(s.mtimeMs).toISOString(),
+      ageMs,
+      ageMinutes: Math.round(ageMs / 60_000),
+    };
+  } catch {
+    return { status: 'missing', lastTickAt: null, ageMs: null, ageMinutes: null };
+  }
+}
+
+async function probeMetaModelService() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPS_HTTP_PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${OPS_META_MODEL_URL}/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    return {
+      status: res.ok ? 'ok' : 'unhealthy',
+      http: res.status,
+      url: OPS_META_MODEL_URL,
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    const reason = err?.name === 'AbortError' ? 'timeout' : String(err?.message || err);
+    return { status: 'unreachable', http: null, url: OPS_META_MODEL_URL, reason };
+  }
+}
+
+async function loadRecentOpsAlerts(limit = OPS_RECENT_ISSUE_LIMIT) {
+  try {
+    const raw = await readFile(OPS_ALERTS_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .slice(-limit)
+      .reverse()
+      .map((entry) => ({
+        timestamp: entry?.timestamp ?? null,
+        severity: entry?.severity ?? 'info',
+        message: typeof entry?.message === 'string' ? entry.message.slice(0, 240) : '',
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness }) {
+  // Critical conditions: master daemon stale/missing, meta-model unreachable, model failed.
+  if (daemon.status !== 'ok') return 'critical';
+  if (metaModel.status === 'unreachable' || modelLevel === 'critical') return 'critical';
+  // Warning conditions: accumulator stale, calibration warning, feature lag, meta-model unhealthy.
+  if (accumulator.status !== 'ok') return 'warning';
+  if (modelLevel === 'warning') return 'warning';
+  if (metaModel.status === 'unhealthy') return 'warning';
+  if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) return 'warning';
+  if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) return 'warning';
+  return 'ok';
+}
+
+async function buildOpsStatusPayload(pool) {
+  const generatedAt = new Date().toISOString();
+
+  // Run independent probes in parallel.
+  const [daemon, accumulator, metaModel, recentIssues, modelHealth] = await Promise.all([
+    probeFileService(OPS_DAEMON_STATE_PATH, OPS_DAEMON_FRESH_MS),
+    probeFileService(OPS_ACCUMULATOR_STATE_PATH, OPS_ACCUMULATOR_FRESH_MS),
+    probeMetaModelService(),
+    loadRecentOpsAlerts(),
+    buildMetaModelHealthPayload(pool).catch((err) => ({
+      ok: false,
+      error: String(err?.message || err),
+      summary: {
+        level: 'critical',
+        pipelineFreshness: null,
+        latestEval: null,
+        activeModel: null,
+        symbolCoverage: null,
+      },
+    })),
+  ]);
+
+  // buildMetaModelHealthPayload nests freshness/eval/activeModel/symbolCoverage
+  // inside `.summary` (see scripts/_shared/event-intelligence-builder.mjs return shape).
+  const modelSummary = modelHealth?.summary || {};
+  const pipelineFreshness = modelSummary.pipelineFreshness || null;
+  const symbolCoverage = modelSummary.symbolCoverage || null;
+  const latestEval = modelSummary.latestEval || null;
+  const activeModelName =
+    modelSummary.activeModel?.modelVersion ||
+    modelSummary.activeModel?.modelId ||
+    modelSummary.activeModel?.model_version ||
+    latestEval?.modelVersion ||
+    latestEval?.model_version ||
+    null;
+  const modelLevel = modelSummary.level || 'unknown';
+
+  const freshness = pipelineFreshness
+    ? {
+      latestArticleDateKey: pipelineFreshness.latestArticleDateKey ?? null,
+      latestFeatureArticleDateKey: pipelineFreshness.latestFeatureArticleDateKey ?? null,
+      latestPredictedArticleDateKey: pipelineFreshness.latestPredictedArticleDateKey ?? null,
+      featureLagDays: pipelineFreshness.featureLagDays ?? null,
+      featureLagHours: pipelineFreshness.featureLagHours ?? null,
+      featureStaleEventCount: pipelineFreshness.featureStaleEventCount ?? 0,
+      articles24h: pipelineFreshness.articles24h ?? 0,
+      events24h: pipelineFreshness.events24h ?? 0,
+    }
+    : null;
+
+  const summaryLevel = rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness });
+  const summaryNotes = [];
+  if (daemon.status !== 'ok') summaryNotes.push(`master-daemon ${daemon.status} (${daemon.ageMinutes ?? '?'} min)`);
+  if (accumulator.status !== 'ok') summaryNotes.push(`data-accumulator ${accumulator.status}`);
+  if (metaModel.status !== 'ok') summaryNotes.push(`meta-model server ${metaModel.status}`);
+  if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) {
+    summaryNotes.push(`event_features lag ${freshness.featureLagDays.toFixed(0)}d`);
+  }
+  if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
+    summaryNotes.push(`${freshness.featureStaleEventCount} stale feature rows`);
+  }
+  if (modelLevel === 'warning') summaryNotes.push('model calibration warning');
+
+  return {
+    ok: true,
+    generatedAt,
+    summary: {
+      level: summaryLevel,
+      notes: summaryNotes,
+    },
+    services: {
+      api: { status: 'ok', port: Number(process.env.PORT || 46200) },
+      masterDaemon: daemon,
+      dataAccumulator: accumulator,
+      metaModel,
+    },
+    freshness,
+    model: {
+      activeModel: activeModelName,
+      worstSplitECE: latestEval?.worstEce ?? null,
+      worstSplitBrier: latestEval?.worstBrierScore ?? null,
+      aggregateBrier: latestEval?.brierScore ?? null,
+      aggregateECE: latestEval?.ece ?? null,
+      level: modelLevel,
+    },
+    symbolCoverage: symbolCoverage
+      ? {
+        themeCount: symbolCoverage.themeCount ?? 0,
+        coveredThemeCount: symbolCoverage.coveredThemeCount ?? 0,
+        coveragePct: symbolCoverage.coveragePct ?? 0,
+        missingThemes: Array.isArray(symbolCoverage.missingThemes) ? symbolCoverage.missingThemes : [],
+      }
+      : null,
+    recentIssues,
+  };
+}
+
 function auditDateToken(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -2286,6 +2461,21 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     if (segments[0] === 'api' && segments[1] === 'health') {
       const payload = await buildHealth();
       return buildJsonResponse(payload, payload.status === 'critical' ? 503 : 200);
+    }
+
+    // ── /api/ops/status (Phase 7 minimal) ──
+    if (segments[0] === 'api' && segments[1] === 'ops' && segments[2] === 'status') {
+      try {
+        const payload = await buildOpsStatusPayload(getPool());
+        const httpStatus = payload.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, httpStatus);
+      } catch (err) {
+        logger.warn('ops/status route failed', { error: String(err?.message || err) });
+        return buildJsonResponse(
+          { ok: false, error: String(err?.message || err), generatedAt: new Date().toISOString() },
+          500,
+        );
+      }
     }
 
     if (segments[0] === 'api' && segments[1] === 'calibration') {
