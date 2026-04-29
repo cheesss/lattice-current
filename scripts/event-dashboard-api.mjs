@@ -2194,9 +2194,10 @@ async function buildAutomationLogPayload() {
   }
 }
 
-async function buildApprovalQueuePayload() {
+async function buildApprovalQueuePayload(options = {}) {
+  const includeFinal = Boolean(options?.includeFinal);
   try {
-    const approvals = await getPendingApprovals(getPool(), 200);
+    const approvals = await getPendingApprovals(getPool(), 200, { includeFinal });
     return { approvals };
   } catch {
     return { approvals: [] };
@@ -2248,16 +2249,33 @@ function classifyMacroVerdict({ vix, marketStress, hyCredit, transmission }) {
   return 'watch';
 }
 
-async function buildProposalInboxPayload() {
-  const [proposalRows, approvalPayload] = await Promise.all([
-    safeQuery(`
+/**
+ * Build proposal-inbox payload.
+ *
+ * Default (S-Level §Phase 2): actionable items only — excludes 'executed'
+ * and 'dead' states. Pass { includeFinal: true } to include them. The
+ * inbox surface in the dashboard must NEVER pass includeFinal=true; only
+ * a future history view should.
+ */
+async function buildProposalInboxPayload(options = {}) {
+  const includeFinal = Boolean(options?.includeFinal);
+  const proposalSql = includeFinal
+    ? `
+      SELECT id, proposal_type, payload, status, result, reasoning, source, created_at, executed_at
+      FROM codex_proposals
+      ORDER BY created_at DESC
+      LIMIT 40
+    `
+    : `
       SELECT id, proposal_type, payload, status, result, reasoning, source, created_at, executed_at
       FROM codex_proposals
       WHERE status NOT IN ('executed', 'dead')
       ORDER BY created_at DESC
       LIMIT 40
-    `),
-    buildApprovalQueuePayload(),
+    `;
+  const [proposalRows, approvalPayload] = await Promise.all([
+    safeQuery(proposalSql),
+    buildApprovalQueuePayload({ includeFinal }),
   ]);
 
   const proposals = proposalRows.rows.map((row) => ({
@@ -2735,7 +2753,8 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'proposal-inbox') {
-      return buildJsonResponse(await buildProposalInboxPayload());
+      const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
+      return buildJsonResponse(await buildProposalInboxPayload({ includeFinal }));
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-proposals' && segments[2] && segments[3] === 'review' && method === 'POST') {
@@ -2747,7 +2766,8 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'approval-queue') {
-      return buildJsonResponse(await buildApprovalQueuePayload());
+      const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
+      return buildJsonResponse(await buildApprovalQueuePayload({ includeFinal }));
     }
 
     if (segments[0] === 'api' && segments[1] === 'runtime-issues' && !segments[2] && method === 'POST') {
@@ -3216,12 +3236,15 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       } catch {
         discoveries = null;
       }
-      const proposals = await safeQuery(`
-        SELECT *
-        FROM codex_proposals
-        ORDER BY created_at DESC
-        LIMIT 20
-      `);
+      // S-Level §Phase 2: actionable items by default. Final proposals
+      // (executed/dead) are omitted unless the caller opts in. Use this
+      // route as a status overview, not as the inbox source-of-truth.
+      const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
+      const proposals = await safeQuery(
+        includeFinal
+          ? `SELECT * FROM codex_proposals ORDER BY created_at DESC LIMIT 20`
+          : `SELECT * FROM codex_proposals WHERE status NOT IN ('executed', 'dead') ORDER BY created_at DESC LIMIT 20`,
+      );
       return buildJsonResponse({ discoveries, proposals: proposals.rows });
     }
 

@@ -83,13 +83,24 @@ export async function queueForApproval(client, action) {
   return result.rows[0];
 }
 
-export async function getPendingApprovals(client, limit = 100) {
+/**
+ * Returns approval queue items.
+ *
+ * Default: actionable items only (status IN ('pending', 'needs-fix')) per
+ * S-Level §Phase 2 — "API should return actionable items by default".
+ *
+ * Pass { includeFinal: true } to include final states (approved, rejected,
+ * executed). Use this only for history/audit views, never for the inbox.
+ */
+export async function getPendingApprovals(client, limit = 100, options = {}) {
   const safeLimit = Math.max(1, Math.min(500, Math.floor(Number(limit) || 100)));
+  const includeFinal = Boolean(options?.includeFinal);
+  const filter = includeFinal ? '' : `WHERE status IN ('pending', 'needs-fix')`;
   const { rows } = await client.query(
     `
       SELECT id, action_type, payload, status, reasoning, created_at, reviewed_at, reviewer
       FROM approval_queue
-      WHERE status IN ('pending', 'needs-fix')
+      ${filter}
       ORDER BY created_at DESC
       LIMIT $1
     `,
