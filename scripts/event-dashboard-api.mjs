@@ -3280,10 +3280,72 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     if (segments[0] === 'api' && segments[1] === 'theme-brief' && segments[2]) {
       const theme = decodeURIComponent(segments[2] || '');
-      if (hasDynamicSinceParams(params)) {
-        return buildJsonResponse(withMeta(await buildThemeBriefPayload(theme, safeQuery, params), {
+      const wantNarrative = params.get('narrative') === 'llm';
+      // S-Tier D1: optional LLM narrative — augments briefStructure with
+      // Codex-generated specific lines. Falls back gracefully on Codex
+      // failure or daily budget exhaustion.
+      const enhanceWithNarrative = async (briefPayload) => {
+        if (!wantNarrative || !briefPayload) return briefPayload;
+        try {
+          const { buildThemeNarrativePayload } = await import('./_shared/ai-analysis-builder.mjs');
+          const period = params.get('period') || 'quarter';
+          const narrativeResult = await buildThemeNarrativePayload(getPool(), {
+            theme,
+            period,
+            briefPayload,
+            forceRefresh: params.get('refresh') === '1',
+          });
+          if (narrativeResult?.ok && narrativeResult.narrative && !narrativeResult.exhausted) {
+            // Merge: replace each section's templated content with LLM lines
+            // ONLY when the LLM produced non-empty content for that section.
+            // Original templated content stays as fallback for empty sections.
+            const merged = { ...(briefPayload.briefStructure || {}) };
+            const n = narrativeResult.narrative;
+            for (const key of ['whatChanged', 'whyMatters', 'caveats', 'monitor']) {
+              if (Array.isArray(n[key]) && n[key].length > 0) merged[key] = n[key];
+            }
+            // Evidence is structured (items/classes) — only replace items.
+            if (Array.isArray(n.evidence) && n.evidence.length > 0) {
+              merged.evidence = {
+                items: n.evidence,
+                classes: briefPayload.briefStructure?.evidence?.classes || [],
+              };
+            }
+            // Related — narrative provides flat list; we put under entities.
+            if (Array.isArray(n.related) && n.related.length > 0) {
+              merged.related = {
+                ...(briefPayload.briefStructure?.related || {}),
+                entities: n.related,
+              };
+            }
+            return {
+              ...briefPayload,
+              briefStructure: merged,
+              narrativeSource: narrativeResult.cached ? 'cache' : 'llm-fresh',
+              narrativeGeneratedAt: narrativeResult.generatedAt,
+            };
+          }
+          // Budget exhausted or LLM failed — keep original templated brief +
+          // surface the reason so the dashboard can show a banner.
+          return {
+            ...briefPayload,
+            narrativeSource: narrativeResult?.exhausted ? 'budget-exhausted' : 'llm-failed',
+            narrativeError: narrativeResult?.error || narrativeResult?.reason || null,
+          };
+        } catch (err) {
+          logger.warn('theme-brief narrative augmentation failed', { error: String(err?.message || err) });
+          return { ...briefPayload, narrativeSource: 'llm-failed', narrativeError: String(err?.message || err) };
+        }
+      };
+
+      if (hasDynamicSinceParams(params) || wantNarrative) {
+        // narrative=llm bypasses cache so the user gets the latest LLM output
+        // (or the LLM cache layer handles it via theme_narrative_cache).
+        const base = await buildThemeBriefPayload(theme, safeQuery, params);
+        const enriched = await enhanceWithNarrative(base);
+        return buildJsonResponse(withMeta(enriched, {
           cacheable: false,
-          cacheReason: 'dynamic-since',
+          cacheReason: wantNarrative ? 'llm-narrative' : 'dynamic-since',
         }));
       }
       return await resolveWithCache(

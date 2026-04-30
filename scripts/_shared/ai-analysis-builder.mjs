@@ -385,6 +385,207 @@ Keep narrative under 700 characters. Cite at most 4 articles. If uplift exists, 
 }
 
 /* ============================================================ */
+/* S-Tier D1: Theme brief LLM narrative                         */
+/* ============================================================ */
+
+const THEME_NARRATIVE_DAILY_BUDGET = Number(process.env.LATTICE_LLM_DAILY_BUDGET || 20);
+
+/**
+ * Build a 6-section theme brief narrative via Codex.
+ *
+ * Output schema (JSON):
+ *   {
+ *     whatChanged: string[],   // 1-3 lines
+ *     whyMatters:  string[],
+ *     evidence:    string[],
+ *     caveats:     string[],
+ *     monitor:     string[],
+ *     related:     string[]
+ *   }
+ *
+ * Caching: theme_narrative_cache table (auto-created), 24h TTL keyed by
+ * (theme, period). Cost guard: respects LATTICE_LLM_DAILY_BUDGET env
+ * (default 20). When budget exhausted, returns { ok: true, exhausted:
+ * true } and the caller falls back to existing templated content.
+ *
+ * Inputs:
+ *   theme       — canonical theme key
+ *   period      — 'week' | 'month' | 'quarter' | 'year'
+ *   briefPayload — the existing templated brief (with whatChanged, etc.)
+ *                   Used to provide context for the LLM and to extract
+ *                   fallback content on failure.
+ */
+export async function buildThemeNarrativePayload(pool, {
+  theme,
+  period = 'quarter',
+  briefPayload = null,
+  forceRefresh = false,
+} = {}) {
+  if (!theme || typeof theme !== 'string') {
+    return { ok: false, error: 'theme required' };
+  }
+  const themeKey = String(theme).trim().toLowerCase();
+  if (!themeKey) return { ok: false, error: 'theme required' };
+
+  // Ensure cache table exists (idempotent).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS theme_narrative_cache (
+      theme TEXT NOT NULL,
+      period TEXT NOT NULL,
+      narrative_json JSONB NOT NULL,
+      generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      tokens_used INT,
+      PRIMARY KEY (theme, period)
+    )
+  `).catch(() => {});
+
+  // Cache lookup.
+  if (!forceRefresh) {
+    const cached = await pool.query(
+      `SELECT narrative_json, generated_at FROM theme_narrative_cache
+        WHERE theme = $1 AND period = $2 AND generated_at > NOW() - INTERVAL '24 hours'`,
+      [themeKey, period],
+    ).catch(() => ({ rows: [] }));
+    if (cached.rows.length > 0) {
+      return {
+        ok: true,
+        cached: true,
+        theme: themeKey,
+        period,
+        narrative: cached.rows[0].narrative_json,
+        generatedAt: cached.rows[0].generated_at,
+      };
+    }
+  }
+
+  // Daily budget guard — count today's narrative generations across all themes.
+  const usage = await pool.query(
+    `SELECT COUNT(*)::int AS used
+       FROM theme_narrative_cache
+      WHERE generated_at >= CURRENT_DATE`,
+  ).catch(() => ({ rows: [{ used: 0 }] }));
+  const usedToday = Number(usage.rows[0]?.used ?? 0);
+  if (usedToday >= THEME_NARRATIVE_DAILY_BUDGET) {
+    return {
+      ok: true,
+      exhausted: true,
+      theme: themeKey,
+      period,
+      reason: `Daily LLM budget reached (${usedToday}/${THEME_NARRATIVE_DAILY_BUDGET}). Falling back to templated brief content.`,
+    };
+  }
+
+  const prompt = buildThemeNarrativePrompt({ theme: themeKey, period, briefPayload });
+  let result;
+  try {
+    const { runCodexJsonPrompt } = await import('./codex-json.mjs');
+    result = await runCodexJsonPrompt(prompt, 90_000, {
+      label: 'theme-narrative',
+      theme: themeKey,
+      period,
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      theme: themeKey,
+      period,
+      error: `Codex CLI unavailable: ${String(err?.message || err).slice(0, 200)}`,
+    };
+  }
+
+  const parsed = result?.parsed;
+  if (!parsed || typeof parsed !== 'object') {
+    return {
+      ok: false,
+      theme: themeKey,
+      period,
+      error: 'codex output not JSON',
+      codexCode: result?.code,
+      stderr: String(result?.stderr || '').slice(0, 400),
+    };
+  }
+
+  // Validate the 6-section shape.
+  const narrative = {
+    whatChanged: Array.isArray(parsed.whatChanged) ? parsed.whatChanged.slice(0, 4) : [],
+    whyMatters: Array.isArray(parsed.whyMatters) ? parsed.whyMatters.slice(0, 4) : [],
+    evidence: Array.isArray(parsed.evidence) ? parsed.evidence.slice(0, 6) : [],
+    caveats: Array.isArray(parsed.caveats) ? parsed.caveats.slice(0, 4) : [],
+    monitor: Array.isArray(parsed.monitor) ? parsed.monitor.slice(0, 4) : [],
+    related: Array.isArray(parsed.related) ? parsed.related.slice(0, 6) : [],
+  };
+
+  // Persist.
+  await pool.query(
+    `INSERT INTO theme_narrative_cache (theme, period, narrative_json, generated_at, tokens_used)
+     VALUES ($1, $2, $3::jsonb, NOW(), $4)
+     ON CONFLICT (theme, period)
+     DO UPDATE SET narrative_json = EXCLUDED.narrative_json,
+                   generated_at = EXCLUDED.generated_at,
+                   tokens_used = EXCLUDED.tokens_used`,
+    [themeKey, period, JSON.stringify(narrative), result?.tokensUsed ?? null],
+  ).catch(() => {});
+
+  return {
+    ok: true,
+    cached: false,
+    theme: themeKey,
+    period,
+    narrative,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function buildThemeNarrativePrompt({ theme, period, briefPayload }) {
+  const summary = briefPayload?.summary || {};
+  const sections = briefPayload?.sections || briefPayload?.briefStructure || {};
+  const articleCount = Number(summary.articleCount ?? 0);
+  const acc = Number(summary.acceleration ?? 0);
+  const vsYear = Number(summary.vsYearAgoPct ?? 0);
+  const lifecycle = String(summary.lifecycleStage || 'unknown');
+
+  // Provide existing templated content as context — the LLM should produce
+  // something better than these, not just rephrase them.
+  const ctxBlock = (key, items) => {
+    const arr = Array.isArray(items) ? items.slice(0, 5) : [];
+    if (arr.length === 0) return `${key}: (none)`;
+    return `${key}:\n${arr.map((s) => `  - ${String(s).slice(0, 200)}`).join('\n')}`;
+  };
+
+  return `You are a senior intelligence analyst writing a ${period} brief on the theme "${theme}".
+
+CONTEXT (current numbers, do not just repeat):
+- articleCount: ${articleCount}
+- acceleration: ${acc}
+- vsYearAgoPct: ${vsYear}
+- lifecycleStage: ${lifecycle}
+
+CURRENT TEMPLATED CONTENT (replace, don't paraphrase — produce sharper, more specific lines):
+${ctxBlock('whatChanged (templated)', sections.whatChanged?.map?.((c) => c?.detail || c) || sections.whatChanged)}
+${ctxBlock('whyMatters (templated)', sections.whyMatters || sections.whyItMatters?.statements?.map?.((s) => s.statement || s) || [])}
+${ctxBlock('caveats (templated)', sections.caveats || sections.risks)}
+${ctxBlock('monitor (templated)', sections.monitor || sections.watchpoints)}
+
+Write a brief that is:
+1. Specific (name companies/sectors/regulators when clear).
+2. Honest about base-effect or small samples.
+3. Actionable (what an analyst should monitor or check next).
+4. Concise (each line ≤ 160 chars, ≤ 4 lines per section).
+
+Output ONLY a single JSON object with this schema (no markdown, no prose outside JSON):
+{
+  "whatChanged": ["...", "..."],
+  "whyMatters":  ["...", "..."],
+  "evidence":    ["..."],
+  "caveats":     ["..."],
+  "monitor":     ["..."],
+  "related":     ["..."]
+}
+
+Total narrative under 1200 characters across all sections.`;
+}
+
+/* ============================================================ */
 /* P0-3: Similar Events Finder (pgvector cosine)                */
 /* ============================================================ */
 export async function buildSimilarEventsPayload(pool, { eventId, limit = 6 } = {}) {
