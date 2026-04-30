@@ -19,6 +19,9 @@ import {
   computeImpactWeight,
   computeDuplicatePenalty,
   computeThemeKeywordOverlap,
+  computeValidationStatus,
+  recommendActionForEvent,
+  summarizeThemeFraming,
 } from '../scripts/_shared/event-product-score.mjs';
 
 const NOW = new Date('2026-04-30T00:00:00Z');
@@ -277,6 +280,101 @@ test('s-tier N1: themeRelevance penalised when overlap is zero on a canonical th
     `mismatched title should penalise: no=${noTitle.value} mismatched=${mismatched.value}`,
   );
   assert.ok(mismatched.rationale.some((r) => /keyword-overlap:none/.test(r)));
+});
+
+test('s-tier N3: validated events return validation.status === validated', () => {
+  const r = computeValidationStatus({
+    promotionEligible: true,
+    bestEvidenceGrade: 'E2',
+    productScore: 0.30,
+    qualityFlags: [],
+  });
+  assert.equal(r.status, 'validated');
+});
+
+test('s-tier N3: E1+ raw grade not promoted with low-control-count → pending', () => {
+  const r = computeValidationStatus({
+    promotionEligible: false,
+    rawEvidenceGrade: 'E2',
+    bestEvidenceGrade: null,
+    productScore: 0.12,
+    lane: 'watch',
+    qualityFlags: ['low-control-count', 'raw-grade-not-promoted'],
+  });
+  assert.equal(r.status, 'pending');
+  assert.ok(r.blockers.length >= 1);
+  const codes = r.blockers.map((b) => b.code);
+  assert.ok(codes.includes('low-control-count'), `expected low-control-count, got ${JSON.stringify(codes)}`);
+});
+
+test('s-tier N3: E1+ with no flags still records unknown-block when not promoted', () => {
+  const r = computeValidationStatus({
+    promotionEligible: false,
+    rawEvidenceGrade: 'E1',
+    productScore: 0.10,
+    lane: 'watch',
+    qualityFlags: [],
+  });
+  assert.equal(r.status, 'pending');
+  assert.equal(r.blockers[0].code, 'unknown-block');
+});
+
+test('s-tier N3: noise lane with no grade returns status=noise', () => {
+  const r = computeValidationStatus({
+    promotionEligible: false,
+    rawEvidenceGrade: null,
+    bestEvidenceGrade: null,
+    productScore: 0.01,
+    lane: 'noise',
+    qualityFlags: [],
+  });
+  assert.equal(r.status, 'noise');
+});
+
+test('s-tier N3: watch + no grade → observation', () => {
+  const r = computeValidationStatus({
+    promotionEligible: false,
+    rawEvidenceGrade: null,
+    productScore: 0.10,
+    lane: 'watch',
+    qualityFlags: [],
+  });
+  assert.equal(r.status, 'observation');
+});
+
+test('s-tier N3: recommendActionForEvent prioritises pending over generic watch', () => {
+  const pendingEv = {
+    lane: 'watch',
+    bestEvidenceGrade: null,
+    rawEvidenceGrade: 'E2',
+    productScore: 0.12,
+    validationStatus: 'pending',
+    validationBlockers: [{ code: 'low-control-count', reason: '...' }],
+  };
+  const r = recommendActionForEvent(pendingEv);
+  assert.match(r.action, /pending validation/i);
+  assert.equal(r.tone, 'primary', 'pending should be primary tone, not secondary');
+});
+
+test('s-tier N3: themeFraming surfaces pending bucket when validated=0 and pending>0', () => {
+  const r = summarizeThemeFraming({
+    laneCounts: { validated: 0, watch: 5, noise: 0 },
+    pendingCount: 3,
+    themeFilter: 'energy-supply-chain',
+  });
+  assert.equal(r.bucket, 'pending_validation');
+  assert.match(r.message, /3 pending-validation/);
+  assert.equal(r.counts.pending, 3);
+});
+
+test('s-tier N3: themeFraming with validated > 0 mentions pending as supplement', () => {
+  const r = summarizeThemeFraming({
+    laneCounts: { validated: 2, watch: 1, noise: 0 },
+    pendingCount: 1,
+    themeFilter: 'ai-ml',
+  });
+  assert.equal(r.bucket, 'validated_signals');
+  assert.match(r.message, /Plus 1 pending-validation/);
 });
 
 test('s-tier S3 contract: empty hot-events response carries emptyState envelope', async () => {

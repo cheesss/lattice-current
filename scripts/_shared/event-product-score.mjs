@@ -346,6 +346,102 @@ export function classifyEventLane(event = {}) {
 }
 
 /**
+ * S-Tier N3: surface "almost-validated" events.
+ *
+ * The existing 3-lane (validated / watch / noise) split is per-event but
+ * coarse — it does not distinguish "watch lane because there's no signal
+ * yet" from "watch lane because there IS a signal that just hasn't
+ * passed the promotion gate". This helper computes a finer status:
+ *
+ *   'validated'  — promoted E2+ AND productScore ≥ 0.20  (same as lane)
+ *   'pending'    — raw evidence grade ≥ E1 but NOT promotion-eligible.
+ *                   Means the statistical signal exists but blocked on
+ *                   controls / t-stat / market-relevance — operator can
+ *                   inspect and override or wait for more controls.
+ *   'observation'— scored watch event without E1+ raw grade.
+ *   'noise'      — productScore < 0.05 / no grade at all.
+ *
+ * Returns a structured envelope with status + blockers (concrete reasons
+ * promotion was blocked) so the dashboard can show "Pending: 3 events
+ * blocked on n_controls < 8" rather than a generic "watch".
+ */
+export function computeValidationStatus(event = {}) {
+  const lane = event.lane || classifyEventLane(event);
+  const rawGrade = String(
+    event.rawEvidenceGrade
+    || event.bestEvidenceGrade
+    || '',
+  ).toUpperCase();
+  const promoted = Boolean(event.promotionEligible);
+  const score = Number(event.productScore ?? 0);
+  const flags = Array.isArray(event.qualityFlags) ? event.qualityFlags : [];
+  const blockers = [];
+
+  // Map known qualityFlags to user-readable blocker reasons.
+  if (flags.includes('low-control-count')) {
+    blockers.push({
+      code: 'low-control-count',
+      reason: 'Promotion blocked: not enough matched controls (n_controls below threshold). Wait for the matching window to expand.',
+    });
+  }
+  if (flags.includes('low-market-relevance')) {
+    blockers.push({
+      code: 'low-market-relevance',
+      reason: 'Promotion blocked: linked articles do not show market relevance. May be off-topic or low-impact for this theme.',
+    });
+  }
+  if (flags.includes('raw-grade-not-promoted') && !promoted) {
+    blockers.push({
+      code: 'raw-grade-not-promoted',
+      reason: 'Raw evidence grade is present but not promoted. Inspect t-stat magnitude — typical block is |t| < 2.',
+    });
+  }
+  if (flags.includes('single-source')) {
+    blockers.push({
+      code: 'single-source',
+      reason: 'Promotion needs ≥ 2 sources confirming the event. Currently single-source.',
+    });
+  }
+  if (flags.includes('single-article')) {
+    blockers.push({
+      code: 'single-article',
+      reason: 'Event is a single-article cluster. Will not promote until additional articles attach.',
+    });
+  }
+
+  let status;
+  if (promoted && score >= 0.20) {
+    status = 'validated';
+  } else if (lane === 'noise' && rawGrade === '') {
+    // No grade and noise score — pure observation.
+    status = 'noise';
+  } else if (['E1', 'E2', 'E3', 'E4'].includes(rawGrade) && !promoted) {
+    // The interesting case — statistically significant but blocked.
+    status = 'pending';
+    if (blockers.length === 0) {
+      // Defensive — when we have a graded event but no qualityFlags,
+      // still record the structural "not promoted" reason.
+      blockers.push({
+        code: 'unknown-block',
+        reason: 'Raw grade present but promotion gate not satisfied — inspect uplift_rows + t-stat manually.',
+      });
+    }
+  } else if (lane === 'noise') {
+    status = 'noise';
+  } else {
+    status = 'observation';
+  }
+
+  return {
+    status,
+    rawGrade: rawGrade || null,
+    promoted,
+    productScore: score,
+    blockers,
+  };
+}
+
+/**
  * One-line rationale for why an event landed in its lane. Used by the
  * empty-state envelope and the dashboard so noise events can show
  * "WHY noise" without the full scoreBreakdown rationale array.
@@ -386,12 +482,26 @@ export function recommendActionForEvent(event = {}) {
   const lane = event.lane || classifyEventLane(event);
   const grade = String(event.bestEvidenceGrade || event.rawEvidenceGrade || '').toUpperCase();
   const score = Number(event.productScore ?? 0);
+  const validationStatus = event.validationStatus
+    || (lane === 'validated' ? 'validated' : null);
+  const blockers = Array.isArray(event.validationBlockers) ? event.validationBlockers : [];
 
   if (lane === 'validated') {
     return {
       action: 'Investigate now',
       tone: 'primary',
       reason: `Validated ${grade} signal with productScore ${score.toFixed(2)} — open the event to inspect uplift, controls, and source diversity before deciding.`,
+    };
+  }
+  // S-Tier §N3: pending takes precedence over generic watch — these are
+  // the most actionable watch events (statistical signal exists, blocked
+  // on a specific gate the operator can inspect).
+  if (validationStatus === 'pending') {
+    const blockerCodes = blockers.map((b) => b.code).join(', ') || 'unknown-block';
+    return {
+      action: 'Inspect blocker · pending validation',
+      tone: 'primary',
+      reason: `Raw ${grade} grade present but promotion blocked on: ${blockerCodes}. Open the event — the block may be fixable (more controls coming) or you can override into the Decision Inbox if the block is structural.`,
     };
   }
   if (lane === 'watch') {
@@ -423,11 +533,12 @@ export function recommendActionForEvent(event = {}) {
  *   message ready-to-render English string explaining what the page is showing
  *   counts  { validated, watch, noise } over the candidate set
  */
-export function summarizeThemeFraming({ events = [], laneCounts = {}, themeFilter = null } = {}) {
+export function summarizeThemeFraming({ events = [], laneCounts = {}, themeFilter = null, pendingCount = 0 } = {}) {
   const counts = {
     validated: Number(laneCounts.validated ?? 0),
     watch: Number(laneCounts.watch ?? 0),
     noise: Number(laneCounts.noise ?? 0),
+    pending: Number(pendingCount ?? 0),
   };
   const total = counts.validated + counts.watch + counts.noise;
   const themeLabel = themeFilter ? `"${themeFilter}"` : 'this view';
@@ -439,9 +550,22 @@ export function summarizeThemeFraming({ events = [], laneCounts = {}, themeFilte
     };
   }
   if (counts.validated > 0) {
+    const pendingNote = counts.pending > 0
+      ? ` Plus ${counts.pending} pending-validation item${counts.pending === 1 ? '' : 's'} (E1+ grade, blocked on controls or t-stat).`
+      : '';
     return {
       bucket: 'validated_signals',
-      message: `${counts.validated} validated signal${counts.validated === 1 ? '' : 's'} for ${themeLabel}. ${counts.watch} additional watch item${counts.watch === 1 ? '' : 's'} for context.`,
+      message: `${counts.validated} validated signal${counts.validated === 1 ? '' : 's'} for ${themeLabel}. ${counts.watch} additional watch item${counts.watch === 1 ? '' : 's'} for context.${pendingNote}`,
+      counts,
+    };
+  }
+  if (counts.pending > 0) {
+    // S-Tier N3: surface near-validation explicitly even when no items have
+    // crossed the promotion gate. This is the most actionable framing for
+    // analysts — "we have signal, here's what's missing".
+    return {
+      bucket: 'pending_validation',
+      message: `${counts.pending} pending-validation event${counts.pending === 1 ? '' : 's'} for ${themeLabel} — these have raw E1+ evidence but are blocked on controls, t-stat, or market-relevance. Inspect to see whether the block is fixable or whether to wait for more controls. ${counts.watch + counts.noise > 0 ? `${counts.watch + counts.noise} additional observations.` : ''}`,
       counts,
     };
   }

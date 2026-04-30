@@ -63,6 +63,7 @@ function ensureStyleSheet() {
     .sl-banner button.sl-close:hover{color:rgba(255,255,255,.85)}
     .sl-lane-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-right:6px}
     .sl-lane-pill.validated{background:rgba(22,199,132,.18);color:#16c784;border:1px solid rgba(22,199,132,.4)}
+    .sl-lane-pill.pending{background:rgba(216,249,157,.16);color:#d8f99d;border:1px solid rgba(216,249,157,.36)}
     .sl-lane-pill.watch{background:rgba(245,158,11,.16);color:#f59e0b;border:1px solid rgba(245,158,11,.36)}
     .sl-lane-pill.noise{background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1)}
   `;
@@ -117,12 +118,19 @@ function buildHotEventsBanner(payload) {
   const empty = payload?.emptyState;
   const banners = [];
   if (framing) {
-    const lvl = framing.bucket === 'no_data' || framing.bucket === 'noise_only' ? 'warn' : 'ok';
+    // Pending validation gets the 'ok' tone because it is actionable signal.
+    // noise_only / no_data warrant the warn tone.
+    const lvl = framing.bucket === 'no_data' || framing.bucket === 'noise_only'
+      ? 'warn'
+      : framing.bucket === 'validated_signals' || framing.bucket === 'pending_validation'
+        ? 'ok'
+        : 'ok';
     const counts = framing.counts || {};
+    const pendingPill = counts.pending > 0 ? ` · ${counts.pending}P` : '';
     banners.push(el('div', { class: `sl-banner ${lvl}`, 'data-source': 'theme-framing' }, [
       el('div', { class: 'sl-banner-head' }, [
         el('span', {}, [`Hot Events · ${framing.bucket || 'view'}`]),
-        el('span', {}, [`${counts.validated || 0}V · ${counts.watch || 0}W · ${counts.noise || 0}N`]),
+        el('span', {}, [`${counts.validated || 0}V${pendingPill} · ${counts.watch || 0}W · ${counts.noise || 0}N`]),
       ]),
       el('div', { class: 'sl-banner-body' }, [framing.message || '']),
       framing.modelDisabledNotice
@@ -155,14 +163,17 @@ function buildHotEventsBanner(payload) {
         : null,
     ]));
   }
-  // S-Tier B2 — top events grouped by lane, with recommendedAction. We
-  // only render this when there ARE events; the empty case is covered
-  // above. Limit to 3 per lane to keep the overlay compact.
+  // S-Tier B2 + N3 — top events grouped by lane, with recommendedAction.
+  // Pending lane is rendered between validated and watch since it sits
+  // semantically between them: real signal, blocked on a fixable gate.
   const eventsByLane = payload?.eventsByLane || {};
-  const totalShown = (eventsByLane.validated?.length || 0) + (eventsByLane.watch?.length || 0);
+  const totalShown =
+    (eventsByLane.validated?.length || 0)
+    + (eventsByLane.pending?.length || 0)
+    + (eventsByLane.watch?.length || 0);
   if (totalShown > 0) {
     const laneRows = [];
-    for (const lane of ['validated', 'watch', 'noise']) {
+    for (const lane of ['validated', 'pending', 'watch', 'noise']) {
       const list = (eventsByLane[lane] || []).slice(0, 3);
       if (list.length === 0) continue;
       laneRows.push(el('div', { class: 'sl-banner-meta', style: 'margin-top:8px' }, [
@@ -181,6 +192,15 @@ function buildHotEventsBanner(payload) {
           }, [
             `${ev.recommendedAction.action}: ${ev.recommendedAction.reason || ''}`,
           ]));
+        }
+        // Pending events: show the concrete blocker codes so the operator
+        // knows whether to wait or override.
+        if (lane === 'pending' && Array.isArray(ev.validationBlockers) && ev.validationBlockers.length > 0) {
+          const codes = ev.validationBlockers.map((b) => b.code).join(', ');
+          laneRows.push(el('div', {
+            class: 'sl-banner-meta',
+            style: 'margin-top:2px;font-size:10.5px',
+          }, [`⛔ ${codes}`]));
         }
       }
     }

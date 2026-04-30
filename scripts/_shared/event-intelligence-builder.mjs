@@ -24,6 +24,7 @@ import {
   explainEventLane,
   summarizeThemeFraming,
   recommendActionForEvent,
+  computeValidationStatus,
 } from './event-product-score.mjs';
 
 const HOT_EVENTS_LIMIT = 10;
@@ -586,19 +587,26 @@ export async function buildHotEventsPayload(pool, {
       const evWithLane = { ...ev, lane };
       // S-Tier §S4: per-event one-liner explaining why it landed in this lane.
       const laneReason = explainEventLane(evWithLane);
-      // S-Tier §A1: explicit themeRelevanceScore + recommendedAction at the
-      // event level, so the dashboard never has to dig into scoreBreakdown
-      // to render "왜 이게 올라왔는지 / 뭘 해야 하는지". The score lives in
-      // scoreBreakdown.components.themeRelevance; we mirror it as a
-      // top-level field for clarity.
+      // S-Tier §A1: explicit themeRelevanceScore at the event level.
       const themeRelevanceScore = Number(
         evWithLane.scoreBreakdown?.components?.themeRelevance ?? 0,
       );
-      const recommendedAction = recommendActionForEvent({ ...evWithLane, laneReason });
+      // S-Tier §N3: validation status + concrete blockers. Computed BEFORE
+      // recommendedAction so the recommendation can branch on
+      // 'pending' status with blocker-specific advice.
+      const validation = computeValidationStatus(evWithLane);
+      const recommendedAction = recommendActionForEvent({
+        ...evWithLane,
+        laneReason,
+        validationStatus: validation.status,
+        validationBlockers: validation.blockers,
+      });
       return {
         ...evWithLane,
         laneReason,
         themeRelevanceScore,
+        validationStatus: validation.status,
+        validationBlockers: validation.blockers,
         recommendedAction,
       };
     });
@@ -635,21 +643,34 @@ export async function buildHotEventsPayload(pool, {
 
     // S-Tier §2 — group filtered events by lane for caller convenience.
     // The plan requires Hot Events split into Validated/Emerging Watch/Noise
-    // visually distinct lanes.
+    // visually distinct lanes. N3 adds a virtual "pending" group for the
+    // E1+ raw-grade items inside the watch lane that are blocked on the
+    // promotion gate; the dashboard can render this as a separate
+    // "Pending Validation" sub-section.
     const eventsByLane = {
       validated: events.filter((e) => e.lane === 'validated'),
-      watch: events.filter((e) => e.lane === 'watch'),
+      pending: events.filter((e) => e.validationStatus === 'pending'),
+      watch: events.filter((e) => e.lane === 'watch' && e.validationStatus !== 'pending'),
       noise: events.filter((e) => e.lane === 'noise'),
     };
 
+    // S-Tier §N3: count of pending-validation items across all candidates.
+    // Surfaced separately in the framing so the user sees "we DO have signal,
+    // it just hasn't crossed the gate" — much more actionable than a flat
+    // watch/noise breakdown.
+    const pendingValidationCount = allLanedEvents.filter(
+      (e) => e.validationStatus === 'pending',
+    ).length;
+
     // S-Tier §S4: theme-level framing explaining what the user is looking
-    // at — "validated signals", "watch only", "noise only", or "no data".
-    // This complements the per-event laneReason and gives the dashboard a
-    // single string to render at the top of a theme page.
+    // at — "validated signals", "pending_validation", "watch only",
+    // "noise only", or "no data". The pending bucket is computed by
+    // counting events whose validationStatus === 'pending'.
     const themeFraming = summarizeThemeFraming({
       events,
       laneCounts,
       themeFilter,
+      pendingCount: pendingValidationCount,
     });
 
     // S-Tier §S5: model trust — when too many predictions are stale relative
