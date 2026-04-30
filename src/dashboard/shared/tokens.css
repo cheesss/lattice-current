@@ -1,0 +1,68 @@
+/*
+ * Lattice dashboard design tokens (G2 dashboard split — first CSS slice).
+ *
+ * This file is the canonical source of truth for the design system: the
+ * background palette, semantic colors (signal/amber/red/blue), text scale,
+ * fonts, and the `--bg`/`--surface`/`--accent` aliases used across the
+ * inline event-dashboard.html style block AND any new per-surface modules.
+ *
+ * Loaded via <link rel="stylesheet"> in event-dashboard.html BEFORE the
+ * inline <style> block. The inline block currently still defines the same
+ * tokens for backward compatibility — that duplicate will be removed when
+ * PR 1 of the full dashboard split lands. Until then, both define the same
+ * values so cascade order has no visible effect.
+ *
+ * If you change a token here, also update the inline <style> :root block
+ * until the duplicate is removed. (Or leave the duplicate stale: cascade
+ * order means the inline block wins, so the duplicate doesn't matter for
+ * runtime — only for future-extracted files that import this directly.)
+ */
+
+:root {
+  /* Background palette */
+  --bg-void: #07080a;
+  --bg-base: #0d0f13;
+  --bg-surface: #13161d;
+  --bg-elevated: #1c2028;
+  --bg-overlay: rgba(13, 15, 19, .92);
+
+  /* Borders */
+  --border-dim: rgba(255, 255, 255, .04);
+  --border-base: rgba(255, 255, 255, .08);
+  --border-focus: rgba(255, 255, 255, .18);
+
+  /* Semantic colors — match plan §1 lane colors so per-surface files can
+     reuse without re-defining */
+  --signal-green: #16c784;
+  --amber-risk: #f59e0b;
+  --red-critical: #ef4444;
+  --blue-info: #3b82f6;
+  --graphite: #4b5563;
+
+  /* Text scale */
+  --text-loud: rgba(255, 255, 255, .95);
+  --text-base: rgba(255, 255, 255, .75);
+  --text-soft: rgba(255, 255, 255, .45);
+  --text-muted: rgba(255, 255, 255, .25);
+
+  /* Fonts */
+  --font-sans: 'Geist', Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Aliases used pervasively in the inline style block.
+     Kept here so per-surface CSS files can reference them too. */
+  --bg: var(--bg-void);
+  --surface: var(--bg-surface);
+  --surface2: var(--bg-elevated);
+  --border: var(--border-base);
+  --text: var(--text-loud);
+  --muted: var(--text-soft);
+
+  /* Accent palette */
+  --accent: #d8f99d;
+  --accent2: var(--signal-green);
+  --amber: var(--amber-risk);
+  --red: var(--red-critical);
+  --teal: #67d1c5;
+  --blue: var(--blue-info);
+}

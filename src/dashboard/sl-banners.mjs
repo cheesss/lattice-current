@@ -49,23 +49,26 @@ function el(tag, props = {}, children = []) {
 
 function ensureStyleSheet() {
   if (document.getElementById('sl-banner-styles')) return;
+  // Uses design tokens from src/dashboard/shared/tokens.css. Falls back to
+  // hardcoded colors when tokens are missing (e.g. when this module is
+  // loaded standalone in tests).
   const css = `
-    #sl-banner-stack{position:fixed;bottom:14px;right:14px;z-index:9000;display:flex;flex-direction:column;gap:8px;width:380px;max-width:calc(100vw - 28px);font-family:'Geist',Inter,system-ui,sans-serif;font-size:12px;line-height:1.45;pointer-events:auto}
-    .sl-banner{padding:12px 14px;border-radius:12px;background:rgba(13,15,19,.94);border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.32);color:rgba(255,255,255,.9)}
-    .sl-banner.warn{border-color:#f59e0b;background:linear-gradient(180deg,rgba(64,42,12,.94),rgba(13,15,19,.94))}
-    .sl-banner.crit{border-color:#ef4444;background:linear-gradient(180deg,rgba(64,12,12,.94),rgba(13,15,19,.94))}
+    #sl-banner-stack{position:fixed;bottom:14px;right:14px;z-index:9000;display:flex;flex-direction:column;gap:8px;width:380px;max-width:calc(100vw - 28px);font-family:var(--font-sans,'Geist',Inter,system-ui,sans-serif);font-size:12px;line-height:1.45;pointer-events:auto}
+    .sl-banner{padding:12px 14px;border-radius:12px;background:var(--bg-overlay,rgba(13,15,19,.94));border:1px solid var(--border-base,rgba(255,255,255,.08));box-shadow:0 8px 24px rgba(0,0,0,.32);color:var(--text-loud,rgba(255,255,255,.9))}
+    .sl-banner.warn{border-color:var(--amber-risk,#f59e0b);background:linear-gradient(180deg,rgba(64,42,12,.94),var(--bg-overlay,rgba(13,15,19,.94)))}
+    .sl-banner.crit{border-color:var(--red-critical,#ef4444);background:linear-gradient(180deg,rgba(64,12,12,.94),var(--bg-overlay,rgba(13,15,19,.94)))}
     .sl-banner.ok{border-color:rgba(22,199,132,.6)}
-    .sl-banner-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:rgba(255,255,255,.6);margin-bottom:6px}
-    .sl-banner-body{color:rgba(255,255,255,.92)}
-    .sl-banner-action{margin-top:6px;font-family:'JetBrains Mono',Consolas,monospace;font-size:11px;color:#d8f99d;white-space:pre-wrap;word-break:break-all}
-    .sl-banner-meta{margin-top:6px;font-size:10.5px;color:rgba(255,255,255,.55)}
-    .sl-banner button.sl-close{background:transparent;border:0;color:rgba(255,255,255,.45);cursor:pointer;font-size:14px;line-height:1;padding:0}
-    .sl-banner button.sl-close:hover{color:rgba(255,255,255,.85)}
+    .sl-banner-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:var(--text-soft,rgba(255,255,255,.6));margin-bottom:6px}
+    .sl-banner-body{color:var(--text-loud,rgba(255,255,255,.92))}
+    .sl-banner-action{margin-top:6px;font-family:var(--font-mono,'JetBrains Mono',Consolas,monospace);font-size:11px;color:var(--accent,#d8f99d);white-space:pre-wrap;word-break:break-all}
+    .sl-banner-meta{margin-top:6px;font-size:10.5px;color:var(--text-soft,rgba(255,255,255,.55))}
+    .sl-banner button.sl-close{background:transparent;border:0;color:var(--text-muted,rgba(255,255,255,.45));cursor:pointer;font-size:14px;line-height:1;padding:0}
+    .sl-banner button.sl-close:hover{color:var(--text-loud,rgba(255,255,255,.85))}
     .sl-lane-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-right:6px}
-    .sl-lane-pill.validated{background:rgba(22,199,132,.18);color:#16c784;border:1px solid rgba(22,199,132,.4)}
-    .sl-lane-pill.pending{background:rgba(216,249,157,.16);color:#d8f99d;border:1px solid rgba(216,249,157,.36)}
-    .sl-lane-pill.watch{background:rgba(245,158,11,.16);color:#f59e0b;border:1px solid rgba(245,158,11,.36)}
-    .sl-lane-pill.noise{background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1)}
+    .sl-lane-pill.validated{background:rgba(22,199,132,.18);color:var(--signal-green,#16c784);border:1px solid rgba(22,199,132,.4)}
+    .sl-lane-pill.pending{background:rgba(216,249,157,.16);color:var(--accent,#d8f99d);border:1px solid rgba(216,249,157,.36)}
+    .sl-lane-pill.watch{background:rgba(245,158,11,.16);color:var(--amber-risk,#f59e0b);border:1px solid rgba(245,158,11,.36)}
+    .sl-lane-pill.noise{background:rgba(255,255,255,.05);color:var(--text-soft,rgba(255,255,255,.5));border:1px solid rgba(255,255,255,.1)}
   `;
   const style = el('style', { id: 'sl-banner-styles' });
   style.textContent = css;
