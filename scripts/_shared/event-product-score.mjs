@@ -1,0 +1,279 @@
+/**
+ * Event product score (S-Tier User Value §1).
+ *
+ * Plan §1 requires ranking events by a composite product score that combines
+ * theme relevance, evidence grade, freshness, source credibility, market/policy
+ * impact, and a duplicate penalty:
+ *
+ *   productScore =
+ *     themeRelevance
+ *     × evidenceWeight
+ *     × freshnessWeight
+ *     × sourceCredibility
+ *     × impactWeight
+ *     × duplicatePenalty
+ *
+ * Pure multiplication is intentional — it expresses that each component is
+ * necessary, not just helpful. A dead-zero in any one of them collapses the
+ * score. To prevent total elimination on a single missing signal we clamp each
+ * component to a small floor, but a weak signal will still dominate the score.
+ *
+ * Every score returns a `components` and `rationale` array so the dashboard can
+ * show the calculation path (plan §1: "Show the calculation path for all
+ * prominent metrics").
+ *
+ * Inputs are the row shape returned by buildHotEventsPayload's normalizeHotEventRow,
+ * augmented with publisherGroups when available.
+ */
+
+const COMPONENT_FLOOR = 0.05;
+
+const EVIDENCE_GRADE_WEIGHTS = {
+  E4: 1.00,
+  E3: 0.85,
+  E2: 0.70,
+  E1: 0.40,
+  E0: 0.20,
+};
+
+// Catch-all themes that the plan §6 says must be penalized "unless no narrower
+// theme exists". We give them a haircut on themeRelevance.
+const CATCH_ALL_THEMES = new Set([
+  'technology-general',
+  'emerging-tech',
+  'general',
+  'misc',
+  'other',
+  'unknown',
+]);
+
+const FRESHNESS_HALF_LIFE_DAYS = 14;
+
+function clamp(value, min = 0, max = 1) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function floorComponent(value) {
+  return clamp(value, COMPONENT_FLOOR, 1);
+}
+
+function isDynamicTheme(theme) {
+  return typeof theme === 'string' && /^dt-[a-z0-9]+$/i.test(theme.trim());
+}
+
+function ageDays(eventDate, now = new Date()) {
+  if (!eventDate) return Number.POSITIVE_INFINITY;
+  const t = new Date(eventDate).getTime();
+  if (!Number.isFinite(t)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (now.getTime() - t) / 86_400_000);
+}
+
+/**
+ * themeRelevance ∈ [floor, 1]
+ *
+ * Heuristic until a dedicated theme-relevance model lands (plan §5):
+ *   - dt-* (auto-generated dynamic theme): 0.40 — uncertain mapping
+ *   - catch-all theme name (technology-general, etc.): 0.55 — too broad
+ *   - explicit market relevance signal favourable
+ *     (market_relevant > low_relevant when known): boost to 0.90
+ *   - no market relevance signal at all: 0.70 (neutral)
+ *   - relevance_blocked quality flag: 0.30
+ */
+export function computeThemeRelevance(event = {}) {
+  const rationale = [];
+  const theme = String(event.theme || '').trim();
+  const flags = Array.isArray(event.qualityFlags) ? event.qualityFlags : [];
+
+  let score = 0.70;
+  if (isDynamicTheme(theme)) {
+    score = 0.40;
+    rationale.push('dynamic-theme-code');
+  } else if (CATCH_ALL_THEMES.has(theme.toLowerCase())) {
+    score = 0.55;
+    rationale.push('catch-all-theme');
+  }
+
+  if (flags.includes('low-market-relevance')) {
+    score = Math.min(score, 0.30);
+    rationale.push('quality-flag:low-market-relevance');
+  }
+
+  const known = Number(event.knownMarketRelevanceArticles ?? 0);
+  const relevant = Number(event.marketRelevantArticles ?? 0);
+  const low = Number(event.lowRelevanceArticles ?? 0);
+  if (known > 0 && relevant >= low + 1) {
+    score = Math.min(1, score + 0.20);
+    rationale.push('market-relevance:strong');
+  }
+
+  return { value: floorComponent(score), rationale };
+}
+
+export function computeEvidenceWeight(event = {}) {
+  const grade = String(event.bestEvidenceGrade || event.rawEvidenceGrade || '').toUpperCase();
+  // Plan §1: "Move `none` evidence-grade items out of the validated signal
+  // lane." We honour that by giving `none` the smallest possible weight.
+  // Combined with downstream classifyEventLane, this naturally drops them
+  // into the noise lane unless other signals are exceptionally strong.
+  const value = EVIDENCE_GRADE_WEIGHTS[grade] ?? COMPONENT_FLOOR;
+  const rationale = [`grade:${grade || 'none'}`];
+  return { value: floorComponent(value), rationale };
+}
+
+export function computeFreshnessWeight(event = {}, now = new Date()) {
+  const days = ageDays(event.eventDate, now);
+  if (!Number.isFinite(days)) {
+    return { value: COMPONENT_FLOOR, rationale: ['no-event-date'] };
+  }
+  const value = Math.exp(-days / FRESHNESS_HALF_LIFE_DAYS);
+  return {
+    value: floorComponent(value),
+    rationale: [`age:${days.toFixed(1)}d`],
+  };
+}
+
+export function computeSourceCredibility(event = {}) {
+  const sourceCount = Number(event.sourceCount ?? 0);
+  const publisherGroups = Number(event.publisherGroups ?? event.publisher_groups ?? 0);
+  const flags = Array.isArray(event.qualityFlags) ? event.qualityFlags : [];
+
+  let value;
+  let rationale;
+  if (publisherGroups >= 3 && sourceCount >= 5) {
+    value = 1.0; rationale = ['multi-publisher:5+'];
+  } else if (publisherGroups >= 2 && sourceCount >= 3) {
+    value = 0.80; rationale = ['multi-publisher:3+'];
+  } else if (sourceCount >= 2) {
+    value = 0.50; rationale = ['multi-source-but-narrow'];
+  } else {
+    value = 0.20; rationale = ['single-source'];
+  }
+  if (flags.includes('single-source')) {
+    value = Math.min(value, 0.25);
+  }
+  return { value: floorComponent(value), rationale };
+}
+
+export function computeImpactWeight(event = {}) {
+  const t = Math.abs(Number(event.rawMaxAbsTStat ?? event.maxAbsTStat ?? 0));
+  let value;
+  let rationale;
+  if (t >= 4) { value = 1.00; rationale = ['t>=4']; }
+  else if (t >= 3) { value = 0.80; rationale = ['t>=3']; }
+  else if (t >= 2) { value = 0.60; rationale = ['t>=2']; }
+  else if (t >= 1) { value = 0.40; rationale = ['t>=1']; }
+  else { value = 0.20; rationale = ['t<1-or-missing']; }
+  return { value: floorComponent(value), rationale };
+}
+
+/**
+ * duplicatePenalty ∈ [floor, 1]
+ *
+ * 1.0 = no duplication penalty.
+ * 0.5 ≈ all articles share one publisher group.
+ *
+ * Without a duplicate cluster ID at the row level we approximate by:
+ *   ratio = publisherGroups / max(1, sourceCount)
+ * a ratio close to 1 means every source is independent.
+ */
+export function computeDuplicatePenalty(event = {}) {
+  const sourceCount = Number(event.sourceCount ?? 0);
+  const publisherGroups = Number(event.publisherGroups ?? event.publisher_groups ?? sourceCount);
+  if (sourceCount <= 1) {
+    return { value: floorComponent(0.30), rationale: ['single-source'] };
+  }
+  if (publisherGroups <= 1) {
+    return { value: 0.50, rationale: ['all-same-publisher-group'] };
+  }
+  const ratio = publisherGroups / Math.max(1, sourceCount);
+  return {
+    value: floorComponent(0.6 + 0.4 * ratio),
+    rationale: [`pub-group-ratio:${ratio.toFixed(2)}`],
+  };
+}
+
+/**
+ * Compute the composite product score for one event.
+ *
+ * Returns:
+ *   {
+ *     productScore: 0..1,
+ *     components: { themeRelevance, evidenceWeight, freshnessWeight,
+ *                   sourceCredibility, impactWeight, duplicatePenalty },
+ *     rationale: string[]   // collected from each component
+ *   }
+ */
+export function computeEventProductScore(event = {}, options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const themeRelevance = computeThemeRelevance(event);
+  const evidenceWeight = computeEvidenceWeight(event);
+  const freshnessWeight = computeFreshnessWeight(event, now);
+  const sourceCredibility = computeSourceCredibility(event);
+  const impactWeight = computeImpactWeight(event);
+  const duplicatePenalty = computeDuplicatePenalty(event);
+
+  const productScore =
+    themeRelevance.value
+    * evidenceWeight.value
+    * freshnessWeight.value
+    * sourceCredibility.value
+    * impactWeight.value
+    * duplicatePenalty.value;
+
+  return {
+    productScore: clamp(productScore, 0, 1),
+    components: {
+      themeRelevance: themeRelevance.value,
+      evidenceWeight: evidenceWeight.value,
+      freshnessWeight: freshnessWeight.value,
+      sourceCredibility: sourceCredibility.value,
+      impactWeight: impactWeight.value,
+      duplicatePenalty: duplicatePenalty.value,
+    },
+    rationale: [
+      ...themeRelevance.rationale,
+      ...evidenceWeight.rationale,
+      ...freshnessWeight.rationale,
+      ...sourceCredibility.rationale,
+      ...impactWeight.rationale,
+      ...duplicatePenalty.rationale,
+    ],
+  };
+}
+
+/**
+ * Sort events in-place by descending productScore. Adds productScore +
+ * scoreBreakdown to each event for the dashboard to display.
+ */
+export function rankByProductScore(events, options = {}) {
+  if (!Array.isArray(events)) return [];
+  const now = options.now instanceof Date ? options.now : new Date();
+  const decorated = events.map((event) => {
+    const score = computeEventProductScore(event, { now });
+    return {
+      ...event,
+      productScore: score.productScore,
+      scoreBreakdown: {
+        components: score.components,
+        rationale: score.rationale,
+      },
+    };
+  });
+  decorated.sort((a, b) => (b.productScore ?? 0) - (a.productScore ?? 0));
+  return decorated;
+}
+
+/**
+ * Classify a scored event into a lane (S-Tier §3 / Phase 2 prep):
+ *   - 'validated': promoted E2+ AND productScore >= 0.20
+ *   - 'watch':     scored event without promotion OR low evidence
+ *   - 'noise':     productScore < 0.05 (catch-all + ungraded + stale)
+ */
+export function classifyEventLane(event = {}) {
+  const productScore = Number(event.productScore ?? 0);
+  const promoted = Boolean(event.promotionEligible);
+  if (promoted && productScore >= 0.20) return 'validated';
+  if (productScore < 0.05) return 'noise';
+  return 'watch';
+}

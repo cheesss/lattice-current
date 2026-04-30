@@ -15,6 +15,11 @@
  *   articles
  */
 
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
+import { rankByProductScore, classifyEventLane } from './event-product-score.mjs';
+
 const HOT_EVENTS_LIMIT = 10;
 const HOT_EVENTS_LOOKBACK_DAYS = 7;
 export const HOT_EVENTS_MIN_PROMOTION_CONTROLS = 8;
@@ -25,6 +30,19 @@ const SOURCE_DIVERSITY_TOP_LIMIT = 15;
 const SOURCE_DOMINANCE_WARN_PCT = 0.30;
 const SOURCE_DOMINANCE_CRITICAL_PCT = 0.50;
 const META_MODEL_RECENT_HOURS = 24;
+export const META_MODEL_PROMOTION_GATES = Object.freeze({
+  maxAggregateBrier: 0.25,
+  maxWorstBrier: 0.25,
+  maxAggregateEce: 0.10,
+  maxWorstRawEceForWatch: 0.15,
+  maxEffectiveEce: 0.08,
+  minTop20Precision: 0.20,
+  minSampleCount: 10_000,
+  maxFeatureLagDays: 0,
+  maxFeatureStaleRows: 0,
+  maxPredictionStaleRows: 0,
+  recentPredictionWindowHours: META_MODEL_RECENT_HOURS,
+});
 
 async function tableExists(executor, tableName) {
   const { rows } = await executor.query(
@@ -32,6 +50,196 @@ async function tableExists(executor, tableName) {
     [`public.${tableName}`],
   );
   return Boolean(rows[0]?.oid);
+}
+
+function finiteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function gateResult(name, value, threshold, pass, warning = false) {
+  return {
+    name,
+    value: value == null ? null : Number(value),
+    threshold,
+    status: pass ? 'pass' : warning ? 'watch' : 'fail',
+  };
+}
+
+async function loadMetaModelCalibrationSidecar(modelVersion) {
+  const safeVersion = String(modelVersion || '').trim();
+  if (!/^[a-zA-Z0-9._-]+$/.test(safeVersion)) return null;
+  const calibrationPath = path.resolve('data', `${safeVersion}.calibration.json`);
+  try {
+    const parsed = JSON.parse(await readFile(calibrationPath, 'utf8'));
+    const postMetrics = parsed?.post_metrics || {};
+    const preMetrics = parsed?.pre_metrics || {};
+    return {
+      source: 'calibration-sidecar',
+      modelVersion: parsed.model_version || safeVersion,
+      method: parsed.calibration_method || 'unknown',
+      temperature: finiteNumber(parsed.temperature),
+      validationN: finiteNumber(parsed.validation_n),
+      preMetrics: {
+        brier: finiteNumber(preMetrics.brier),
+        ece: finiteNumber(preMetrics.ece),
+      },
+      postMetrics: {
+        brier: finiteNumber(postMetrics.brier),
+        ece: finiteNumber(postMetrics.ece),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function evaluateMetaModelTrust({
+  hasEval,
+  hasPredictions,
+  latestEval,
+  recentPredictions,
+  pipelineFreshness,
+  symbolCoverage,
+  calibration,
+} = {}) {
+  const notes = [];
+  const recommendedActions = [];
+  const gates = [];
+
+  if (!hasEval && !hasPredictions) {
+    return {
+      level: 'warning',
+      healthStatus: 'disabled',
+      effectiveMetrics: null,
+      gates,
+      notes: ['model_eval / model_predictions tables missing; meta-model pipeline is not initialized'],
+      recommendedActions: ['Run model table migrations, train-meta-model, then meta-model-infer.'],
+    };
+  }
+  if (!hasEval) {
+    return {
+      level: 'warning',
+      healthStatus: 'disabled',
+      effectiveMetrics: null,
+      gates,
+      notes: ['model_eval table missing; Brier/ECE tracking is unavailable'],
+      recommendedActions: ['Create model_eval and run the validation job before trusting model scores.'],
+    };
+  }
+  if (!latestEval) {
+    return {
+      level: 'warning',
+      healthStatus: 'disabled',
+      effectiveMetrics: null,
+      gates,
+      notes: ['model_eval is empty; run the first validation job'],
+      recommendedActions: ['Run train-meta-model or compare-models to populate model_eval.'],
+    };
+  }
+
+  const aggregateBrier = finiteNumber(latestEval.brierScore);
+  const worstBrier = finiteNumber(latestEval.worstBrierScore) ?? aggregateBrier;
+  const aggregateEce = finiteNumber(latestEval.ece);
+  const worstEce = finiteNumber(latestEval.worstEce) ?? aggregateEce;
+  const calibratedEce = finiteNumber(calibration?.postMetrics?.ece);
+  const calibratedBrier = finiteNumber(calibration?.postMetrics?.brier);
+  const effectiveEce = calibratedEce ?? aggregateEce;
+  const effectiveBrier = calibratedBrier ?? aggregateBrier;
+  const top20Precision = finiteNumber(latestEval.top20Precision);
+  const sampleCount = finiteNumber(latestEval.sampleCount);
+  const featureLagDays = finiteNumber(pipelineFreshness?.featureLagDays);
+  const featureStaleRows = finiteNumber(pipelineFreshness?.featureStaleEventCount) ?? 0;
+  const predictionStaleRows = finiteNumber(pipelineFreshness?.predictionStaleCount) ?? 0;
+
+  gates.push(gateResult('aggregate-brier', aggregateBrier, `<= ${META_MODEL_PROMOTION_GATES.maxAggregateBrier}`, aggregateBrier != null && aggregateBrier <= META_MODEL_PROMOTION_GATES.maxAggregateBrier));
+  gates.push(gateResult('worst-split-brier', worstBrier, `<= ${META_MODEL_PROMOTION_GATES.maxWorstBrier}`, worstBrier != null && worstBrier <= META_MODEL_PROMOTION_GATES.maxWorstBrier));
+  gates.push(gateResult('aggregate-ece', aggregateEce, `<= ${META_MODEL_PROMOTION_GATES.maxAggregateEce}`, aggregateEce != null && aggregateEce <= META_MODEL_PROMOTION_GATES.maxAggregateEce));
+  gates.push(gateResult(
+    'effective-ece',
+    effectiveEce,
+    `<= ${META_MODEL_PROMOTION_GATES.maxEffectiveEce}`,
+    effectiveEce != null && effectiveEce <= META_MODEL_PROMOTION_GATES.maxEffectiveEce,
+    effectiveEce != null && effectiveEce <= META_MODEL_PROMOTION_GATES.maxAggregateEce,
+  ));
+  gates.push(gateResult('top20-precision', top20Precision, `>= ${META_MODEL_PROMOTION_GATES.minTop20Precision}`, top20Precision != null && top20Precision >= META_MODEL_PROMOTION_GATES.minTop20Precision));
+  gates.push(gateResult('sample-count', sampleCount, `>= ${META_MODEL_PROMOTION_GATES.minSampleCount}`, sampleCount != null && sampleCount >= META_MODEL_PROMOTION_GATES.minSampleCount));
+  gates.push(gateResult('feature-lag-days', featureLagDays ?? 0, `<= ${META_MODEL_PROMOTION_GATES.maxFeatureLagDays}`, (featureLagDays ?? 0) <= META_MODEL_PROMOTION_GATES.maxFeatureLagDays));
+  gates.push(gateResult('stale-feature-rows', featureStaleRows, `<= ${META_MODEL_PROMOTION_GATES.maxFeatureStaleRows}`, featureStaleRows <= META_MODEL_PROMOTION_GATES.maxFeatureStaleRows));
+  gates.push(gateResult('stale-prediction-rows', predictionStaleRows, `<= ${META_MODEL_PROMOTION_GATES.maxPredictionStaleRows}`, predictionStaleRows <= META_MODEL_PROMOTION_GATES.maxPredictionStaleRows));
+
+  let healthStatus = 'ok';
+  if (Number.isFinite(worstEce) && worstEce > META_MODEL_PROMOTION_GATES.maxAggregateEce) {
+    if (calibratedEce != null && calibratedEce <= META_MODEL_PROMOTION_GATES.maxEffectiveEce) {
+      notes.push(`Raw worst split ECE ${worstEce.toFixed(4)} > ${META_MODEL_PROMOTION_GATES.maxAggregateEce.toFixed(2)}, but active temperature calibration lowers operational ECE to ${calibratedEce.toFixed(4)}`);
+      recommendedActions.push('No operator action required now; keep the model active and refresh calibration on the next retrain cycle.');
+    } else if (worstEce <= META_MODEL_PROMOTION_GATES.maxWorstRawEceForWatch) {
+      healthStatus = 'calibration-warning';
+      notes.push(`Worst split ECE ${worstEce.toFixed(4)} is above target; calibration sidecar is missing or insufficient`);
+      recommendedActions.push('Run python scripts/calibrate-meta-model.py, restart meta-model-server, then rerun meta-model-infer.');
+    } else {
+      healthStatus = 'calibration-warning';
+      notes.push(`Worst split ECE ${worstEce.toFixed(4)} exceeds the hard watch gate ${META_MODEL_PROMOTION_GATES.maxWorstRawEceForWatch.toFixed(2)}`);
+      recommendedActions.push('Move the model to shadow/deprecated and retrain before using new predictions for operator priority.');
+    }
+  }
+  if (Number.isFinite(worstBrier) && worstBrier > META_MODEL_PROMOTION_GATES.maxWorstBrier) {
+    healthStatus = 'calibration-warning';
+    notes.push(`Worst split Brier ${worstBrier.toFixed(4)} > ${META_MODEL_PROMOTION_GATES.maxWorstBrier}; probability calibration may be weak`);
+    recommendedActions.push('Recalibrate or retrain before promoting a new model version.');
+  }
+  if (top20Precision != null && top20Precision < META_MODEL_PROMOTION_GATES.minTop20Precision) {
+    healthStatus = 'calibration-warning';
+    notes.push(`Top20 precision ${top20Precision.toFixed(3)} < ${META_MODEL_PROMOTION_GATES.minTop20Precision}; high-priority ranking is weak`);
+    recommendedActions.push('Audit feature quality and keep predictions advisory-only until ranking improves.');
+  }
+  if (recentPredictions && recentPredictions.recentCount === 0 && recentPredictions.total > 0) {
+    healthStatus = 'stale';
+    notes.push(`No model_predictions created in the last ${META_MODEL_RECENT_HOURS}h; check daemon meta-model-infer`);
+    recommendedActions.push('Run node --import tsx scripts/meta-model-infer.mjs and inspect daemon logs.');
+  }
+  if (featureLagDays != null && featureLagDays >= 1 && Number(pipelineFreshness?.articles24h ?? 0) > 0) {
+    healthStatus = 'stale';
+    notes.push(`event_features lag latest article date by ${featureLagDays.toFixed(0)}d; run event-engine-incremental before inference`);
+    recommendedActions.push('Run master-daemon repair-stale-features, then meta-model-infer.');
+  }
+  if (featureStaleRows > 0) {
+    healthStatus = 'stale';
+    notes.push(`${featureStaleRows} recent event_features rows are stale versus canonical event stats; run event-engine-incremental`);
+    recommendedActions.push('Run node scripts/master-daemon.mjs --task repair-stale-features.');
+  }
+  if (predictionStaleRows > 0) {
+    healthStatus = 'stale';
+    notes.push(`${predictionStaleRows} model prediction rows are older than current event features; rerun meta-model-infer`);
+    recommendedActions.push('Run node --import tsx scripts/meta-model-infer.mjs.');
+  }
+  if (symbolCoverage && symbolCoverage.coveragePct < 0.9) {
+    healthStatus = 'stale';
+    notes.push(`Only ${(symbolCoverage.coveragePct * 100).toFixed(0)}% of recent themes have symbol mappings; curated fallback seed is required`);
+    recommendedActions.push('Run seed-theme-symbols-curation and review missing theme mappings.');
+  }
+
+  const hasFailGate = gates.some((gate) => gate.status === 'fail');
+  const level = healthStatus === 'stale' || healthStatus === 'disabled' || healthStatus === 'calibration-warning'
+    ? 'warning'
+    : 'ok';
+
+  return {
+    level: hasFailGate ? 'warning' : level,
+    healthStatus,
+    effectiveMetrics: {
+      brier: effectiveBrier,
+      ece: effectiveEce,
+      calibrated: Boolean(calibratedEce != null || calibratedBrier != null),
+      rawAggregateBrier: aggregateBrier,
+      rawAggregateEce: aggregateEce,
+      rawWorstBrier: worstBrier,
+      rawWorstEce: worstEce,
+    },
+    gates,
+    notes,
+    recommendedActions: Array.from(new Set(recommendedActions)),
+  };
 }
 
 /* ===================== get_hot_events ===================== */
@@ -92,6 +300,7 @@ export function normalizeHotEventRow(row = {}) {
     marketRelevantArticles: Number(row.market_relevant_articles ?? 0),
     knownMarketRelevanceArticles: Number(row.known_market_relevance_articles ?? 0),
     lowRelevanceArticles: Number(row.low_relevance_articles ?? 0),
+    publisherGroups: Number(row.publisher_groups ?? 0),
     qualityFlags,
     promotionEligible: ['E2', 'E3', 'E4'].includes(String(promotedGrade || '').toUpperCase()),
     qualityGate: {
@@ -262,6 +471,7 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
                COALESCE(aq.known_market_relevance_articles, 0) AS known_market_relevance_articles,
                COALESCE(aq.market_relevant_articles, 0) AS market_relevant_articles,
                COALESCE(aq.low_relevance_articles, 0) AS low_relevance_articles,
+               COALESCE(aq.publisher_groups, 0) AS publisher_groups,
                (COALESCE(ua.strong_uplift_rows, 0) > 0 AND COALESCE(ua.promoted_uplift_rows, 0) = 0) AS controls_blocked,
                (COALESCE(aq.known_market_relevance_articles, 0) > 0
                 AND COALESCE(aq.market_relevant_articles, 0) = 0
@@ -283,16 +493,27 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
          article_count DESC
        LIMIT $1::int
       `,
-      [safeLimit, safeLookback],
+      // Pull 3x candidates from SQL so JS-side product-score re-ranking has
+      // headroom; final slice happens after rankByProductScore (S-Tier §1).
+      [safeLimit * 3, safeLookback],
     );
 
-    const events = rows.map(normalizeHotEventRow);
+    const normalized = rows.map(normalizeHotEventRow);
+
+    // S-Tier §1 — composite product score replaces Hawkes-temperature-only
+    // ordering. Adds productScore + scoreBreakdown + lane to every event so
+    // consumers can show the calculation path and split lanes.
+    const ranked = rankByProductScore(normalized).slice(0, safeLimit);
+    const events = ranked.map((ev) => ({ ...ev, lane: classifyEventLane(ev) }));
 
     const gradeCounts = { E4: 0, E3: 0, E2: 0, E1: 0, E0: 0, none: 0 };
+    const laneCounts = { validated: 0, watch: 0, noise: 0 };
     for (const ev of events) {
       const g = ev.bestEvidenceGrade;
       if (g && g in gradeCounts) gradeCounts[g] += 1;
       else gradeCounts.none += 1;
+      const lane = ev.lane || 'watch';
+      if (lane in laneCounts) laneCounts[lane] += 1;
     }
 
     return {
@@ -305,8 +526,14 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
         minControlsRequired: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
         note: 'Raw E2/E3/E4 grades are promoted only when the uplift row has enough matched controls and is not market-relevance blocked.',
       },
+      ranking: {
+        method: 'product-score',
+        components: ['themeRelevance', 'evidenceWeight', 'freshnessWeight', 'sourceCredibility', 'impactWeight', 'duplicatePenalty'],
+        note: 'Each event includes productScore (0..1) and scoreBreakdown.components/rationale.',
+      },
       totalReturned: events.length,
       gradeCounts,
+      laneCounts,
       surgeCount: events.filter((e) => e.isSurge).length,
       events,
     };
@@ -322,6 +549,34 @@ export async function buildMetaModelHealthPayload(pool) {
   try {
     const haveEval = await tableExists(client, 'model_eval');
     const havePredictions = await tableExists(client, 'model_predictions');
+    const haveModelRegistry = await tableExists(client, 'model_registry');
+
+    let activeModel = null;
+    if (haveModelRegistry) {
+      const registry = await client.query(`
+        SELECT model_key, model_version, target_signal, feature_set_hash, promotion_state,
+               train_window_start, train_window_end, eval_summary, promoted_at, created_at
+          FROM model_registry
+         WHERE promotion_state = 'active'
+         ORDER BY promoted_at DESC NULLS LAST, created_at DESC NULLS LAST
+         LIMIT 1
+      `).catch(() => null);
+      const row = registry?.rows?.[0] || null;
+      if (row) {
+        activeModel = {
+          modelKey: row.model_key,
+          modelVersion: row.model_version,
+          targetSignal: row.target_signal,
+          featureSetHash: row.feature_set_hash,
+          promotionState: row.promotion_state,
+          trainWindowStart: row.train_window_start,
+          trainWindowEnd: row.train_window_end,
+          evalSummary: row.eval_summary || null,
+          promotedAt: row.promoted_at,
+          createdAt: row.created_at,
+        };
+      }
+    }
 
     let latestEval = null;
     let evalHistory = [];
@@ -330,7 +585,7 @@ export async function buildMetaModelHealthPayload(pool) {
         SELECT model_version, eval_date, brier_score, ece, log_loss, n_samples,
                deflated_sharpe, top20_precision, alpha_hit_rate, split_type
           FROM model_eval
-         ORDER BY eval_date DESC
+         ORDER BY eval_date DESC, model_version DESC, split_type ASC
          LIMIT 8
       `);
       evalHistory = rows.map((r) => ({
@@ -345,20 +600,78 @@ export async function buildMetaModelHealthPayload(pool) {
         top20Precision: r.top20_precision == null ? null : Number(r.top20_precision),
         alphaHitRate: r.alpha_hit_rate == null ? null : Number(r.alpha_hit_rate),
       }));
-      latestEval = evalHistory[0] ?? null;
+      const aggregate = await client.query(`
+        WITH target_model AS (
+          SELECT COALESCE(
+            $1::text,
+            (SELECT model_version FROM model_eval ORDER BY eval_date DESC, model_version DESC LIMIT 1)
+          ) AS model_version
+        )
+        SELECT me.model_version,
+               MAX(me.eval_date) AS eval_date,
+               COUNT(*)::int AS split_count,
+               AVG(me.brier_score) AS brier_score,
+               MAX(me.brier_score) AS worst_brier_score,
+               AVG(me.ece) AS ece,
+               MAX(me.ece) AS worst_ece,
+               AVG(me.log_loss) AS log_loss,
+               SUM(me.n_samples)::int AS n_samples,
+               AVG(me.deflated_sharpe) AS deflated_sharpe,
+               AVG(me.top20_precision) AS top20_precision,
+               AVG(me.alpha_hit_rate) AS alpha_hit_rate
+          FROM model_eval me
+          JOIN target_model tm ON tm.model_version = me.model_version
+         GROUP BY me.model_version
+      `, [activeModel?.modelVersion || null]).catch(() => null);
+      const agg = aggregate?.rows?.[0] || null;
+      latestEval = agg ? {
+        modelVersion: agg.model_version,
+        evalDate: agg.eval_date,
+        splitType: 'purged_wf_aggregate',
+        splitCount: Number(agg.split_count ?? 0),
+        brierScore: agg.brier_score == null ? null : Number(agg.brier_score),
+        worstBrierScore: agg.worst_brier_score == null ? null : Number(agg.worst_brier_score),
+        ece: agg.ece == null ? null : Number(agg.ece),
+        worstEce: agg.worst_ece == null ? null : Number(agg.worst_ece),
+        logLoss: agg.log_loss == null ? null : Number(agg.log_loss),
+        sampleCount: agg.n_samples == null ? null : Number(agg.n_samples),
+        deflatedSharpe: agg.deflated_sharpe == null ? null : Number(agg.deflated_sharpe),
+        top20Precision: agg.top20_precision == null ? null : Number(agg.top20_precision),
+        alphaHitRate: agg.alpha_hit_rate == null ? null : Number(agg.alpha_hit_rate),
+      } : (evalHistory[0] ?? null);
     }
 
     let recentPredictions = null;
     let activeModelVersions = [];
+    let pipelineFreshness = null;
+    let symbolCoverage = null;
     if (havePredictions) {
       const counts = await client.query(
         `
-        SELECT COUNT(*)::int                                AS total,
-               COUNT(DISTINCT model_version)::int           AS model_versions,
+        SELECT COUNT(*)::int AS total,
+               COUNT(DISTINCT mp.model_version)::int AS model_versions,
                COUNT(*) FILTER (
-                 WHERE created_at > now() - ($1 || ' hours')::interval
-               )::int                                       AS recent
-          FROM model_predictions
+                 WHERE mp.created_at > now() - ($1 || ' hours')::interval
+               )::int AS recent_created,
+               COUNT(*) FILTER (
+                 WHERE ce.event_date >= NOW()::date - INTERVAL '1 day'
+               )::int AS recent_event_predictions,
+               MAX(ce.event_date) AS latest_predicted_event_date,
+               to_char(MAX(ce.event_date), 'YYYY-MM-DD') AS latest_predicted_event_date_key,
+               (
+                 SELECT MAX(a.published_at)
+                   FROM (SELECT DISTINCT canonical_event_id FROM model_predictions) pe
+                   JOIN article_event_map aem ON aem.canonical_event_id = pe.canonical_event_id
+                   JOIN articles a ON a.id = aem.article_id
+               ) AS latest_predicted_article_at,
+               (
+                 SELECT to_char(MAX(a.published_at)::date, 'YYYY-MM-DD')
+                   FROM (SELECT DISTINCT canonical_event_id FROM model_predictions) pe
+                   JOIN article_event_map aem ON aem.canonical_event_id = pe.canonical_event_id
+                   JOIN articles a ON a.id = aem.article_id
+               ) AS latest_predicted_article_date_key
+          FROM model_predictions mp
+          LEFT JOIN canonical_events ce ON ce.id = mp.canonical_event_id
         `,
         [String(META_MODEL_RECENT_HOURS)],
       ).catch(() => null);
@@ -367,7 +680,14 @@ export async function buildMetaModelHealthPayload(pool) {
           total: counts.rows[0]?.total ?? 0,
           modelVersions: counts.rows[0]?.model_versions ?? 0,
           recentWindowHours: META_MODEL_RECENT_HOURS,
-          recentCount: counts.rows[0]?.recent ?? 0,
+          recentCount: counts.rows[0]?.recent_created ?? 0,
+          recentCreatedCount: counts.rows[0]?.recent_created ?? 0,
+          recentEventPredictionCount: counts.rows[0]?.recent_event_predictions ?? 0,
+          latestPredictedEventDate: counts.rows[0]?.latest_predicted_event_date ?? null,
+          latestPredictedEventDateKey: counts.rows[0]?.latest_predicted_event_date_key ?? null,
+          latestPredictedArticleAt: counts.rows[0]?.latest_predicted_article_at ?? null,
+          latestPredictedArticleDateKey: counts.rows[0]?.latest_predicted_article_date_key ?? null,
+          countBasis: 'created_at',
         };
       }
       const versions = await client.query(`
@@ -386,42 +706,223 @@ export async function buildMetaModelHealthPayload(pool) {
       }
     }
 
-    let level = 'ok';
-    const notes = [];
-    if (!haveEval && !havePredictions) {
-      level = 'warning';
-      notes.push('model_eval / model_predictions 테이블 없음 — meta-model 파이프라인 미초기화');
-    } else if (!haveEval) {
-      level = 'warning';
-      notes.push('model_eval 테이블 없음 — Brier/ECE 추적 불가');
-    } else if (!latestEval) {
-      level = 'warning';
-      notes.push('model_eval 비어 있음 — 첫 검증 실행 필요');
-    } else {
-      if (Number.isFinite(latestEval.brierScore) && latestEval.brierScore > 0.25) {
-        level = 'warning';
-        notes.push(`Brier ${latestEval.brierScore.toFixed(4)} > 0.25 — 확률 보정 재검토`);
-      }
-      if (Number.isFinite(latestEval.ece) && latestEval.ece > 0.10) {
-        level = 'warning';
-        notes.push(`ECE ${latestEval.ece.toFixed(4)} > 0.10 — calibration drift 가능성`);
+    const [
+      haveArticles,
+      haveCanonicalEvents,
+      haveEventFeatures,
+      haveAutoThemeSymbols,
+    ] = await Promise.all([
+      tableExists(client, 'articles'),
+      tableExists(client, 'canonical_events'),
+      tableExists(client, 'event_features'),
+      tableExists(client, 'auto_theme_symbols'),
+    ]).catch(() => [false, false, false, false]);
+
+    if (haveArticles && haveCanonicalEvents && haveEventFeatures) {
+      const freshness = await client.query(`
+        SELECT
+          (SELECT MAX(published_at) FROM articles) AS latest_article_at,
+          (SELECT to_char(MAX(published_at)::date, 'YYYY-MM-DD') FROM articles) AS latest_article_date_key,
+          (SELECT COUNT(*)::int FROM articles WHERE published_at > NOW() - INTERVAL '24 hours') AS articles_24h,
+          (SELECT MAX(event_date) FROM canonical_events) AS latest_event_date,
+          (SELECT COUNT(*)::int FROM canonical_events WHERE event_date > NOW() - INTERVAL '24 hours') AS events_24h,
+          (
+            SELECT MAX(ce.event_date)
+              FROM event_features ef
+              JOIN canonical_events ce ON ce.id = ef.canonical_event_id
+          ) AS latest_feature_event_date,
+          (
+            SELECT to_char(MAX(ce.event_date), 'YYYY-MM-DD')
+              FROM event_features ef
+              JOIN canonical_events ce ON ce.id = ef.canonical_event_id
+          ) AS latest_feature_event_date_key,
+          (
+            SELECT MAX(a.published_at)
+              FROM event_features ef
+              JOIN article_event_map aem ON aem.canonical_event_id = ef.canonical_event_id
+              JOIN articles a ON a.id = aem.article_id
+          ) AS latest_feature_article_at,
+          (
+            SELECT to_char(MAX(a.published_at)::date, 'YYYY-MM-DD')
+              FROM event_features ef
+              JOIN article_event_map aem ON aem.canonical_event_id = ef.canonical_event_id
+              JOIN articles a ON a.id = aem.article_id
+          ) AS latest_feature_article_date_key,
+          (
+            SELECT COUNT(*)::int
+              FROM event_features ef
+              JOIN canonical_events ce ON ce.id = ef.canonical_event_id
+             WHERE ce.event_date > NOW() - INTERVAL '24 hours'
+          ) AS feature_events_24h,
+          (
+            SELECT COUNT(*)::int
+              FROM canonical_events ce
+              JOIN event_features ef ON ef.canonical_event_id = ce.id
+             WHERE ce.event_date >= NOW()::date - INTERVAL '14 days'
+               AND (
+                 COALESCE(ce.source_count, -1) <> COALESCE(ef.source_count, -1)
+                 OR COALESCE(ce.article_count, -1) <> COALESCE(ef.article_count, -1)
+                 OR ABS(COALESCE(ce.source_diversity, -1) - COALESCE(ef.source_diversity, -1)) > 0.0001
+               )
+          ) AS feature_stale_event_count
+      `).catch(() => null);
+      const row = freshness?.rows?.[0] || null;
+      if (row) {
+        const latestArticleAt = row.latest_article_at ? new Date(row.latest_article_at) : null;
+        const latestFeatureArticleAt = row.latest_feature_article_at
+          ? new Date(row.latest_feature_article_at)
+          : (row.latest_feature_event_date ? new Date(row.latest_feature_event_date) : null);
+        const featureLagHours = latestArticleAt && latestFeatureArticleAt
+          ? Math.max(0, (latestArticleAt.getTime() - latestFeatureArticleAt.getTime()) / 3_600_000)
+          : null;
+        const featureDateKey = row.latest_feature_article_date_key || row.latest_feature_event_date_key;
+        const featureLagDays = row.latest_article_date_key && featureDateKey
+          ? Math.max(
+            0,
+            (Date.parse(`${row.latest_article_date_key}T00:00:00Z`) - Date.parse(`${featureDateKey}T00:00:00Z`)) / 86_400_000,
+          )
+          : null;
+        pipelineFreshness = {
+          latestArticleAt: row.latest_article_at,
+          latestArticleDateKey: row.latest_article_date_key,
+          articles24h: Number(row.articles_24h ?? 0),
+          latestEventDate: row.latest_event_date,
+          events24h: Number(row.events_24h ?? 0),
+          latestFeatureEventDate: row.latest_feature_event_date,
+          latestFeatureEventDateKey: row.latest_feature_event_date_key,
+          latestFeatureArticleAt: row.latest_feature_article_at,
+          latestFeatureArticleDateKey: row.latest_feature_article_date_key,
+          featureEvents24h: Number(row.feature_events_24h ?? 0),
+          featureStaleEventCount: Number(row.feature_stale_event_count ?? 0),
+          featureLagHours,
+          featureLagDays,
+        };
       }
     }
-    if (recentPredictions && recentPredictions.recentCount === 0 && recentPredictions.total > 0) {
-      if (level !== 'warning') level = 'warning';
-      notes.push(`최근 ${META_MODEL_RECENT_HOURS}시간 예측 0건 — 추론 서버 확인`);
+
+    if (pipelineFreshness && recentPredictions) {
+      const latestArticleAt = pipelineFreshness.latestArticleAt ? new Date(pipelineFreshness.latestArticleAt) : null;
+      const latestPredictedArticleAt = recentPredictions.latestPredictedArticleAt ? new Date(recentPredictions.latestPredictedArticleAt) : null;
+      const predictionLagHours = latestArticleAt && latestPredictedArticleAt
+        ? Math.max(0, (latestArticleAt.getTime() - latestPredictedArticleAt.getTime()) / 3_600_000)
+        : null;
+      const predictionLagDays = pipelineFreshness.latestArticleDateKey && recentPredictions.latestPredictedArticleDateKey
+        ? Math.max(
+          0,
+          (Date.parse(`${pipelineFreshness.latestArticleDateKey}T00:00:00Z`) - Date.parse(`${recentPredictions.latestPredictedArticleDateKey}T00:00:00Z`)) / 86_400_000,
+        )
+        : null;
+      pipelineFreshness.latestPredictedEventDate = recentPredictions.latestPredictedEventDate;
+      pipelineFreshness.latestPredictedEventDateKey = recentPredictions.latestPredictedEventDateKey;
+      pipelineFreshness.latestPredictedArticleAt = recentPredictions.latestPredictedArticleAt;
+      pipelineFreshness.latestPredictedArticleDateKey = recentPredictions.latestPredictedArticleDateKey;
+      pipelineFreshness.recentPredictionCount = recentPredictions.recentCount;
+      pipelineFreshness.recentEventPredictionCount = recentPredictions.recentEventPredictionCount;
+      pipelineFreshness.predictionLagHours = predictionLagHours;
+      pipelineFreshness.predictionLagDays = predictionLagDays;
     }
+
+    if (pipelineFreshness && havePredictions && haveEventFeatures && haveCanonicalEvents) {
+      const activeModelVersion = activeModel?.modelVersion || latestEval?.modelVersion || null;
+      const stalePredictions = await client.query(`
+        WITH current_universe AS (
+          SELECT ce.id AS canonical_event_id, ats.symbol, h.horizon
+            FROM canonical_events ce
+            CROSS JOIN (VALUES ('1w'), ('2w'), ('1m')) h(horizon)
+            JOIN LATERAL (
+              SELECT symbol
+                FROM auto_theme_symbols ats
+               WHERE ats.theme = ce.theme
+               ORDER BY quality_score DESC NULLS LAST,
+                        correlation DESC NULLS LAST,
+                        reaction_count DESC NULLS LAST,
+                        symbol
+               LIMIT 5
+            ) ats ON TRUE
+           WHERE ce.event_date >= NOW()::date - INTERVAL '14 days'
+        )
+        SELECT COUNT(*)::int AS stale_prediction_count
+          FROM model_predictions mp
+          JOIN event_features ef ON ef.canonical_event_id = mp.canonical_event_id
+          JOIN current_universe cu
+            ON cu.canonical_event_id = mp.canonical_event_id
+           AND cu.symbol = mp.symbol
+           AND cu.horizon = mp.horizon
+         WHERE mp.model_version = $1
+           AND ef.computed_at > mp.created_at
+      `, [activeModelVersion]).catch(() => null);
+      pipelineFreshness.predictionStaleCount = Number(stalePredictions?.rows?.[0]?.stale_prediction_count ?? 0);
+    } else if (pipelineFreshness) {
+      pipelineFreshness.predictionStaleCount = null;
+    }
+
+    if (haveCanonicalEvents && haveAutoThemeSymbols) {
+      const coverage = await client.query(`
+        WITH recent_themes AS (
+          SELECT DISTINCT theme
+            FROM canonical_events
+           WHERE event_date >= NOW() - INTERVAL '7 days'
+             AND theme IS NOT NULL
+             AND theme <> 'unknown'
+        ),
+        theme_status AS (
+          SELECT rt.theme,
+                 EXISTS (
+                   SELECT 1 FROM auto_theme_symbols ats WHERE ats.theme = rt.theme
+                 ) AS has_symbols
+            FROM recent_themes rt
+        )
+        SELECT COUNT(*)::int AS theme_count,
+               COUNT(*) FILTER (WHERE has_symbols)::int AS covered_theme_count,
+               COALESCE(
+                 ARRAY_AGG(theme ORDER BY theme) FILTER (WHERE NOT has_symbols),
+                 ARRAY[]::text[]
+               ) AS missing_themes
+          FROM theme_status
+      `).catch(() => null);
+      const row = coverage?.rows?.[0] || null;
+      if (row) {
+        const themeCount = Number(row.theme_count ?? 0);
+        const coveredThemeCount = Number(row.covered_theme_count ?? 0);
+        symbolCoverage = {
+          lookbackDays: 7,
+          themeCount,
+          coveredThemeCount,
+          coveragePct: themeCount > 0 ? coveredThemeCount / themeCount : 1,
+          missingThemes: Array.isArray(row.missing_themes) ? row.missing_themes.slice(0, 12) : [],
+        };
+      }
+    }
+
+    const calibration = await loadMetaModelCalibrationSidecar(activeModel?.modelVersion || latestEval?.modelVersion);
+    const trust = evaluateMetaModelTrust({
+      hasEval: haveEval,
+      hasPredictions: havePredictions,
+      latestEval,
+      recentPredictions,
+      pipelineFreshness,
+      symbolCoverage,
+      calibration,
+    });
 
     return {
       ok: true,
       generatedAt: new Date().toISOString(),
       summary: {
-        level,
+        level: trust.level,
+        healthStatus: trust.healthStatus,
         hasEvalTable: haveEval,
         hasPredictionsTable: havePredictions,
+        activeModel,
         latestEval,
+        calibration,
+        effectiveMetrics: trust.effectiveMetrics,
+        promotionGates: trust.gates,
         recentPredictions,
-        notes,
+        pipelineFreshness,
+        symbolCoverage,
+        notes: trust.notes,
+        recommendedActions: trust.recommendedActions,
       },
       evalHistory,
       activeModelVersions,
