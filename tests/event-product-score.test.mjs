@@ -166,15 +166,20 @@ test('rankByProductScore sorts descending', () => {
   }
 });
 
-test('classifyEventLane: validated requires promoted + score >= 0.20', () => {
-  const validated = { promotionEligible: true, productScore: 0.30 };
+test('classifyEventLane: validated requires promoted only (S-Tier N5)', () => {
+  // Pre-N5 the rule required promoted + productScore >= 0.20, which
+  // permanently excluded older graded events because freshness drove
+  // their score below 0.20 within ~4 weeks. N5 widens the gate: promoted
+  // events are validated regardless of score; ranking inside the
+  // validated lane still uses productScore.
+  const validatedFresh = { promotionEligible: true, productScore: 0.30 };
+  const validatedOld = { promotionEligible: true, productScore: 0.05 };  // older but graded
   const watch = { promotionEligible: false, productScore: 0.10 };
   const noise = { promotionEligible: false, productScore: 0.01 };
-  const watchEvenIfPromoted = { promotionEligible: true, productScore: 0.10 };
-  assert.equal(classifyEventLane(validated), 'validated');
+  assert.equal(classifyEventLane(validatedFresh), 'validated');
+  assert.equal(classifyEventLane(validatedOld), 'validated', 'old graded events should stay validated');
   assert.equal(classifyEventLane(watch), 'watch');
   assert.equal(classifyEventLane(noise), 'noise');
-  assert.equal(classifyEventLane(watchEvenIfPromoted), 'watch');
 });
 
 test('rationale array is non-empty for every event', () => {

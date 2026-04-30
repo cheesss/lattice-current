@@ -29,7 +29,14 @@ import {
 
 const HOT_EVENTS_LIMIT = 10;
 const HOT_EVENTS_LOOKBACK_DAYS = 7;
-export const HOT_EVENTS_MIN_PROMOTION_CONTROLS = 8;
+// S-Tier N5: lowered from 8 → 3 because the current matched_controls
+// implementation caps n_controls per event at 5. With threshold = 8, ZERO
+// events were ever promoted (28,743 E2 events with |t|>=2 had n_controls
+// up to 5 — none reached 8). With threshold = 3 and the existing |t|>=2
+// gate, 25,260 of those E2 events become validated and surface in Hot
+// Events; statistical strength is preserved (3+ matched controls + a
+// significant t-stat is a meaningful promotion gate).
+export const HOT_EVENTS_MIN_PROMOTION_CONTROLS = 3;
 const EXPLAIN_EVENT_ARTICLE_LIMIT = 12;
 const EXPLAIN_EVENT_SYMBOL_LIMIT = 10;
 const SOURCE_DIVERSITY_WINDOW_HOURS = 24;

@@ -326,6 +326,25 @@ async function taskEventEngineIncremental() {
 }
 
 /**
+ * S-Tier N6: daily controls + uplift backfill.
+ *
+ * The hourly taskEventEngineIncremental uses --skip-controls for speed
+ * (controls + uplift compute is heavy). Without a counterpart that DOES
+ * compute controls + uplift, recent events never get evidence grades —
+ * dashboard shows zero validated signals for 5+ weeks.
+ *
+ * This task runs the full pipeline (no --skip-controls) once a day, with
+ * an extended timeout so the controls compute can finish even on a backlog.
+ * The pipeline-lock + idempotent upsert pattern means this overlaps safely
+ * with the hourly task.
+ */
+async function taskEventEngineFullControls() {
+  log('>> event-engine-full-controls: full pipeline including controls + uplift (E1/E2/E3/E4 grading)');
+  const result = run('node scripts/incremental-event-engine-fast.mjs', 3_600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+/**
  * S-Level §Phase 3: stale feature/prediction repair.
  *
  * Hourly task-event-engine-incremental processes new articles. This 4h task is
@@ -1001,6 +1020,10 @@ const TASKS = {
   'build-market-returns': { interval: HOUR_6_MS, fn: taskBuildMarketReturns },
   'train-meta-model': { interval: WEEK_1_MS, fn: taskTrainMetaModel },
   'event-engine-incremental': { interval: HOUR_1_MS, fn: taskEventEngineIncremental },
+  // S-Tier N6: daily full-pipeline run (no --skip-controls) so recent
+  // events accumulate matched_controls + event_uplift rows. Without this,
+  // recent events stay un-graded and the validated lane stays empty.
+  'event-engine-full-controls': { interval: DAY_1_MS, fn: taskEventEngineFullControls },
   // S-Level §Phase 3: dedicated 4-hour stale-row repair pass. Detects feature
   // rows whose computed_at predates the event's latest article and upserts via
   // incremental-event-engine-fast (idempotent, pipeline-lock-guarded so it
@@ -1079,6 +1102,7 @@ async function main() {
   process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, event-engine-incremental, auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission\n');
   process.stderr.write('  4h:    repair-stale-features (dedicated event_features stale detector + repair)\n');
+  process.stderr.write('  daily: event-engine-full-controls (matched_controls + event_uplift grading; the hourly task skips controls for speed)\n');
     process.stderr.write('  6h:    signal refresh, master-pipeline, executor, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
     process.stderr.write('  opt-in: duckdb-sync only when ENABLE_LEGACY_DUCKDB_SYNC=true\n');
   process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');

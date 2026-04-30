@@ -332,15 +332,28 @@ export function rankByProductScore(events, options = {}) {
 }
 
 /**
- * Classify a scored event into a lane (S-Tier §3 / Phase 2 prep):
- *   - 'validated': promoted E2+ AND productScore >= 0.20
- *   - 'watch':     scored event without promotion OR low evidence
- *   - 'noise':     productScore < 0.05 (catch-all + ungraded + stale)
+ * Classify a scored event into a lane.
+ *
+ * S-Tier N5: promotion gate (evidence_grade ∈ E2..E4 + |t|>=2 + n_controls
+ * above threshold) is a STRONG statistical claim — an event that survives
+ * matched-control comparison and a t-test should reach the validated lane
+ * regardless of how recent it is. The previous rule required productScore
+ * ≥ 0.20 in addition, which permanently excluded any event older than ~30
+ * days because the freshness half-life (14 d) drives the multiplicative
+ * score below the threshold.
+ *
+ * Rules:
+ *   'validated': promoted (E2+ with controls + |t|>=2)
+ *   'watch':     not promoted but productScore >= 0.05 (observable)
+ *   'noise':     productScore < 0.05 (catch-all + ungraded + stale)
+ *
+ * Within the validated lane events are still sorted by productScore, so
+ * fresh + high-impact events still rank above old ones.
  */
 export function classifyEventLane(event = {}) {
   const productScore = Number(event.productScore ?? 0);
   const promoted = Boolean(event.promotionEligible);
-  if (promoted && productScore >= 0.20) return 'validated';
+  if (promoted) return 'validated';
   if (productScore < 0.05) return 'noise';
   return 'watch';
 }
@@ -410,7 +423,10 @@ export function computeValidationStatus(event = {}) {
   }
 
   let status;
-  if (promoted && score >= 0.20) {
+  if (promoted) {
+    // S-Tier N5: promoted (E2+ with controls + |t|>=2) is the validation
+    // signal. Score is used for ranking inside the validated lane, not
+    // for gating it.
     status = 'validated';
   } else if (lane === 'noise' && rawGrade === '') {
     // No grade and noise score — pure observation.
