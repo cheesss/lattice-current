@@ -11,6 +11,7 @@ import {
   resolveThemeTaxonomy as taxonomyResolveThemeTaxonomy,
 } from './theme-taxonomy.mjs';
 import { isLowValueGoogleNewsSourceName } from './google-news-source-policy.mjs';
+import { decorateBriefWithStructure } from './brief-structure.mjs';
 
 const TABLE_PROBE_TTL_MS = 5 * 60 * 1000;
 const tableProbeCache = new Map();
@@ -3837,7 +3838,11 @@ export async function buildThemeBriefPayload(themeParam, safeQuery, params = new
     }),
   };
 
-  return {
+  // S-Tier §2: project the brief into the canonical 6-section envelope
+  // (whatChanged, whyMatters, evidence, caveats, monitor, related) and
+  // compute briefCompleteness so consumers can rely on a stable shape and
+  // the product-quality endpoint can aggregate across briefs.
+  const payload = {
     theme,
     label,
     category,
@@ -3911,6 +3916,8 @@ export async function buildThemeBriefPayload(themeParam, safeQuery, params = new
     sectionMeta,
     notebookState,
   };
+
+  return decorateBriefWithStructure(payload);
 }
 
 async function ensureThemeNotebookSchema(safeQuery) {
