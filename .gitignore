@@ -107,6 +107,7 @@ data/hn-backfill-state.debug.json
 data/dynamic-rss-backfill-state.json
 data/retrain-state.json
 data/user-prefs.json
+data/public-demo/
 data/failed-proposals.json
 data/verify-e2e-result.json
 data/codex-agent-discover-*.json
