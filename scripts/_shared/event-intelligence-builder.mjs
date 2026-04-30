@@ -318,6 +318,58 @@ export function normalizeHotEventRow(row = {}) {
 
 const VALID_LANES = ['validated', 'watch', 'noise'];
 
+// S-Tier §S5: stale prediction threshold. When more than this many rows in
+// model_predictions are older than their corresponding event_features.computed_at,
+// the model output is no longer trustable for ranking, and the UI must say so.
+const STALE_PREDICTION_DISABLE_THRESHOLD = 1000;
+const STALE_PREDICTION_WARN_THRESHOLD = 200;
+
+async function probeModelTrust(client) {
+  try {
+    const { rows } = await client.query(
+      `WITH latest_features AS (
+         SELECT canonical_event_id, MAX(computed_at) AS latest_computed_at
+           FROM event_features
+          GROUP BY canonical_event_id
+       ),
+       stale_check AS (
+         SELECT mp.canonical_event_id
+           FROM model_predictions mp
+           JOIN latest_features lf ON lf.canonical_event_id = mp.canonical_event_id
+          WHERE lf.latest_computed_at IS NOT NULL
+            AND mp.created_at IS NOT NULL
+            AND lf.latest_computed_at > mp.created_at
+       )
+       SELECT COUNT(*)::int AS stale_prediction_count FROM stale_check`,
+    );
+    const staleCount = Number(rows?.[0]?.stale_prediction_count ?? 0);
+    let level;
+    let usable;
+    let reason;
+    if (staleCount >= STALE_PREDICTION_DISABLE_THRESHOLD) {
+      level = 'disabled';
+      usable = false;
+      reason = `${staleCount} stale predictions (threshold ${STALE_PREDICTION_DISABLE_THRESHOLD}) — model output is too stale to drive ranking. Run meta-model-infer to refresh.`;
+    } else if (staleCount >= STALE_PREDICTION_WARN_THRESHOLD) {
+      level = 'stale';
+      usable = true;
+      reason = `${staleCount} stale predictions (warn ≥ ${STALE_PREDICTION_WARN_THRESHOLD}). Ranking still uses model output but should be reviewed.`;
+    } else {
+      level = 'fresh';
+      usable = true;
+      reason = `${staleCount} stale predictions — within tolerance.`;
+    }
+    return { level, usable, stalePredictionCount: staleCount, reason };
+  } catch (err) {
+    return {
+      level: 'unknown',
+      usable: true, // benefit of the doubt — don't block on probe failure
+      stalePredictionCount: null,
+      reason: `Could not probe model_predictions vs event_features: ${String(err?.message || err).slice(0, 120)}`,
+    };
+  }
+}
+
 function normalizeLaneFilter(input) {
   if (input == null) return null;
   if (Array.isArray(input)) return input.map((s) => String(s).toLowerCase()).filter((s) => VALID_LANES.includes(s));
@@ -586,6 +638,19 @@ export async function buildHotEventsPayload(pool, {
       themeFilter,
     });
 
+    // S-Tier §S5: model trust — when too many predictions are stale relative
+    // to event_features.computed_at, ranking based on model output is no
+    // longer reliable. Surface the level so dashboards can disable the
+    // model-priority view; the themeFraming message is augmented when the
+    // model is disabled so users understand the priority is deterministic.
+    const modelTrust = await probeModelTrust(client);
+    if (modelTrust.level === 'disabled') {
+      themeFraming.modelDisabledNotice = modelTrust.reason;
+      themeFraming.message = `${themeFraming.message} ⚠ Model-driven ranking is currently disabled (${modelTrust.stalePredictionCount} stale predictions). The current order falls back to evidence grade + t-stat + freshness only.`;
+    } else if (modelTrust.level === 'stale') {
+      themeFraming.modelStaleNotice = modelTrust.reason;
+    }
+
     // S-Tier §3 — empty-state envelope. When events.length === 0 (either
     // because no candidates matched, or because the lane filter excluded
     // everything) the plan requires the response to explain WHY rather
@@ -684,6 +749,7 @@ export async function buildHotEventsPayload(pool, {
       laneCounts,
       eventsByLane,
       themeFraming,
+      modelTrust,
       emptyState,
       surgeCount: events.filter((e) => e.isSurge).length,
       events,
