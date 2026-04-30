@@ -58,6 +58,7 @@ import {
 } from './_shared/user-watchlist.mjs';
 import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs.mjs';
 import { isDemoMode, blockIfDemoMode, loadDemoSnapshot } from './_shared/demo-mode.mjs';
+import { buildModelComparisonPayload } from './_shared/model-comparison.mjs';
 import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
@@ -2783,6 +2784,17 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         return buildJsonResponse({ error: 'unsupported method on user-prefs' }, 405);
       } catch (err) {
         logger.warn('user-prefs route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/model-comparison (S-Tier B1) ──
+    if (segments[0] === 'api' && segments[1] === 'model-comparison') {
+      try {
+        const payload = await buildModelComparisonPayload(getPool());
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('model-comparison route failed', { error: String(err?.message || err) });
         return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
       }
     }

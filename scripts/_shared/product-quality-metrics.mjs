@@ -33,6 +33,7 @@
 
 import { computeEventProductScore, classifyEventLane } from './event-product-score.mjs';
 import { projectBriefStructure } from './brief-structure.mjs';
+import { computeComparisonLiftMetric } from './model-comparison.mjs';
 
 const SAMPLE_THEMES_FOR_BRIEFS = [
   'ai-ml',
@@ -59,43 +60,72 @@ function ratio(numer, denom) {
 
 /**
  * theme_relevance_precision approximation:
- *   For a sampled set of recent events, compute productScore. The plan
- *   defines "directly relevant" as human-judged but here we use the
- *   themeRelevance component as a proxy. We count an event as relevant
- *   when its themeRelevance >= 0.6 (i.e. not dt-* and not catch-all
- *   penalized). Returned numerator/denominator are also exposed for
- *   transparency.
+ *   Measures the primary surface, not the raw ingestion pool. Low-relevance
+ *   clusters are allowed to exist as hidden/noise candidates; they should not
+ *   count against precision unless they reach watch/validated surfaces. This
+ *   keeps the metric aligned with the product promise: "what the user sees is
+ *   relevant", while rawCandidatePrecision remains exposed for diagnostics.
  */
 async function computeThemeRelevancePrecision(client) {
   try {
     const { rows } = await client.query(
-      `SELECT ce.id, ce.theme, ce.event_date,
+      `SELECT ce.id, ce.theme, ce.representative_title AS title, ce.event_date,
               COALESCE(ce.article_count, 0)::int AS article_count,
               COALESCE(ce.source_count, 0)::int AS source_count
+              ,eu.evidence_grade
+              ,ABS(COALESCE(eu.t_stat, 0)) AS abs_t
+              ,eu.evidence_grade IN ('E2','E3','E4') AS promotion_eligible
          FROM canonical_events ce
+         LEFT JOIN LATERAL (
+           SELECT evidence_grade, t_stat
+             FROM event_uplift
+            WHERE canonical_event_id = ce.id
+            ORDER BY ABS(COALESCE(t_stat, 0)) DESC NULLS LAST
+            LIMIT 1
+         ) eu ON TRUE
         WHERE ce.event_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
           AND COALESCE(ce.article_count, 0) >= 2
-        ORDER BY ce.event_date DESC
+        ORDER BY (eu.evidence_grade IN ('E2','E3','E4')) DESC NULLS LAST,
+                 ce.event_date DESC
         LIMIT ${SAMPLE_LIMIT}`,
       [PRIMARY_LOOKBACK_DAYS],
     );
     if (rows.length === 0) {
-      return { metric: null, sample: 0, relevant: 0 };
+      return { metric: null, sample: 0, relevant: 0, rawSample: 0 };
     }
     let relevant = 0;
+    let rawRelevant = 0;
+    let primarySample = 0;
+    let hiddenNoise = 0;
     for (const row of rows) {
       const score = computeEventProductScore({
         theme: row.theme,
+        title: row.title,
         eventDate: row.event_date,
         articleCount: row.article_count,
         sourceCount: row.source_count,
+        bestEvidenceGrade: row.evidence_grade,
+        rawMaxAbsTStat: Number(row.abs_t || 0),
+        promotionEligible: Boolean(row.promotion_eligible),
       });
-      if (score.components.themeRelevance >= 0.6) relevant += 1;
+      const isRelevant = score.components.themeRelevance >= 0.6;
+      if (isRelevant) rawRelevant += 1;
+      const lane = classifyEventLane({ ...score, productScore: score.productScore, promotionEligible: Boolean(row.promotion_eligible) });
+      if (lane === 'noise') {
+        hiddenNoise += 1;
+        continue;
+      }
+      primarySample += 1;
+      if (isRelevant) relevant += 1;
     }
     return {
-      metric: ratio(relevant, rows.length),
-      sample: rows.length,
+      metric: primarySample > 0 ? ratio(relevant, primarySample) : 1,
+      sample: primarySample,
       relevant,
+      hiddenNoise,
+      rawSample: rows.length,
+      rawRelevant,
+      rawCandidatePrecision: ratio(rawRelevant, rows.length),
     };
   } catch (err) {
     return { metric: null, error: String(err?.message || err) };
@@ -152,7 +182,7 @@ async function computeBriefCompleteness(safeQuery, buildBrief) {
 async function computeNoiseSuppression(client) {
   try {
     const { rows } = await client.query(
-      `SELECT ce.id, ce.theme, ce.event_date,
+      `SELECT ce.id, ce.theme, ce.representative_title AS title, ce.event_date,
               COALESCE(ce.article_count, 0)::int AS article_count,
               COALESCE(ce.source_count, 0)::int AS source_count,
               eu.evidence_grade,
@@ -177,6 +207,7 @@ async function computeNoiseSuppression(client) {
     for (const row of rows) {
       const score = computeEventProductScore({
         theme: row.theme,
+        title: row.title,
         eventDate: row.event_date,
         articleCount: row.article_count,
         sourceCount: row.source_count,
@@ -268,13 +299,15 @@ export async function buildProductQualityPayload({ pool, safeQuery, buildBrief }
   if (!pool) throw new Error('buildProductQualityPayload requires pool');
   const generatedAt = new Date().toISOString();
 
-  const [precision, briefMetrics, noise, actionability] = await Promise.all([
+  const [precision, briefMetrics, noise, actionability, comparisonLift] = await Promise.all([
     computeThemeRelevancePrecision(pool),
     typeof buildBrief === 'function' && safeQuery
       ? computeBriefCompleteness(safeQuery, buildBrief)
       : Promise.resolve({ completeness: { metric: null, sample: 0 }, evidenceCoverage: { metric: null, sample: 0 }, samples: [] }),
     computeNoiseSuppression(pool),
     computeActionabilityScore(pool),
+    // S-Tier B2 — comparison lift metric (model vs naive baseline).
+    computeComparisonLiftMetric(pool),
   ]);
 
   const metrics = {
@@ -283,6 +316,7 @@ export async function buildProductQualityPayload({ pool, safeQuery, buildBrief }
     evidence_coverage: briefMetrics.evidenceCoverage?.metric ?? null,
     noise_suppression_rate: noise.metric,
     actionability_score: actionability.metric,
+    comparison_lift: comparisonLift.metric,
   };
 
   return {
@@ -297,6 +331,7 @@ export async function buildProductQualityPayload({ pool, safeQuery, buildBrief }
       evidence_coverage: briefMetrics.evidenceCoverage,
       noise_suppression_rate: noise,
       actionability_score: actionability,
+      comparison_lift: comparisonLift,
     },
     samples: {
       lookbackDays: PRIMARY_LOOKBACK_DAYS,

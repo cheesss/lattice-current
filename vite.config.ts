@@ -771,6 +771,11 @@ export default defineConfig({
         settings: resolve(__dirname, 'settings.html'),
         liveChannels: resolve(__dirname, 'live-channels.html'),
         backtestHub: resolve(__dirname, 'backtest-hub.html'),
+        // S-Tier B1+E1: standalone investor / external pages.
+        modelComparison: resolve(__dirname, 'model-comparison.html'),
+        license: resolve(__dirname, 'license.html'),
+        dataSources: resolve(__dirname, 'data-sources.html'),
+        terms: resolve(__dirname, 'terms.html'),
       },
       output: {
         manualChunks(id) {
