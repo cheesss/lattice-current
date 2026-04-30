@@ -59,6 +59,7 @@ import {
 import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs.mjs';
 import { isDemoMode, blockIfDemoMode, loadDemoSnapshot } from './_shared/demo-mode.mjs';
 import { buildModelComparisonPayload } from './_shared/model-comparison.mjs';
+import { makeRouteHandler } from './_shared/route-helper.mjs';
 import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
@@ -2659,6 +2660,11 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
   const { pathname, segments, params } = parseUrl(rawUrl);
   const method = String(requestMeta.method || 'GET').toUpperCase();
   const body = requestMeta.body && typeof requestMeta.body === 'object' ? requestMeta.body : {};
+  // Standard try/catch wrapper for routes that follow the
+  // "build → return JSON" pattern. Reduces ~5 lines of boilerplate per
+  // route. Routes that need custom error handling can still use raw
+  // try/catch (kept for ops/status, hot-events, etc. that have 503-level logic).
+  const handle = makeRouteHandler(logger, buildJsonResponse);
   try {
     // S-Tier C3: demo-mode write block. POST/PUT/DELETE/PATCH return 403
     // when LATTICE_DEMO_MODE=1 so the public sandbox stays read-only.
@@ -2790,13 +2796,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     // ── /api/model-comparison (S-Tier B1) ──
     if (segments[0] === 'api' && segments[1] === 'model-comparison') {
-      try {
-        const payload = await buildModelComparisonPayload(getPool());
-        return buildJsonResponse(payload);
-      } catch (err) {
-        logger.warn('model-comparison route failed', { error: String(err?.message || err) });
-        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-      }
+      return handle('model-comparison', () => buildModelComparisonPayload(getPool()));
     }
 
     // ── /api/dashboard/health-summary (S-Tier A4) ──
@@ -3045,38 +3045,25 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     //   ?limit=12   — max themes returned (max 50)
     //   ?min=2      — minimum article_count per included event
     if (segments[0] === 'api' && segments[1] === 'themes' && segments[2] === 'trending') {
-      try {
-        const payload = await buildTrendingThemesPayload(getPool(), {
-          windowDays: Number(params.get('window') || 7),
-          limit: Number(params.get('limit') || 12),
-          minArticleCount: Number(params.get('min') || 2),
-        });
-        return buildJsonResponse(payload);
-      } catch (err) {
-        logger.warn('themes/trending route failed', { error: String(err?.message || err) });
-        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-      }
+      return handle('themes/trending', () => buildTrendingThemesPayload(getPool(), {
+        windowDays: Number(params.get('window') || 7),
+        limit: Number(params.get('limit') || 12),
+        minArticleCount: Number(params.get('min') || 2),
+      }));
     }
 
     if (segments[0] === 'api' && segments[1] === 'meta-model-health') {
-      try {
+      return handle('meta-model-health', async () => {
         const payload = await buildMetaModelHealthPayload(getPool());
-        const status = payload?.summary?.level === 'critical' ? 503 : 200;
-        return buildJsonResponse(payload, status);
-      } catch (err) {
-        logger.warn('meta-model-health route failed', { error: String(err?.message || err) });
-        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-      }
+        return { payload, statusCode: payload?.summary?.level === 'critical' ? 503 : 200 };
+      });
     }
 
     if (segments[0] === 'api' && segments[1] === 'explain-event' && segments[2]) {
-      try {
+      return handle('explain-event', async () => {
         const payload = await buildExplainEventPayload(getPool(), { eventId: segments[2] });
-        return buildJsonResponse(payload, payload.ok ? 200 : 404);
-      } catch (err) {
-        logger.warn('explain-event route failed', { error: String(err?.message || err) });
-        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-      }
+        return { payload, statusCode: payload.ok ? 200 : 404 };
+      });
     }
 
     if (segments[0] === 'api' && segments[1] === 'theme-symbols-bulk') {
@@ -3218,30 +3205,23 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'theme-impact' && segments[2]) {
-      try {
+      return handle('theme-impact', async () => {
         const payload = await buildThemeImpactPayload(getPool(), {
           theme: segments[2],
           horizon: params.get('horizon') || null,
           symbolLimit: Number(params.get('limit') || 12),
         });
-        return buildJsonResponse(payload, payload.ok ? 200 : 400);
-      } catch (err) {
-        logger.warn('theme-impact route failed', { error: String(err?.message || err) });
-        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-      }
+        return { payload, statusCode: payload.ok ? 200 : 400 };
+      });
     }
 
     if (segments[0] === 'api' && segments[1] === 'source-diversity-audit') {
-      try {
+      return handle('source-diversity-audit', async () => {
         const payload = await buildSourceDiversityAuditPayload(getPool(), {
           windowHours: Number(params.get('window') || 24),
         });
-        const status = payload?.level === 'critical' ? 503 : 200;
-        return buildJsonResponse(payload, status);
-      } catch (err) {
-        logger.warn('source-diversity-audit route failed', { error: String(err?.message || err) });
-        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
-      }
+        return { payload, statusCode: payload?.level === 'critical' ? 503 : 200 };
+      });
     }
 
     if (segments[0] === 'api' && segments[1] === 'runtime-observability') {
