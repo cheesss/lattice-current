@@ -564,6 +564,79 @@ export async function buildHotEventsPayload(pool, {
       noise: events.filter((e) => e.lane === 'noise'),
     };
 
+    // S-Tier §3 — empty-state envelope. When events.length === 0 (either
+    // because no candidates matched, or because the lane filter excluded
+    // everything) the plan requires the response to explain WHY rather
+    // than show a blank screen. We surface:
+    //   reasons         human-readable strings describing the cause
+    //   pendingData     what upstream data was checked
+    //   nextCheckpoint  when more data is expected (operational hint)
+    //   alternativeObservations  noise-lane / fallback events the user
+    //                            can still inspect even though they
+    //                            don't qualify as actionable signals
+    let emptyState = null;
+    if (events.length === 0) {
+      const reasons = [];
+      const pendingData = [];
+      const nextCheckpoint = [];
+      let alternativeObservations = [];
+
+      if (laneAllowed && allLanedEvents.length > 0) {
+        // Filter excluded everything — surface what's outside the requested lane.
+        reasons.push(
+          `No events in lane(s) [${laneAllowed.join(', ')}] for the current window. ${allLanedEvents.length} candidate event(s) exist but they fall in other lane(s).`,
+        );
+        const otherLanes = allLanedEvents.filter((e) => !laneAllowed.includes(e.lane));
+        if (otherLanes.length > 0) {
+          alternativeObservations = otherLanes.slice(0, 5).map((e) => ({
+            id: e.id,
+            theme: e.theme,
+            lane: e.lane,
+            title: e.title,
+            eventDate: e.eventDate,
+            productScore: e.productScore,
+            scoreBreakdown: e.scoreBreakdown,
+          }));
+        }
+      } else if (themeFilter && allLanedEvents.length === 0) {
+        reasons.push(`No events for theme "${themeFilter}" in the last ${safeLookback} days.`);
+        pendingData.push('canonical_events table for this theme');
+        pendingData.push('article_event_map links');
+        nextCheckpoint.push('Check that articles for this theme are being ingested. Try a wider lookback (?lookback=30) or remove the theme filter.');
+      } else if (allLanedEvents.length === 0) {
+        reasons.push(`No canonical events with article_count >= 2 in the last ${safeLookback} days.`);
+        pendingData.push('canonical_events / article_event_map');
+        nextCheckpoint.push('Check daemon: incremental-event-engine and meta-model-infer should have produced rows.');
+      } else {
+        // allLanedEvents > 0 but events == 0 after slicing/filtering — shouldn't
+        // happen after the slice but cover the case.
+        reasons.push('All ranked candidates were filtered out by the requested constraints.');
+      }
+
+      // For ALL empty results, also surface noise-lane items as observable
+      // alternatives — plan says "검증 신호 없음, 대신 볼 만한 관찰 항목".
+      if (alternativeObservations.length === 0 && eventsByLane.noise.length > 0) {
+        alternativeObservations = eventsByLane.noise.slice(0, 5).map((e) => ({
+          id: e.id,
+          theme: e.theme,
+          lane: e.lane,
+          title: e.title,
+          eventDate: e.eventDate,
+          productScore: e.productScore,
+          scoreBreakdown: e.scoreBreakdown,
+        }));
+      }
+
+      emptyState = {
+        reasons,
+        pendingData,
+        nextCheckpoint,
+        alternativeObservations,
+        laneCounts,
+        totalCandidates: allLanedEvents.length,
+      };
+    }
+
     return {
       ok: true,
       generatedAt: new Date().toISOString(),
@@ -588,6 +661,7 @@ export async function buildHotEventsPayload(pool, {
       gradeCounts,
       laneCounts,
       eventsByLane,
+      emptyState,
       surgeCount: events.filter((e) => e.isSurge).length,
       events,
     };
