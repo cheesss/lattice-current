@@ -534,14 +534,30 @@ function buildTrendingBanner(payload) {
 async function refreshBanners() {
   ensureStyleSheet();
   const stack = ensureContainer();
-  const [ops, hot, trending, nowDo, health] = await Promise.all([
+  const [ops, hot, trending, nowDo, health, demoSnap] = await Promise.all([
     fetchJson('/api/ops/status'),
     fetchJson('/api/hot-events?limit=5'),
     fetchJson('/api/themes/trending?window=7&limit=5'),
     fetchJson('/api/dashboard/now-do'),
     fetchJson('/api/dashboard/health-summary'),
+    fetchJson('/api/demo/snapshot'),
   ]);
   clearTransient();
+  // S-Tier C3: demo-mode badge — when the API is running with
+  // LATTICE_DEMO_MODE=1, surface a clear "demo data, read-only" banner
+  // at the top of the stack so users know what they're looking at.
+  if (demoSnap?.ok && demoSnap.demoMode) {
+    stack.appendChild(el('div', { class: 'sl-banner warn', 'data-source': 'demo-mode' }, [
+      el('div', { class: 'sl-banner-head' }, [
+        el('span', {}, ['Demo data · read-only']),
+        el('span', {}, [demoSnap.windowMonths ? `${demoSnap.windowMonths}-month slice` : 'sandbox']),
+      ]),
+      el('div', { class: 'sl-banner-body' }, [
+        `Sanitized snapshot from ${demoSnap.generatedAt ? new Date(demoSnap.generatedAt).toLocaleDateString() : 'unknown'}. ${demoSnap.counts?.canonicalEvents || 0} events · ${demoSnap.counts?.articles || 0} articles · ${demoSnap.counts?.eventUplift || 0} uplift rows.`,
+      ]),
+      el('div', { class: 'sl-banner-meta' }, ['Writes (review / mutate / preferences) return 403 in demo mode.']),
+    ]));
+  }
   // Stack order (top to bottom = priority):
   //   1. Now-do (single prescriptive action)         — A3
   //   2. Today's top decision (hero card)            — A1, A2

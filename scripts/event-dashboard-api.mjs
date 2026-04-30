@@ -57,6 +57,7 @@ import {
   VALID_WATCHLIST_ITEM_TYPES,
 } from './_shared/user-watchlist.mjs';
 import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs.mjs';
+import { isDemoMode, blockIfDemoMode, loadDemoSnapshot } from './_shared/demo-mode.mjs';
 import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
@@ -2658,6 +2659,76 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
   const method = String(requestMeta.method || 'GET').toUpperCase();
   const body = requestMeta.body && typeof requestMeta.body === 'object' ? requestMeta.body : {};
   try {
+    // S-Tier C3: demo-mode write block. POST/PUT/DELETE/PATCH return 403
+    // when LATTICE_DEMO_MODE=1 so the public sandbox stays read-only.
+    // GET routes pass through.
+    const demoBlock = blockIfDemoMode(method);
+    if (demoBlock) {
+      return buildJsonResponse(demoBlock.body, demoBlock.status);
+    }
+
+    // ── /api/demo/snapshot (S-Tier C3) ──
+    // Returns the static snapshot (built by build-public-demo-snapshot.mjs)
+    // when one is available. Used by the sandbox dashboard to render real
+    // events without needing the live NAS DB.
+    if (segments[0] === 'api' && segments[1] === 'demo' && segments[2] === 'snapshot') {
+      try {
+        const snap = await loadDemoSnapshot();
+        if (!snap) {
+          return buildJsonResponse({
+            ok: false,
+            error: 'No demo snapshot found. Run scripts/build-public-demo-snapshot.mjs to generate one.',
+            demoMode: isDemoMode(),
+          }, 404);
+        }
+        return buildJsonResponse({
+          ok: true,
+          demoMode: isDemoMode(),
+          generatedAt: snap.generatedAt,
+          counts: snap.counts,
+          windowMonths: snap.windowMonths,
+          attribution: snap.attribution,
+          // The full themes/events/articles arrays are large — stream them
+          // separately via /api/demo/snapshot/<section> if needed.
+          // For now we ship the metadata + small theme list.
+          themes: snap.themes,
+        });
+      } catch (err) {
+        logger.warn('demo/snapshot route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+    if (segments[0] === 'api' && segments[1] === 'demo' && segments[2] === 'snapshot' && segments[3]) {
+      // /api/demo/snapshot/<section> — events|articles|uplift|predictions
+      try {
+        const snap = await loadDemoSnapshot();
+        if (!snap) return buildJsonResponse({ ok: false, error: 'no snapshot' }, 404);
+        const section = segments[3];
+        const limit = Math.max(1, Math.min(2000, Number(params.get('limit')) || 100));
+        const offset = Math.max(0, Number(params.get('offset')) || 0);
+        const sectionMap = {
+          events: snap.canonicalEvents,
+          articles: snap.articles,
+          uplift: snap.eventUplift,
+          predictions: snap.modelPredictions,
+        };
+        const rows = sectionMap[section];
+        if (!Array.isArray(rows)) {
+          return buildJsonResponse({ ok: false, error: `unknown section: ${section}` }, 404);
+        }
+        return buildJsonResponse({
+          ok: true,
+          section,
+          total: rows.length,
+          offset,
+          limit,
+          rows: rows.slice(offset, offset + limit),
+        });
+      } catch (err) {
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     // ── /api/health ──
     if (segments[0] === 'api' && segments[1] === 'health') {
       const payload = await buildHealth();
