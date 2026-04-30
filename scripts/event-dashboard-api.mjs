@@ -60,6 +60,7 @@ import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs
 import { isDemoMode, blockIfDemoMode, loadDemoSnapshot } from './_shared/demo-mode.mjs';
 import { buildModelComparisonPayload } from './_shared/model-comparison.mjs';
 import { makeRouteHandler } from './_shared/route-helper.mjs';
+import { memoize } from './_shared/memoize-payload.mjs';
 import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
@@ -272,6 +273,31 @@ async function safeQuery(text, values = []) {
     return { rows: [] };
   }
 }
+
+// R3 — In-process micro-cache (10s TTL) for heavy builders that get called
+// from multiple aggregator endpoints (now-do, health-summary) plus their
+// dedicated routes within the same dashboard refresh tick. Pool is closed
+// over so the cache key is computed from non-pool args only.
+const memoOpsStatusPayload = memoize(
+  'ops-status',
+  () => buildOpsStatusPayload(getPool()),
+);
+const memoHotEventsPayload = memoize(
+  'hot-events',
+  (opts) => buildHotEventsPayload(getPool(), opts),
+);
+const memoTrendingThemesPayload = memoize(
+  'trending-themes',
+  (opts) => buildTrendingThemesPayload(getPool(), opts),
+);
+const memoProductQualityPayload = memoize(
+  'product-quality',
+  () => buildProductQualityPayload({
+    pool: getPool(),
+    safeQuery,
+    buildBrief: buildThemeBriefPayload,
+  }),
+);
 
 async function loadLatestSignalsWithQuality() {
   // signal_history may or may not have value_origin/writer_id columns depending
@@ -2752,11 +2778,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     // watches whether the product is delivering useful information.
     if (segments[0] === 'api' && segments[1] === 'product-quality') {
       try {
-        const payload = await buildProductQualityPayload({
-          pool: getPool(),
-          safeQuery,
-          buildBrief: buildThemeBriefPayload,
-        });
+        const payload = await memoProductQualityPayload();
         const httpStatus = payload.summary?.level === 'critical' ? 503 : 200;
         return buildJsonResponse(payload, httpStatus);
       } catch (err) {
@@ -2807,10 +2829,10 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     if (segments[0] === 'api' && segments[1] === 'dashboard' && segments[2] === 'health-summary') {
       try {
         const [opsPayload, productPayload, hotPayload] = await Promise.all([
-          buildOpsStatusPayload(getPool()).catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
-          buildProductQualityPayload({ pool: getPool(), safeQuery, buildBrief: buildThemeBriefPayload })
+          memoOpsStatusPayload().catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
+          memoProductQualityPayload()
             .catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
-          buildHotEventsPayload(getPool(), { limit: 1, lookbackDays: 7 })
+          memoHotEventsPayload({ limit: 1, lookbackDays: 7 })
             .catch(() => ({ modelTrust: null, themeFraming: null, laneCounts: null })),
         ]);
 
@@ -2901,9 +2923,9 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     if (segments[0] === 'api' && segments[1] === 'dashboard' && segments[2] === 'now-do') {
       try {
         const [opsPayload, hotPayload, trendingPayload] = await Promise.all([
-          buildOpsStatusPayload(getPool()).catch(() => null),
-          buildHotEventsPayload(getPool(), { limit: 5, lookbackDays: 7 }).catch(() => null),
-          buildTrendingThemesPayload(getPool(), { windowDays: 7, limit: 1 }).catch(() => null),
+          memoOpsStatusPayload().catch(() => null),
+          memoHotEventsPayload({ limit: 5, lookbackDays: 7 }).catch(() => null),
+          memoTrendingThemesPayload({ windowDays: 7, limit: 1 }).catch(() => null),
         ]);
 
         const counts = hotPayload?.laneCounts || { validated: 0, pending: 0, watch: 0, noise: 0 };
@@ -2970,7 +2992,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     // ── /api/ops/status (Phase 7 minimal) ──
     if (segments[0] === 'api' && segments[1] === 'ops' && segments[2] === 'status') {
       try {
-        const payload = await buildOpsStatusPayload(getPool());
+        const payload = await memoOpsStatusPayload();
         const httpStatus = payload.summary?.level === 'critical' ? 503 : 200;
         return buildJsonResponse(payload, httpStatus);
       } catch (err) {
@@ -3024,7 +3046,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         // or noise-suppressed home views. lane=all returns everything.
         const laneParam = params.get('lane');
         const themeParam = params.get('theme');
-        const payload = await buildHotEventsPayload(getPool(), {
+        const payload = await memoHotEventsPayload({
           limit: Number(params.get('limit') || 10),
           lookbackDays: Number(params.get('lookback') || 7),
           laneFilter: laneParam ? laneParam.split(/[,\s]+/) : null,
@@ -3045,7 +3067,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     //   ?limit=12   — max themes returned (max 50)
     //   ?min=2      — minimum article_count per included event
     if (segments[0] === 'api' && segments[1] === 'themes' && segments[2] === 'trending') {
-      return handle('themes/trending', () => buildTrendingThemesPayload(getPool(), {
+      return handle('themes/trending', () => memoTrendingThemesPayload({
         windowDays: Number(params.get('window') || 7),
         limit: Number(params.get('limit') || 12),
         minArticleCount: Number(params.get('min') || 2),
