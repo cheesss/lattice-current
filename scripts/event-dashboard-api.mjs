@@ -23,6 +23,7 @@ import { buildNowcastStatusPayload } from './_shared/nowcast-status-builder.mjs'
 import {
   HOT_EVENTS_MIN_PROMOTION_CONTROLS,
   buildHotEventsPayload,
+  buildTrendingThemesPayload,
   buildMetaModelHealthPayload,
   buildExplainEventPayload,
   buildSourceDiversityAuditPayload,
@@ -2754,6 +2755,27 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         return buildJsonResponse(payload);
       } catch (err) {
         logger.warn('hot-events route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/themes/trending (S-Tier N7) ──
+    // Article-volume change ranking as a fallback when event_uplift /
+    // evidence-grade pipeline is catching up. Always-on signal that
+    // works regardless of validated lane state.
+    //   ?window=7   — comparison window in days (now vs prior, max 30)
+    //   ?limit=12   — max themes returned (max 50)
+    //   ?min=2      — minimum article_count per included event
+    if (segments[0] === 'api' && segments[1] === 'themes' && segments[2] === 'trending') {
+      try {
+        const payload = await buildTrendingThemesPayload(getPool(), {
+          windowDays: Number(params.get('window') || 7),
+          limit: Number(params.get('limit') || 12),
+          minArticleCount: Number(params.get('min') || 2),
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('themes/trending route failed', { error: String(err?.message || err) });
         return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
       }
     }

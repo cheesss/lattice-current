@@ -801,6 +801,145 @@ export async function buildHotEventsPayload(pool, {
   }
 }
 
+/* ===================== get_trending_themes ===================== */
+
+/**
+ * S-Tier N7: trending themes ranked by article-volume change.
+ *
+ * Even when event_uplift is sparse (recent weeks have no E2+ grades), the
+ * raw canonical_events + article_count data is fresh and meaningful. This
+ * builder ranks themes by week-over-week article volume change so the
+ * dashboard always has an actionable signal to surface, even when the
+ * validated lane is empty.
+ *
+ * Output is intentionally compact — one row per theme, no per-event
+ * detail. The user is meant to click through to /api/theme-brief/<theme>
+ * for the full analysis.
+ *
+ * Plan §3 ("Theme Page should behave like a focused intelligence brief")
+ * is well-served by this fallback when validation pipeline is catching
+ * up on a backlog.
+ */
+export async function buildTrendingThemesPayload(pool, {
+  windowDays = 7,
+  limit = 12,
+  minArticleCount = 2,
+} = {}) {
+  const safeWindow = Math.max(1, Math.min(30, Number(windowDays) || 7));
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 12));
+  const safeMinArticles = Math.max(1, Math.min(50, Number(minArticleCount) || 2));
+
+  const client = pool;
+  try {
+    const haveCanonical = await tableExists(client, 'canonical_events');
+    if (!haveCanonical) {
+      return {
+        ok: true,
+        generatedAt: new Date().toISOString(),
+        available: false,
+        windowDays: safeWindow,
+        themes: [],
+        note: 'canonical_events table missing — event engine not initialized',
+      };
+    }
+
+    const { rows } = await client.query(
+      `
+      WITH recent AS (
+        SELECT theme,
+               COUNT(*)::int                  AS events_now,
+               SUM(article_count)::int        AS articles_now,
+               SUM(source_count)::int         AS sources_now,
+               MAX(event_date)                AS latest_event_at
+          FROM canonical_events
+         WHERE event_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')
+           AND article_count >= $3::int
+           AND theme NOT LIKE 'dt-%'
+           AND theme IS NOT NULL
+         GROUP BY theme
+      ),
+      prev AS (
+        SELECT theme,
+               COUNT(*)::int                  AS events_prev,
+               SUM(article_count)::int        AS articles_prev
+          FROM canonical_events
+         WHERE event_date >= CURRENT_DATE - (2 * $1::int * INTERVAL '1 day')
+           AND event_date <  CURRENT_DATE - ($1::int * INTERVAL '1 day')
+           AND article_count >= $3::int
+           AND theme NOT LIKE 'dt-%'
+           AND theme IS NOT NULL
+         GROUP BY theme
+      )
+      SELECT r.theme,
+             r.events_now,
+             r.articles_now,
+             r.sources_now,
+             r.latest_event_at,
+             COALESCE(p.events_prev, 0)   AS events_prev,
+             COALESCE(p.articles_prev, 0) AS articles_prev,
+             CASE
+               WHEN COALESCE(p.articles_prev, 0) = 0 THEN NULL
+               ELSE ROUND(((r.articles_now::numeric / p.articles_prev) - 1) * 100, 1)
+             END AS articles_change_pct,
+             CASE
+               WHEN COALESCE(p.events_prev, 0) = 0 THEN NULL
+               ELSE ROUND(((r.events_now::numeric / p.events_prev) - 1) * 100, 1)
+             END AS events_change_pct
+        FROM recent r
+        LEFT JOIN prev p ON p.theme = r.theme
+       ORDER BY articles_change_pct DESC NULLS LAST,
+                r.articles_now DESC
+       LIMIT $2::int
+      `,
+      [safeWindow, safeLimit, safeMinArticles],
+    );
+
+    const themes = rows.map((row) => {
+      const articlesNow = Number(row.articles_now ?? 0);
+      const articlesPrev = Number(row.articles_prev ?? 0);
+      const pct = row.articles_change_pct == null ? null : Number(row.articles_change_pct);
+      // Lightweight "trend status" so consumers can colour-code without
+      // re-deriving:
+      let trendStatus;
+      if (pct == null) {
+        trendStatus = articlesPrev === 0 ? 'newly-active' : 'no-baseline';
+      } else if (pct >= 100) {
+        trendStatus = 'surge';
+      } else if (pct >= 25) {
+        trendStatus = 'rising';
+      } else if (pct >= -25) {
+        trendStatus = 'stable';
+      } else {
+        trendStatus = 'cooling';
+      }
+      return {
+        theme: row.theme,
+        eventsNow: Number(row.events_now ?? 0),
+        eventsPrev: Number(row.events_prev ?? 0),
+        articlesNow,
+        articlesPrev,
+        sourcesNow: Number(row.sources_now ?? 0),
+        articlesChangePct: pct,
+        eventsChangePct: row.events_change_pct == null ? null : Number(row.events_change_pct),
+        latestEventAt: row.latest_event_at,
+        trendStatus,
+      };
+    });
+
+    return {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      available: true,
+      windowDays: safeWindow,
+      limit: safeLimit,
+      note: 'Article-volume trend ranking. Use as fallback / context when event_uplift / evidence_grade is sparse.',
+      themes,
+    };
+  } catch (err) {
+    throw err;
+  }
+}
+
 /* ===================== get_meta_model_health ===================== */
 
 export async function buildMetaModelHealthPayload(pool) {

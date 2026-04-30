@@ -296,16 +296,49 @@ async function fetchJson(url) {
   }
 }
 
+function buildTrendingBanner(payload) {
+  if (!payload || !Array.isArray(payload.themes) || payload.themes.length === 0) return null;
+  const top = payload.themes.slice(0, 5);
+  const rows = [];
+  for (const t of top) {
+    const pct = t.articlesChangePct == null
+      ? `new`
+      : `${t.articlesChangePct >= 0 ? '+' : ''}${t.articlesChangePct}%`;
+    const trendIcon = t.trendStatus === 'surge' ? '↑↑'
+      : t.trendStatus === 'rising' ? '↑'
+      : t.trendStatus === 'cooling' ? '↓'
+      : t.trendStatus === 'newly-active' ? '✦'
+      : '·';
+    rows.push(el('div', { class: 'sl-banner-body', style: 'margin-top:3px;font-size:11.5px' }, [
+      `${trendIcon} ${t.theme} `,
+      el('span', { style: 'color:rgba(255,255,255,.55)' }, [`(${t.articlesNow}a · ${pct})`]),
+    ]));
+  }
+  return el('div', { class: 'sl-banner ok', 'data-source': 'trending' }, [
+    el('div', { class: 'sl-banner-head' }, [
+      el('span', {}, ['Trending themes']),
+      el('span', {}, [`${payload.windowDays}d`]),
+    ]),
+    el('div', { class: 'sl-banner-meta' }, ['Article volume vs prior period']),
+    ...rows,
+  ]);
+}
+
 async function refreshBanners() {
   ensureStyleSheet();
   const stack = ensureContainer();
-  const [ops, hot] = await Promise.all([
+  const [ops, hot, trending] = await Promise.all([
     fetchJson('/api/ops/status'),
     fetchJson('/api/hot-events?limit=5'),
+    fetchJson('/api/themes/trending?window=7&limit=5'),
   ]);
   clearTransient();
   for (const b of buildOpsBanners(ops || {})) stack.appendChild(b);
   for (const b of buildHotEventsBanner(hot || {})) stack.appendChild(b);
+  // S-Tier N7: trending fallback. Always rendered — even when validated
+  // events exist, the rate-of-change view is complementary.
+  const trendingBanner = buildTrendingBanner(trending);
+  if (trendingBanner) stack.appendChild(trendingBanner);
 }
 
 if (typeof window !== 'undefined') {
