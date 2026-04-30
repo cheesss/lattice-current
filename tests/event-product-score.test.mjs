@@ -239,11 +239,15 @@ test('s-tier N1: keyword overlap returns null when title is missing', () => {
 
 test('s-tier N1: keyword match must respect word boundaries (no inside-word match)', () => {
   // theme has token 'ai'; title has 'gain' but not standalone 'ai'.
+  // Note: with the THEME_RELEVANCE_TERMS domain dictionary, 'nvidia' is
+  // a legitimate relevance term for 'ai-ml', so this title hits via the
+  // domain-overlap path. Use a title with no domain terms either.
   const r = computeThemeKeywordOverlap({
     theme: 'ai-ml',
-    title: 'NVIDIA investors gain on chip demand',
+    title: 'Investors gain on consumer chip-free demand surprise',
   });
-  // 'ai' should NOT match inside 'gain'; 'ml' not present either → 0
+  // Domain terms not hit (no nvidia/gpu/openai/etc); tokens 'ai'/'ml' not
+  // standalone in the title → 0 (word-boundary check works).
   assert.equal(r, 0);
 });
 
@@ -264,7 +268,12 @@ test('s-tier N1: themeRelevance boosts when overlap is strong', () => {
     titledMatching.value > noTitle.value,
     `matching title should boost relevance: no=${noTitle.value} matching=${titledMatching.value}`,
   );
-  assert.ok(titledMatching.rationale.some((r) => /keyword-overlap:\d/.test(r)));
+  // Either keyword-overlap (token-based) or domain-overlap (THEME_RELEVANCE_TERMS-based)
+  // is acceptable — both signal the same thing.
+  assert.ok(
+    titledMatching.rationale.some((r) => /(keyword|domain)-overlap:\d/.test(r)),
+    `expected (keyword|domain)-overlap rationale, got ${JSON.stringify(titledMatching.rationale)}`,
+  );
 });
 
 test('s-tier N1: themeRelevance penalised when overlap is zero on a canonical theme', () => {
