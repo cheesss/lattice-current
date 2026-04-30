@@ -2689,6 +2689,174 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       }
     }
 
+    // ── /api/dashboard/health-summary (S-Tier A4) ──
+    // Single envelope combining ops/status, product-quality, and the
+    // hot-events.modelTrust / themeFraming signal so the dashboard can
+    // render one unified system-health view instead of stitching four
+    // separate endpoints together.
+    if (segments[0] === 'api' && segments[1] === 'dashboard' && segments[2] === 'health-summary') {
+      try {
+        const [opsPayload, productPayload, hotPayload] = await Promise.all([
+          buildOpsStatusPayload(getPool()).catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
+          buildProductQualityPayload({ pool: getPool(), safeQuery, buildBrief: buildThemeBriefPayload })
+            .catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
+          buildHotEventsPayload(getPool(), { limit: 1, lookbackDays: 7 })
+            .catch(() => ({ modelTrust: null, themeFraming: null, laneCounts: null })),
+        ]);
+
+        const dataLevel = (() => {
+          const fresh = opsPayload?.freshness;
+          if (!fresh) return 'unknown';
+          if ((fresh.featureStaleEventCount ?? 0) > 0) return 'warning';
+          if ((fresh.featureLagDays ?? 0) >= 1) return 'warning';
+          return 'ok';
+        })();
+        const pipelineLevel = (() => {
+          const services = opsPayload?.services || {};
+          if (services.masterDaemon?.status !== 'ok') return 'critical';
+          if (services.dataAccumulator?.status !== 'ok') return 'warning';
+          return 'ok';
+        })();
+        const modelLevel = (() => {
+          const trust = hotPayload?.modelTrust;
+          if (trust?.level === 'disabled') return 'critical';
+          if (trust?.level === 'stale') return 'warning';
+          if (opsPayload?.model?.healthStatus === 'calibration-warning') return 'warning';
+          return 'ok';
+        })();
+        const productLevel = productPayload?.summary?.level || 'unknown';
+
+        const overall = (() => {
+          const levels = [dataLevel, pipelineLevel, modelLevel, productLevel];
+          if (levels.includes('critical')) return 'critical';
+          if (levels.includes('warning')) return 'warning';
+          if (levels.every((l) => l === 'ok')) return 'ok';
+          return 'unknown';
+        })();
+
+        return buildJsonResponse({
+          ok: true,
+          generatedAt: new Date().toISOString(),
+          overall,
+          pillars: {
+            data: {
+              level: dataLevel,
+              latestArticleDateKey: opsPayload?.freshness?.latestArticleDateKey ?? null,
+              featureLagDays: opsPayload?.freshness?.featureLagDays ?? null,
+              featureStaleEventCount: opsPayload?.freshness?.featureStaleEventCount ?? 0,
+              articles24h: opsPayload?.freshness?.articles24h ?? 0,
+            },
+            pipeline: {
+              level: pipelineLevel,
+              masterDaemon: opsPayload?.services?.masterDaemon?.status ?? 'unknown',
+              dataAccumulator: opsPayload?.services?.dataAccumulator?.status ?? 'unknown',
+              metaModel: opsPayload?.services?.metaModel?.status ?? 'unknown',
+              api: opsPayload?.services?.api?.status ?? 'unknown',
+            },
+            model: {
+              level: modelLevel,
+              activeModel: opsPayload?.model?.activeModel ?? null,
+              calibration: opsPayload?.model?.healthStatus ?? 'unknown',
+              modelTrust: hotPayload?.modelTrust?.level ?? 'unknown',
+              stalePredictionCount: hotPayload?.modelTrust?.stalePredictionCount ?? null,
+              worstSplitECE: opsPayload?.model?.worstSplitECE ?? null,
+            },
+            product: {
+              level: productLevel,
+              themeRelevancePrecision: productPayload?.metrics?.theme_relevance_precision ?? null,
+              briefCompleteness: productPayload?.metrics?.brief_completeness ?? null,
+              evidenceCoverage: productPayload?.metrics?.evidence_coverage ?? null,
+              actionabilityScore: productPayload?.metrics?.actionability_score ?? null,
+              noiseSuppressionRate: productPayload?.metrics?.noise_suppression_rate ?? null,
+            },
+          },
+          actionables: opsPayload?.actionableInstructions ?? [],
+          laneCounts: hotPayload?.laneCounts ?? null,
+          themeFraming: hotPayload?.themeFraming ?? null,
+        }, overall === 'critical' ? 503 : 200);
+      } catch (err) {
+        logger.warn('dashboard/health-summary route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/dashboard/now-do (S-Tier A3) ──
+    // Single prescriptive recommendation — "the one thing the operator
+    // should do right now". Priority queue:
+    //   1. ops critical → run-instruction
+    //   2. validated > 0 → "open inbox"
+    //   3. pending > 0 → "inspect blockers"
+    //   4. noise_only → "watch trending themes"
+    //   5. otherwise → "system idle"
+    if (segments[0] === 'api' && segments[1] === 'dashboard' && segments[2] === 'now-do') {
+      try {
+        const [opsPayload, hotPayload, trendingPayload] = await Promise.all([
+          buildOpsStatusPayload(getPool()).catch(() => null),
+          buildHotEventsPayload(getPool(), { limit: 5, lookbackDays: 7 }).catch(() => null),
+          buildTrendingThemesPayload(getPool(), { windowDays: 7, limit: 1 }).catch(() => null),
+        ]);
+
+        const counts = hotPayload?.laneCounts || { validated: 0, pending: 0, watch: 0, noise: 0 };
+        const criticalActionable = (opsPayload?.actionableInstructions || []).find(
+          (a) => a.severity === 'critical',
+        );
+        const topTrending = trendingPayload?.themes?.[0] || null;
+
+        let recommendation;
+        if (criticalActionable) {
+          recommendation = {
+            priority: 'critical',
+            icon: '⚠',
+            label: criticalActionable.condition,
+            action: criticalActionable.action,
+            target: '/api/ops/status',
+          };
+        } else if (counts.validated > 0) {
+          recommendation = {
+            priority: 'primary',
+            icon: '✓',
+            label: `${counts.validated} validated signal${counts.validated === 1 ? '' : 's'} ready for review`,
+            action: 'Open Decision Inbox to triage',
+            target: '#inbox',
+          };
+        } else if (counts.pending > 0) {
+          recommendation = {
+            priority: 'primary',
+            icon: '○',
+            label: `${counts.pending} pending validation — blocked on controls or t-stat`,
+            action: 'Inspect blockers; promote manually if structural',
+            target: '#inbox?lane=pending',
+          };
+        } else if (topTrending) {
+          recommendation = {
+            priority: 'secondary',
+            icon: '✦',
+            label: `No validated signals yet. Top trending: ${topTrending.theme} (${topTrending.articlesNow} articles${topTrending.articlesChangePct != null ? `, ${topTrending.articlesChangePct >= 0 ? '+' : ''}${topTrending.articlesChangePct}%` : ''})`,
+            action: 'Open theme brief',
+            target: `/api/theme-brief/${encodeURIComponent(topTrending.theme)}`,
+          };
+        } else {
+          recommendation = {
+            priority: 'idle',
+            icon: '·',
+            label: 'System idle. Articles ingested but no actionable theme yet.',
+            action: 'Wait for next pipeline tick or check ops/status',
+            target: '/api/ops/status',
+          };
+        }
+
+        return buildJsonResponse({
+          ok: true,
+          generatedAt: new Date().toISOString(),
+          recommendation,
+          counts,
+        });
+      } catch (err) {
+        logger.warn('dashboard/now-do route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     // ── /api/ops/status (Phase 7 minimal) ──
     if (segments[0] === 'api' && segments[1] === 'ops' && segments[2] === 'status') {
       try {

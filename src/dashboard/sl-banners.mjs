@@ -91,6 +91,213 @@ function clearTransient() {
   }
 }
 
+/**
+ * S-Tier A3 — single prescriptive recommendation at the top of the stack.
+ * Reads /api/dashboard/now-do which already aggregates ops + hot-events +
+ * trending into one priority queue.
+ */
+function buildNowDoBanner(payload) {
+  if (!payload?.recommendation) return null;
+  const r = payload.recommendation;
+  const tone = r.priority === 'critical' ? 'crit'
+    : r.priority === 'primary' ? 'ok'
+    : r.priority === 'secondary' ? 'warn'
+    : 'ok';
+  return el('div', { class: `sl-banner ${tone}`, 'data-source': 'now-do', 'data-persist': '0' }, [
+    el('div', { class: 'sl-banner-head' }, [
+      el('span', {}, ['Now do']),
+      el('span', {}, [r.priority || 'idle']),
+    ]),
+    el('div', { class: 'sl-banner-body', style: 'font-size:13px;font-weight:500' }, [
+      `${r.icon || '·'} ${r.label || ''}`,
+    ]),
+    r.action ? el('div', { class: 'sl-banner-action' }, [`▸ ${r.action}`]) : null,
+  ]);
+}
+
+/**
+ * S-Tier A1 — Today's top validated signal as a hero card. When validated
+ * is empty, shows the top trending theme as fallback so the dashboard
+ * always opens with something concrete.
+ */
+function buildTopDecisionBanner(hotPayload, trendingPayload) {
+  const topValidated = hotPayload?.eventsByLane?.validated?.[0] || null;
+  const topPending = hotPayload?.eventsByLane?.pending?.[0] || null;
+  const topTrending = trendingPayload?.themes?.[0] || null;
+
+  // Prefer validated > pending > trending for the hero spot.
+  const ev = topValidated || topPending;
+  if (ev) {
+    const title = ev.title || ev.representative_title || `event ${ev.id}`;
+    const lane = ev.lane || (topValidated ? 'validated' : 'pending');
+    const grade = ev.bestEvidenceGrade || ev.rawEvidenceGrade || '';
+    const score = Number(ev.productScore ?? 0);
+    return el('div', { class: 'sl-banner ok', 'data-source': 'top-decision' }, [
+      el('div', { class: 'sl-banner-head' }, [
+        el('span', {}, ['Today\'s top decision']),
+        el('span', { class: `sl-lane-pill ${lane}` }, [lane]),
+      ]),
+      el('div', { class: 'sl-banner-body', style: 'font-size:13px;font-weight:500;line-height:1.4' }, [
+        title.length > 110 ? title.slice(0, 107) + '…' : title,
+      ]),
+      el('div', { class: 'sl-banner-meta' }, [
+        `${ev.theme || 'unknown theme'}`,
+        grade ? ` · ${grade}` : '',
+        ` · score ${score.toFixed(2)}`,
+        ` · click expand for evidence`,
+      ]),
+      // S-Tier A2: data attribute so the click handler can fetch evidence.
+      el('button', {
+        class: 'sl-evidence-toggle',
+        style: 'margin-top:8px;background:transparent;border:1px solid var(--border-base,rgba(255,255,255,.08));border-radius:8px;padding:4px 10px;color:var(--accent,#d8f99d);cursor:pointer;font-family:inherit;font-size:11px',
+        'data-event-id': String(ev.id),
+        type: 'button',
+      }, ['Show evidence ▾']),
+    ]);
+  }
+  if (topTrending) {
+    const pct = topTrending.articlesChangePct == null
+      ? 'new'
+      : `${topTrending.articlesChangePct >= 0 ? '+' : ''}${topTrending.articlesChangePct}%`;
+    return el('div', { class: 'sl-banner warn', 'data-source': 'top-decision' }, [
+      el('div', { class: 'sl-banner-head' }, [
+        el('span', {}, ['Today\'s top — trending fallback']),
+        el('span', {}, ['no validated yet']),
+      ]),
+      el('div', { class: 'sl-banner-body', style: 'font-size:13px;font-weight:500' }, [
+        `${topTrending.theme} surging — ${topTrending.articlesNow} articles this week (${pct})`,
+      ]),
+      el('div', { class: 'sl-banner-meta' }, [
+        'Validation pipeline catching up. Volume signal worth tracking.',
+      ]),
+    ]);
+  }
+  return null;
+}
+
+/**
+ * S-Tier A2 — fetch evidence for one event and inject as a sibling row.
+ * Toggles on a button placed by buildTopDecisionBanner.
+ */
+async function attachEvidenceToggleHandlers(stack) {
+  for (const btn of stack.querySelectorAll('.sl-evidence-toggle')) {
+    if (btn.dataset.bound === '1') continue;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', async () => {
+      const eventId = btn.dataset.eventId;
+      if (!eventId) return;
+      const banner = btn.closest('.sl-banner');
+      const existing = banner?.querySelector('.sl-evidence-detail');
+      if (existing) {
+        existing.remove();
+        btn.textContent = 'Show evidence ▾';
+        return;
+      }
+      btn.textContent = 'Loading…';
+      btn.disabled = true;
+      const data = await fetchJson(`/api/explain-event/${encodeURIComponent(eventId)}`);
+      btn.disabled = false;
+      btn.textContent = 'Hide evidence ▴';
+      if (!data || data.ok === false) {
+        const err = el('div', { class: 'sl-evidence-detail sl-banner-meta', style: 'margin-top:8px' }, [
+          'Could not load evidence — check API logs.',
+        ]);
+        banner?.appendChild(err);
+        return;
+      }
+      const articles = Array.isArray(data.articles) ? data.articles.slice(0, 3) : [];
+      const uplift = Array.isArray(data.uplift) ? data.uplift.slice(0, 3) : [];
+      const controls = Array.isArray(data.controls) ? data.controls : [];
+      const detail = el('div', { class: 'sl-evidence-detail', style: 'margin-top:10px;padding-top:10px;border-top:1px solid var(--border-dim,rgba(255,255,255,.08))' }, []);
+      detail.appendChild(el('div', { class: 'sl-banner-head', style: 'margin-bottom:4px' }, [
+        el('span', {}, ['Evidence']),
+        el('span', {}, [`${controls.length} controls · ${articles.length} articles · ${uplift.length} uplift rows`]),
+      ]));
+      // Uplift rows — concrete statistical evidence.
+      for (const u of uplift) {
+        const t = u.t_stat == null ? '?' : Number(u.t_stat).toFixed(2);
+        const upliftPct = u.uplift == null ? '?' : (Number(u.uplift) * 100).toFixed(2);
+        const grade = u.promoted_grade || u.raw_evidence_grade || '?';
+        const n = u.n_controls ?? '?';
+        detail.appendChild(el('div', { class: 'sl-banner-body', style: 'margin-top:3px;font-size:11px' }, [
+          `▸ ${u.symbol || '?'} ${u.horizon || ''} — grade ${grade}, |t|=${t}, uplift ${upliftPct}%, n_controls=${n}`,
+        ]));
+      }
+      // Article citations — concrete sources.
+      for (const a of articles) {
+        const title = a.title || '(no title)';
+        detail.appendChild(el('div', { class: 'sl-banner-meta', style: 'margin-top:4px' }, [
+          `▸ ${a.source || 'unknown'}: ${title.length > 95 ? title.slice(0, 92) + '…' : title}`,
+        ]));
+      }
+      // Controls summary if present.
+      if (controls.length > 0) {
+        const regimes = [...new Set(controls.map((c) => c.regime_event).filter(Boolean))];
+        if (regimes.length) {
+          detail.appendChild(el('div', { class: 'sl-banner-meta', style: 'margin-top:6px' }, [
+            `Matched controls cover regimes: ${regimes.slice(0, 3).join(', ')}`,
+          ]));
+        }
+      }
+      banner?.appendChild(detail);
+    });
+  }
+}
+
+/**
+ * S-Tier A4 — system health pillars (data / pipeline / model / product).
+ * 4 dots + overall level, expandable to show pillar-level details.
+ */
+function buildHealthPillarsBanner(payload) {
+  if (!payload?.pillars) return null;
+  const overall = payload.overall || 'unknown';
+  const tone = overall === 'critical' ? 'crit' : overall === 'warning' ? 'warn' : 'ok';
+  const dot = (level) => {
+    const color = level === 'critical' ? 'var(--red-critical,#ef4444)'
+      : level === 'warning' ? 'var(--amber-risk,#f59e0b)'
+      : level === 'ok' ? 'var(--signal-green,#16c784)'
+      : 'rgba(255,255,255,.3)';
+    return el('span', {
+      style: `display:inline-block;width:10px;height:10px;border-radius:999px;background:${color};margin-right:4px;vertical-align:middle`,
+    });
+  };
+  const pillarsRow = el('div', {
+    class: 'sl-banner-body',
+    style: 'font-size:11.5px;display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap',
+  }, [
+    el('span', {}, [dot(payload.pillars.data?.level), 'data']),
+    el('span', {}, [dot(payload.pillars.pipeline?.level), 'pipeline']),
+    el('span', {}, [dot(payload.pillars.model?.level), 'model']),
+    el('span', {}, [dot(payload.pillars.product?.level), 'product']),
+  ]);
+  const detailLines = [];
+  const data = payload.pillars.data;
+  if (data) {
+    const lag = data.featureLagDays != null ? ` · lag ${data.featureLagDays}d` : '';
+    detailLines.push(`data: latest=${data.latestArticleDateKey || '?'} · 24h=${data.articles24h}${lag} · stale=${data.featureStaleEventCount}`);
+  }
+  const pipe = payload.pillars.pipeline;
+  if (pipe) {
+    detailLines.push(`pipeline: daemon=${pipe.masterDaemon} · accumulator=${pipe.dataAccumulator} · meta=${pipe.metaModel}`);
+  }
+  const model = payload.pillars.model;
+  if (model) {
+    detailLines.push(`model: ${model.activeModel || '?'} · trust=${model.modelTrust} · stale=${model.stalePredictionCount ?? '?'} · ECE=${model.worstSplitECE != null ? Number(model.worstSplitECE).toFixed(3) : '?'}`);
+  }
+  const prod = payload.pillars.product;
+  if (prod) {
+    detailLines.push(`product: rel=${(prod.themeRelevancePrecision ?? 0).toFixed(2)} · brief=${(prod.briefCompleteness ?? 0).toFixed(2)} · evid=${(prod.evidenceCoverage ?? 0).toFixed(2)} · act=${(prod.actionabilityScore ?? 0).toFixed(2)}`);
+  }
+  return el('div', { class: `sl-banner ${tone}`, 'data-source': 'health-pillars' }, [
+    el('div', { class: 'sl-banner-head' }, [
+      el('span', {}, ['System health']),
+      el('span', {}, [`overall: ${overall}`]),
+    ]),
+    pillarsRow,
+    ...detailLines.map((line) => el('div', { class: 'sl-banner-meta', style: 'margin-top:4px;font-size:10.5px' }, [line])),
+  ]);
+}
+
 function buildOpsBanners(opsPayload) {
   const banners = [];
   const summary = opsPayload?.summary;
@@ -327,18 +534,34 @@ function buildTrendingBanner(payload) {
 async function refreshBanners() {
   ensureStyleSheet();
   const stack = ensureContainer();
-  const [ops, hot, trending] = await Promise.all([
+  const [ops, hot, trending, nowDo, health] = await Promise.all([
     fetchJson('/api/ops/status'),
     fetchJson('/api/hot-events?limit=5'),
     fetchJson('/api/themes/trending?window=7&limit=5'),
+    fetchJson('/api/dashboard/now-do'),
+    fetchJson('/api/dashboard/health-summary'),
   ]);
   clearTransient();
+  // Stack order (top to bottom = priority):
+  //   1. Now-do (single prescriptive action)         — A3
+  //   2. Today's top decision (hero card)            — A1, A2
+  //   3. System health pillars                       — A4
+  //   4. Ops actionable instructions                 — existing
+  //   5. Hot Events theme framing + lane breakdown   — existing
+  //   6. Trending themes fallback                    — N7
+  const nowDoBanner = buildNowDoBanner(nowDo || {});
+  if (nowDoBanner) stack.appendChild(nowDoBanner);
+  const topDecisionBanner = buildTopDecisionBanner(hot || {}, trending || {});
+  if (topDecisionBanner) stack.appendChild(topDecisionBanner);
+  const healthBanner = buildHealthPillarsBanner(health || {});
+  if (healthBanner) stack.appendChild(healthBanner);
   for (const b of buildOpsBanners(ops || {})) stack.appendChild(b);
   for (const b of buildHotEventsBanner(hot || {})) stack.appendChild(b);
-  // S-Tier N7: trending fallback. Always rendered — even when validated
-  // events exist, the rate-of-change view is complementary.
   const trendingBanner = buildTrendingBanner(trending);
   if (trendingBanner) stack.appendChild(trendingBanner);
+
+  // S-Tier A2: bind expand/collapse evidence toggle to the hero card.
+  attachEvidenceToggleHandlers(stack);
 }
 
 if (typeof window !== 'undefined') {
