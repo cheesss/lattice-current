@@ -55,6 +55,7 @@ import {
   VALID_WATCHLIST_STATES,
   VALID_WATCHLIST_ITEM_TYPES,
 } from './_shared/user-watchlist.mjs';
+import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
   getPendingApprovals,
@@ -2594,6 +2595,32 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     if (segments[0] === 'api' && segments[1] === 'health') {
       const payload = await buildHealth();
       return buildJsonResponse(payload, payload.status === 'critical' ? 503 : 200);
+    }
+
+    // ── /api/product-quality (S-Tier §7) ──
+    // Five product-quality metrics (theme_relevance_precision,
+    // brief_completeness, evidence_coverage, noise_suppression_rate,
+    // actionability_score) plus their S-tier targets, rolled up into a
+    // single summary.level (ok/warning/unknown). The endpoint is
+    // intentionally separate from /api/ops/status — that one watches
+    // technical health (services, freshness, model state); this one
+    // watches whether the product is delivering useful information.
+    if (segments[0] === 'api' && segments[1] === 'product-quality') {
+      try {
+        const payload = await buildProductQualityPayload({
+          pool: getPool(),
+          safeQuery,
+          buildBrief: buildThemeBriefPayload,
+        });
+        const httpStatus = payload.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, httpStatus);
+      } catch (err) {
+        logger.warn('product-quality route failed', { error: String(err?.message || err) });
+        return buildJsonResponse(
+          { ok: false, error: String(err?.message || err), generatedAt: new Date().toISOString() },
+          500,
+        );
+      }
     }
 
     // ── /api/ops/status (Phase 7 minimal) ──
