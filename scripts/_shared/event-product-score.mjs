@@ -62,6 +62,55 @@ function isDynamicTheme(theme) {
   return typeof theme === 'string' && /^dt-[a-z0-9]+$/i.test(theme.trim());
 }
 
+/**
+ * Token set extracted from the theme tag itself. We split on hyphens and
+ * underscores, lowercase, drop short stop tokens. For 'energy-supply-chain'
+ * this yields ['energy', 'supply', 'chain']. For 'ai-ml' → ['ai', 'ml']
+ * (we keep 2-char tokens because they are often legitimate domain terms).
+ *
+ * Stop tokens are domain-specific common-but-uninformative words.
+ */
+const THEME_TOKEN_STOPLIST = new Set([
+  'and', 'the', 'for', 'with', 'from', 'into', 'over', 'general', 'misc', 'other',
+]);
+
+function themeTokenSet(theme) {
+  if (!theme || typeof theme !== 'string') return new Set();
+  const raw = theme.trim().toLowerCase();
+  if (!raw || raw === 'unknown' || isDynamicTheme(raw)) return new Set();
+  const tokens = raw
+    .split(/[-_\s]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && !THEME_TOKEN_STOPLIST.has(t));
+  return new Set(tokens);
+}
+
+/**
+ * Compute keyword overlap between the theme tag and the event's
+ * representative_title (and any title hints on linked articles).
+ *
+ * Returns a number in [0, 1]:
+ *   1.0  every theme token appears in the title
+ *   0.5  half of theme tokens appear
+ *   0.0  no overlap (likely mismatched theme assignment)
+ *
+ * If the theme has no informative tokens (dt-*, generic, single short word),
+ * returns null so callers can ignore the signal.
+ */
+export function computeThemeKeywordOverlap(event = {}) {
+  const tokens = themeTokenSet(event.theme);
+  if (tokens.size === 0) return null;
+  const title = String(event.title || event.representative_title || '').toLowerCase();
+  if (!title) return null;
+  let hit = 0;
+  for (const t of tokens) {
+    // Word-boundary-ish check — avoid 'ai' matching inside 'gain'.
+    const re = new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i');
+    if (re.test(title)) hit += 1;
+  }
+  return hit / tokens.size;
+}
+
 function ageDays(eventDate, now = new Date()) {
   if (!eventDate) return Number.POSITIVE_INFINITY;
   const t = new Date(eventDate).getTime();
@@ -105,6 +154,24 @@ export function computeThemeRelevance(event = {}) {
   if (known > 0 && relevant >= low + 1) {
     score = Math.min(1, score + 0.20);
     rationale.push('market-relevance:strong');
+  }
+
+  // S-Tier N1: keyword overlap between the theme tag and the event title.
+  // A canonical theme like 'energy-supply-chain' should appear word-for-word
+  // (or token-by-token) in its events' titles. Strong overlap (>= 50%)
+  // boosts the score; zero overlap is a meaningful red flag — the theme
+  // assignment may be wrong even when the rest of the signals look healthy.
+  const overlap = computeThemeKeywordOverlap(event);
+  if (overlap !== null) {
+    if (overlap >= 0.5) {
+      score = Math.min(1, score + 0.10);
+      rationale.push(`keyword-overlap:${(overlap * 100).toFixed(0)}%`);
+    } else if (overlap === 0) {
+      score = Math.max(0, score - 0.20);
+      rationale.push('keyword-overlap:none — theme tag may not match event content');
+    } else {
+      rationale.push(`keyword-overlap:${(overlap * 100).toFixed(0)}%`);
+    }
   }
 
   return { value: floorComponent(score), rationale };

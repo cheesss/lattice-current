@@ -18,6 +18,7 @@ import {
   computeSourceCredibility,
   computeImpactWeight,
   computeDuplicatePenalty,
+  computeThemeKeywordOverlap,
 } from '../scripts/_shared/event-product-score.mjs';
 
 const NOW = new Date('2026-04-30T00:00:00Z');
@@ -188,6 +189,94 @@ test('rankByProductScore preserves original event metadata', () => {
   assert.equal(ranked[0].extraField, 'preserved', 'extra fields must pass through');
   assert.ok(typeof ranked[0].productScore === 'number');
   assert.ok(ranked[0].scoreBreakdown);
+});
+
+test('s-tier N1: keyword overlap returns 1.0 when all theme tokens appear in title', () => {
+  const r = computeThemeKeywordOverlap({
+    theme: 'energy-supply-chain',
+    title: 'New cobalt energy supply chain disruption hits battery makers',
+  });
+  assert.equal(r, 1, `expected 1.0 overlap, got ${r}`);
+});
+
+test('s-tier N1: keyword overlap returns 0 when title is unrelated', () => {
+  const r = computeThemeKeywordOverlap({
+    theme: 'energy-supply-chain',
+    title: 'Bank of Japan keeps rates unchanged',
+  });
+  assert.equal(r, 0, `expected 0 overlap, got ${r}`);
+});
+
+test('s-tier N1: keyword overlap is fractional for partial matches', () => {
+  const r = computeThemeKeywordOverlap({
+    theme: 'ai-ml-semiconductor',
+    title: 'New AI training run benchmarks released',
+  });
+  // ai matches; ml not in title; semiconductor not in title → 1/3
+  assert.ok(Math.abs(r - 1 / 3) < 1e-9, `expected ~0.33, got ${r}`);
+});
+
+test('s-tier N1: keyword overlap returns null for dt-* dynamic themes', () => {
+  const r = computeThemeKeywordOverlap({
+    theme: 'dt-abc123',
+    title: 'Some news headline',
+  });
+  assert.equal(r, null);
+});
+
+test('s-tier N1: keyword overlap returns null when title is missing', () => {
+  const r = computeThemeKeywordOverlap({ theme: 'energy-supply-chain' });
+  assert.equal(r, null);
+});
+
+test('s-tier N1: keyword match must respect word boundaries (no inside-word match)', () => {
+  // theme has token 'ai'; title has 'gain' but not standalone 'ai'.
+  const r = computeThemeKeywordOverlap({
+    theme: 'ai-ml',
+    title: 'NVIDIA investors gain on chip demand',
+  });
+  // 'ai' should NOT match inside 'gain'; 'ml' not present either → 0
+  assert.equal(r, 0);
+});
+
+test('s-tier N1: themeRelevance boosts when overlap is strong', () => {
+  const baseFixture = {
+    theme: 'energy-supply-chain',
+    knownMarketRelevanceArticles: 0,
+    marketRelevantArticles: 0,
+    lowRelevanceArticles: 0,
+    qualityFlags: [],
+  };
+  const noTitle = computeThemeRelevance(baseFixture);
+  const titledMatching = computeThemeRelevance({
+    ...baseFixture,
+    title: 'Cobalt energy supply chain crunch hits Q2 earnings',
+  });
+  assert.ok(
+    titledMatching.value > noTitle.value,
+    `matching title should boost relevance: no=${noTitle.value} matching=${titledMatching.value}`,
+  );
+  assert.ok(titledMatching.rationale.some((r) => /keyword-overlap:\d/.test(r)));
+});
+
+test('s-tier N1: themeRelevance penalised when overlap is zero on a canonical theme', () => {
+  const baseFixture = {
+    theme: 'energy-supply-chain',
+    knownMarketRelevanceArticles: 0,
+    marketRelevantArticles: 0,
+    lowRelevanceArticles: 0,
+    qualityFlags: [],
+  };
+  const noTitle = computeThemeRelevance(baseFixture);
+  const mismatched = computeThemeRelevance({
+    ...baseFixture,
+    title: 'Cricket world cup highlights',
+  });
+  assert.ok(
+    mismatched.value < noTitle.value,
+    `mismatched title should penalise: no=${noTitle.value} mismatched=${mismatched.value}`,
+  );
+  assert.ok(mismatched.rationale.some((r) => /keyword-overlap:none/.test(r)));
 });
 
 test('s-tier S3 contract: empty hot-events response carries emptyState envelope', async () => {

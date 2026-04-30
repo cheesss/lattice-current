@@ -53,6 +53,8 @@ const DASHBOARD_HEALTH_TIMEOUT_MS = Number(process.env.DASHBOARD_HEALTH_TIMEOUT_
 const DASHBOARD_RESTART_CMD = String(process.env.EVENT_DASHBOARD_RESTART_CMD || '').trim();
 const DB_RESTART_CMD = String(process.env.DB_RESTART_CMD || '').trim();
 const DUCKDB_SYNC_TIMEOUT_MS = Number(process.env.DUCKDB_SYNC_TIMEOUT_MS || (2 * HOUR_1_MS));
+const LEGACY_DUCKDB_SYNC_ENABLED = process.env.ENABLE_LEGACY_DUCKDB_SYNC === 'true';
+const RUN_MAX_BUFFER_BYTES = Math.max(1024 * 1024, Number(process.env.DAEMON_RUN_MAX_BUFFER_BYTES || 64 * 1024 * 1024));
 const STATE_PATH = 'data/daemon-state.json';
 const logger = createLogger('master-daemon');
 
@@ -108,6 +110,16 @@ function saveState(state) {
   }
 }
 
+function markHeartbeat(state, phase = 'idle') {
+  state.heartbeat = {
+    ...(state.heartbeat || {}),
+    masterDaemonAt: new Date().toISOString(),
+    phase,
+    pid: process.pid,
+  };
+  saveState(state);
+}
+
 function run(command, timeoutMs = 300_000) {
   logger.info('running shell command', { command, timeoutMs });
   try {
@@ -117,6 +129,7 @@ function run(command, timeoutMs = 300_000) {
       env: { ...process.env },
       cwd: process.cwd(),
       windowsHide: true,
+      maxBuffer: RUN_MAX_BUFFER_BYTES,
     });
     logger.metric('shell.success_count', 1);
     return { ok: true, error: '' };
@@ -329,6 +342,7 @@ async function taskEventEngineIncremental() {
 async function taskRepairStaleFeatures() {
   log('>> repair-stale-features: detecting and re-upserting stale event_features rows');
   let staleCount = 0;
+  let metricMismatchCount = 0;
   let lagDays = 0;
   try {
     const { Client } = await import('pg');
@@ -356,10 +370,22 @@ async function taskRepairStaleFeatures() {
         )
         SELECT
           COUNT(*) FILTER (WHERE is_stale)::int AS stale_count,
+          (
+            SELECT COUNT(*)::int
+              FROM canonical_events ce
+              JOIN event_features ef ON ef.canonical_event_id = ce.id
+             WHERE ce.event_date >= NOW()::date - INTERVAL '14 days'
+               AND (
+                 COALESCE(ce.source_count, -1) <> COALESCE(ef.source_count, -1)
+                 OR COALESCE(ce.article_count, -1) <> COALESCE(ef.article_count, -1)
+                 OR ABS(COALESCE(ce.source_diversity, -1) - COALESCE(ef.source_diversity, -1)) > 0.0001
+               )
+          ) AS metric_mismatch_count,
           COALESCE(EXTRACT(EPOCH FROM (MAX(latest_article_at) - MIN(computed_at) FILTER (WHERE is_stale))) / 86400, 0) AS lag_days
         FROM feature_status
       `);
       staleCount = Number(rows[0]?.stale_count ?? 0);
+      metricMismatchCount = Number(rows[0]?.metric_mismatch_count ?? 0);
       lagDays = Number(rows[0]?.lag_days ?? 0);
     } finally {
       await client.end();
@@ -368,13 +394,13 @@ async function taskRepairStaleFeatures() {
     return { ok: false, error: `stale detector failed: ${String(err?.message || err)}` };
   }
 
-  log(`   stale event_features rows: ${staleCount}, max lag (days): ${lagDays.toFixed(2)}`);
+  log(`   stale event_features rows: ${staleCount}, metric mismatches: ${metricMismatchCount}, max lag (days): ${lagDays.toFixed(2)}`);
 
-  if (staleCount === 0 && lagDays < 1) {
+  if (staleCount === 0 && metricMismatchCount === 0 && lagDays < 1) {
     return { ok: true };
   }
 
-  log(`   triggering incremental-event-engine-fast to repair ${staleCount} stale rows (lag ${lagDays.toFixed(2)}d)`);
+  log(`   triggering incremental-event-engine-fast to repair stale=${staleCount}, metricMismatch=${metricMismatchCount} (lag ${lagDays.toFixed(2)}d)`);
   const result = run('node scripts/incremental-event-engine-fast.mjs --skip-controls', 600_000);
   return { ok: result.ok, error: result.error };
 }
@@ -384,6 +410,59 @@ async function taskMetaModelInfer() {
   // META_INFER_LIMIT, META_MODEL_URL, META_INFER_BATCH inherited from process.env.
   const refresh = run('node scripts/incremental-event-engine-fast.mjs --skip-controls', 300_000);
   if (!refresh.ok) return { ok: false, error: refresh.error };
+  const result = run('node --import tsx scripts/meta-model-infer.mjs', 900_000);
+  return { ok: result.ok, error: result.error };
+}
+
+/**
+ * S-Tier N2: adaptive burst cadence for stale predictions.
+ *
+ * Baseline taskMetaModelInfer runs every 2 h. When stalePredictionCount
+ * crosses 1000, /api/hot-events.modelTrust flips to 'disabled' — the user
+ * sees a critical banner. Without this burst task they'd wait up to 2 h
+ * for the cron. This 30-min check fires meta-model-infer ONLY when stale
+ * predictions are above the threshold, so it's idempotent and cheap when
+ * the system is healthy.
+ *
+ * Threshold mirrors STALE_PREDICTION_DISABLE_THRESHOLD on the API side
+ * so the burst clears exactly the condition the dashboard flags.
+ */
+const META_INFER_BURST_THRESHOLD = 1000;
+
+async function taskMetaModelInferBurst() {
+  let stale = 0;
+  try {
+    const { Client } = await import('pg');
+    const client = new Client(getPgConfig());
+    await client.connect();
+    try {
+      const { rows } = await client.query(`
+        WITH latest_features AS (
+          SELECT canonical_event_id, MAX(computed_at) AS latest_computed_at
+            FROM event_features
+           GROUP BY canonical_event_id
+        )
+        SELECT COUNT(*)::int AS stale
+          FROM model_predictions mp
+          JOIN latest_features lf ON lf.canonical_event_id = mp.canonical_event_id
+         WHERE lf.latest_computed_at IS NOT NULL
+           AND mp.created_at IS NOT NULL
+           AND lf.latest_computed_at > mp.created_at
+      `);
+      stale = Number(rows?.[0]?.stale ?? 0);
+    } finally {
+      await client.end();
+    }
+  } catch (err) {
+    return { ok: false, error: `burst probe failed: ${String(err?.message || err)}` };
+  }
+
+  if (stale < META_INFER_BURST_THRESHOLD) {
+    log(`>> meta-model-infer-burst: ${stale} stale predictions (threshold ${META_INFER_BURST_THRESHOLD}) — no action needed`);
+    return { ok: true };
+  }
+
+  log(`>> meta-model-infer-burst: ${stale} stale predictions ≥ threshold — firing meta-model-infer ahead of the 2-h baseline`);
   const result = run('node --import tsx scripts/meta-model-infer.mjs', 900_000);
   return { ok: result.ok, error: result.error };
 }
@@ -565,6 +644,10 @@ async function taskDailyBackup(state) {
 }
 
 async function taskDuckdbSync() {
+  if (!LEGACY_DUCKDB_SYNC_ENABLED) {
+    log('  duckdb-sync: skipped; set ENABLE_LEGACY_DUCKDB_SYNC=true to run legacy DuckDB cache sync');
+    return { ok: true, skipped: true };
+  }
   const inFlight = listRunningNodeProcesses('sync-nas-to-duckdb\\.mjs');
   if (inFlight.length > 0) {
     log(`  duckdb-sync: skip because another sync process is already running (pid ${inFlight[0].pid})`);
@@ -691,7 +774,7 @@ async function taskSecSeedUniverse() {
 async function taskOpenAlexThemeEvidence() {
   log('>> openalex-theme-evidence: refreshing OpenAlex research evidence for canonical themes');
   const result = run(
-    'node --import tsx scripts/fetch-openalex-theme-evidence.mjs --themes ai-ml,quantum-computing,robotics-automation,biotech,materials-science,space --limit 8 --from-date 2021-01-01',
+    'node --import tsx scripts/fetch-openalex-theme-evidence.mjs --themes ai-ml,quantum-computing,robotics-automation,biotech,materials-science,space --limit 8 --from-date 2021-01-01 --summary-only',
     1_200_000,
   );
   return { ok: result.ok, error: result.error };
@@ -924,6 +1007,11 @@ const TASKS = {
   // safely overlaps with the hourly task).
   'repair-stale-features': { interval: 4 * HOUR_1_MS, fn: taskRepairStaleFeatures },
   'meta-model-infer': { interval: HOUR_2_MS, fn: taskMetaModelInfer },
+  // S-Tier N2: 30-min adaptive burst that only fires when stale predictions
+  // exceed STALE_PREDICTION_DISABLE_THRESHOLD (1000). Cheap probe + early
+  // catchup so the dashboard's modelTrust banner doesn't sit at 'disabled'
+  // for up to 2 h waiting for the baseline cron.
+  'meta-model-infer-burst': { interval: MIN_30_MS, fn: taskMetaModelInferBurst },
   ...(RATES_NOWCAST_ENABLED
     ? { 'rates-nowcast': { interval: MIN_30_MS, fn: taskRatesNowcast } }
     : {}),
@@ -942,7 +1030,9 @@ const TASKS = {
   'master-pipeline': { interval: HOUR_6_MS, fn: taskMasterPipeline },
   'executor': { interval: HOUR_6_MS, fn: taskExecutor },
   'refresh-event-market-transmission': { interval: HOUR_2_MS, fn: taskRefreshEventMarketTransmission },
-  'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync },
+  ...(LEGACY_DUCKDB_SYNC_ENABLED
+    ? { 'duckdb-sync': { interval: HOUR_6_MS, fn: taskDuckdbSync } }
+    : {}),
   'data-quality': { interval: HOUR_6_MS, fn: taskDataQuality },
   'data-freshness-audit': { interval: HOUR_6_MS, fn: taskDataFreshnessAudit },
   'arxiv-backfill': { interval: HOUR_6_MS, fn: taskArxivBackfill },
@@ -985,11 +1075,12 @@ async function main() {
     process.stderr.write('  [disabled] rates-nowcast (NOWCAST_RATES_ENABLED != true) — see NOWCAST_HANDOFF §5.2\n');
   }
   process.stderr.write('  15min: market quote refresh, db health\n');
-  process.stderr.write('  30min: article check, dashboard health\n');
+  process.stderr.write('  30min: article check, dashboard health, meta-model-infer-burst (adaptive — only when stale predictions ≥ 1000)\n');
   process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, event-engine-incremental, auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission\n');
   process.stderr.write('  4h:    repair-stale-features (dedicated event_features stale detector + repair)\n');
-    process.stderr.write('  6h:    signal refresh, master-pipeline, executor, duckdb sync, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
+    process.stderr.write('  6h:    signal refresh, master-pipeline, executor, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
+    process.stderr.write('  opt-in: duckdb-sync only when ENABLE_LEGACY_DUCKDB_SYNC=true\n');
   process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');
     process.stderr.write('  daily: FRED backfill, pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
     process.stderr.write('         curated daily news, sec seed universe, openalex theme evidence, followed-theme briefings, weekly digest, coverage-gap-analysis\n');
@@ -1030,11 +1121,14 @@ async function main() {
   }
 
   await runAllTasks(state);
+  markHeartbeat(state, 'started');
   if (ONCE) return;
 
   setInterval(async () => {
     const currentState = loadState();
+    markHeartbeat(currentState, 'tick');
     await runAllTasks(currentState);
+    markHeartbeat(currentState, 'idle');
   }, MIN_15_MS);
 
   log('daemon running');
