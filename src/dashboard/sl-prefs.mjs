@@ -1,9 +1,6 @@
 /**
  * S-Tier C1 — Dashboard user-preferences modal.
  *
- * Loaded from event-dashboard.html via:
- *   <script type="module" src="/src/dashboard/sl-prefs.mjs"></script>
- *
  * Adds a small gear button (bottom-left, fixed) that opens a modal with:
  *   - Display: language (EN/KO), default lane filter
  *   - Alerts: validated signal threshold, ops-critical toggle, stale notify minutes
@@ -17,57 +14,9 @@
  * secrets/feature flags). This is in-app UX preferences.
  */
 
-const API_BASE = (() => {
-  if (typeof window !== 'undefined' && window.LATTICE_API_BASE) {
-    return String(window.LATTICE_API_BASE).replace(/\/$/, '');
-  }
-  return '';
-})();
+import { el as $, API_BASE, ensureOverlayStylesheet, deferUntilIdle } from './shared/dom-utils.mjs';
 
 const LOCAL_STORAGE_KEY = 'lattice-prefs-fallback';
-
-function $(tag, props = {}, children = []) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') node.className = v;
-    else if (k === 'style') node.setAttribute('style', v);
-    else if (k.startsWith('data-')) node.setAttribute(k, v);
-    else node[k] = v;
-  }
-  for (const c of children) {
-    if (c == null) continue;
-    if (typeof c === 'string') node.appendChild(document.createTextNode(c));
-    else node.appendChild(c);
-  }
-  return node;
-}
-
-function ensureStyles() {
-  if (document.getElementById('sl-prefs-styles')) return;
-  const style = $('style', { id: 'sl-prefs-styles' });
-  style.textContent = `
-    #sl-prefs-toggle{position:fixed;bottom:14px;left:14px;z-index:8500;width:36px;height:36px;border-radius:999px;background:var(--bg-overlay,rgba(13,15,19,.94));border:1px solid var(--border-base,rgba(255,255,255,.08));color:var(--text-soft,rgba(255,255,255,.6));cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:color .15s ease,border-color .15s ease}
-    #sl-prefs-toggle:hover{color:var(--accent,#d8f99d);border-color:var(--accent,#d8f99d)}
-    .sl-prefs-backdrop{position:fixed;inset:0;background:rgba(7,8,10,.78);backdrop-filter:blur(6px);z-index:9500;display:flex;align-items:center;justify-content:center;animation:sl-prefs-fade .2s ease-out}
-    .sl-prefs-modal{width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow-y:auto;background:var(--bg-surface,#13161d);border:1px solid var(--border-base,rgba(255,255,255,.1));border-radius:18px;padding:24px 28px;color:var(--text-loud,rgba(255,255,255,.95));font-family:var(--font-sans,'Geist',Inter,system-ui,sans-serif);box-shadow:0 32px 80px rgba(0,0,0,.5)}
-    .sl-prefs-title{font-size:18px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
-    .sl-prefs-section{margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border-dim,rgba(255,255,255,.04))}
-    .sl-prefs-section:last-child{border-bottom:none}
-    .sl-prefs-section-title{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent,#d8f99d);margin-bottom:10px}
-    .sl-prefs-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;font-size:13px}
-    .sl-prefs-row label{color:var(--text-base,rgba(255,255,255,.85));flex:1}
-    .sl-prefs-row input[type="number"],.sl-prefs-row select{appearance:none;background:var(--bg-elevated,#1c2028);border:1px solid var(--border-base,rgba(255,255,255,.1));color:inherit;padding:5px 10px;border-radius:8px;font-family:inherit;font-size:12px;min-width:96px}
-    .sl-prefs-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent,#d8f99d)}
-    .sl-prefs-foot{display:flex;justify-content:space-between;gap:12px;margin-top:16px}
-    .sl-prefs-btn{appearance:none;border:1px solid var(--border-base,rgba(255,255,255,.12));background:transparent;color:inherit;font-family:inherit;font-size:13px;padding:8px 16px;border-radius:999px;cursor:pointer;font-weight:500}
-    .sl-prefs-btn:hover{background:rgba(255,255,255,.06)}
-    .sl-prefs-btn.primary{background:var(--accent,#d8f99d);color:var(--bg-void,#07080a);border-color:var(--accent,#d8f99d)}
-    .sl-prefs-btn.danger{color:var(--red-critical,#ef4444);border-color:rgba(239,68,68,.3)}
-    .sl-prefs-status{margin-top:8px;font-size:11px;color:var(--text-soft,rgba(255,255,255,.55))}
-    @keyframes sl-prefs-fade{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
-  `;
-  document.head.appendChild(style);
-}
 
 async function apiGet() {
   try {
@@ -204,7 +153,7 @@ function buildModal(prefs) {
 }
 
 async function openModal() {
-  ensureStyles();
+  ensureOverlayStylesheet();
   let prefs = await apiGet();
   if (!prefs) prefs = loadFallback() || {};
   const backdrop = $('div', { class: 'sl-prefs-backdrop' });
@@ -270,12 +219,9 @@ function ensureToggle() {
   document.body.appendChild(btn);
 }
 
-if (typeof window !== 'undefined') {
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', () => setTimeout(ensureToggle, 1500), { once: true });
-  } else {
-    setTimeout(ensureToggle, 1500);
-  }
-}
+deferUntilIdle(() => {
+  ensureOverlayStylesheet();
+  ensureToggle();
+});
 
 export { openModal as openPrefsModal };

@@ -1,78 +1,29 @@
 /**
  * S-Tier user-value banner renderer (G2 dashboard split — first slice).
  *
- * This module is loaded from event-dashboard.html via a single <script
- * type="module"> tag and injects an overlay panel that consumes the new
- * API envelopes added by the S-Tier server work:
+ * Loaded from event-dashboard.html as a <script type="module"> tag.
+ * Renders NEW DOM additions in a contained #sl-banner-stack overlay so
+ * the inline 7,000-line dashboard keeps working unchanged. Future dashboard
+ * split (G2 PR 3) will fold this into per-surface modules.
  *
- *   /api/hot-events       → themeFraming, modelTrust, eventsByLane,
- *                           emptyState, per-event recommendedAction
+ * APIs consumed (all via shared fetchJson):
+ *   /api/hot-events       → themeFraming, modelTrust, eventsByLane, emptyState
  *   /api/ops/status       → actionableInstructions
- *   /api/theme-brief/<t>  → briefStructure, briefCompleteness, missingSections
- *
- * Design principle: NEVER replace existing render logic. We render NEW DOM
- * additions in a contained #sl-banner-stack overlay so the inline 7,000-line
- * dashboard keeps working unchanged. PR 3 of the dashboard split design
- * (docs/DASHBOARD_SPLIT_DESIGN_2026-04-30.md) will eventually fold this
- * into per-surface modules.
- *
- * Refresh cadence: 60 s. The dashboard's existing fetch lifecycle is
- * untouched.
+ *   /api/dashboard/now-do → top-priority recommendation
+ *   /api/dashboard/health-summary → 4-pillar overall health
+ *   /api/themes/trending  → window-over-window article volume rank
+ *   /api/theme-brief/<t>  → 6-section briefStructure (when a theme opens)
+ *   /api/explain-event/<id> → matched_controls + uplift + citations
+ *   /api/demo/snapshot    → demo-mode banner gating
  */
 
-const API_BASE = (() => {
-  // Allow override via window.LATTICE_API_BASE; fall back to same-origin
-  // /api so production and dev work identically.
-  if (typeof window !== 'undefined' && window.LATTICE_API_BASE) {
-    return String(window.LATTICE_API_BASE).replace(/\/$/, '');
-  }
-  return '';
-})();
+import { el, fetchJson, ensureOverlayStylesheet, deferUntilIdle } from './shared/dom-utils.mjs';
 
 const REFRESH_MS = 60_000;
 
-function el(tag, props = {}, children = []) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') node.className = v;
-    else if (k === 'style') node.setAttribute('style', v);
-    else if (k.startsWith('data-')) node.setAttribute(k, v);
-    else node[k] = v;
-  }
-  for (const child of children) {
-    if (child === null || child === undefined) continue;
-    if (typeof child === 'string') node.appendChild(document.createTextNode(child));
-    else node.appendChild(child);
-  }
-  return node;
-}
-
+// Keep the legacy exported name so the rest of this file is unchanged.
 function ensureStyleSheet() {
-  if (document.getElementById('sl-banner-styles')) return;
-  // Uses design tokens from src/dashboard/shared/tokens.css. Falls back to
-  // hardcoded colors when tokens are missing (e.g. when this module is
-  // loaded standalone in tests).
-  const css = `
-    #sl-banner-stack{position:fixed;bottom:14px;right:14px;z-index:9000;display:flex;flex-direction:column;gap:8px;width:380px;max-width:calc(100vw - 28px);font-family:var(--font-sans,'Geist',Inter,system-ui,sans-serif);font-size:12px;line-height:1.45;pointer-events:auto}
-    .sl-banner{padding:12px 14px;border-radius:12px;background:var(--bg-overlay,rgba(13,15,19,.94));border:1px solid var(--border-base,rgba(255,255,255,.08));box-shadow:0 8px 24px rgba(0,0,0,.32);color:var(--text-loud,rgba(255,255,255,.9))}
-    .sl-banner.warn{border-color:var(--amber-risk,#f59e0b);background:linear-gradient(180deg,rgba(64,42,12,.94),var(--bg-overlay,rgba(13,15,19,.94)))}
-    .sl-banner.crit{border-color:var(--red-critical,#ef4444);background:linear-gradient(180deg,rgba(64,12,12,.94),var(--bg-overlay,rgba(13,15,19,.94)))}
-    .sl-banner.ok{border-color:rgba(22,199,132,.6)}
-    .sl-banner-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10px;color:var(--text-soft,rgba(255,255,255,.6));margin-bottom:6px}
-    .sl-banner-body{color:var(--text-loud,rgba(255,255,255,.92))}
-    .sl-banner-action{margin-top:6px;font-family:var(--font-mono,'JetBrains Mono',Consolas,monospace);font-size:11px;color:var(--accent,#d8f99d);white-space:pre-wrap;word-break:break-all}
-    .sl-banner-meta{margin-top:6px;font-size:10.5px;color:var(--text-soft,rgba(255,255,255,.55))}
-    .sl-banner button.sl-close{background:transparent;border:0;color:var(--text-muted,rgba(255,255,255,.45));cursor:pointer;font-size:14px;line-height:1;padding:0}
-    .sl-banner button.sl-close:hover{color:var(--text-loud,rgba(255,255,255,.85))}
-    .sl-lane-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-right:6px}
-    .sl-lane-pill.validated{background:rgba(22,199,132,.18);color:var(--signal-green,#16c784);border:1px solid rgba(22,199,132,.4)}
-    .sl-lane-pill.pending{background:rgba(216,249,157,.16);color:var(--accent,#d8f99d);border:1px solid rgba(216,249,157,.36)}
-    .sl-lane-pill.watch{background:rgba(245,158,11,.16);color:var(--amber-risk,#f59e0b);border:1px solid rgba(245,158,11,.36)}
-    .sl-lane-pill.noise{background:rgba(255,255,255,.05);color:var(--text-soft,rgba(255,255,255,.5));border:1px solid rgba(255,255,255,.1)}
-  `;
-  const style = el('style', { id: 'sl-banner-styles' });
-  style.textContent = css;
-  document.head.appendChild(style);
+  ensureOverlayStylesheet();
 }
 
 function ensureContainer() {
@@ -493,16 +444,6 @@ function observeThemeChanges() {
   tick();
 }
 
-async function fetchJson(url) {
-  try {
-    const res = await fetch(`${API_BASE}${url}`, { cache: 'no-store' });
-    if (!res.ok && res.status !== 503) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
 function buildTrendingBanner(payload) {
   if (!payload || !Array.isArray(payload.themes) || payload.themes.length === 0) return null;
   const top = payload.themes.slice(0, 5);
@@ -580,24 +521,10 @@ async function refreshBanners() {
   attachEvidenceToggleHandlers(stack);
 }
 
-if (typeof window !== 'undefined') {
-  // Idle until the dashboard's heavy boot finishes (existing inline scripts
-  // do their thing first), then fire and re-fire on a 60-s cadence.
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        refreshBanners();
-        observeThemeChanges();
-      }, 1500);
-      setInterval(refreshBanners, REFRESH_MS);
-    }, { once: true });
-  } else {
-    setTimeout(() => {
-      refreshBanners();
-      observeThemeChanges();
-    }, 1500);
-    setInterval(refreshBanners, REFRESH_MS);
-  }
-}
+deferUntilIdle(() => {
+  refreshBanners();
+  observeThemeChanges();
+  setInterval(refreshBanners, REFRESH_MS);
+});
 
 export { refreshBanners, refreshBriefStructure };

@@ -6,15 +6,14 @@
  * 'lattice-onboarded'). User can dismiss with Skip or finish through
  * Next-Next-Done.
  *
- * Loaded from event-dashboard.html via:
- *   <script type="module" src="/src/dashboard/sl-onboarding.mjs"></script>
- *
  * Design note: this is intentionally a one-time modal, NOT a continuous
  * coachmark / spotlight. Spotlight overlays on a 7,971-line dashboard with
  * dynamic surfaces would require positional anchors that break across
  * resize / surface switch. A single modal that explains the system is a
  * better fit until the dashboard split (G2 PR 3) lands.
  */
+
+import { el as $, ensureOverlayStylesheet, deferUntilIdle } from './shared/dom-utils.mjs';
 
 const STORAGE_KEY = 'lattice-onboarded';
 const STORAGE_VERSION = '1';
@@ -50,48 +49,6 @@ const STEPS = [
     cta: 'Got it · Done',
   },
 ];
-
-function $(tag, props = {}, children = []) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === 'class') node.className = v;
-    else if (k === 'style') node.setAttribute('style', v);
-    else if (k.startsWith('data-')) node.setAttribute(k, v);
-    else node[k] = v;
-  }
-  for (const c of children) {
-    if (c == null) continue;
-    if (typeof c === 'string') node.appendChild(document.createTextNode(c));
-    else node.appendChild(c);
-  }
-  return node;
-}
-
-function ensureOnboardingStyles() {
-  if (document.getElementById('sl-onboarding-styles')) return;
-  const style = $('style', { id: 'sl-onboarding-styles' });
-  style.textContent = `
-    .sl-onb-backdrop{position:fixed;inset:0;background:rgba(7,8,10,.78);backdrop-filter:blur(6px);z-index:10000;display:flex;align-items:center;justify-content:center;animation:sl-onb-fade .25s ease-out}
-    .sl-onb-modal{width:min(540px,calc(100vw - 32px));background:var(--bg-surface,#13161d);border:1px solid var(--border-base,rgba(255,255,255,.1));border-radius:18px;padding:28px;color:var(--text-loud,rgba(255,255,255,.95));font-family:var(--font-sans,'Geist',Inter,system-ui,sans-serif);box-shadow:0 32px 80px rgba(0,0,0,.5)}
-    .sl-onb-eyebrow{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent,#d8f99d);margin-bottom:10px}
-    .sl-onb-title{font-size:22px;font-weight:600;margin-bottom:14px;line-height:1.2}
-    .sl-onb-body{font-size:14px;line-height:1.55;color:var(--text-base,rgba(255,255,255,.85));margin-bottom:14px}
-    .sl-onb-hint{font-size:12px;color:var(--text-soft,rgba(255,255,255,.55));font-family:var(--font-mono,'JetBrains Mono',Consolas,monospace);padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid var(--border-dim,rgba(255,255,255,.04));margin-bottom:18px}
-    .sl-onb-foot{display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .sl-onb-progress{display:flex;gap:6px}
-    .sl-onb-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15)}
-    .sl-onb-dot.active{background:var(--accent,#d8f99d)}
-    .sl-onb-actions{display:flex;gap:10px}
-    .sl-onb-btn{appearance:none;border:1px solid var(--border-base,rgba(255,255,255,.12));background:transparent;color:var(--text-loud,rgba(255,255,255,.9));font-family:inherit;font-size:13px;padding:9px 18px;border-radius:999px;cursor:pointer;font-weight:500;transition:background .15s ease,border-color .15s ease}
-    .sl-onb-btn:hover{background:rgba(255,255,255,.06)}
-    .sl-onb-btn.primary{background:var(--accent,#d8f99d);color:var(--bg-void,#07080a);border-color:var(--accent,#d8f99d)}
-    .sl-onb-btn.primary:hover{filter:brightness(1.08)}
-    .sl-onb-skip{background:transparent;border:0;color:var(--text-soft,rgba(255,255,255,.4));font-size:11px;padding:0;cursor:pointer;font-family:inherit}
-    .sl-onb-skip:hover{color:var(--text-loud,rgba(255,255,255,.9))}
-    @keyframes sl-onb-fade{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
-  `;
-  document.head.appendChild(style);
-}
 
 function markOnboarded() {
   try {
@@ -143,7 +100,7 @@ function render(stepIdx, onAdvance, onSkip) {
 }
 
 function start() {
-  ensureOnboardingStyles();
+  ensureOverlayStylesheet();
   let backdrop = $('div', { class: 'sl-onb-backdrop', id: 'sl-onb-backdrop' });
   let stepIdx = 0;
   const close = () => {
@@ -178,19 +135,8 @@ function start() {
   document.body.appendChild(backdrop);
 }
 
-if (typeof window !== 'undefined') {
-  // Defer to after the dashboard's heavy boot finishes.
-  if (document.readyState === 'loading') {
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        if (shouldShow()) start();
-      }, 2000);
-    }, { once: true });
-  } else {
-    setTimeout(() => {
-      if (shouldShow()) start();
-    }, 2000);
-  }
-}
+deferUntilIdle(() => {
+  if (shouldShow()) start();
+}, 2000);
 
 export { start as startOnboarding, STEPS };
