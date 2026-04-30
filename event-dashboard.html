@@ -1423,6 +1423,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
      docs/DASHBOARD_SPLIT_DESIGN_2026-04-30.md. -->
 <link rel="stylesheet" href="/src/dashboard/shared/tokens.css">
 <script type="module" src="/src/dashboard/sl-banners.mjs"></script>
+<script type="module" src="/src/dashboard/sl-onboarding.mjs"></script>
 </head>
 <body data-surface="home">
 <!-- Language Toggle -->
@@ -5840,7 +5841,7 @@ async function refreshAll(){
   const decisionInboxReady=refreshDecisionInbox();
   await Promise.all([
     decisionInboxReady,
-    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadModelHealth(),loadDataQuality(),loadDataFreshnessAudit(),loadCodexQuality(),
+    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadCodexQuality(),loadModelHealth(),loadDataFreshnessAudit(),
     loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
