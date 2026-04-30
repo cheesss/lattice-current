@@ -3569,11 +3569,39 @@ function buildThemeBriefRisks(snapshot, digestItems, subTheme, openAlexContext) 
 function buildThemeBriefWatchpoints(snapshot, subTheme, openAlexContext, githubContext) {
   const watchpoints = [];
   if (snapshot) {
-    watchpoints.push(`Monitor whether ${snapshot.label} keeps positive acceleration over the next ${snapshot.periodType} window.`);
+    // S-Tier §A3: phrase the watchpoint to match the actual direction of
+    // motion. The previous template said "keeps positive acceleration" even
+    // when acceleration was negative (a cooling theme), which read as a
+    // template glitch and eroded trust.
+    const acceleration = Number(snapshot.acceleration ?? 0);
+    const vsPrevious = Number(snapshot.vsPreviousPct ?? 0);
+    const lifecycle = String(snapshot.lifecycleStage || '').toLowerCase();
+
+    if (acceleration > 5 && vsPrevious >= 0) {
+      watchpoints.push(`Monitor whether ${snapshot.label} keeps positive acceleration (${acceleration.toFixed(0)}) over the next ${snapshot.periodType} window — a stall would be the first sign of cooling.`);
+    } else if (acceleration < -5 || vsPrevious < 0) {
+      watchpoints.push(`${snapshot.label} is decelerating (acceleration ${acceleration.toFixed(0)}, ${vsPrevious >= 0 ? '+' : ''}${vsPrevious}% vs prior ${snapshot.periodType}). Watch whether the slowdown deepens or stabilises before treating it as a structural reversal.`);
+    } else if (Math.abs(acceleration) <= 5) {
+      watchpoints.push(`Acceleration is flat (${acceleration.toFixed(0)}). Watch for a directional break — either side — over the next ${snapshot.periodType}.`);
+    }
+
+    if (lifecycle === 'declining' || lifecycle === 'mature_declining') {
+      watchpoints.push(`Lifecycle stage is "${lifecycle}". The next signal to watch is whether new sub-topics revive coverage or whether the decline broadens.`);
+    } else if (lifecycle === 'nascent' || lifecycle === 'emerging') {
+      watchpoints.push(`Lifecycle stage is "${lifecycle}" — early-stage themes can reverse quickly. Watch for the first multi-source confirmation, not just volume.`);
+    }
+
     watchpoints.push(`Check if source diversity expands beyond ${snapshot.sourceDiversity} and whether geographic spread broadens from ${snapshot.geographicSpread}.`);
   }
   if (subTheme) {
-    watchpoints.push(`Track whether ${subTheme.label} holds or expands its ${subTheme.lastSharePct}% share inside ${humanizeTheme(subTheme.parentTheme)}.`);
+    const delta = Number(subTheme.deltaSharePct ?? 0);
+    if (delta > 0) {
+      watchpoints.push(`Track whether ${subTheme.label} holds or expands its ${subTheme.lastSharePct}% share inside ${humanizeTheme(subTheme.parentTheme)} (${delta >= 0 ? '+' : ''}${delta} pts in this window).`);
+    } else if (delta < 0) {
+      watchpoints.push(`${subTheme.label} share is shrinking inside ${humanizeTheme(subTheme.parentTheme)} (${delta} pts). Watch whether the drop accelerates or stabilises — declining share + declining volume would confirm structural fade.`);
+    } else {
+      watchpoints.push(`${subTheme.label} share inside ${humanizeTheme(subTheme.parentTheme)} is unchanged at ${subTheme.lastSharePct}%. Watch for any directional move.`);
+    }
   }
   if (openAlexContext?.summary?.workCount) {
     watchpoints.push(`Watch whether research coverage for this theme stays above ${openAlexContext.summary.workCount} tracked OpenAlex works and whether new papers broaden beyond ${asArray(openAlexContext.summary.topConcepts).slice(0, 2).join(' / ') || 'the current concept cluster'}.`);

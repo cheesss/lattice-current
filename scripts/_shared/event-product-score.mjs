@@ -305,6 +305,51 @@ export function explainEventLane(event = {}) {
 }
 
 /**
+ * Per-event recommended action (S-Tier §4 — every signal card must include
+ * a recommended action). Hooks off the lane + score breakdown so the
+ * recommendation is consistent with WHY the event landed where it did.
+ *
+ * Returns:
+ *   action     short verb-phrase: "Investigate now", "Watch for confirmation",
+ *              "Skip — observation only", "Promote to inbox"
+ *   tone       'primary' | 'secondary' | 'muted'  — for UI button styling
+ *   reason     one-liner explaining the recommendation
+ */
+export function recommendActionForEvent(event = {}) {
+  const lane = event.lane || classifyEventLane(event);
+  const grade = String(event.bestEvidenceGrade || event.rawEvidenceGrade || '').toUpperCase();
+  const score = Number(event.productScore ?? 0);
+
+  if (lane === 'validated') {
+    return {
+      action: 'Investigate now',
+      tone: 'primary',
+      reason: `Validated ${grade} signal with productScore ${score.toFixed(2)} — open the event to inspect uplift, controls, and source diversity before deciding.`,
+    };
+  }
+  if (lane === 'watch') {
+    if (grade && grade !== 'NONE') {
+      return {
+        action: 'Watch for confirmation',
+        tone: 'secondary',
+        reason: `${grade} evidence present but not yet promoted (likely missing controls or t-stat). Re-check after the next event-engine refresh; promote to Decision Inbox if it crosses the threshold.`,
+      };
+    }
+    return {
+      action: 'Watch — evidence pending',
+      tone: 'secondary',
+      reason: `productScore ${score.toFixed(2)} — observable but no evidence grade yet. Wait for the meta-model-infer cycle to attach uplift before acting.`,
+    };
+  }
+  // noise
+  return {
+    action: 'Skip — observation only',
+    tone: 'muted',
+    reason: `Below validation threshold (productScore ${score.toFixed(3)}, no evidence grade). Surface only as context, not as actionable signal.`,
+  };
+}
+
+/**
  * Theme-level framing for empty / noise-only theme pages (plan §3 + S4).
  * Returns:
  *   bucket  'validated_signals' | 'watch_only' | 'noise_only' | 'no_data'

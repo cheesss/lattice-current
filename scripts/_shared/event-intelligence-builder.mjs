@@ -23,6 +23,7 @@ import {
   classifyEventLane,
   explainEventLane,
   summarizeThemeFraming,
+  recommendActionForEvent,
 } from './event-product-score.mjs';
 
 const HOT_EVENTS_LIMIT = 10;
@@ -583,10 +584,23 @@ export async function buildHotEventsPayload(pool, {
     let allLanedEvents = ranked.map((ev) => {
       const lane = classifyEventLane(ev);
       const evWithLane = { ...ev, lane };
-      // S-Tier §S4: per-event one-liner explaining why it landed in this
-      // lane. Complements the existing scoreBreakdown.rationale array with
-      // a ready-to-render English sentence for the dashboard.
-      return { ...evWithLane, laneReason: explainEventLane(evWithLane) };
+      // S-Tier §S4: per-event one-liner explaining why it landed in this lane.
+      const laneReason = explainEventLane(evWithLane);
+      // S-Tier §A1: explicit themeRelevanceScore + recommendedAction at the
+      // event level, so the dashboard never has to dig into scoreBreakdown
+      // to render "왜 이게 올라왔는지 / 뭘 해야 하는지". The score lives in
+      // scoreBreakdown.components.themeRelevance; we mirror it as a
+      // top-level field for clarity.
+      const themeRelevanceScore = Number(
+        evWithLane.scoreBreakdown?.components?.themeRelevance ?? 0,
+      );
+      const recommendedAction = recommendActionForEvent({ ...evWithLane, laneReason });
+      return {
+        ...evWithLane,
+        laneReason,
+        themeRelevanceScore,
+        recommendedAction,
+      };
     });
 
     // S-Tier §2 — optional theme filter for theme-page relevance precision.

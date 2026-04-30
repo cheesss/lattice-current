@@ -1459,6 +1459,10 @@ async function buildOpsStatusPayload(pool) {
       featureLagDays: pipelineFreshness.featureLagDays ?? null,
       featureLagHours: pipelineFreshness.featureLagHours ?? null,
       featureStaleEventCount: pipelineFreshness.featureStaleEventCount ?? 0,
+      // S-Tier §A4: copy predictionStaleCount through so the actionableInstructions
+      // builder can fire its threshold checks. The field is set by
+      // buildMetaModelHealthPayload when model_predictions table exists.
+      predictionStaleCount: pipelineFreshness.predictionStaleCount ?? 0,
       articles24h: pipelineFreshness.articles24h ?? 0,
       events24h: pipelineFreshness.events24h ?? 0,
     }
@@ -1479,6 +1483,66 @@ async function buildOpsStatusPayload(pool) {
     summaryNotes.push(modelSummary.notes?.[0] || 'model health warning');
   } else if (modelHealthStatus === 'watch') {
     summaryNotes.push(modelSummary.notes?.[0] || 'model watch: calibrated but monitor next validation fold');
+  }
+
+  // S-Tier §A4: actionable instructions. Each item is a concrete operator
+  // command paired with the condition that triggered it, so a human (or a
+  // dashboard) can immediately do the right thing without parsing every
+  // sub-field. The master-daemon's existing 2h meta-model-infer task is the
+  // self-heal path; these instructions cover the case where the daemon is
+  // behind or the threshold has been crossed since the last tick.
+  const actionableInstructions = [];
+  if (daemon.status !== 'ok') {
+    actionableInstructions.push({
+      severity: 'critical',
+      condition: `master-daemon is ${daemon.status} (${daemon.ageMinutes ?? '?'} min since last tick)`,
+      action: 'Restart the master daemon: `npm run daemon` (or check the systemd/PM2 supervisor).',
+    });
+  }
+  if (metaModel.status === 'unreachable') {
+    actionableInstructions.push({
+      severity: 'critical',
+      condition: 'meta-model-server is unreachable',
+      action: 'Restart: `python scripts/meta-model-server.py` and verify it binds 8100.',
+    });
+  }
+  if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `${freshness.featureStaleEventCount} stale event_features rows`,
+      action: 'Run repair task once: `node scripts/master-daemon.mjs --task repair-stale-features --once`',
+    });
+  }
+  if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `event_features lag ${freshness.featureLagDays.toFixed(0)} day(s) behind latest article date`,
+      action: 'Trigger event-engine: `node scripts/incremental-event-engine-fast.mjs --skip-controls`',
+    });
+  }
+  // Stale prediction surfacing — the value also lives on /api/hot-events
+  // modelTrust, but we duplicate here so /api/ops/status alone can drive
+  // the operator's day.
+  const stalePredictionCount = Number(freshness?.predictionStaleCount ?? 0);
+  if (stalePredictionCount >= 1000) {
+    actionableInstructions.push({
+      severity: 'critical',
+      condition: `${stalePredictionCount} stale model_predictions (≥ 1000) — model-driven ranking is currently disabled in /api/hot-events`,
+      action: 'Run: `node --import tsx scripts/meta-model-infer.mjs` to refresh predictions, or wait up to 2h for the master-daemon meta-model-infer cron.',
+    });
+  } else if (stalePredictionCount >= 200) {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `${stalePredictionCount} stale model_predictions (≥ 200)`,
+      action: 'Predictions will refresh on the next master-daemon meta-model-infer cycle. To force now: `node --import tsx scripts/meta-model-infer.mjs`',
+    });
+  }
+  if (modelHealthStatus === 'calibration-warning') {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `model calibration drifting (worst-split ECE ${(latestEval?.worstEce ?? 0).toFixed(3)})`,
+      action: 'Re-calibrate: `python scripts/calibrate-meta-model.py --apply` and inspect data/meta-*.calibration.json.',
+    });
   }
 
   return {
@@ -1518,6 +1582,7 @@ async function buildOpsStatusPayload(pool) {
         missingThemes: Array.isArray(symbolCoverage.missingThemes) ? symbolCoverage.missingThemes : [],
       }
       : null,
+    actionableInstructions,
     recentIssues,
   };
 }
