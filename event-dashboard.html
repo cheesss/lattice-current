@@ -96,6 +96,32 @@ th{color:var(--muted);font-weight:normal}
 .theme-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text);cursor:pointer}
 .theme-chip.active{border-color:rgba(197,255,109,.5);background:linear-gradient(135deg,rgba(197,255,109,.22),rgba(126,224,129,.12));color:var(--accent)}
 .theme-chip.muted{opacity:.6}
+.theme-watchlist-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.theme-watchlist-stat{padding:10px;border-radius:12px;border:1px solid var(--border-dim);background:rgba(255,255,255,.025)}
+.theme-watchlist-stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-soft)}
+.theme-watchlist-stat-value{margin-top:4px;font-size:18px;font-weight:700;color:var(--text-loud)}
+.theme-watchlist-rail{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.theme-collapse{border:1px solid var(--border-dim);border-radius:14px;background:rgba(255,255,255,.018);padding:0;overflow:hidden}
+.theme-collapse+ .theme-collapse{margin-top:10px}
+.theme-collapse>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;cursor:pointer;list-style:none;color:var(--text);font-weight:600}
+.theme-collapse>summary::-webkit-details-marker{display:none}
+.theme-collapse>summary::after{content:"+";color:var(--muted);font-family:var(--font-mono);font-size:14px}
+.theme-collapse[open]>summary{border-bottom:1px solid var(--border-dim);background:rgba(255,255,255,.025)}
+.theme-collapse[open]>summary::after{content:"-"}
+.theme-compact-list{display:flex;flex-direction:column;gap:0}
+.theme-compact-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border-dim);align-items:start}
+.theme-compact-row:last-child{border-bottom:none}
+.theme-compact-row.active{background:rgba(197,255,109,.055)}
+.theme-compact-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.theme-name-btn{padding:0;border:0;background:transparent;color:var(--text-loud);font:inherit;font-weight:650;cursor:pointer;text-align:left}
+.theme-name-btn:hover{color:var(--accent)}
+.theme-compact-line{margin-top:4px;color:var(--muted);font-size:11px;line-height:1.45}
+.theme-row-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.theme-row-drawer{grid-column:1/-1;margin-top:2px}
+.theme-row-drawer>summary{cursor:pointer;color:var(--text-soft);font-size:10px;letter-spacing:.1em;text-transform:uppercase;list-style:none}
+.theme-row-drawer>summary::-webkit-details-marker{display:none}
+.theme-row-detail-body{margin-top:8px;padding:9px 10px;border-radius:10px;background:rgba(0,0,0,.2);border:1px solid var(--border-dim);color:var(--muted);font-size:11px;line-height:1.5}
+@media (max-width:900px){.theme-watchlist-summary{grid-template-columns:1fr}.theme-compact-row{grid-template-columns:1fr}.theme-row-actions{justify-content:flex-start}}
 .focus-strip{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;margin-bottom:12px}
 .map-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
 .focus-summary{display:flex;flex-direction:column;gap:10px}
@@ -1390,6 +1416,12 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
   .drawer-metrics{grid-template-columns:1fr}
 }
 </style>
+<!-- S-Tier banner overlay (G2 dashboard split, first slice). Renders
+     themeFraming, modelTrust, ops actionableInstructions, and Hot Events
+     emptyState envelopes from the new APIs without touching the inline
+     render code. See src/dashboard/sl-banners.mjs and
+     docs/DASHBOARD_SPLIT_DESIGN_2026-04-30.md. -->
+<script type="module" src="/src/dashboard/sl-banners.mjs"></script>
 </head>
 <body data-surface="home">
 <!-- Language Toggle -->
@@ -2002,6 +2034,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       </div>
       <div class="grid3" style="margin-top:12px">
         <div class="card"><div class="card-title">System Health</div><div id="operator-health" class="loading">Loading system health...</div></div>
+        <div class="card"><div class="card-title">Model Trust</div><div id="operator-model-health" class="loading">Loading model trust...</div></div>
         <div class="card"><div class="card-title">Data Quality</div><div id="operator-data-quality" class="loading">Loading data quality...</div></div>
         <div class="card"><div class="card-title">Freshness Audit</div><div id="operator-freshness-audit" class="loading">Loading freshness audit...</div></div>
         <div class="card"><div class="card-title">Codex Quality</div><div id="operator-codex-quality" class="loading">Loading Codex quality...</div></div>
@@ -2274,8 +2307,28 @@ function updateShareUrl(){try{const url=new URL(window.location.href);if(state.c
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function decodeHtmlEntities(value){const el=document.createElement('textarea');el.innerHTML=String(value??'');return el.value;}
 function asArray(value){return Array.isArray(value)?value:value==null?[]:[value];}
-function normalizeTheme(value){return String(value||'').trim().toLowerCase();}
+function normalizeTheme(value){
+  return String(value||'')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g,' and ')
+    .replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-+|-+$/g,'');
+}
 function normalizeThemeList(values){return Array.from(new Set(asArray(values).map((value)=>normalizeTheme(value)).filter((value)=>value&&value!=='unknown')));}
+function normalizeThemeRecordMap(record){
+  if(!record||typeof record!=='object')return{};
+  const out={};
+  Object.entries(record).forEach(([key,value])=>{
+    const theme=normalizeTheme(key);
+    if(!theme||theme==='unknown')return;
+    const current=out[theme];
+    const nextTime=new Date(value||0).valueOf();
+    const currentTime=new Date(current||0).valueOf();
+    if(!current||Number.isNaN(currentTime)||nextTime>=currentTime)out[theme]=value;
+  });
+  return out;
+}
 function isGenericBucketTheme(value){const theme=normalizeTheme(value);return theme.endsWith('-general');}
 function shouldShowDiscoveryTheme(value){const theme=normalizeTheme(value);return Boolean(theme&&theme!=='unknown'&&!isGenericBucketTheme(theme));}
 function readLabel(value){if(value==null)return'';if(typeof value==='string'||typeof value==='number')return String(value);for(const key of['label','name','title','theme','signal','symbol','id']){if(value[key]!=null)return String(value[key]);}return JSON.stringify(value);}
@@ -2687,10 +2740,37 @@ function unmuteTheme(theme){
   loadFollowedThemeBriefing();
   emitEmbeddedContext();
 }
+function compactThemeStatus(summary){
+  if(!summary)return'No loaded trend snapshot yet';
+  return `${summary.lifecycleStage||'n/a'} | YoY ${fmtPercent(summary.vsYearAgoPct,0)} | accel ${fmtPercent(summary.acceleration,0)}`;
+}
+function renderThemeCompactRow(theme,{muted=false,suggested=false}={}){
+  const active=state.currentTheme===theme?' active':'';
+  const brief=themeBriefCache[theme]||null;
+  const summary=brief?.summary||null;
+  const topChange=brief?.sections?.whatChanged?.[0]||null;
+  const lastViewed=themeLastViewed[theme]||null;
+  const label=brief?.label||humanizeTheme(theme);
+  const status=suggested?'suggested':muted?'muted':'followed';
+  const openAction=`openThemeBrief('${theme}')`;
+  const actionHtml=muted
+    ? `<button class="btn" onclick="unmuteTheme('${theme}')">Unmute</button>`
+    : suggested
+      ? `<button class="btn" onclick="followTheme('${theme}')">Follow</button><button class="btn" onclick="muteTheme('${theme}')">Mute</button>`
+      : `<button class="btn" onclick="unfollowTheme('${theme}')">Unfollow</button><button class="btn" onclick="muteTheme('${theme}')">Mute</button>`;
+  return `<div class="theme-compact-row${active}"><div><div class="theme-compact-head"><button class="theme-name-btn" onclick="${openAction}">${escapeHtml(label)}</button><span class="badge">${status}</span>${summary?.lifecycleStage?`<span class="badge">${escapeHtml(summary.lifecycleStage)}</span>`:''}</div><div class="theme-compact-line">${escapeHtml(compactThemeStatus(summary))}${lastViewed?` | opened ${escapeHtml(fmtDateTime(lastViewed))}`:' | not opened yet'}</div></div><div class="theme-row-actions">${actionHtml}</div><details class="theme-row-drawer"><summary>Details</summary><div class="theme-row-detail-body">${topChange?escapeHtml(truncate(topChange.detail||topChange.title||'',220)):'No expanded brief text is cached for this theme yet. Open the full brief to hydrate the local workspace.'}<div style="margin-top:6px">Last opened ${escapeHtml(fmtDateTime(lastViewed))}</div></div></details></div>`;
+}
 function renderMyThemes(){
   const el=document.getElementById('my-themes');
   const badge=document.getElementById('my-themes-badge');
   if(!el||!badge)return;
+  const normalizedThemes=normalizeThemeList(state.myThemes);
+  const normalizedMuted=normalizeThemeList(state.mutedThemes);
+  if(normalizedThemes.length!==state.myThemes.length||normalizedThemes.some((item,index)=>item!==state.myThemes[index])||normalizedMuted.length!==state.mutedThemes.length||normalizedMuted.some((item,index)=>item!==state.mutedThemes[index])){
+    state.myThemes=normalizedThemes;
+    state.mutedThemes=normalizedMuted;
+    persistThemeState();
+  }
   const suggested=getSuggestedThemes().filter((theme)=>!isThemeFollowed(theme)).slice(0,8);
   const snapshotMeta=followedThemeBriefing?.snapshot||null;
   badge.textContent=`${state.myThemes.length} followed`;
@@ -2699,38 +2779,30 @@ function renderMyThemes(){
   if(snapshotMeta?.snapshotDate){
     html+=`<div class="section-note">Weekly saved snapshot ${snapshotMeta.persisted?'available':'pending'} for ${escapeHtml(fmtDate(snapshotMeta.snapshotDate))}${snapshotMeta.generatedAt?` | refreshed ${escapeHtml(fmtDateTime(snapshotMeta.generatedAt))}`:''}</div>`;
   }
+  const hydratedCount=state.myThemes.filter((theme)=>themeBriefCache[theme]?.summary).length;
+  html+=`<div class="theme-watchlist-summary"><div class="theme-watchlist-stat"><div class="theme-watchlist-stat-label">Followed</div><div class="theme-watchlist-stat-value">${escapeHtml(fmtWhole(state.myThemes.length))}</div></div><div class="theme-watchlist-stat"><div class="theme-watchlist-stat-label">Briefs Ready</div><div class="theme-watchlist-stat-value">${escapeHtml(fmtWhole(hydratedCount))}</div></div><div class="theme-watchlist-stat"><div class="theme-watchlist-stat-label">Muted</div><div class="theme-watchlist-stat-value">${escapeHtml(fmtWhole(state.mutedThemes.length))}</div></div></div>`;
   if(!state.myThemes.length){
     html+='<div class="theme-empty">No followed themes yet. Follow themes from the trend surfaces to build a repeatable weekly workspace.</div>';
   }else{
-    html+='<div class="brief-list">';
-    state.myThemes.forEach((theme)=>{
-      const active=state.currentTheme===theme?' active':'';
-      const brief=themeBriefCache[theme]||null;
-      const summary=brief?.summary||null;
-      const topChange=brief?.sections?.whatChanged?.[0]||null;
-      const lastViewed=themeLastViewed[theme]||null;
-      html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><button class="theme-chip${active}" onclick="openThemeBrief('${theme}')">${escapeHtml(brief?.label||humanizeTheme(theme))}</button><span class="badge">followed</span></div>${summary?`<div class="meta-line" style="margin-top:6px">Lifecycle ${escapeHtml(summary.lifecycleStage||'n/a')} | YoY ${fmtPercent(summary.vsYearAgoPct,0)} | acceleration ${fmtPercent(summary.acceleration,0)}</div>`:''}${topChange?`<div class="story-summary">${escapeHtml(truncate(topChange.detail||topChange.title||'',160))}</div>`:''}<div class="meta-line" style="margin-top:6px">Last opened ${escapeHtml(fmtDateTime(lastViewed))}</div><div class="theme-actions"><button class="btn" onclick="unfollowTheme('${theme}')">Unfollow</button><button class="btn" onclick="muteTheme('${theme}')">Mute</button></div></div>`;
-    });
-    html+='</div>';
+    html+=`<div class="theme-watchlist-rail">${state.myThemes.slice(0,12).map((theme)=>`<button class="theme-chip${state.currentTheme===theme?' active':''}" onclick="openThemeBrief('${theme}')">${escapeHtml(themeBriefCache[theme]?.label||humanizeTheme(theme))}</button>`).join('')}${state.myThemes.length>12?`<span class="badge">+${escapeHtml(fmtWhole(state.myThemes.length-12))} more</span>`:''}</div>`;
+    html+=`<details class="theme-collapse"${state.myThemes.length<=6?' open':''}><summary><span>All followed themes</span><span class="badge">${escapeHtml(fmtWhole(state.myThemes.length))}</span></summary><div class="theme-compact-list">`;
+    state.myThemes.forEach((theme)=>{html+=renderThemeCompactRow(theme);});
+    html+='</div></details>';
   }
   html+='</div>';
-  html+='<div class="brief-section"><div class="brief-section-title">Suggested Themes</div>';
+  html+=`<details class="theme-collapse"><summary><span>Suggested Themes</span><span class="badge">${escapeHtml(fmtWhole(suggested.length))}</span></summary>`;
   if(!suggested.length){
     html+='<div class="theme-empty">Suggestions will populate from the curated digest and lifecycle pyramid.</div>';
   }else{
-    html+='<div class="brief-list">';
-    suggested.forEach((theme)=>{
-      html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><button class="theme-chip" onclick="openThemeBrief('${theme}')">${escapeHtml(humanizeTheme(theme))}</button><span class="badge">suggested</span></div><div class="theme-actions"><button class="btn" onclick="followTheme('${theme}')">Follow</button><button class="btn" onclick="muteTheme('${theme}')">Mute</button></div></div>`;
-    });
+    html+='<div class="theme-compact-list">';
+    suggested.forEach((theme)=>{html+=renderThemeCompactRow(theme,{suggested:true});});
     html+='</div>';
   }
-  html+='</div>';
+  html+='</details>';
   if(state.mutedThemes.length){
-    html+='<div class="brief-section"><div class="brief-section-title">Muted Themes</div><div class="brief-list">';
-    state.mutedThemes.slice(0,8).forEach((theme)=>{
-      html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><button class="theme-chip muted" onclick="openThemeBrief('${theme}')">${escapeHtml(humanizeTheme(theme))}</button><span class="badge">muted</span></div><div class="theme-actions"><button class="btn" onclick="unmuteTheme('${theme}')">Unmute</button></div></div>`;
-    });
-    html+='</div></div>';
+    html+=`<details class="theme-collapse"><summary><span>Muted Themes</span><span class="badge">${escapeHtml(fmtWhole(state.mutedThemes.length))}</span></summary><div class="theme-compact-list">`;
+    state.mutedThemes.slice(0,12).forEach((theme)=>{html+=renderThemeCompactRow(theme,{muted:true});});
+    html+='</div></details>';
   }
   html+='</div>';
   el.innerHTML=html;
@@ -3534,6 +3606,10 @@ function normalizeTriageToReviewItem(triage) {
     sources,
   };
 }
+function isFinalDiscoveryTriageItem(triage) {
+  const state = String(triage?.promotionState || triage?.lastReview?.decision || '').trim().toLowerCase();
+  return state === 'canonical' || state === 'suppressed';
+}
 function hasApprovalProbeMeta(item) {
   if (!item || item.type !== 'approval') return false;
   const payload = item.payload || {};
@@ -3578,7 +3654,7 @@ function resolveInboxDecision(item, decision) {
   if (direct[item.type] && direct[item.type].includes(decision)) return decision;
   const mapped = {
     proposal: { accept: 'accept', reject: 'reject', snooze: 'snooze' },
-    approval: { accept: 'accept', reject: 'reject' },
+    approval: { accept: 'accept', reject: 'reject', retry: 'accept' },
     triage: { accept: 'canonical', reject: 'suppress', snooze: 'watch' },
     'e2-signal': { snooze: 'snooze' },
   };
@@ -3702,7 +3778,9 @@ async function refreshDecisionInbox() {
     (inboxData?.approvals || []).forEach(a => items.push(normalizeApprovalToReviewItem(a)));
     // Triage
     const triageItems = Array.isArray(triageRes?.items) ? triageRes.items : Array.isArray(triageRes) ? triageRes : [];
-    triageItems.forEach(t => items.push(normalizeTriageToReviewItem(t)));
+    triageItems
+      .filter((triage) => !isFinalDiscoveryTriageItem(triage))
+      .forEach(t => items.push(normalizeTriageToReviewItem(t)));
     inboxItems = items;
     if (inboxSelectedId && !inboxItems.some((x) => x.id === inboxSelectedId)) inboxSelectedId = null;
     [...inboxSelection].forEach((id) => {
@@ -3773,6 +3851,9 @@ function renderTopDecisionCard() {
   const simulate = item.type === 'approval'
     ? `<button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>`
     : '';
+  const retry = item.type === 'approval' && getApprovalProbeState(item).blocked
+    ? `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('retry','${escapeHtml(item.id)}')" title="Re-run validation and execute only if the source passes current gates">Retry Check <span class="inbox-shortcut">A</span></button>`
+    : '';
   const acceptDecision = item.type === 'triage' ? 'canonical' : 'accept';
   const rejectDecision = item.type === 'triage' ? 'suppress' : 'reject';
   el.innerHTML = `
@@ -3785,7 +3866,7 @@ function renderTopDecisionCard() {
     </div>
     <div class="top-decision-actions">
       ${simulate}
-      ${resolveInboxDecision(item, acceptDecision) ? `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('${acceptDecision}','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>` : ''}
+      ${retry || (resolveInboxDecision(item, acceptDecision) ? `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('${acceptDecision}','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>` : '')}
       ${resolveInboxDecision(item, rejectDecision) ? `<button class="inbox-btn inbox-btn-reject" onclick="inboxAction('${rejectDecision}','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>` : ''}
       <button class="inbox-btn" onclick="switchSurface('inbox');setTimeout(()=>selectInboxItem(null,'${escapeHtml(item.id)}'),50)">Preview</button>
     </div>`;
@@ -3899,7 +3980,7 @@ function renderInboxPreview(item) {
     : status === 'simulated'
       ? 'Dry run complete. No backend state was changed.'
       : status === 'needs-fix'
-        ? 'Repair required. Probe or registration failed, so this item is not currently actionable.'
+        ? 'Repair required. Use Retry Check to re-run validation; if it passes, the approval will execute. Otherwise reject it or let source repair update the URL.'
         : `State: ${escapeHtml(status)}`;
   preview.innerHTML = `
     <div class="inbox-status-banner ${escapeHtml(status)}">${statusCopy}</div>
@@ -4070,36 +4151,36 @@ function closeEvidenceDrawer(){
 function buildInboxActions(item) {
   if (item.type === 'proposal') {
     return `
-      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
+      <button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="snooze" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-reject" data-inbox-action="reject" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
       ${item.payload?.targetTheme ? `<button class="inbox-btn" onclick="openThemeBrief('${normalizeTheme(item.payload.targetTheme)}')">Open brief</button>` : ''}`;
   }
   if (item.type === 'approval') {
     const probeState = getApprovalProbeState(item);
     const acceptButton = probeState.blocked
-      ? ''
-      : `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>`;
+      ? `<button class="inbox-btn inbox-btn-accept" data-inbox-action="retry" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('retry','${escapeHtml(item.id)}')" title="Re-run validation and execute only if the source passes current gates">Retry Check <span class="inbox-shortcut">A</span></button>`
+      : `<button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>`;
     const repairHint = probeState.blocked
-      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)}</span>`
+      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)} Retry Check re-runs the same server-side gates before any execution.</span>`
       : '';
     return `
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="simulate" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>
       ${acceptButton}
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
+      <button class="inbox-btn inbox-btn-reject" data-inbox-action="reject" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
       ${repairHint}`;
   }
   if (item.type === 'triage') {
     return `
-      <button class="inbox-btn inbox-btn-accept" onclick="inboxAction('canonical','${escapeHtml(item.id)}')">Canonical <span class="inbox-shortcut">A</span></button>
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('watch','${escapeHtml(item.id)}')">Watch <span class="inbox-shortcut">S</span></button>
-      <button class="inbox-btn inbox-btn-reject" onclick="inboxAction('suppress','${escapeHtml(item.id)}')">Suppress <span class="inbox-shortcut">R</span></button>`;
+      <button class="inbox-btn inbox-btn-accept" data-inbox-action="canonical" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('canonical','${escapeHtml(item.id)}')">Canonical <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="watch" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('watch','${escapeHtml(item.id)}')">Watch <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-reject" data-inbox-action="suppress" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('suppress','${escapeHtml(item.id)}')">Suppress <span class="inbox-shortcut">R</span></button>`;
   }
   if (item.type === 'e2-signal') {
     const themeParam = item.theme ? `'${normalizeTheme(item.theme)}'` : 'null';
     return `
       <button class="inbox-btn" onclick="openThemeBrief(${themeParam})">Open evidence</button>
-      <button class="inbox-btn inbox-btn-snooze" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>`;
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="snooze" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="e2-signal" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>`;
   }
   return '';
 }
@@ -4459,8 +4540,13 @@ document.addEventListener('keydown', (ev) => {
   } else if (ev.key === '1' && inboxSelectedId) {
     ev.preventDefault();
     const item = inboxItems.find(x => x.id === inboxSelectedId);
-    const action = item ? resolveInboxDecision(item, item.type === 'triage' ? 'canonical' : 'accept') : null;
-    if (action) inboxAction(action, inboxSelectedId);
+    const decision = item?.type === 'approval' && getApprovalProbeState(item).blocked
+      ? 'retry'
+      : item?.type === 'triage'
+        ? 'canonical'
+        : 'accept';
+    const action = item ? resolveInboxDecision(item, decision) : null;
+    if (action) inboxAction(decision, inboxSelectedId);
   } else if (ev.key === '2' && inboxSelectedId) {
     ev.preventDefault();
     const item = inboxItems.find(x => x.id === inboxSelectedId);
@@ -4473,7 +4559,11 @@ document.addEventListener('keydown', (ev) => {
     if (action) inboxAction(action, inboxSelectedId);
   } else if ((ev.key === 'a' || ev.key === 'A') && inboxSelectedId) {
     ev.preventDefault();
-    const decision = selectedItem?.type === 'triage' ? 'canonical' : 'accept';
+    const decision = selectedItem?.type === 'approval' && getApprovalProbeState(selectedItem).blocked
+      ? 'retry'
+      : selectedItem?.type === 'triage'
+        ? 'canonical'
+        : 'accept';
     runSelected(decision);
   } else if ((ev.key === 'r' || ev.key === 'R') && inboxSelectedId) {
     ev.preventDefault();
@@ -5611,9 +5701,12 @@ async function refreshTrustStrip(){
     const s=metaRes.summary||{};
     const le=s.latestEval;
     if(le&&Number.isFinite(Number(le.brierScore))){
-      const b=Number(le.brierScore), e=Number(le.ece);
+      const effective=s.effectiveMetrics||{};
+      const b=Number(effective.brier??le.brierScore), e=Number(effective.ece??le.ece);
       const level=s.level||'ok';
-      setTrustChunk('meta',`Brier ${b.toFixed(3)} · ECE ${Number.isFinite(e)?e.toFixed(3):'n/a'}`,level,`Latest ${le.modelVersion||'?'} · n=${le.sampleCount||'?'}${s.notes&&s.notes.length?' · '+s.notes[0]:''}`);
+      const status=s.healthStatus||level;
+      const cal=effective.calibrated?' calibrated':'';
+      setTrustChunk('meta',`Brier ${b.toFixed(3)} · ECE ${Number.isFinite(e)?e.toFixed(3):'n/a'}`,level,`Latest ${le.modelVersion||'?'} · ${status}${cal} · n=${le.sampleCount||'?'}${s.notes&&s.notes.length?' · '+s.notes[0]:''}`);
     } else {
       setTrustChunk('meta','no eval','warning','model_eval empty');
     }
@@ -5746,7 +5839,7 @@ async function refreshAll(){
   const decisionInboxReady=refreshDecisionInbox();
   await Promise.all([
     decisionInboxReady,
-    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadDataFreshnessAudit(),loadCodexQuality(),
+    loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadModelHealth(),loadDataQuality(),loadDataFreshnessAudit(),loadCodexQuality(),
     loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
@@ -5874,6 +5967,42 @@ async function loadSystemHealth(){
       </div>
     </div>
   `;
+  el.innerHTML=html;
+}
+async function loadModelHealth(){
+  const {data,cached,cachedAt}=await f(`${API}/ops/status`,'ops-status');
+  const el=document.getElementById('operator-model-health');
+  if(!el)return;
+  const model=data?.model||{};
+  if(!data||!model){
+    el.innerHTML='<div class="meta-line">Model trust unavailable.</div>';
+    return;
+  }
+  const gates=Array.isArray(model.promotionGates)?model.promotionGates:[];
+  const actions=Array.isArray(model.recommendedActions)?model.recommendedActions:[];
+  const failed=gates.filter(g=>g.status==='fail').length;
+  const watch=gates.filter(g=>g.status==='watch').length;
+  const level=model.level||data.summary?.level||'unknown';
+  const health=model.healthStatus||level;
+  let html=cached?`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`:'';
+  html+=`<div class="meta-line" style="margin-bottom:8px"><span class="tag ${snapshotLevelClass(level)}">${escapeHtml(String(health).toUpperCase())}</span> ${escapeHtml(model.activeModel||'no active model')}</div>`;
+  html+=`
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value">${fmt(Number(model.effectiveBrier),3)}</div><div class="meta-line">Effective Brier</div></div>
+      <div class="kpi"><div class="kpi-value">${fmt(Number(model.effectiveECE),3)}</div><div class="meta-line">Effective ECE</div></div>
+      <div class="kpi"><div class="kpi-value">${model.calibrated?'yes':'no'}</div><div class="meta-line">Calibration sidecar</div></div>
+    </div>
+  `;
+  html+=`<div class="detail-block"><div><strong>Promotion gates</strong></div><div class="meta-line" style="margin-top:6px">pass ${fmtWhole(gates.filter(g=>g.status==='pass').length)} | watch ${fmtWhole(watch)} | fail ${fmtWhole(failed)}</div>`;
+  if(gates.length){
+    html+=`<div class="pill-row" style="margin-top:8px">${gates.slice(0,6).map(g=>`<span class="tag ${g.status==='pass'?'tag-growing':g.status==='watch'?'tag-nascent':'tag-declining'}">${escapeHtml(g.name)} ${escapeHtml(String(g.value??'n/a'))}</span>`).join('')}</div>`;
+  }
+  if(model.calibration?.postMetrics?.ece!=null || model.calibration?.post_metrics?.ece!=null){
+    const calEce=model.calibration?.postMetrics?.ece??model.calibration?.post_metrics?.ece;
+    html+=`<div class="meta-line" style="margin-top:8px">Temperature calibration active | post-ECE ${fmt(Number(calEce),3)}</div>`;
+  }
+  if(actions.length)html+=`<div class="section-note">${escapeHtml(actions[0])}</div>`;
+  html+='</div>';
   el.innerHTML=html;
 }
 async function loadDataQuality(){
@@ -7313,7 +7442,9 @@ async function loadRegimeTimeline(){
 state.myThemes=normalizeThemeList(lsGet('my-themes'));
 state.mutedThemes=normalizeThemeList(lsGet('muted-themes'));
 state.currentTheme=state.currentTheme||normalizeTheme(lsGet('current-theme')||'');
-themeLastViewed=lsGet('theme-last-viewed')||{};
+themeLastViewed=normalizeThemeRecordMap(lsGet('theme-last-viewed'));
+persistThemeState();
+lsSet('theme-last-viewed',themeLastViewed);
 window.addEventListener('message',(event)=>{
   if(event.origin!==window.location.origin)return;
   const data=event.data||{};
