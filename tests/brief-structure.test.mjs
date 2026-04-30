@@ -145,3 +145,101 @@ test('decorateBriefWithStructure no-op for non-objects', () => {
   assert.equal(decorateBriefWithStructure(undefined), undefined);
   assert.equal(decorateBriefWithStructure('string'), 'string');
 });
+
+test('rich evidence object yields populated evidence.items (S1 fix)', () => {
+  // The legacy buildThemeEvidence emits an object with curatedItems/provenance/
+  // recentArticles/secContext/trend rather than a flat list. The projector
+  // must extract human-readable strings so evidence_coverage > 0 even before
+  // the LLM narrative track lands.
+  const proj = projectBriefStructure({
+    sections: {
+      whatChanged: ['change'],
+      evidence: {
+        provenance: [
+          { type: 'curated_digest', label: 'Reuters: Tariff escalation 2026-04-29' },
+          { type: 'recent_article', label: 'BBG: Cobalt supply tightens' },
+        ],
+        curatedItems: [
+          { title: 'OPEC+ aligns on Q3 production cap', source: 'Bloomberg' },
+        ],
+        recentArticles: [
+          { title: 'Senate releases trade bill draft' },
+        ],
+        trend: { articleCount: 38, vsPreviousPct: 24, lifecycleStage: 'expanding' },
+        evidenceClasses: [
+          { class: 'curated_digest', count: 4 },
+          { class: 'recent_articles', count: 12 },
+        ],
+      },
+    },
+  });
+  assert.ok(proj.briefStructure.evidence.items.length >= 4, `expected ≥4 evidence items, got ${proj.briefStructure.evidence.items.length}`);
+  assert.ok(proj.briefStructure.evidence.classes.length >= 2);
+  // Trend snapshot one-liner should also appear.
+  const hasTrendOneLiner = proj.briefStructure.evidence.items.some((s) => /38 articles/.test(s));
+  assert.ok(hasTrendOneLiner, 'trend snapshot should produce a one-liner');
+});
+
+test('whyMatters object with statements[] is unwrapped', () => {
+  const proj = projectBriefStructure({
+    sections: {
+      whyItMatters: {
+        statements: [
+          { statement: 'SPY fell 2% on the announcement.' },
+          { statement: 'Sector rotation expected.' },
+        ],
+        provenance: [{ label: 'unused' }],
+      },
+    },
+  });
+  assert.equal(proj.briefStructure.whyMatters.length, 2);
+  assert.match(proj.briefStructure.whyMatters[0], /SPY fell/);
+});
+
+test('relatedEntities object with entities[] is unwrapped', () => {
+  // SEC connector emits entities with companyName + entityKey + relationType
+  // and a separate pathways[] with note. Both should surface as related strings.
+  const proj = projectBriefStructure({
+    sections: {
+      relatedEntities: {
+        entities: [
+          { companyName: 'Albemarle Corp', entityKey: 'ALB', relationType: 'beneficiary' },
+          { companyName: 'SQM', entityKey: 'SQM' },
+        ],
+        pathways: [
+          { relationType: 'supplier', note: 'Tantalum exposure to lithium ore restrictions.' },
+        ],
+      },
+      adjacentPathways: {
+        items: [
+          { label: 'Battery cathode supply chain', reason: 'Tier-1 dependency on lithium hydroxide' },
+        ],
+      },
+    },
+  });
+  assert.ok(proj.briefStructure.related.entities.length >= 2, `entities=${JSON.stringify(proj.briefStructure.related.entities)}`);
+  assert.ok(proj.briefStructure.related.pathways.length >= 2, `pathways=${JSON.stringify(proj.briefStructure.related.pathways)}`);
+});
+
+test('rich brief with evidence/whyMatters/related boosts completeness above 0.83', () => {
+  // Plan target: brief_completeness >= 0.95. With all 6 plan-named sections
+  // populated from the legacy rich shape, projection must hit close to 1.
+  const payload = {
+    sections: {
+      whatChanged: ['Spike in tariff rhetoric'],
+      whyItMatters: { statements: [{ statement: 'Manufacturers face cost pass-through' }] },
+      evidence: {
+        curatedItems: [{ title: 'Reuters digest 1' }, { title: 'Reuters digest 2' }],
+        provenance: [{ label: 'BBG: trade desk note' }],
+      },
+      risks: ['Small baseline; treat with caution'],
+      watchpoints: { statements: [{ statement: 'Watch FOMC commentary' }] },
+      relatedEntities: { entities: [{ companyName: 'Caterpillar', entityKey: 'CAT' }] },
+    },
+  };
+  const proj = projectBriefStructure(payload);
+  assert.ok(
+    proj.briefCompleteness >= 5 / 6,
+    `expected completeness ≥ 0.83, got ${proj.briefCompleteness} (missing: ${JSON.stringify(proj.missingSections)})`,
+  );
+});
