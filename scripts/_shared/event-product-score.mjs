@@ -277,3 +277,73 @@ export function classifyEventLane(event = {}) {
   if (productScore < 0.05) return 'noise';
   return 'watch';
 }
+
+/**
+ * One-line rationale for why an event landed in its lane. Used by the
+ * empty-state envelope and the dashboard so noise events can show
+ * "WHY noise" without the full scoreBreakdown rationale array.
+ */
+export function explainEventLane(event = {}) {
+  const lane = classifyEventLane(event);
+  const grade = String(event.bestEvidenceGrade || event.rawEvidenceGrade || '').toUpperCase() || 'none';
+  const promoted = Boolean(event.promotionEligible);
+  const score = Number(event.productScore ?? 0);
+  if (lane === 'validated') {
+    return `Validated: promoted ${grade} grade with productScore ${score.toFixed(2)}.`;
+  }
+  if (lane === 'watch') {
+    if (!promoted && grade !== 'none') {
+      return `Watch: ${grade} evidence but not promoted (likely below control or t-stat threshold). Worth tracking, not yet a confirmed signal.`;
+    }
+    return `Watch: productScore ${score.toFixed(2)} — observable but evidence is thin.`;
+  }
+  // noise
+  if (grade === 'none') {
+    return `Noise: no evidence grade (E0+) yet. Article cluster exists but has no statistical confirmation.`;
+  }
+  return `Noise: productScore ${score.toFixed(3)} below threshold. Likely catch-all theme or stale.`;
+}
+
+/**
+ * Theme-level framing for empty / noise-only theme pages (plan §3 + S4).
+ * Returns:
+ *   bucket  'validated_signals' | 'watch_only' | 'noise_only' | 'no_data'
+ *   message ready-to-render English string explaining what the page is showing
+ *   counts  { validated, watch, noise } over the candidate set
+ */
+export function summarizeThemeFraming({ events = [], laneCounts = {}, themeFilter = null } = {}) {
+  const counts = {
+    validated: Number(laneCounts.validated ?? 0),
+    watch: Number(laneCounts.watch ?? 0),
+    noise: Number(laneCounts.noise ?? 0),
+  };
+  const total = counts.validated + counts.watch + counts.noise;
+  const themeLabel = themeFilter ? `"${themeFilter}"` : 'this view';
+  if (total === 0) {
+    return {
+      bucket: 'no_data',
+      message: `No event candidates for ${themeLabel} in the current window. The aggregator returned zero rows.`,
+      counts,
+    };
+  }
+  if (counts.validated > 0) {
+    return {
+      bucket: 'validated_signals',
+      message: `${counts.validated} validated signal${counts.validated === 1 ? '' : 's'} for ${themeLabel}. ${counts.watch} additional watch item${counts.watch === 1 ? '' : 's'} for context.`,
+      counts,
+    };
+  }
+  if (counts.watch > 0) {
+    return {
+      bucket: 'watch_only',
+      message: `No validated signals for ${themeLabel} yet. ${counts.watch} watch-only item${counts.watch === 1 ? '' : 's'} flagged for monitoring — these have evidence in progress but have not crossed the validation threshold.`,
+      counts,
+    };
+  }
+  // noise-only
+  return {
+    bucket: 'noise_only',
+    message: `No validated or watch signals for ${themeLabel} yet. ${counts.noise} item${counts.noise === 1 ? '' : 's'} are surfaced as noise — they reached the news ingestion floor but have neither evidence grade nor sufficient statistical confirmation. Treat as observation only, not as actionable signals.`,
+    counts,
+  };
+}

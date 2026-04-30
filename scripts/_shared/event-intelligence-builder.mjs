@@ -18,7 +18,12 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { rankByProductScore, classifyEventLane } from './event-product-score.mjs';
+import {
+  rankByProductScore,
+  classifyEventLane,
+  explainEventLane,
+  summarizeThemeFraming,
+} from './event-product-score.mjs';
 
 const HOT_EVENTS_LIMIT = 10;
 const HOT_EVENTS_LOOKBACK_DAYS = 7;
@@ -523,7 +528,14 @@ export async function buildHotEventsPayload(pool, {
     // ordering. Adds productScore + scoreBreakdown + lane to every event so
     // consumers can show the calculation path and split lanes.
     let ranked = rankByProductScore(normalized);
-    let allLanedEvents = ranked.map((ev) => ({ ...ev, lane: classifyEventLane(ev) }));
+    let allLanedEvents = ranked.map((ev) => {
+      const lane = classifyEventLane(ev);
+      const evWithLane = { ...ev, lane };
+      // S-Tier §S4: per-event one-liner explaining why it landed in this
+      // lane. Complements the existing scoreBreakdown.rationale array with
+      // a ready-to-render English sentence for the dashboard.
+      return { ...evWithLane, laneReason: explainEventLane(evWithLane) };
+    });
 
     // S-Tier §2 — optional theme filter for theme-page relevance precision.
     if (themeFilter) {
@@ -563,6 +575,16 @@ export async function buildHotEventsPayload(pool, {
       watch: events.filter((e) => e.lane === 'watch'),
       noise: events.filter((e) => e.lane === 'noise'),
     };
+
+    // S-Tier §S4: theme-level framing explaining what the user is looking
+    // at — "validated signals", "watch only", "noise only", or "no data".
+    // This complements the per-event laneReason and gives the dashboard a
+    // single string to render at the top of a theme page.
+    const themeFraming = summarizeThemeFraming({
+      events,
+      laneCounts,
+      themeFilter,
+    });
 
     // S-Tier §3 — empty-state envelope. When events.length === 0 (either
     // because no candidates matched, or because the lane filter excluded
@@ -661,6 +683,7 @@ export async function buildHotEventsPayload(pool, {
       gradeCounts,
       laneCounts,
       eventsByLane,
+      themeFraming,
       emptyState,
       surgeCount: events.filter((e) => e.isSurge).length,
       events,
