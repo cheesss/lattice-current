@@ -106,6 +106,7 @@ data/hn-backfill-state.json
 data/hn-backfill-state.debug.json
 data/dynamic-rss-backfill-state.json
 data/retrain-state.json
+data/user-prefs.json
 data/failed-proposals.json
 data/verify-e2e-result.json
 data/codex-agent-discover-*.json
@@ -123,6 +124,7 @@ data/runtime-issues/
 data/runtime-logs/
 data/verification-screenshots/
 data/meta-*.calibration.json
+data/meta-*.pt
 .tmp/
 .openclaw/
 

@@ -56,6 +56,7 @@ import {
   VALID_WATCHLIST_STATES,
   VALID_WATCHLIST_ITEM_TYPES,
 } from './_shared/user-watchlist.mjs';
+import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs.mjs';
 import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
@@ -2686,6 +2687,32 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
           { ok: false, error: String(err?.message || err), generatedAt: new Date().toISOString() },
           500,
         );
+      }
+    }
+
+    // ── /api/user-prefs (S-Tier C1) ──
+    // GET /api/user-prefs[?user=]   — read prefs (defaults if absent)
+    // POST /api/user-prefs          — partial merge update
+    // DELETE /api/user-prefs        — reset to defaults
+    if (segments[0] === 'api' && segments[1] === 'user-prefs') {
+      try {
+        const userId = String(body.userId || params.get('user') || 'default').slice(0, 120);
+        if (method === 'GET') {
+          const prefs = await getUserPrefs(userId);
+          return buildJsonResponse({ ok: true, userId, prefs });
+        }
+        if (method === 'POST') {
+          const prefs = await setUserPrefs(userId, body || {});
+          return buildJsonResponse({ ok: true, userId, prefs });
+        }
+        if (method === 'DELETE') {
+          const prefs = await resetUserPrefs(userId);
+          return buildJsonResponse({ ok: true, userId, prefs, reset: true });
+        }
+        return buildJsonResponse({ error: 'unsupported method on user-prefs' }, 405);
+      } catch (err) {
+        logger.warn('user-prefs route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
       }
     }
 
