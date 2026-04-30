@@ -178,3 +178,14 @@ test('rationale array is non-empty for every event', () => {
   assert.ok(Array.isArray(score.rationale));
   assert.ok(score.rationale.length >= 5, 'should collect rationale from each component');
 });
+
+test('rankByProductScore preserves original event metadata', () => {
+  const events = [
+    makeEvent({ id: 7, theme: 'energy-supply-chain', extraField: 'preserved' }),
+  ];
+  const ranked = rankByProductScore(events);
+  assert.equal(ranked[0].id, 7);
+  assert.equal(ranked[0].extraField, 'preserved', 'extra fields must pass through');
+  assert.ok(typeof ranked[0].productScore === 'number');
+  assert.ok(ranked[0].scoreBreakdown);
+});

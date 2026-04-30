@@ -311,7 +311,26 @@ export function normalizeHotEventRow(row = {}) {
   };
 }
 
-export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lookbackDays = HOT_EVENTS_LOOKBACK_DAYS } = {}) {
+const VALID_LANES = ['validated', 'watch', 'noise'];
+
+function normalizeLaneFilter(input) {
+  if (input == null) return null;
+  if (Array.isArray(input)) return input.map((s) => String(s).toLowerCase()).filter((s) => VALID_LANES.includes(s));
+  const tokens = String(input)
+    .toLowerCase()
+    .split(/[,\s]+/)
+    .filter(Boolean);
+  if (tokens.includes('all')) return null;
+  const valid = tokens.filter((t) => VALID_LANES.includes(t));
+  return valid.length ? valid : null;
+}
+
+export async function buildHotEventsPayload(pool, {
+  limit = HOT_EVENTS_LIMIT,
+  lookbackDays = HOT_EVENTS_LOOKBACK_DAYS,
+  laneFilter = null,
+  themeFilter = null,
+} = {}) {
   const client = pool;
   try {
     const haveCanonical = await tableExists(client, 'canonical_events');
@@ -503,18 +522,47 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
     // S-Tier §1 — composite product score replaces Hawkes-temperature-only
     // ordering. Adds productScore + scoreBreakdown + lane to every event so
     // consumers can show the calculation path and split lanes.
-    const ranked = rankByProductScore(normalized).slice(0, safeLimit);
-    const events = ranked.map((ev) => ({ ...ev, lane: classifyEventLane(ev) }));
+    let ranked = rankByProductScore(normalized);
+    let allLanedEvents = ranked.map((ev) => ({ ...ev, lane: classifyEventLane(ev) }));
+
+    // S-Tier §2 — optional theme filter for theme-page relevance precision.
+    if (themeFilter) {
+      const tf = String(themeFilter).toLowerCase();
+      allLanedEvents = allLanedEvents.filter((e) => String(e.theme || '').toLowerCase() === tf);
+    }
+
+    // S-Tier §2 — caller-controlled lane filter. Default behaviour returns
+    // all lanes so consumers can render their own grouping. Pass laneFilter
+    // = ['validated'] to surface only validated, etc. Null/missing/'all'
+    // returns everything.
+    const laneAllowed = normalizeLaneFilter(laneFilter);
+    const filtered = laneAllowed
+      ? allLanedEvents.filter((e) => laneAllowed.includes(e.lane))
+      : allLanedEvents;
+
+    const events = filtered.slice(0, safeLimit);
 
     const gradeCounts = { E4: 0, E3: 0, E2: 0, E1: 0, E0: 0, none: 0 };
     const laneCounts = { validated: 0, watch: 0, noise: 0 };
-    for (const ev of events) {
+    // Aggregate lane counts over ALL ranked candidates (pre-filter) so the
+    // dashboard knows e.g. "0 validated / 17 noise" even when the caller
+    // requested only validated lane.
+    for (const ev of allLanedEvents) {
       const g = ev.bestEvidenceGrade;
       if (g && g in gradeCounts) gradeCounts[g] += 1;
       else gradeCounts.none += 1;
       const lane = ev.lane || 'watch';
       if (lane in laneCounts) laneCounts[lane] += 1;
     }
+
+    // S-Tier §2 — group filtered events by lane for caller convenience.
+    // The plan requires Hot Events split into Validated/Emerging Watch/Noise
+    // visually distinct lanes.
+    const eventsByLane = {
+      validated: events.filter((e) => e.lane === 'validated'),
+      watch: events.filter((e) => e.lane === 'watch'),
+      noise: events.filter((e) => e.lane === 'noise'),
+    };
 
     return {
       ok: true,
@@ -531,9 +579,15 @@ export async function buildHotEventsPayload(pool, { limit = HOT_EVENTS_LIMIT, lo
         components: ['themeRelevance', 'evidenceWeight', 'freshnessWeight', 'sourceCredibility', 'impactWeight', 'duplicatePenalty'],
         note: 'Each event includes productScore (0..1) and scoreBreakdown.components/rationale.',
       },
+      filters: {
+        lane: laneAllowed,
+        theme: themeFilter || null,
+      },
       totalReturned: events.length,
+      totalCandidates: allLanedEvents.length,
       gradeCounts,
       laneCounts,
+      eventsByLane,
       surgeCount: events.filter((e) => e.isSurge).length,
       events,
     };

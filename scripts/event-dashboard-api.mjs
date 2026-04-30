@@ -1326,8 +1326,8 @@ const OPS_DAEMON_STATE_PATH = path.resolve('data', 'daemon-state.json');
 const OPS_ACCUMULATOR_STATE_PATH = path.resolve('data', 'historical', 'accumulator-state.json');
 const OPS_ALERTS_PATH = path.resolve('data', 'alerts.json');
 const OPS_META_MODEL_URL = process.env.META_MODEL_URL || 'http://127.0.0.1:8100';
-const OPS_DAEMON_FRESH_MS = 10 * 60 * 1000;       // 10 min
-const OPS_ACCUMULATOR_FRESH_MS = 30 * 60 * 1000;  // 30 min
+const OPS_DAEMON_FRESH_MS = 30 * 60 * 1000;       // 2x the 15-minute daemon tick
+const OPS_ACCUMULATOR_FRESH_MS = 90 * 60 * 1000;  // accumulator cycles include slow network backfills
 const OPS_HTTP_PROBE_TIMEOUT_MS = 1500;
 const OPS_RECENT_ISSUE_LIMIT = 10;
 
@@ -1371,6 +1371,14 @@ async function loadRecentOpsAlerts(limit = OPS_RECENT_ISSUE_LIMIT) {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed
+      .filter((entry) => {
+        const message = typeof entry?.message === 'string' ? entry.message : '';
+        // Legacy read-only /api/calibration calls used to emit this as a
+        // meta-model critical alert even though it measured sensitivity-matrix
+        // calibration. Keep the raw log on disk, but do not surface it as an
+        // active ops issue.
+        return !(entry?.context?.type === 'model_drift' && message.startsWith('Meta-model calibration drift:'));
+      })
       .slice(-limit)
       .reverse()
       .map((entry) => ({
@@ -1432,6 +1440,7 @@ async function buildOpsStatusPayload(pool) {
     latestEval?.model_version ||
     null;
   const modelLevel = modelSummary.level || 'unknown';
+  const modelHealthStatus = modelSummary.healthStatus || modelLevel;
 
   const freshness = pipelineFreshness
     ? {
@@ -1457,7 +1466,11 @@ async function buildOpsStatusPayload(pool) {
   if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
     summaryNotes.push(`${freshness.featureStaleEventCount} stale feature rows`);
   }
-  if (modelLevel === 'warning') summaryNotes.push('model calibration warning');
+  if (modelLevel === 'warning') {
+    summaryNotes.push(modelSummary.notes?.[0] || 'model health warning');
+  } else if (modelHealthStatus === 'watch') {
+    summaryNotes.push(modelSummary.notes?.[0] || 'model watch: calibrated but monitor next validation fold');
+  }
 
   return {
     ok: true,
@@ -1475,10 +1488,17 @@ async function buildOpsStatusPayload(pool) {
     freshness,
     model: {
       activeModel: activeModelName,
+      healthStatus: modelHealthStatus,
       worstSplitECE: latestEval?.worstEce ?? null,
       worstSplitBrier: latestEval?.worstBrierScore ?? null,
       aggregateBrier: latestEval?.brierScore ?? null,
       aggregateECE: latestEval?.ece ?? null,
+      effectiveBrier: modelSummary.effectiveMetrics?.brier ?? latestEval?.brierScore ?? null,
+      effectiveECE: modelSummary.effectiveMetrics?.ece ?? latestEval?.ece ?? null,
+      calibrated: Boolean(modelSummary.effectiveMetrics?.calibrated),
+      calibration: modelSummary.calibration ?? null,
+      promotionGates: Array.isArray(modelSummary.promotionGates) ? modelSummary.promotionGates : [],
+      recommendedActions: Array.isArray(modelSummary.recommendedActions) ? modelSummary.recommendedActions : [],
       level: modelLevel,
     },
     symbolCoverage: symbolCoverage
@@ -2584,7 +2604,8 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'calibration') {
-      return buildJsonResponse(await computeCalibrationDiagnostic(getPool(), { alertFn: sendAlert }));
+      const emitAlert = params.get('emit_alert') === '1' || params.get('alert') === '1';
+      return buildJsonResponse(await computeCalibrationDiagnostic(getPool(), emitAlert ? { alertFn: sendAlert } : {}));
     }
 
     if (segments[0] === 'api' && segments[1] === 'kpi-summary') {
@@ -2620,9 +2641,15 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     if (segments[0] === 'api' && segments[1] === 'hot-events') {
       try {
+        // S-Tier §2: clients may request a subset of lanes for theme pages
+        // or noise-suppressed home views. lane=all returns everything.
+        const laneParam = params.get('lane');
+        const themeParam = params.get('theme');
         const payload = await buildHotEventsPayload(getPool(), {
           limit: Number(params.get('limit') || 10),
           lookbackDays: Number(params.get('lookback') || 7),
+          laneFilter: laneParam ? laneParam.split(/[,\s]+/) : null,
+          themeFilter: themeParam || null,
         });
         return buildJsonResponse(payload);
       } catch (err) {
