@@ -47,6 +47,14 @@ import {
   newRequestId,
   hashRequestBody,
 } from './_shared/inbox-audit.mjs';
+import {
+  setWatchlistState,
+  getWatchlistEntry,
+  removeWatchlistEntry,
+  listWatchlist,
+  VALID_WATCHLIST_STATES,
+  VALID_WATCHLIST_ITEM_TYPES,
+} from './_shared/user-watchlist.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
   getPendingApprovals,
@@ -3125,6 +3133,133 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         return buildJsonResponse({ ok: true, count: rows.length, entries: rows });
       } catch (err) {
         logger.warn('inbox/audit route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/watchlist (S-Tier §4) ──
+    // Persist user follow / mute / dismiss / snooze state for items that
+    // have no DB-side review queue (e2_signal type, themes, symbols).
+    //
+    //   GET    /api/watchlist[?type=&state=]           list user entries
+    //   GET    /api/watchlist/<type>/<id>              query single entry
+    //   POST   /api/watchlist                          upsert {itemType,itemId,state,snoozeUntil?,note?}
+    //   DELETE /api/watchlist/<type>/<id>              remove entry
+    //
+    // userId comes from body.userId or query.user; defaults to 'default' until
+    // auth lands. Each successful mutation also writes an inbox-audit row with
+    // item_type='e2_signal' (or whatever VALID_WATCHLIST_ITEM_TYPES says).
+    if (segments[0] === 'api' && segments[1] === 'watchlist') {
+      try {
+        const userId = String(body.userId || params.get('user') || 'default').slice(0, 120);
+        const reviewer = String(body.reviewer || 'dashboard-ui').slice(0, 160);
+
+        // GET /api/watchlist (no extra segments) — list mode
+        if (method === 'GET' && !segments[2]) {
+          const rows = await listWatchlist(getPool(), {
+            userId,
+            itemType: params.get('type'),
+            state: params.get('state'),
+            active: params.get('include_expired') !== '1',
+            limit: Number(params.get('limit') || 200),
+          });
+          return buildJsonResponse({ ok: true, count: rows.length, entries: rows });
+        }
+
+        // GET /api/watchlist/<type>/<id> — single lookup
+        if (method === 'GET' && segments[2] && segments[3]) {
+          const row = await getWatchlistEntry(getPool(), {
+            userId,
+            itemType: segments[2],
+            itemId: decodeURIComponent(segments[3]),
+          });
+          return buildJsonResponse({ ok: true, entry: row });
+        }
+
+        // POST /api/watchlist — upsert
+        if (method === 'POST' && !segments[2]) {
+          const requestId = newRequestId();
+          const bodyHash = hashRequestBody(body);
+          const itemType = String(body.itemType || body.item_type || '').toLowerCase();
+          const itemId = String(body.itemId || body.item_id || '').trim();
+          const nextState = body.state ? String(body.state).toLowerCase() : null;
+          const snoozeUntil = body.snoozeUntil || body.snooze_until || null;
+          if (!VALID_WATCHLIST_ITEM_TYPES.has(itemType)) {
+            return buildJsonResponse({
+              error: `invalid itemType — expected one of ${[...VALID_WATCHLIST_ITEM_TYPES].join(', ')}`,
+              audit: { requestId },
+            }, 400);
+          }
+          if (nextState && !VALID_WATCHLIST_STATES.has(nextState)) {
+            return buildJsonResponse({
+              error: `invalid state — expected one of ${[...VALID_WATCHLIST_STATES].join(', ')}`,
+              audit: { requestId },
+            }, 400);
+          }
+          // Capture prev state for the audit transition.
+          const prevRow = await getWatchlistEntry(getPool(), { userId, itemType, itemId });
+          const prevState = prevRow?.state ?? null;
+
+          const result = await setWatchlistState(getPool(), {
+            userId,
+            itemType,
+            itemId,
+            state: nextState,
+            snoozeUntil,
+            note: body.note ? String(body.note) : null,
+          });
+
+          // Audit. Best-effort: failure must not break the user action.
+          try {
+            await recordInboxAction(getPool(), {
+              itemType: VALID_WATCHLIST_ITEM_TYPES.has(itemType) && itemType !== 'e2_signal' ? 'e2_signal' : itemType,
+              itemId,
+              prevState,
+              nextState,
+              decision: nextState,
+              reviewer,
+              requestId,
+              bodyHash,
+              note: body.note ? String(body.note) : null,
+            });
+          } catch (auditErr) {
+            logger.warn('watchlist audit write failed', {
+              itemType,
+              itemId,
+              error: String(auditErr?.message || auditErr),
+            });
+          }
+
+          return buildJsonResponse({ ok: true, entry: result, audit: { requestId } });
+        }
+
+        // DELETE /api/watchlist/<type>/<id>
+        if (method === 'DELETE' && segments[2] && segments[3]) {
+          const requestId = newRequestId();
+          const itemType = String(segments[2]).toLowerCase();
+          const itemId = decodeURIComponent(segments[3]);
+          const prevRow = await getWatchlistEntry(getPool(), { userId, itemType, itemId });
+          const result = await removeWatchlistEntry(getPool(), { userId, itemType, itemId });
+          try {
+            await recordInboxAction(getPool(), {
+              itemType: itemType === 'e2_signal' ? 'e2_signal' : 'e2_signal',
+              itemId,
+              prevState: prevRow?.state ?? null,
+              nextState: null,
+              decision: 'remove',
+              reviewer,
+              requestId,
+              bodyHash: null,
+            });
+          } catch (auditErr) {
+            logger.warn('watchlist audit (delete) write failed', { error: String(auditErr?.message || auditErr) });
+          }
+          return buildJsonResponse({ ok: true, removed: result.removed, audit: { requestId } });
+        }
+
+        return buildJsonResponse({ error: 'unsupported watchlist route' }, 405);
+      } catch (err) {
+        logger.warn('watchlist route failed', { error: String(err?.message || err) });
         return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
       }
     }
