@@ -65,4 +65,88 @@
   --red: var(--red-critical);
   --teal: #67d1c5;
   --blue: var(--blue-info);
+
+  /* ============================================================
+     V3 — Pro-tool design tokens (Palantir/Bloomberg-grade)
+     Source: docs research pass 1 + 2 (refer plan v3 Phase 0).
+     Additive — older tokens above remain so existing inline
+     styles keep rendering until per-surface modules adopt v3.
+     ============================================================ */
+
+  /* Lane (categorical) — Radix dark scales */
+  --v3-lane-validated: #46a758; /* radix grass-9 */
+  --v3-lane-pending:   #ffb224; /* radix amber-9 */
+  --v3-lane-watch:     #00a2c7; /* radix sky-9 */
+  --v3-lane-noise:     #687076; /* radix slate-500 */
+
+  /* Direction (Bloomberg-semantic, deuteranopia-safe).
+     amber here is intentionally NEUTRAL — only data text. Never
+     a sentiment cue. Up = blue, down = red.  */
+  --v3-dir-up:      #3b82f6;
+  --v3-dir-down:    #ef4444;
+  --v3-dir-neutral: #ffa028;
+
+  /* Severity */
+  --v3-sev-critical: #e54d2e; /* radix tomato-9 */
+  --v3-sev-warning:  #ffb224;
+  --v3-sev-info:     #00a2c7;
+  --v3-sev-ok:       #46a758;
+
+  /* Background depth (5 steps, slate-tinted) */
+  --v3-bg-950: #020617;
+  --v3-bg-900: #0f172a;
+  --v3-bg-850: #1e293b;
+  --v3-bg-800: #334155;
+  --v3-bg-750: #475569;
+
+  /* Borders — hairline / soft / strong, slate-tinted */
+  --v3-border-hairline: rgba(148, 163, 184, 0.08);
+  --v3-border-soft:     rgba(148, 163, 184, 0.16);
+  --v3-border-strong:   rgba(148, 163, 184, 0.32);
+  --v3-border-focus:    var(--accent);
+
+  /* Text — luminosity scale (no opacity tricks) */
+  --v3-text-loud: #f1f5f9;
+  --v3-text-base: #cbd5e1;
+  --v3-text-soft: #94a3b8;
+  --v3-text-muted: #64748b;
+
+  /* Evidence ladder — luminosity, not opacity (fixes E0 a11y bug) */
+  --v3-ev-e0: #475569;
+  --v3-ev-e1: #64748b;
+  --v3-ev-e2: #94a3b8;
+  --v3-ev-e3: #4ade80;
+  --v3-ev-e4: #16a34a;
+
+  /* Radius — 3-tier only */
+  --v3-radius-sm: 8px;
+  --v3-radius-md: 12px;
+  --v3-radius-lg: 16px;
+
+  /* Spacing — 4px base */
+  --v3-space-1: 4px;
+  --v3-space-2: 8px;
+  --v3-space-3: 12px;
+  --v3-space-4: 16px;
+  --v3-space-6: 24px;
+  --v3-space-8: 32px;
+
+  /* Freshness pill (Smashing 3-state) */
+  --v3-freshness-live:   var(--v3-sev-ok);
+  --v3-freshness-stale:  var(--v3-sev-warning);
+  --v3-freshness-paused: var(--v3-text-muted);
+
+  /* Motion — Linear-style restraint */
+  --v3-motion-fast:   100ms;
+  --v3-motion-base:   200ms;
+  --v3-motion-slow:   300ms;
+  --v3-ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --v3-ease-in:      cubic-bezier(0.7, 0, 0.84, 0);
+  --v3-ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Numbers — every numeric cell tabular, slashed-zero, mono. */
+.v3-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
 }
