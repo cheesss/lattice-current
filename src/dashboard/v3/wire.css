@@ -1,0 +1,97 @@
+/*
+ * V3 wire — visual overrides layered on top of the inline monolith style.
+ *
+ * Loaded after the inline <style> block via the existing <link> chain, so
+ * cascade order means these rules win for the targeted selectors. The
+ * goal is to fix the audit-flagged opacity bug for E-grade evidence cells
+ * and apply a few token-aware micro-polishes WITHOUT touching the
+ * monolith's inline CSS.
+ */
+
+/* -- E-grade evidence: luminosity-based, not opacity -------------------- */
+/* Audit: `--text-muted` is rgba(255,255,255,.25), so E0 grade text and
+ * E0 row titles were nearly invisible on dark backgrounds. Replace with
+ * the v3 evidence ladder (luminosity-based slate→green scale). */
+.evidence-row.grade-e0 .ev-grade,
+.evidence-row.grade-none .ev-grade {
+  color: var(--v3-ev-e0);
+  border-color: var(--v3-border-soft);
+}
+.evidence-row.grade-e1 .ev-grade {
+  color: var(--v3-ev-e1);
+}
+.evidence-row.grade-e0 .ev-title,
+.evidence-row.grade-none .ev-title {
+  color: var(--v3-ev-e1); /* readable but de-emphasised */
+}
+
+/* The lighter title for E2/3/4 stays as the existing rule says (--text-loud
+ * already maps to slate-100-ish), so no override needed there. */
+
+/* -- Tabular numbers: utility-class enforcement ------------------------- */
+/* Phase 1 ships .v3-num as a utility class. Wire.mjs stamps it onto
+ * .brief-stat-value, .kpi-chip-value, etc. Make absolutely sure the
+ * class wins the cascade (the inline CSS uses `font-feature-settings`
+ * intermittently). */
+.v3-num {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums slashed-zero !important;
+  font-feature-settings: 'tnum', 'zero' !important;
+}
+
+/* -- Pillar sparkline slot --------------------------------------------- */
+/* Inline strip we mount sparklines into — wire.mjs queries
+ * [data-v3-spark-pillar="<key>"] and renders a 80x16 SVG inside. */
+.v3-pillar-spark,
+[data-v3-spark-pillar] {
+  display: inline-block;
+  height: 16px;
+  width: 80px;
+  margin-left: var(--v3-space-2);
+  vertical-align: middle;
+}
+
+/* -- Surface swap fade resilience -------------------------------------- */
+/* Phase 4 animateSurfaceSwap sets opacity:0 on the outgoing surface
+ * before display:none is applied by the page. If the page sets display
+ * synchronously, the fade will be invisible — guard with a transition
+ * that the inline rule can also benefit from. */
+.surface[data-surface] {
+  transition: opacity var(--v3-motion-base) var(--v3-ease-out);
+}
+
+/* -- Inbox optimistic row tints ---------------------------------------- */
+/* Phase 1 already defined .v3-row-accepted/-rejected/-snoozed in
+ * phase1-state.css for stand-alone use. When applied to .inbox-item the
+ * monolith's own padding / border can stomp our tint. Anchor the tint
+ * specifically inside .inbox-item. */
+.inbox-item.v3-row-accepted {
+  background: linear-gradient(90deg, rgba(70, 167, 88, 0.10), transparent 60%);
+  border-left: 2px solid var(--v3-dir-up);
+}
+.inbox-item.v3-row-rejected {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.10), transparent 60%);
+  border-left: 2px solid var(--v3-dir-down);
+}
+.inbox-item.v3-row-snoozed {
+  background: linear-gradient(90deg, rgba(255, 178, 36, 0.08), transparent 60%);
+  border-left: 2px solid var(--v3-dir-neutral);
+  opacity: 0.85;
+}
+
+/* -- Body padding for the ticker bar ----------------------------------- */
+/* When `data-v3-ticker` is set, Phase 2 inserts a 28-32px bar at the
+ * very top of <body>. Keep the rest of the page from sliding under it. */
+body[data-v3-ticker] {
+  padding-top: 32px;
+}
+
+/* -- Cheatsheet open: dim the rest gently ------------------------------ */
+/* Slack-style sidebar should not block clicks but should signal focus
+ * shift. Phase 2 toggles `[data-v3-cheat-open]` on body. */
+body[data-v3-cheat-open] .surface,
+body[data-v3-cheat-open] .surface-nav,
+body[data-v3-cheat-open] #lang-toggle {
+  filter: brightness(0.92);
+  transition: filter var(--v3-motion-base) var(--v3-ease-out);
+}
