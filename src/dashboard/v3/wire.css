@@ -6,7 +6,51 @@
  * goal is to fix the audit-flagged opacity bug for E-grade evidence cells
  * and apply a few token-aware micro-polishes WITHOUT touching the
  * monolith's inline CSS.
+ *
+ * "Fancy" pass: re-maps the legacy token aliases (--accent, --bg-*,
+ * --signal-green, etc.) to the v3 fancy palette, so the monolith's own
+ * inline rules pick up the new colours without any HTML edit. Also adds
+ * frosted-glass on chrome surfaces, glows on validated/critical states,
+ * and aurora-tone gradients on hero cards.
  */
+
+/* ─────────────────────────────────────────────────────────────────
+ *  Legacy token re-routing — turn the whole page fancy at once
+ * ─────────────────────────────────────────────────────────────────
+ *  cascade order: this file is appended via JS at runtime, so its
+ *  :root rules WIN over both tokens.css and the inline <style> block.
+ *  Effect: monolith CSS that reads var(--accent) etc. now resolves to
+ *  the v3 fancy palette automatically. */
+:root {
+  /* Accent: lime-yellow → cyan signature */
+  --accent:        var(--v3-accent);
+  --accent2:       var(--v3-accent-2);
+
+  /* Lane mapping */
+  --signal-green:  var(--v3-lane-validated);
+  --amber-risk:    var(--v3-lane-pending);
+  --red-critical:  var(--v3-sev-critical);
+  --blue-info:     var(--v3-dir-up);
+  --teal:          var(--v3-accent);
+
+  /* Background depth — pull from indigo-tinted scale */
+  --bg-void:     var(--v3-bg-950);
+  --bg-base:     var(--v3-bg-900);
+  --bg-surface:  var(--v3-bg-850);
+  --bg-elevated: var(--v3-bg-800);
+  --bg-overlay:  rgba(13, 15, 31, 0.92);
+
+  /* Border tints (indigo-tinted) */
+  --border-dim:   var(--v3-border-hairline);
+  --border-base:  var(--v3-border-soft);
+  --border-focus: var(--v3-accent-glow);
+
+  /* Text scale — keep luminosity-driven (already accessible) */
+  --text-loud:  var(--v3-text-loud);
+  --text-base:  var(--v3-text-base);
+  --text-soft:  var(--v3-text-soft);
+  --text-muted: var(--v3-text-muted);
+}
 
 /* -- E-grade evidence: luminosity-based, not opacity -------------------- */
 /* Audit: `--text-muted` is rgba(255,255,255,.25), so E0 grade text and
@@ -94,4 +138,197 @@ body[data-v3-cheat-open] .surface-nav,
 body[data-v3-cheat-open] #lang-toggle {
   filter: brightness(0.92);
   transition: filter var(--v3-motion-base) var(--v3-ease-out);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ *  FANCY upgrades — frosted glass, glow, aurora gradients
+ * ─────────────────────────────────────────────────────────────────
+ *  These rules add the high-end visual polish without any HTML
+ *  changes. Each block is scoped to a stable selector and can be
+ *  removed independently if it conflicts with anything. */
+
+/* Ticker bar — frosted glass + cyan accent border */
+.v3-ticker {
+  background: var(--v3-glass-bg);
+  backdrop-filter: var(--v3-glass-blur);
+  -webkit-backdrop-filter: var(--v3-glass-blur);
+  border-bottom: 1px solid var(--v3-border-soft);
+  box-shadow: 0 1px 0 rgba(34, 211, 238, 0.06), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.v3-ticker-cell:not(:last-child) {
+  border-right: 1px solid var(--v3-border-hairline);
+}
+.v3-ticker-label {
+  color: var(--v3-text-soft);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 9.5px;
+}
+.v3-ticker-val {
+  color: var(--v3-text-loud);
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.18);
+}
+
+/* Cheatsheet panel — frosted glass + subtle gradient */
+.v3-cheat-panel {
+  background: var(--v3-glass-bg);
+  backdrop-filter: var(--v3-glass-blur);
+  -webkit-backdrop-filter: var(--v3-glass-blur);
+  border-left: 1px solid var(--v3-border-soft);
+  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.5),
+              -1px 0 0 rgba(167, 139, 250, 0.10);
+}
+.v3-cheat-kbd {
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.20);
+  color: var(--v3-accent);
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.30);
+}
+
+/* Freshness pill — glow on live */
+.v3-fresh-state-live .v3-fresh-dot {
+  background: var(--v3-freshness-live);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.65),
+              0 0 16px rgba(52, 211, 153, 0.30);
+}
+.v3-fresh-state-stale .v3-fresh-dot {
+  background: var(--v3-freshness-stale);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.55);
+}
+
+/* Validated evidence rows — emerald glow trim */
+.evidence-row.grade-e4,
+.evidence-row.grade-e3 {
+  position: relative;
+}
+.evidence-row.grade-e4::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--v3-ev-e4), var(--v3-ev-e3));
+  box-shadow: 0 0 12px var(--v3-ev-e4);
+}
+.evidence-row.grade-e4 .ev-grade {
+  color: var(--v3-ev-e4) !important;
+  text-shadow: 0 0 10px rgba(0, 245, 212, 0.45);
+}
+
+/* Cards — aurora gradient halo on accent cards / cockpit panels */
+.accent-card,
+.decision-cockpit,
+#decision-cockpit .cockpit-panel {
+  background-image: var(--v3-grad-aurora);
+  background-blend-mode: screen;
+}
+.cockpit-panel.selected-proof-panel {
+  border-color: rgba(34, 211, 238, 0.24);
+  box-shadow: var(--v3-glow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Surface nav — active tab gets cyan underline + glow */
+.surface-nav-btn[data-surface].active,
+.surface-nav-btn[aria-current="page"],
+body[data-surface="home"] .surface-nav-btn[data-surface="home"],
+body[data-surface="inbox"] .surface-nav-btn[data-surface="inbox"],
+body[data-surface="investigate"] .surface-nav-btn[data-surface="investigate"],
+body[data-surface="geo"] .surface-nav-btn[data-surface="geo"],
+body[data-surface="ops"] .surface-nav-btn[data-surface="ops"] {
+  color: var(--v3-text-loud);
+  position: relative;
+}
+body[data-surface="home"] .surface-nav-btn[data-surface="home"]::after,
+body[data-surface="inbox"] .surface-nav-btn[data-surface="inbox"]::after,
+body[data-surface="investigate"] .surface-nav-btn[data-surface="investigate"]::after,
+body[data-surface="geo"] .surface-nav-btn[data-surface="geo"]::after,
+body[data-surface="ops"] .surface-nav-btn[data-surface="ops"]::after {
+  content: '';
+  position: absolute;
+  left: 12%; right: 12%; bottom: -4px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--v3-accent), transparent);
+  box-shadow: 0 0 12px var(--v3-accent-glow);
+}
+
+/* Trust strip values — slight cyan glow on tabular numbers */
+.tstrip-value.v3-num {
+  color: var(--v3-text-loud);
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.22);
+}
+
+/* Focus ring — Linear-style cyan halo on interactive elements */
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--v3-accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.18),
+              0 0 18px rgba(34, 211, 238, 0.30) !important;
+}
+
+/* Inbox optimistic — upgrade with glow */
+.inbox-item.v3-row-accepted {
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.14), transparent 70%);
+  border-left: 2px solid var(--v3-lane-validated);
+  box-shadow: inset 0 0 24px rgba(52, 211, 153, 0.06);
+}
+.inbox-item.v3-row-rejected {
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.14), transparent 70%);
+  border-left: 2px solid var(--v3-dir-down);
+  box-shadow: inset 0 0 24px rgba(244, 63, 94, 0.06);
+}
+.inbox-item.v3-row-snoozed {
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.10), transparent 70%);
+  border-left: 2px solid var(--v3-dir-neutral);
+  opacity: 0.78;
+}
+
+/* Critical banner — rose glow */
+.sl-banner.crit,
+.sl-banner-tone-crit,
+.alert-critical {
+  box-shadow: var(--v3-glow-critical), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-color: rgba(251, 113, 133, 0.40) !important;
+}
+
+/* KPI chip values — Bloomberg-amber glow on neutral-direction numbers
+   (matches the Bloomberg-correct semantic: amber = neutral data text). */
+.kpi-chip-value.v3-num {
+  color: var(--v3-dir-neutral);
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.25);
+}
+
+/* Sparkline tweaks inside cards — cyan stroke for default */
+.tstrip-spark path,
+.tstrip-spark polyline,
+.kpi-strip svg polyline {
+  stroke: var(--v3-accent) !important;
+  filter: drop-shadow(0 0 4px var(--v3-accent-glow));
+}
+
+/* Theme spectrum strip — aurora gradient backing */
+#theme-spectrum-strip,
+#lattice-trust-strip,
+#lattice-since-strip {
+  background-image:
+    linear-gradient(180deg, rgba(34, 211, 238, 0.04), transparent),
+    linear-gradient(135deg, rgba(167, 139, 250, 0.05), transparent 50%);
+  border-color: var(--v3-border-soft) !important;
+}
+
+/* Section titles — accent gradient kicker */
+.section-kicker {
+  background: linear-gradient(90deg, var(--v3-accent), var(--v3-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+/* Reduce motion: kill the heavy shadows, keep glow */
+@media (prefers-reduced-motion: reduce) {
+  .v3-ticker, .v3-cheat-panel { backdrop-filter: none; }
 }

@@ -67,56 +67,81 @@
   --blue: var(--blue-info);
 
   /* ============================================================
-     V3 — Pro-tool design tokens (Palantir/Bloomberg-grade)
-     Source: docs research pass 1 + 2 (refer plan v3 Phase 0).
-     Additive — older tokens above remain so existing inline
-     styles keep rendering until per-surface modules adopt v3.
+     V3 — FANCY pro-tool palette (Linear / Palantir / Vercel tone)
+     Source: research pass 1+2 + "fancy" upgrade pass.
+     Indigo-tinted dark base, vivid Linear-saturation lanes,
+     cyan signature accent, violet secondary, glows on accents.
      ============================================================ */
 
-  /* Lane (categorical) — Radix dark scales */
-  --v3-lane-validated: #46a758; /* radix grass-9 */
-  --v3-lane-pending:   #ffb224; /* radix amber-9 */
-  --v3-lane-watch:     #00a2c7; /* radix sky-9 */
-  --v3-lane-noise:     #687076; /* radix slate-500 */
+  /* Lane (categorical) — Tailwind 400-tier saturation, Linear feel */
+  --v3-lane-validated: #34d399; /* emerald-400 — vivid */
+  --v3-lane-pending:   #fbbf24; /* amber-400 */
+  --v3-lane-watch:     #60a5fa; /* blue-400 */
+  --v3-lane-noise:     #64748b; /* slate-500, kept dim */
 
-  /* Direction (Bloomberg-semantic, deuteranopia-safe).
-     amber here is intentionally NEUTRAL — only data text. Never
-     a sentiment cue. Up = blue, down = red.  */
-  --v3-dir-up:      #3b82f6;
-  --v3-dir-down:    #ef4444;
-  --v3-dir-neutral: #ffa028;
+  /* Direction (Bloomberg-semantic, deuteranopia-safe + amped).
+     amber here is NEUTRAL data text only. Up = sky, down = rose. */
+  --v3-dir-up:      #38bdf8; /* sky-400 */
+  --v3-dir-down:    #f43f5e; /* rose-500, hot */
+  --v3-dir-neutral: #fbbf24;
 
-  /* Severity */
-  --v3-sev-critical: #e54d2e; /* radix tomato-9 */
-  --v3-sev-warning:  #ffb224;
-  --v3-sev-info:     #00a2c7;
-  --v3-sev-ok:       #46a758;
+  /* Severity — rosy critical for glow */
+  --v3-sev-critical: #fb7185; /* rose-400 */
+  --v3-sev-warning:  #fbbf24;
+  --v3-sev-info:     #38bdf8;
+  --v3-sev-ok:       #34d399;
 
-  /* Background depth (5 steps, slate-tinted) */
-  --v3-bg-950: #020617;
-  --v3-bg-900: #0f172a;
-  --v3-bg-850: #1e293b;
-  --v3-bg-800: #334155;
-  --v3-bg-750: #475569;
+  /* Background depth (5 steps, indigo-tinted near-black).
+     Cooler than slate, warmer than pure black, hint of premium. */
+  --v3-bg-950: #08081a;
+  --v3-bg-900: #0d0f1f;
+  --v3-bg-850: #15182b;
+  --v3-bg-800: #1f2238;
+  --v3-bg-750: #2a2e47;
 
-  /* Borders — hairline / soft / strong, slate-tinted */
-  --v3-border-hairline: rgba(148, 163, 184, 0.08);
-  --v3-border-soft:     rgba(148, 163, 184, 0.16);
-  --v3-border-strong:   rgba(148, 163, 184, 0.32);
-  --v3-border-focus:    var(--accent);
+  /* Borders — indigo-tinted instead of slate (subtle premium tint) */
+  --v3-border-hairline: rgba(165, 180, 252, 0.08);
+  --v3-border-soft:     rgba(165, 180, 252, 0.16);
+  --v3-border-strong:   rgba(165, 180, 252, 0.32);
+  --v3-border-focus:    var(--v3-accent);
 
-  /* Text — luminosity scale (no opacity tricks) */
-  --v3-text-loud: #f1f5f9;
-  --v3-text-base: #cbd5e1;
-  --v3-text-soft: #94a3b8;
+  /* Text — luminosity scale (cooler tint) */
+  --v3-text-loud:  #f1f5f9;
+  --v3-text-base:  #cbd5e1;
+  --v3-text-soft:  #94a3b8;
   --v3-text-muted: #64748b;
 
-  /* Evidence ladder — luminosity, not opacity (fixes E0 a11y bug) */
+  /* Evidence ladder — luminosity → mint-cyan top (matrix tone) */
   --v3-ev-e0: #475569;
   --v3-ev-e1: #64748b;
   --v3-ev-e2: #94a3b8;
-  --v3-ev-e3: #4ade80;
-  --v3-ev-e4: #16a34a;
+  --v3-ev-e3: #34d399;
+  --v3-ev-e4: #00f5d4; /* mint-cyan, high-conviction */
+
+  /* Signature accents — Palantir cyan + Linear violet + pink */
+  --v3-accent:       #22d3ee; /* cyan-400, primary signature */
+  --v3-accent-glow:  rgba(34, 211, 238, 0.35);
+  --v3-accent-2:     #a78bfa; /* violet-400, secondary */
+  --v3-accent-2-glow: rgba(167, 139, 250, 0.35);
+  --v3-accent-3:     #f472b6; /* pink-400, special-event */
+
+  /* Glows — for selected, validated, critical, focus */
+  --v3-glow-validated: 0 0 20px rgba(52, 211, 153, 0.30);
+  --v3-glow-critical:  0 0 20px rgba(251, 113, 133, 0.35);
+  --v3-glow-accent:    0 0 16px var(--v3-accent-glow);
+  --v3-glow-accent-2:  0 0 16px var(--v3-accent-2-glow);
+  --v3-glow-soft:      0 0 10px rgba(255, 255, 255, 0.06);
+
+  /* Gradients — subtle tile depth */
+  --v3-grad-tile:        linear-gradient(135deg, rgba(34, 211, 238, 0.04), transparent 60%);
+  --v3-grad-validated:   linear-gradient(135deg, rgba(52, 211, 153, 0.08), transparent 60%);
+  --v3-grad-critical:    linear-gradient(135deg, rgba(251, 113, 133, 0.10), transparent 60%);
+  --v3-grad-violet:      linear-gradient(135deg, rgba(167, 139, 250, 0.08), transparent 60%);
+  --v3-grad-aurora:      linear-gradient(135deg, rgba(34, 211, 238, 0.10), rgba(167, 139, 250, 0.08) 50%, rgba(244, 114, 182, 0.06) 100%);
+
+  /* Frosted glass — for ticker / cheatsheet / palette */
+  --v3-glass-bg:   rgba(13, 15, 31, 0.70);
+  --v3-glass-blur: blur(20px) saturate(180%);
 
   /* Radius — 3-tier only */
   --v3-radius-sm: 8px;
