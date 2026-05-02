@@ -1425,8 +1425,15 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
 <script type="module" src="/src/dashboard/sl-banners.mjs"></script>
 <script type="module" src="/src/dashboard/sl-onboarding.mjs"></script>
 <script type="module" src="/src/dashboard/sl-prefs.mjs"></script>
+<!-- V3 pro-tool UI upgrade — Palantir/Bloomberg-grade tokens, freshness pills,
+     ticker bar (opt-in via data-v3-ticker on body), `?` cheatsheet sidebar,
+     Cmd+[/] history stack, motion utilities, and additive surface components
+     (sparkline, treemap, matched-control DAG, lightweight-charts wrapper,
+     Tabulator dense-table wrapper). All four phase modules self-mount on
+     deferUntilIdle and are no-ops on surfaces that don't opt in. -->
+<script type="module" src="/src/dashboard/v3/index.mjs"></script>
 </head>
-<body data-surface="home">
+<body data-surface="home" data-v3-ticker>
 <!-- Language Toggle -->
 <div class="lang-toggle" id="lang-toggle">
   <button class="active" data-lang="en">EN</button>

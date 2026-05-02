@@ -1,0 +1,30 @@
+/*
+ * V3 Phase 4 — Motion utility shared CSS.
+ *
+ * Most motion is JS-driven via the Web Animations API (see
+ * phase4-motion.mjs). This file only carries:
+ *
+ *   1. A shared `v3-shimmer` keyframe so other phases (skeleton loaders,
+ *      pending states) can opt in to a single canonical shimmer instead
+ *      of redefining their own. Phase 1's skeleton loader is already
+ *      self-contained, but exposing the keyframe here lets future
+ *      surfaces consume it without duplication.
+ *
+ *   2. A blanket `prefers-reduced-motion` override that disables CSS
+ *      animations / transitions on any element tagged with `.v3-anim`.
+ *      JS-driven animations honor reduce-motion in `anim()` directly;
+ *      this stylesheet covers the CSS path.
+ */
+
+@keyframes v3-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-anim,
+  .v3-anim * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
