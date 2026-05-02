@@ -48,11 +48,14 @@ import { animateSurfaceSwap, pulseGlow } from './phase4-motion.mjs';
  *  auto-mount picks it up — but we ALSO call mountFreshnessPill directly
  *  with surface-specific labels, so the pill shows useful copy.
  */
+// Real monolith selectors (verified via grep on event-dashboard.html as of
+// 2026-04-30). Each surface lists fallbacks in priority order — the first
+// match wins. Silent no-op when none match.
 const FRESHNESS_TARGETS = [
-  { surface: 'home', selector: '#now-do-card, #signal-scan-card, [data-card="home-hero"]', label: 'home' },
-  { surface: 'inbox', selector: '#inbox-stat-strip, .inbox-meta-bar, [data-card="inbox-hero"]', label: 'inbox' },
-  { surface: 'investigate', selector: '#investigate-curated, [data-card="investigate-hero"]', label: 'investigate' },
-  { surface: 'ops', selector: '#ops-system-health, [data-card="ops-hero"]', label: 'ops' },
+  { surface: 'home', selector: '#decision-cockpit .cockpit-panel:first-child, #hot-events-section .section-heading, #kpi-strip', label: 'home' },
+  { surface: 'inbox', selector: '#decision-inbox .section-heading, #inbox-total-count', label: 'inbox' },
+  { surface: 'investigate', selector: '#period-tabs, #evolution-parent-select', label: 'investigate' },
+  { surface: 'ops', selector: '#lattice-trust-strip, #status-badge', label: 'ops' },
 ];
 
 function wireFreshnessPills() {
@@ -85,6 +88,11 @@ const NUM_SELECTORS = [
   '.kpi-chip-value',
   '.story-rank',
   '.ticker-value',
+  '.tstrip-value',
+  '.since-value',
+  '.since-delta',
+  '.kpi-regime-badge',
+  '.count', // surface-nav counts
   '[data-numeric]',
 ];
 
@@ -93,6 +101,27 @@ function wireNumericCells() {
     document.querySelectorAll(sel).forEach((el) => {
       el.classList.add('v3-num');
     });
+  }
+}
+
+/**
+ * Stamp data-pulse-on-update on cells whose textContent the page rewrites
+ * during refresh ticks. The MutationObserver in wireValuePulse() then
+ * triggers a directional glow whenever the value changes.
+ */
+const PULSE_SELECTORS = [
+  '#kpi-vix', '#kpi-risk', '#kpi-spread', '#kpi-oil', '#kpi-dollar',
+  '#tstrip-data-value', '#tstrip-nowcast-value',
+  '#tstrip-source-value', '#tstrip-meta-value',
+  '#since-inbox', '#since-synd',
+  '#inbox-total-count',
+];
+function wirePulseTargets() {
+  for (const sel of PULSE_SELECTORS) {
+    const el = document.querySelector(sel);
+    if (el && !el.hasAttribute('data-pulse-on-update')) {
+      el.setAttribute('data-pulse-on-update', '');
+    }
   }
 }
 
@@ -239,6 +268,7 @@ deferUntilIdle(() => {
     ensureWireStylesheet();
     wireFreshnessPills();
     wireNumericCells();
+    wirePulseTargets();
     wireOpsSparklines();
     wireInboxOptimistic();
     wireSurfaceSwap();
@@ -251,6 +281,7 @@ deferUntilIdle(() => {
 export {
   wireFreshnessPills,
   wireNumericCells,
+  wirePulseTargets,
   wireOpsSparklines,
   wireInboxOptimistic,
   wireSurfaceSwap,
