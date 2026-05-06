@@ -19,6 +19,7 @@ import {
   resolveSubjectKey,
 } from './report-subject-fidelity.mjs';
 import { applyReportDataDiagnostics } from './report-data-diagnostics.mjs';
+import { loadThemeContext, themeContextToBundleAdditions } from './report-theme-context.mjs';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -202,6 +203,12 @@ export async function buildDbThemeReportBundle(client, input = {}) {
   if (matchStatus === 'subject-bound') {
     matchStatus = classifySubjectMatch({ requested: requestedSubject || themeKey, actual: row.theme });
   }
+  /* P2: load enriched theme context — subtopics, peer symbols, multi-regime
+   * impacts, knowledge graph paths, event timeline. The bundle keeps its
+   * existing shape; the enrichment is appended via metrics/marketReactions/
+   * evidence arrays plus a metadata.themeContext snapshot. */
+  const themeCtx = await loadThemeContext(client, row.theme, { periodType });
+  const themeAdditions = themeContextToBundleAdditions(themeCtx, row.theme);
 
   const articles = await recentThemeArticles(client, row.theme, Number(input.evidenceLimit || 6));
   const evidence = articles.map(articleEvidence);
@@ -237,6 +244,7 @@ export async function buildDbThemeReportBundle(client, input = {}) {
       { metricId: 'MET-THEME-ARTICLES', kind: 'theme_trend', name: 'article_count', value: num(row.article_count), unit: 'articles', window: row.period_type, asOf: iso(row.computed_at) },
       { metricId: 'MET-THEME-SHARE', kind: 'theme_trend', name: 'theme_share_pct', value: num(row.theme_share_pct), unit: 'percent', window: row.period_type, asOf: iso(row.computed_at) },
       { metricId: 'MET-THEME-NOVELTY', kind: 'theme_trend', name: 'novelty_score', value: num(row.novelty_score), unit: 'score', window: row.period_type, asOf: iso(row.computed_at) },
+      ...themeAdditions.metrics,
     ],
     caveats: aggregateEvidenceMismatch ? [{
       caveatId: 'CAV-THEME-AGGREGATE-EVIDENCE-MISMATCH',
@@ -245,20 +253,23 @@ export async function buildDbThemeReportBundle(client, input = {}) {
       text: 'The selected trend aggregate reports no current-period articles while the recent evidence ledger contains articles; distinguish period metrics from latest evidence.',
       appliesToClaimIds: ['CLM-001'],
     }] : [],
-    evidence,
-    marketReactions: marketRows.map((marketRow, index) => ({
-      reactionId: `MRKT-THEME-${row.theme}-${index + 1}`,
-      symbol: marketRow.symbol,
-      benchmark: marketRow.regime || 'regime_baseline',
-      eventWindow: marketRow.horizon,
-      relativeReturnPct: num(marketRow.avg_return),
-      uplift: num(marketRow.regime_multiplier),
-      tStat: num(marketRow.hit_rate),
-      alpha: num(marketRow.avg_return),
-      controls: [`sample_size=${num(marketRow.sample_size)}`],
-      validationStatus: num(marketRow.sample_size) >= 30 ? 'validated' : 'candidate',
-      metadata: marketRow,
-    })),
+    evidence: [...evidence, ...themeAdditions.evidence],
+    marketReactions: [
+      ...marketRows.map((marketRow, index) => ({
+        reactionId: `MRKT-THEME-${row.theme}-${index + 1}`,
+        symbol: marketRow.symbol,
+        benchmark: marketRow.regime || 'regime_baseline',
+        eventWindow: marketRow.horizon,
+        relativeReturnPct: num(marketRow.avg_return),
+        uplift: num(marketRow.regime_multiplier),
+        tStat: num(marketRow.hit_rate),
+        alpha: num(marketRow.avg_return),
+        controls: [`sample_size=${num(marketRow.sample_size)}`],
+        validationStatus: num(marketRow.sample_size) >= 30 ? 'validated' : 'candidate',
+        metadata: marketRow,
+      })),
+      ...themeAdditions.marketReactions,
+    ],
     sourceSummary,
     watchIndicators: [{
       watchId: 'WATCH-DB-THEME-CONFIRMATION',
@@ -270,7 +281,7 @@ export async function buildDbThemeReportBundle(client, input = {}) {
       claimIds: ['CLM-001'],
     }],
     dataFreshness: [{ dataset: 'theme_trend_aggregates', freshnessStatus: freshnessFromTimestamp(row.computed_at, 24), lastUpdatedAt: iso(row.computed_at), slaHours: 24 }],
-    metadata: { dbBacked: true, row },
+    metadata: { dbBacked: true, row, ...(themeAdditions.extension || {}) },
   }));
   attachSubjectFidelity(bundle, {
     requestedSubject: requestedSubject || themeKey,
