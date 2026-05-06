@@ -105,9 +105,9 @@ th{color:var(--muted);font-weight:normal}
 .theme-collapse+ .theme-collapse{margin-top:10px}
 .theme-collapse>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;cursor:pointer;list-style:none;color:var(--text);font-weight:600}
 .theme-collapse>summary::-webkit-details-marker{display:none}
-.theme-collapse>summary::after{content:"+";color:var(--muted);font-family:var(--font-mono);font-size:14px}
+.theme-collapse>summary::after{content:"";width:6px;height:6px;border-right:1px solid var(--muted);border-bottom:1px solid var(--muted);transform:rotate(45deg);opacity:.8}
 .theme-collapse[open]>summary{border-bottom:1px solid var(--border-dim);background:rgba(255,255,255,.025)}
-.theme-collapse[open]>summary::after{content:"-"}
+.theme-collapse[open]>summary::after{transform:rotate(225deg)}
 .theme-compact-list{display:flex;flex-direction:column;gap:0}
 .theme-compact-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border-dim);align-items:start}
 .theme-compact-row:last-child{border-bottom:none}
@@ -152,6 +152,33 @@ th{color:var(--muted);font-weight:normal}
 .brief-section{padding:12px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:rgba(255,255,255,.02)}
 .brief-section-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
 .brief-section-title{color:var(--accent);text-transform:uppercase;letter-spacing:.14em;font-size:10px;margin-bottom:8px}
+/* P0-4: Brief Trust pill — collapses lifecycle / YoY / accel / source-div into ●●●○ */
+.brief-trust-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 10px;margin-top:10px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--border);font-size:11px;position:relative}
+.brief-trust-label-lead{text-transform:uppercase;letter-spacing:.1em;font-size:9.5px;opacity:.6;font-weight:600}
+.brief-trust-dots{display:inline-flex;gap:3px;font-size:13px;line-height:1}
+.brief-trust-dot{display:inline-block;cursor:help}
+.brief-trust-dot-strong{color:#34d399}
+.brief-trust-dot-medium{color:#fbbf24}
+.brief-trust-dot-weak{color:rgba(148,163,184,.55)}
+.brief-trust-details{position:relative}
+.brief-trust-details summary{list-style:none;cursor:pointer;font-size:11px;opacity:.55;padding:0 4px;border-radius:4px}
+.brief-trust-details summary::-webkit-details-marker{display:none}
+.brief-trust-details summary:hover{opacity:.95;background:rgba(255,255,255,.05)}
+.brief-trust-details[open] summary{opacity:.95}
+.brief-trust-popover{position:absolute;top:calc(100% + 6px);left:0;z-index:50;min-width:280px;padding:12px;background:var(--surface2,#1c2028);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:11.5px}
+.brief-trust-row{display:grid;grid-template-columns:18px 1fr auto;gap:8px;padding:4px 0;align-items:baseline}
+.brief-trust-label{opacity:.75}
+.brief-trust-value{font-family:var(--font-mono);font-variant-numeric:tabular-nums slashed-zero;opacity:.9}
+.brief-trust-diagnostics{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+/* P0-4: Demoted Related/Pathways block */
+.brief-secondary-details{margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:0;background:rgba(255,255,255,.02)}
+.brief-secondary-details > summary.brief-secondary-summary{list-style:none;cursor:pointer;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.brief-secondary-details > summary.brief-secondary-summary::-webkit-details-marker{display:none}
+.brief-secondary-details > summary.brief-secondary-summary::before{content:'▸';opacity:.55;display:inline-block;transition:transform .15s ease}
+.brief-secondary-details[open] > summary.brief-secondary-summary::before{transform:rotate(90deg)}
+.brief-secondary-summary .brief-section-title{margin-bottom:0}
+.brief-secondary-preview{flex-basis:100%;font-size:11px;opacity:.6;margin-top:4px}
+.brief-secondary-body{padding:0 14px 14px}
 .brief-item{padding:10px;border:1px solid rgba(255,255,255,.04);border-radius:10px;background:rgba(255,255,255,.02)}
 .brief-item strong{display:block;margin-bottom:4px}
 .brief-item-copy{color:var(--text);font-size:12px}
@@ -222,8 +249,8 @@ th{color:var(--muted);font-weight:normal}
 .surface-drawer>summary{cursor:pointer;list-style:none;padding:16px 18px;color:var(--muted);user-select:none}
 .surface-drawer>summary::-webkit-details-marker{display:none}
 .surface-drawer[open]>summary{color:var(--accent);border-bottom:1px solid rgba(255,255,255,.05)}
-.surface-drawer>summary::after{content:"+";float:right;color:var(--accent)}
-.surface-drawer[open]>summary::after{content:"-"}
+.surface-drawer>summary::after{content:"";float:right;width:6px;height:6px;margin-top:6px;border-right:1px solid var(--accent);border-bottom:1px solid var(--accent);transform:rotate(45deg)}
+.surface-drawer[open]>summary::after{transform:rotate(225deg)}
 @media (max-width:1320px){.hero,.section-heading{flex-direction:column;align-items:flex-start}.hero-actions{min-width:0;align-items:flex-start}.hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.snapshot-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3,.mini-grid,.pyramid-grid,.category-grid,.grid2,.reference-grid,.primary-grid,.kpi-grid,.map-grid{grid-template-columns:1fr}.span-5,.span-7,.span-2{grid-column:span 1}}
 @media (max-width:760px){.container{padding:12px}.hero{padding:16px}h1{font-size:22px}.hero-grid,.snapshot-grid{grid-template-columns:1fr}.story-card{grid-template-columns:1fr}.story-rank{width:34px;height:34px}.embed-frame{height:clamp(520px,66vh,760px)}}
 /* KPI Strip */
@@ -290,6 +317,8 @@ th{color:var(--muted);font-weight:normal}
 .top-decision-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .signal-queue{margin:0}
 .signal-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;max-height:390px;overflow:auto;padding-right:4px}
+.signal-status-note{grid-column:1/-1;padding:9px 11px;border-radius:12px;border:1px solid rgba(22,199,132,.22);background:rgba(22,199,132,.08);color:var(--muted);font-size:11px;line-height:1.45}
+.signal-status-note.warning{border-color:rgba(245,158,11,.28);background:rgba(245,158,11,.08);color:#f8d29a}
 .signal-card{padding:14px;border-radius:14px;background:linear-gradient(145deg,rgba(28,32,40,.72),rgba(13,15,19,.92));border:1px solid var(--border-base);display:flex;flex-direction:column;gap:8px;transition:border-color .15s ease,background .15s ease,transform .15s ease}
 .signal-card:hover{border-color:rgba(22,199,132,.35);transform:translateY(-1px)}
 .signal-card.selected{border-color:rgba(22,199,132,.7);box-shadow:0 0 0 1px rgba(22,199,132,.24),0 18px 40px rgba(0,0,0,.2)}
@@ -361,6 +390,20 @@ th{color:var(--muted);font-weight:normal}
 .inbox-filter-chip{font-size:10px;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.04);color:var(--muted);border:1px solid transparent;cursor:pointer;transition:.15s ease}
 .inbox-filter-chip:hover{background:rgba(255,255,255,.08);color:var(--text)}
 .inbox-filter-chip.active{background:rgba(126,224,129,.15);color:#7ee081;border-color:rgba(126,224,129,.3)}
+/* P1-2: Inbox filter consolidation — single row with segmented + chips + help */
+.inbox-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 4px;margin-bottom:8px}
+.inbox-filter-segmented{display:inline-flex;border:1px solid var(--border);border-radius:8px;padding:2px;background:rgba(255,255,255,.02);gap:0}
+.inbox-filter-seg{font-size:11px;padding:5px 12px;border-radius:6px;background:transparent;color:var(--muted);border:none;cursor:pointer;transition:.15s ease;font-weight:500}
+.inbox-filter-seg:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.inbox-filter-seg.active{background:rgba(126,224,129,.15);color:#7ee081;font-weight:600}
+.inbox-filter-seg .seg-label{margin-right:2px}
+.inbox-filter-chips{display:inline-flex;gap:6px;flex-wrap:wrap}
+.inbox-filter-keyword-overflow{margin-left:auto;font-size:10px;opacity:.65}
+.inbox-filter-keyword-overflow:disabled{opacity:.35}
+.inbox-filter-help{font-size:10px;color:var(--muted);flex-basis:100%;opacity:.65;letter-spacing:.02em}
+/* Hide zero-count badges (only the number — the chip itself stays) */
+.seg-count{font-family:var(--font-mono);font-variant-numeric:tabular-nums;opacity:.7;font-size:9.5px;margin-left:4px}
+.seg-count.is-zero{display:none}
 .inbox-preview{padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;min-height:400px}
 .inbox-preview-empty{color:var(--muted);font-size:12px;text-align:center;padding:60px 20px}
 .inbox-result{margin-top:12px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
@@ -403,8 +446,68 @@ th{color:var(--muted);font-weight:normal}
 .inbox-btn-snooze:hover{background:rgba(148,163,184,.2)}
 .inbox-btn-accept:disabled:hover,.inbox-btn-reject:disabled:hover,.inbox-btn-snooze:disabled:hover{background:initial}
 .inbox-shortcut{display:inline-block;margin-left:6px;padding:1px 5px;border-radius:3px;background:rgba(0,0,0,.3);font-size:9px;color:var(--muted);font-family:monospace}
-.inbox-bulk-bar{display:none;padding:8px 12px;background:rgba(126,224,129,.08);border:1px solid rgba(126,224,129,.2);border-radius:8px;margin-bottom:8px;gap:10px;align-items:center;font-size:11px}
-.inbox-bulk-bar.active{display:flex}
+/* P0-2: verb → destination affordances on inbox buttons */
+.inbox-arrow{display:inline-block;margin:0 3px;opacity:.55;font-size:11px;font-weight:400}
+.inbox-dest{display:inline-block;font-size:10.5px;font-weight:500;opacity:.78;letter-spacing:.04em;text-transform:lowercase}
+.inbox-btn-accept .inbox-dest{color:rgba(126,224,129,.85)}
+.inbox-btn-reject .inbox-dest{color:rgba(239,68,68,.85)}
+.inbox-btn-snooze .inbox-dest{color:rgba(148,163,184,.85)}
+.inbox-bulk-bar{display:none;padding:8px 12px;background:rgba(126,224,129,.08);border:1px solid rgba(126,224,129,.2);border-radius:8px;margin-bottom:8px;gap:10px;align-items:center;font-size:11px;position:relative}
+.inbox-bulk-bar.active{display:flex;flex-wrap:wrap}
+/* P1-3: Bulk dropdown */
+.inbox-bulk-menu{position:relative}
+.inbox-bulk-menu > summary{list-style:none;display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.12);cursor:pointer;font-weight:600;font-size:12px}
+.inbox-bulk-menu > summary::-webkit-details-marker{display:none}
+.inbox-bulk-menu > summary:hover{background:rgba(255,255,255,.1)}
+.inbox-bulk-menu[open] > summary{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22)}
+.inbox-bulk-menu-body{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:280px;padding:8px;background:var(--surface2,#1c2028);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:6px}
+.inbox-bulk-menu-body .inbox-btn{justify-content:flex-start;text-align:left}
+.inbox-bulk-breakdown{font-size:10.5px;opacity:.7;font-family:var(--font-mono);font-variant-numeric:tabular-nums slashed-zero}
+/* P1-5: Investigate drawer tab-row jump links above the two reference drawers */
+.investigate-drawers-tab-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 8px;align-items:center}
+.investigate-drawers-tab{padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;font-weight:500;transition:.15s ease}
+.investigate-drawers-tab:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}
+/* P1-6: Personal Tracking compact chip strip */
+.tracking-chip-strip{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 12px;min-height:32px}
+.tracking-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:999px;background:rgba(126,224,129,.08);border:1px solid rgba(126,224,129,.2);color:#7ee081;font-size:11.5px;cursor:pointer;transition:.15s ease;font-weight:500}
+.tracking-chip:hover{background:rgba(126,224,129,.16);border-color:rgba(126,224,129,.35)}
+.tracking-chip-empty{font-size:11px;opacity:.6}
+.tracking-chip-more{font-size:11px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.04);opacity:.7}
+.tracking-add-details{margin-top:4px;border-top:1px dashed var(--border);padding-top:8px}
+.tracking-add-summary{list-style:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--text);padding:6px 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tracking-add-summary::-webkit-details-marker{display:none}
+.tracking-add-plus{display:inline-block;width:18px;height:18px;line-height:16px;text-align:center;border-radius:50%;background:var(--accent);color:#000;font-weight:700;font-size:13px}
+.tracking-add-details[open] .tracking-add-summary{margin-bottom:8px}
+/* P1-7: Compact since-summary line replaces the multi-pill since strip */
+.lattice-since-strip.is-hidden-strip{display:none !important}
+.lattice-since-summary{display:flex;align-items:center;gap:10px;padding:5px 14px;margin:4px 0 12px;border:1px solid var(--border-dim);border-radius:8px;background:rgba(17,23,15,.32);font-family:var(--font-mono);font-size:10.5px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.lattice-since-summary .since-summary-head{font-family:var(--font-sans);font-size:9.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--text-soft)}
+.lattice-since-summary .since-summary-spacer{flex:1 1 auto}
+.lattice-since-summary #since-summary-text{color:var(--text-base);opacity:.85}
+/* P1-8: Canonical 4-state dot system. The ONLY dot variants allowed on signal cards.
+   States: validated (green) · candidate (amber) · stale (grey) · provisional (violet).
+   Use class .lattice-dot + .lattice-dot-{state} on a span. Hover surfaces the meaning. */
+.lattice-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;vertical-align:baseline;margin-right:5px;cursor:help}
+.lattice-dot-validated{background:#34d399;box-shadow:0 0 6px rgba(52,211,153,.5)}
+.lattice-dot-candidate{background:#fbbf24}
+.lattice-dot-stale{background:rgba(148,163,184,.55)}
+.lattice-dot-provisional{background:#a78bfa;box-shadow:0 0 5px rgba(167,139,250,.4)}
+.lattice-dot-with-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
+.lattice-dot-with-label.state-validated{color:#34d399}
+.lattice-dot-with-label.state-candidate{color:#fbbf24}
+.lattice-dot-with-label.state-stale{color:rgba(148,163,184,.85)}
+.lattice-dot-with-label.state-provisional{color:#a78bfa}
+/* P2-7: First-run modal */
+.lattice-firstrun{padding:0;border:1px solid var(--border);border-radius:14px;background:var(--surface2,#1c2028);color:var(--text);max-width:680px;width:90%}
+.lattice-firstrun::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+.lattice-firstrun .firstrun-head{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 20px;border-bottom:1px solid var(--border)}
+.lattice-firstrun .firstrun-grid{padding:18px 20px;display:grid;grid-template-columns:1fr;gap:12px}
+.lattice-firstrun .firstrun-step{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02);font-size:13px;line-height:1.5}
+.lattice-firstrun .firstrun-step .step-index{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#000;font-weight:700;flex-shrink:0;font-size:12px}
+.lattice-firstrun .firstrun-step kbd{display:inline-block;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.35);border:1px solid var(--border-dim);font-family:var(--font-mono);font-size:10.5px;margin:0 1px}
+.lattice-firstrun .firstrun-foot{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.lattice-firstrun .btn-primary{background:var(--accent);color:#000;font-weight:600;padding:7px 16px;border-radius:8px;border:none;cursor:pointer}
+.lattice-firstrun .btn-primary:hover{filter:brightness(1.08)}
 .inbox-item.multi-selected{border-color:rgba(96,165,250,.45);box-shadow:inset 0 0 0 1px rgba(96,165,250,.25)}
 /* Numbered citations in Theme Brief */
 .cite-num{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 5px;margin:0 2px;border-radius:3px;background:rgba(126,224,129,.12);color:#7ee081;font-size:9px;font-weight:700;text-decoration:none;border:1px solid rgba(126,224,129,.2);vertical-align:middle;cursor:pointer}
@@ -996,6 +1099,20 @@ input:focus-visible{
 .scenario-input .val{text-align:right;font-weight:600;color:var(--text-loud);font-variant-numeric:tabular-nums}
 .scenario-regime{padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;color:var(--accent);font-family:var(--font-sans);border:1px solid var(--c-border-hair)}
 .scenario-predictions{max-height:260px;overflow-y:auto}
+/* P0-5: Scenario lab subtitle + per-slider why hint + no-change explainer */
+.scenario-lab-subtitle{font-size:11px;opacity:.65;margin:4px 0 10px;line-height:1.45}
+.scenario-input{cursor:help}
+.scenario-why{display:inline-block;margin-left:5px;width:13px;height:13px;line-height:13px;text-align:center;border-radius:50%;background:rgba(255,255,255,.08);font-size:9px;opacity:.55;cursor:help}
+.scenario-input:hover .scenario-why{opacity:.95;background:var(--accent);color:#000}
+.scenario-empty-explainer{padding:10px 12px;margin-top:6px;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:8px;font-size:12px}
+/* P0-6: Ops legacy monitoring feeds — collapsed by default. */
+.ops-legacy-feeds{margin-top:12px;border:1px dashed var(--border);border-radius:10px;padding:0}
+.ops-legacy-summary{list-style:none;cursor:pointer;padding:14px 16px;display:block}
+.ops-legacy-summary::-webkit-details-marker{display:none}
+.ops-legacy-summary::before{content:'▸';display:inline-block;margin-right:8px;opacity:.55;transition:transform .15s ease}
+.ops-legacy-feeds[open] > .ops-legacy-summary::before{transform:rotate(90deg)}
+.ops-legacy-feeds > .grid3{padding:0 16px}
+.ops-legacy-feeds[open] > .grid3:last-child{padding-bottom:16px}
 .scenario-pred-row{display:grid;grid-template-columns:minmax(0,1.2fr) 50px 60px 60px 40px;gap:8px;padding:4px 6px;border-bottom:1px dotted var(--c-border-hair);font-size:10.5px;font-variant-numeric:tabular-nums}
 .scenario-pred-row .theme{color:var(--text-base);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scenario-pred-row .sym{color:var(--text-loud);font-weight:600}
@@ -1205,11 +1322,259 @@ input:focus-visible{
 body:not([data-surface="home"]) .hero,
 body:not([data-surface="home"]) .home-orientation,
 body:not([data-surface="home"]) .decision-cockpit,
+body:not([data-surface="home"]) .lattice-trust-strip,
 body:not([data-surface="home"]) .lattice-since-strip,
 body:not([data-surface="home"]) .theme-spectrum-strip,
 body:not([data-surface="home"]) .hotkey-hint{
   display:none!important;
 }
+
+/* Analyst-mode declutter: keep default surfaces decision-first, move
+   operator/tutorial detail behind explicit help or diagnostics drawers. */
+body .hotkey-hint{display:none!important}
+.home-orientation,
+.hero-grid.hero-grid-summary{display:none!important}
+.hero-grid.hero-grid-summary .onboarding-repeat{display:none}
+.surface-context-actions .shortcut-chip:not(.help-only){display:none}
+.kpi-detail-drawer{display:none}
+.decision-cockpit-header{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:10px;
+  padding-bottom:9px;
+  border-bottom:1px solid var(--c-border-hair);
+}
+.decision-cockpit-header .eyebrow{
+  color:var(--text-soft);
+  font-size:10px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.decision-cockpit-header .title{
+  color:var(--text-loud);
+  font-size:18px;
+  font-weight:720;
+  letter-spacing:-.02em;
+}
+.decision-cockpit-header .copy{
+  color:var(--text-soft);
+  font-size:12px;
+  max-width:520px;
+  line-height:1.45;
+}
+.decision-cockpit-header .right-note{
+  color:var(--text-muted);
+  font-size:11px;
+  text-align:right;
+  max-width:360px;
+}
+.home-priority-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:12px;
+  align-items:start;
+}
+.home-priority-grid .section-block{
+  margin-top:0;
+  min-height:100%;
+}
+.home-reference-drawer{
+  margin-top:14px;
+  border:1px solid var(--c-border-hair);
+  border-radius:16px;
+  background:rgba(255,255,255,.018);
+  overflow:hidden;
+}
+.home-reference-drawer > summary{
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  color:var(--text-base);
+  font-size:12px;
+  font-weight:650;
+  letter-spacing:.02em;
+  list-style:none;
+}
+.home-reference-drawer > summary::-webkit-details-marker{display:none}
+.home-reference-drawer > summary::after{
+  content:"Open";
+  color:var(--text-muted);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.home-reference-drawer[open] > summary::after{content:"Close"}
+.home-reference-copy{
+  color:var(--text-soft);
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:0;
+}
+.home-reference-body{
+  padding:0 12px 14px;
+  border-top:1px solid var(--c-border-hair);
+}
+.home-reference-body .section-block{
+  margin-top:12px;
+}
+.home-reference-body .section-block:first-child{
+  margin-top:14px;
+}
+.home-reference-body .ux-section-primary,
+.home-reference-body .ux-section-secondary,
+.home-reference-body .ux-section-tertiary{
+  box-shadow:none;
+}
+.investigate-brief-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(360px,.65fr);
+  gap:12px;
+  align-items:start;
+}
+/* P1-4: 3-column variant for Theme Brief · Current Regime · Scenario Lab */
+.investigate-brief-grid-3col{
+  grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr) minmax(280px,1fr);
+}
+@media (max-width:1440px){
+  .investigate-brief-grid-3col{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);}
+  .investigate-brief-grid-3col > .investigate-scenario-card{grid-column:1/-1}
+}
+@media (max-width:1100px){
+  .investigate-brief-grid-3col{grid-template-columns:1fr;}
+  .investigate-brief-grid-3col > .investigate-scenario-card{grid-column:auto}
+}
+.investigate-brief-card #investigate-theme-brief{
+  max-height:680px;
+  overflow:auto;
+  padding-right:4px;
+}
+.investigate-brief-card .brief-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.investigate-regime-card{
+  position:sticky;
+  top:72px;
+}
+.investigate-reference-drawer{
+  margin-top:14px;
+  border:1px solid var(--c-border-hair);
+  border-radius:16px;
+  background:rgba(255,255,255,.018);
+  overflow:hidden;
+}
+.investigate-reference-drawer > summary{
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  color:var(--text-base);
+  font-size:12px;
+  font-weight:650;
+  letter-spacing:.02em;
+  list-style:none;
+}
+.investigate-reference-drawer > summary::-webkit-details-marker{display:none}
+.investigate-reference-drawer > summary::after{
+  content:"Open";
+  color:var(--text-muted);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.investigate-reference-drawer[open] > summary::after{content:"Close"}
+.investigate-reference-copy{
+  color:var(--text-soft);
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:0;
+}
+.investigate-reference-body{
+  padding:0 12px 14px;
+  border-top:1px solid var(--c-border-hair);
+}
+.investigate-reference-body .section-block{
+  margin-top:12px;
+}
+.investigate-reference-body .section-block:first-child,
+.investigate-reference-body > .surface-drawer:first-child{
+  margin-top:14px;
+}
+.diagnostic-details{
+  margin-top:8px;
+  border-top:1px solid var(--c-border-hair);
+  padding-top:7px;
+}
+.diagnostic-details summary{
+  cursor:pointer;
+  color:var(--text-soft);
+  font-size:11px;
+  letter-spacing:.02em;
+}
+.diagnostic-details[open] summary{color:var(--text-base)}
+.cross-theme-card .delta-kpi-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cross-theme-card > .meta-line,
+.cross-theme-card > .warning-note,
+.cross-theme-card > .info-note.inline-help{display:none}
+#cross-theme-connectors > .snapshot-grid{display:none}
+/* P0-3: Cross-theme card front simplification.
+   Front: claim + lane chip + score + evidence count + 1 primary button.
+   Details (collapsed): novelty / seed-sim / pathway / diagnostics / secondary actions. */
+.xtc-card{padding:12px 14px}
+.xtc-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.xtc-claim{flex:1;min-width:0}
+.xtc-claim strong{display:block;font-size:14px;line-height:1.35;margin-bottom:2px}
+.xtc-pair{font-size:11px;opacity:.62}
+.xtc-meta{display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0}
+.xtc-lane{font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.06);font-weight:500}
+.xtc-lane.lane-validated{background:rgba(52,211,153,.14);color:#34d399}
+.xtc-lane.lane-exploration,.xtc-lane.lane-research{background:rgba(96,165,250,.14);color:#60a5fa}
+.xtc-lane.lane-needs_evidence,.xtc-lane.lane-needs-evidence{background:rgba(251,191,36,.14);color:#fbbf24}
+.xtc-lane.lane-noise{background:rgba(100,116,139,.16);color:#94a3b8}
+.xtc-score{font-size:11px;font-family:var(--font-mono);font-variant-numeric:tabular-nums slashed-zero;opacity:.78;cursor:help}
+.xtc-reason{margin-top:8px;font-size:13px;line-height:1.45}
+.xtc-evidence-line{margin-top:8px;font-size:11px;opacity:.7;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.xtc-sep{opacity:.45}
+.xtc-status{text-transform:uppercase;letter-spacing:.04em;font-size:9.5px;opacity:.85}
+.xtc-actions{margin-top:10px}
+.xtc-actions .xtc-primary{font-weight:600}
+.xtc-details{margin-top:10px}
+.xtc-details summary{font-size:11px;opacity:.65;cursor:pointer;padding:4px 0}
+.xtc-details summary:hover{opacity:.95}
+.xtc-details[open] summary{opacity:.85}
+.xtc-secondary-actions .btn{font-size:11px;padding:4px 9px}
+#curated-items > .stale-badge{display:none}
+.research-os-compact{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  margin-bottom:10px;
+  border:1px solid var(--c-border-hair);
+  border-radius:12px;
+  background:rgba(0,0,0,.32);
+}
+.research-os-compact .primary{color:var(--text-loud);font-weight:650}
+.research-os-compact .secondary{color:var(--text-soft);font-size:11px}
+.research-os-compact.warn{border-color:rgba(245,158,11,.24);background:rgba(245,158,11,.06)}
+.internal-copy{display:none}
+.evidence-chain-tooltip .chain-step::before{
+  content:""!important;
+  left:-10px;
+  top:.6em;
+  width:4px;
+  height:4px;
+  border-radius:999px;
+  background:var(--text-muted);
+  opacity:.65;
+}
+#ai-lab-section .section-title::before{content:""!important}
 
 body:not([data-surface="home"]) .surface-nav{
   margin-top:0;
@@ -1409,6 +1774,13 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
 @media (max-width:1179px){
   .surface-context-bar{display:none!important}
   .home-orientation{grid-template-columns:1fr 1fr}
+  .decision-cockpit-header,
+  .home-priority-grid,
+  .investigate-brief-grid{grid-template-columns:1fr;display:grid}
+  .decision-cockpit-header .right-note{text-align:left;max-width:none}
+  .investigate-regime-card{position:static}
+  .home-reference-drawer > summary,
+  .investigate-reference-drawer > summary{display:grid}
 }
 @media (max-width:760px){
   .home-orientation{grid-template-columns:1fr}
@@ -1433,7 +1805,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
      deferUntilIdle and are no-ops on surfaces that don't opt in. -->
 <script type="module" src="/src/dashboard/v3/index.mjs"></script>
 </head>
-<body data-surface="home" data-v3-ticker>
+<body data-surface="home">
 <!-- Language Toggle -->
 <div class="lang-toggle" id="lang-toggle">
   <button class="active" data-lang="en">EN</button>
@@ -1461,7 +1833,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
     <div>
       <div class="eyebrow">Theme-Led Signal Intelligence</div>
       <h1>LATTICE SIGNAL INTELLIGENCE</h1>
-      <div class="subtitle">The theme shell is now the primary product surface. Live signals, 2D geo context, Codex proposals, approvals, validation, and operator diagnostics are all reviewed from here instead of a separate legacy main page.</div>
+      <div class="subtitle">Theme-led signals, cross-theme research, and evidence-backed briefs are reviewed from one decision surface. Operational diagnostics stay available in Ops when needed.</div>
     </div>
     <div class="hero-actions">
       <button class="command-launch" type="button" onclick="openCommandPalette()" data-lattice-tip="Open a single navigation and action search. Use it when the screen feels dense or you do not know where a function lives.">
@@ -1498,7 +1870,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       <span class="shortcut-chip"><kbd>J</kbd><kbd>K</kbd> move</span>
       <span class="shortcut-chip"><kbd>Space</kbd> peek</span>
       <span class="shortcut-chip"><kbd>E</kbd> explain</span>
-      <span class="shortcut-chip"><kbd>?</kbd> help</span>
+      <span class="shortcut-chip help-only"><kbd>?</kbd> shortcuts</span>
     </div>
   </div>
 
@@ -1527,8 +1899,11 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
     </a>
   </div>
 
-  <!-- Since You Last Looked: delta vs last visit (localStorage) -->
-  <div class="lattice-since-strip" id="lattice-since-strip" role="status" aria-label="Change since last visit">
+  <!-- P1-7: Since Strip absorbed into Trust Strip pillar tooltips.
+       Element kept hidden so existing JS (loadSinceSnapshot / updateSinceStrip)
+       continues writing values without errors. A compact summary line below
+       summarises deltas for users who still want a single-row delta scan. -->
+  <div class="lattice-since-strip is-hidden-strip" id="lattice-since-strip" role="status" aria-label="Change since last visit" hidden>
     <span class="since-head">SINCE</span>
     <span class="since-ago" id="since-ago">first visit</span>
     <div class="since-item" data-since="articles24h"><span class="since-label">articles 24h</span><span class="since-value" id="since-articles24h">—</span><span class="since-delta zero" id="since-articles24h-delta">Δ—</span></div>
@@ -1537,6 +1912,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
     <div class="since-item" data-since="synd"><span class="since-label">synd%</span><span class="since-value" id="since-synd">—</span><span class="since-delta zero" id="since-synd-delta">Δ—</span></div>
     <button class="since-reset" onclick="resetSinceSnapshot()" title="Reset baseline to now">reset</button>
   </div>
+  <div class="lattice-since-summary" id="lattice-since-summary" role="status" aria-label="Compact since-summary"><span class="since-summary-head">since last look</span><span id="since-summary-text" class="meta-line">—</span><span class="since-summary-spacer"></span><button class="since-reset" onclick="resetSinceSnapshot()" title="Reset baseline to now">reset</button></div>
 
   <!-- Theme Spectrum Strip: one-line hottest-theme scan with lifecycle direction -->
   <div class="theme-spectrum-strip" id="theme-spectrum-strip" role="status" aria-label="Hottest themes today">
@@ -1580,8 +1956,16 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
   </section>
 
   <section class="decision-cockpit" id="decision-cockpit" aria-label="Alert proof action cockpit">
+    <div class="decision-cockpit-header">
+      <div>
+        <div class="eyebrow">Today's Decisions</div>
+        <div class="title">Validated signals first</div>
+      </div>
+      <div class="copy">Start here: review quality-gated E2 signals, inspect the proof panel, then move into Inbox or Investigate only when the signal needs action.</div>
+      <div class="right-note">Secondary tables and operations detail are now collapsed below the primary workflow.</div>
+    </div>
     <div class="regime-strip">
-      <div class="regime-strip-title">Regime Strip</div>
+      <div class="regime-strip-title">Regime Context</div>
       <div class="kpi-strip" id="kpi-strip">
         <div class="kpi-chip" title="CBOE Volatility Index"><span class="kpi-chip-label">VIX</span><span class="kpi-chip-value" id="kpi-vix">--</span><svg id="kpi-vix-spark" width="50" height="16"></svg></div>
         <div class="kpi-chip" title="Composite risk gauge (4-100)"><span class="kpi-chip-label">Risk</span><span class="kpi-chip-value" id="kpi-risk">--</span><div class="kpi-gauge-bar"><div class="kpi-gauge-fill" id="kpi-risk-fill"></div></div></div>
@@ -1601,15 +1985,15 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       <div class="cockpit-panel action-signal-panel">
         <div id="e2-signal-queue" class="signal-queue">
           <div class="card-title" style="margin-bottom:8px">Actionable Signals <span class="badge" id="e2-queue-count">0</span> <span style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:normal">Click a card for proof | <a href="#inbox" onclick="switchSurface('inbox');return false;" style="color:var(--accent)">Open Decision Inbox</a></span></div>
-          <div id="e2-signal-cards" class="signal-card-grid"><div class="meta-line">Loading E2 signal queue...</div></div>
+          <div id="e2-signal-cards" class="signal-card-grid"><div class="meta-line">No validated signals yet. Validated E2 picks (post-hoc, statistically significant) will appear here.</div></div>
         </div>
       </div>
       <div class="cockpit-panel selected-proof-panel" id="selected-proof-card">
         <div class="cockpit-title-row">
-          <div class="cockpit-kicker">Selected Review Item</div>
+          <div class="cockpit-kicker">Evidence Preview</div>
           <span class="badge">evidence chain</span>
         </div>
-        <div class="proof-title">Select an actionable signal or inbox item.</div>
+        <div class="proof-title">Click an E2 signal or inbox item to load proof, citations, and freshness here.</div>
         <div class="proof-meta">This panel summarizes direction, uplift, t-stat, controls, citations, and freshness without opening the full dossier.</div>
       </div>
     </div>
@@ -1622,9 +2006,65 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
   <div class="hero-grid hero-grid-summary">
     <div class="card accent-card"><div class="card-title">Dashboard State <span class="badge" id="status-badge">-</span></div><div class="desc-text" data-i18n="status-desc">System health: API connections, data pipeline status, and collection freshness. Green = all systems operational.</div><div id="system-status" class="loading">Loading system state...</div></div>
     <div class="card"><div class="card-title">Horizon Focus <span class="badge" id="current-period-badge">Quarterly</span></div><div class="desc-text" data-i18n="horizon-desc">Current analysis time window. Weekly = fast-moving signals. Monthly = confirmed trends. Quarterly = structural shifts.</div><div id="horizon-summary" class="loading">Preparing horizon focus...</div></div>
-    <div class="card"><div class="card-title">How To Use This Dashboard <span class="badge">Start here</span></div><div class="step-list"><div class="step-item"><span class="step-index">1</span>Review <strong>Actionable Signals</strong> above for the highest-priority E2 items.</div><div class="step-item"><span class="step-index">2</span>Process pending work in <strong>Decision Inbox</strong> to accept, reject, or triage items.</div><div class="step-item"><span class="step-index">3</span>Drill into a theme via <strong>Investigate</strong> for evidence, citations, and related entities.</div></div></div>
+    <!-- P2-7: "How To Use This Dashboard" card removed; replaced by first-run modal + F key. -->
   </div>
 
+  <div class="home-priority-grid" aria-label="Primary home workflow">
+  <section class="section-block ux-section-primary" id="tracked-targets-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">My Tracking</div><div class="section-title">Private list <span class="badge" id="tracked-targets-badge">0 active</span></div></div>
+      <div class="section-meta">Private operator layer. Targets are pinned and backfilled, but never promoted to canonical themes without review. Stays local to you.</div>
+    </div>
+    <!-- P1-6: Compact chip strip above the form. Click chip = filter; right-click = remove menu. -->
+    <div class="tracking-chip-strip" id="tracked-targets-chips" aria-label="Tracked targets">
+      <span class="meta-line" style="opacity:.55;font-size:11px">loading...</span>
+    </div>
+    <details class="tracking-add-details">
+      <summary class="tracking-add-summary"><span class="tracking-add-plus">+</span> Add tracking target <span class="meta-line" style="font-size:10.5px;opacity:.6">— keyword, symbol, company, or theme candidate</span></summary>
+    <div class="grid2">
+      <div class="card tint-teal">
+        <div class="card-title">Add Tracking Target <span class="badge">private</span></div>
+        <div class="meta-line" style="margin-bottom:8px">Examples: Linde cryogenic cooling, LIN, liquid hydrogen, rocket fuel.</div>
+        <div style="display:grid;grid-template-columns:1fr 140px 120px;gap:8px;margin-bottom:8px">
+          <input class="note-input" id="tracking-label-input" placeholder="Label: Linde cryogenic cooling" autocomplete="off">
+          <select id="tracking-type-input"><option value="keyword">Keyword</option><option value="symbol">Symbol</option><option value="company">Company</option><option value="theme_candidate">Theme candidate</option></select>
+          <select id="tracking-priority-input"><option value="high">High</option><option value="normal" selected>Normal</option><option value="low">Low</option></select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 220px;gap:8px;margin-bottom:8px">
+          <input class="note-input" id="tracking-aliases-input" placeholder="Aliases: cryogenic cooling, liquid hydrogen, rocket fuel" autocomplete="off">
+          <input class="note-input" id="tracking-symbols-input" placeholder="Symbols: LIN" autocomplete="off">
+        </div>
+        <div class="theme-actions" style="align-items:center">
+          <label class="select-label"><input type="checkbox" id="tracking-pin-input" checked> Pin to Home</label>
+          <label class="select-label">Backfill <select id="tracking-backfill-input"><option value="30">30d</option><option value="180" selected>180d</option><option value="365">1y</option><option value="0">none</option></select></label>
+          <button class="btn" onclick="createTrackedTarget()">Track</button>
+          <button class="btn" onclick="loadTrackedTargets()">Reload</button>
+          <span id="tracking-form-status" class="meta-line"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Detail view <span class="badge">isolated</span></div>
+        <div id="tracked-targets" class="loading" data-skeleton="list">The full target list (with backfill state, hits, and quality flags) renders here. Compact chips above are the primary view.</div>
+      </div>
+    </div>
+    </details>
+  </section>
+
+  <section class="section-block ux-section-primary tint-cold" id="cross-theme-connectors-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Cross-Theme Research</div><div class="section-title">Hidden Bottlenecks <span class="badge" id="cross-theme-connectors-badge">loading</span></div></div>
+      <div class="section-meta">Autonomous research questions connect themes to components, materials, suppliers, and evidence. These are candidates until reviewed.</div>
+    </div>
+    <div id="cross-theme-connectors" class="loading" data-skeleton="list">No new cross-theme links since last refresh. New non-obvious connections between themes will surface here.</div>
+  </section>
+  </div>
+
+  <details class="home-reference-drawer" id="home-reference-drawer">
+    <summary onclick="event.preventDefault(); this.parentElement.open = !this.parentElement.open;" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.parentElement.open = !this.parentElement.open;}" title="P1-1: Hot events, evidence chain, structural alerts, lifecycle transitions, and workspace folded into a single drawer. Closed by default — open only when the cockpit + cross-theme view above isn't enough.">
+      Reference: hot events · evidence chain · alerts · lifecycle · workspace
+      <span class="home-reference-copy">Closed by default. Open only when the Cockpit + Cross-Theme view above isn't enough — for raw rows, geo/transmission, workspace detail, or lifecycle transitions.</span>
+    </summary>
+    <div class="home-reference-body">
   <section class="section-block ux-section-primary" id="hot-events-section">
     <div class="section-heading">
       <div><div class="section-kicker">Scan Row</div><div class="section-title">Hot Events <span class="badge" id="hot-events-badge">loading</span></div></div>
@@ -1730,26 +2170,13 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
           <div id="approval-queue" class="loading" data-skeleton="list">loading approval queue</div>
         </div>
       </div>
-      <!-- Secondary snapshot grid: 4 context cards (Geo/Transmission/Investment moved to GOLD Strip above) -->
-      <div class="snapshot-grid secondary-snapshot-grid">
-        <div class="card tint-warm">
-          <div class="card-title">Risk Snapshot <span class="badge" id="risk-snapshot-badge">Field</span></div>
-          <div id="risk-snapshot" class="loading" data-skeleton="card">loading risk snapshot</div>
-        </div>
-        <div class="card tint-cold">
-          <div class="card-title">Macro Snapshot <span class="badge" id="macro-snapshot-badge">Signals</span></div>
-          <div id="macro-snapshot" class="loading" data-skeleton="kpi">loading macro snapshot</div>
-        </div>
-        <div class="card">
-          <div class="card-title">Validation Snapshot <span class="badge" id="validation-snapshot-badge">Replay</span></div>
-          <div id="validation-snapshot" class="loading" data-skeleton="card">loading validation snapshot</div>
-        </div>
-        <div class="card tint-cold">
-          <div class="card-title">Source Ops Snapshot <span class="badge" id="source-ops-snapshot-badge">Feeds</span></div>
-          <div id="source-ops-snapshot" class="loading" data-skeleton="card">loading source ops</div>
-        </div>
-      </div>
+      <!-- Risk/Macro/Validation/Source-Ops Snapshot cards removed (P0-1):
+           duplicates of Trust Strip (data/nowcast/source/meta) and Regime Strip.
+           Original render functions still exist in JS but are no longer called from Home. -->
+
     </section>
+    </div>
+  </details>
 
   </div><!-- /surface: home -->
 
@@ -1757,27 +2184,43 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
   <!-- SURFACE 2: DECISION INBOX ??unified review queue                     -->
   <!-- ??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??-->
   <div class="surface" data-surface="inbox">
+    <!-- P1-3: Bulk operations folded into a Bulk… ▾ menu with per-type preview.
+         Bar still appears only when items are selected (bulk-bar.active). The
+         menu shows a per-type breakdown so the operator sees what 'Accept all'
+         actually does before committing. Keyboard: B opens the menu. -->
     <div class="inbox-bulk-bar" id="inbox-bulk-bar">
       <span id="inbox-bulk-count">0 selected</span>
-      <button class="inbox-btn inbox-btn-accept" id="inbox-bulk-accept" onclick="inboxBulkAction('accept')" disabled>Accept All <span class="inbox-shortcut">A</span></button>
-      <button class="inbox-btn inbox-btn-reject" id="inbox-bulk-reject" onclick="inboxBulkAction('reject')" disabled>Reject All <span class="inbox-shortcut">R</span></button>
-      <button class="inbox-btn inbox-btn-snooze" id="inbox-bulk-snooze" onclick="inboxBulkAction('snooze')" disabled>Snooze All <span class="inbox-shortcut">S</span></button>
-      <button class="inbox-btn" id="inbox-bulk-simulate" onclick="inboxBulkSimulate()" disabled title="Dry-run accept decisions for all selected approval items (no state change)">Simulate All <span class="inbox-shortcut">⇧S</span></button>
-      <button class="inbox-btn" id="inbox-bulk-clear" style="margin-left:auto" onclick="inboxClearSelection()" disabled>Clear</button>
+      <span class="inbox-bulk-breakdown meta-line" id="inbox-bulk-breakdown" style="font-size:10.5px;opacity:.7"></span>
+      <details class="inbox-bulk-menu" id="inbox-bulk-menu">
+        <summary class="inbox-btn" tabindex="0" id="inbox-bulk-menu-summary">Bulk… <span class="inbox-arrow">▾</span> <span class="inbox-shortcut">B</span></summary>
+        <div class="inbox-bulk-menu-body">
+          <button class="inbox-btn inbox-btn-accept" id="inbox-bulk-accept" onclick="inboxBulkAction('accept')" disabled title="Accept all selected — proposals execute (→ Followed), approvals run, triage promotes (→ Canonical)">Accept all <span class="inbox-arrow">→</span> <span class="inbox-dest">per-type</span> <span class="inbox-shortcut">A</span></button>
+          <button class="inbox-btn inbox-btn-reject" id="inbox-bulk-reject" onclick="inboxBulkAction('reject')" disabled title="Reject all selected — moves each to archive">Reject all <span class="inbox-arrow">→</span> <span class="inbox-dest">Archive</span> <span class="inbox-shortcut">R</span></button>
+          <button class="inbox-btn inbox-btn-snooze" id="inbox-bulk-snooze" onclick="inboxBulkAction('snooze')" disabled title="Snooze all selected for 1 day, then resurface">Snooze all <span class="inbox-dest">1d</span> <span class="inbox-shortcut">S</span></button>
+          <button class="inbox-btn" id="inbox-bulk-simulate" onclick="inboxBulkSimulate()" disabled title="Dry-run accept decisions for all selected approval items — shows what Accept would do, no state change">Simulate all <span class="inbox-dest">(dry-run)</span> <span class="inbox-shortcut">⇧S</span></button>
+        </div>
+      </details>
+      <button class="inbox-btn" id="inbox-bulk-clear" style="margin-left:auto" onclick="inboxClearSelection()" disabled>Clear selection</button>
     </div>
     <div id="inbox-bulk-sim-result"></div>
+    <!-- P1-2: State filter is a segmented control; type filters are a chip strip.
+         Default = "Actionable + All types" (95% of opens). Zero-count chips hide
+         their numeric badge via JS (renderInboxFilterCounts in P1-2 helper). -->
     <div class="inbox-filter-bar" id="inbox-filter-bar">
-      <span style="font-size:11px;color:var(--muted);margin-right:4px">State:</span>
-      <button class="inbox-filter-chip active" data-status-filter="actionable" onclick="inboxFilter('actionable')">Actionable <span id="inbox-count-status-actionable">...</span></button>
-      <button class="inbox-filter-chip" data-status-filter="needs-fix" onclick="inboxFilter('needs-fix')">Needs Fix <span id="inbox-count-status-needs-fix">...</span></button>
-      <button class="inbox-filter-chip" data-status-filter="all" onclick="inboxFilter('all')">All <span id="inbox-count-status-all">...</span></button>
-      <span style="font-size:11px;color:var(--muted);margin-left:12px;margin-right:4px">Type:</span>
-      <button class="inbox-filter-chip active" data-type-filter="all" onclick="inboxTypeFilterSelect('all')">All types <span id="inbox-count-type-all">...</span></button>
-      <button class="inbox-filter-chip" data-type-filter="e2-signal" onclick="inboxTypeFilterSelect('e2-signal')">E2 <span id="inbox-count-type-e2-signal">...</span></button>
-      <button class="inbox-filter-chip" data-type-filter="proposal" onclick="inboxTypeFilterSelect('proposal')">Proposals <span id="inbox-count-type-proposal">...</span></button>
-      <button class="inbox-filter-chip" data-type-filter="approval" onclick="inboxTypeFilterSelect('approval')">Approvals <span id="inbox-count-type-approval">...</span></button>
-      <button class="inbox-filter-chip" data-type-filter="triage" onclick="inboxTypeFilterSelect('triage')">Discovery <span id="inbox-count-type-triage">...</span></button>
-      <span style="font-size:10px;color:var(--muted);margin-left:auto">J/K navigate | A accept | R reject | S simulate/snooze | Space preview | Esc clear</span>
+      <div class="inbox-filter-segmented" role="tablist" aria-label="Inbox state filter">
+        <button class="inbox-filter-seg active" data-status-filter="actionable" onclick="inboxFilter('actionable')" role="tab"><span class="seg-label">Actionable</span> <span class="seg-count" id="inbox-count-status-actionable">...</span></button>
+        <button class="inbox-filter-seg" data-status-filter="needs-fix" onclick="inboxFilter('needs-fix')" role="tab"><span class="seg-label">Needs fix</span> <span class="seg-count" id="inbox-count-status-needs-fix">...</span></button>
+        <button class="inbox-filter-seg" data-status-filter="all" onclick="inboxFilter('all')" role="tab"><span class="seg-label">All</span> <span class="seg-count" id="inbox-count-status-all">...</span></button>
+      </div>
+      <div class="inbox-filter-chips" role="tablist" aria-label="Inbox type filter">
+        <button class="inbox-filter-chip active" data-type-filter="all" onclick="inboxTypeFilterSelect('all')">All <span id="inbox-count-type-all" class="seg-count">...</span></button>
+        <button class="inbox-filter-chip" data-type-filter="e2-signal" onclick="inboxTypeFilterSelect('e2-signal')">E2 <span id="inbox-count-type-e2-signal" class="seg-count">...</span></button>
+        <button class="inbox-filter-chip" data-type-filter="proposal" onclick="inboxTypeFilterSelect('proposal')">Proposals <span id="inbox-count-type-proposal" class="seg-count">...</span></button>
+        <button class="inbox-filter-chip" data-type-filter="approval" onclick="inboxTypeFilterSelect('approval')">Approvals <span id="inbox-count-type-approval" class="seg-count">...</span></button>
+        <button class="inbox-filter-chip" data-type-filter="triage" onclick="inboxTypeFilterSelect('triage')">Discovery <span id="inbox-count-type-triage" class="seg-count">...</span></button>
+      </div>
+      <button class="inbox-filter-chip inbox-filter-keyword-overflow" id="inbox-accept-keywords" onclick="inboxAcceptAllKeywords()" disabled title="Accept all currently visible Discovery keyword topics as canonical themes (kept here for power users — fully migrating into Bulk in P1-3)">Accept all keywords <span id="inbox-keyword-accept-count" class="seg-count">0</span></button>
+      <span class="inbox-filter-help">J/K nav · A accept · R reject · S simulate · Space peek · Esc clear</span>
     </div>
     <div class="inbox-container">
       <div>
@@ -1787,7 +2230,7 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       </div>
       <div class="inbox-preview" id="inbox-preview">
         <div id="inbox-preview-content">
-          <div class="inbox-preview-empty">Select an item from the list to preview and take action.<br/><br/>Use <strong>J/K</strong> to navigate, <strong>A</strong> to accept, <strong>R</strong> to reject, <strong>S</strong> to simulate or snooze.</div>
+          <div class="inbox-preview-empty">Pick an item — the preview shows the claim, evidence, and what each action does.<br/><br/><strong>J/K</strong> navigates · <strong>A</strong> accepts · <strong>R</strong> rejects · <strong>S</strong> simulates/snoozes · <strong>Space</strong> peeks.</div>
         </div>
       </div>
     </div>
@@ -1797,6 +2240,73 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
   <!-- SURFACE 3: INVESTIGATE ??rotation, breadth, analytics, tactical     -->
   <!-- ??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??-->
   <div class="surface" data-surface="investigate">
+  <section class="section-block investigate-brief-section" id="investigate-brief-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Investigation Brief</div><div class="section-title">Theme Evidence And Regime Context</div></div>
+      <div class="section-meta">Default read: what changed, why it matters, evidence, risks, and the current macro regime. Supporting datasets are collapsed below.</div>
+    </div>
+    <!-- P1-4: Investigate brief grid is 3-column above the fold:
+         Theme Brief · Current Regime · Scenario Lab. Scenario Lab moved up from
+         AI Analysis Lab section since it was the user-flagged high-value tool. -->
+    <div class="investigate-brief-grid investigate-brief-grid-3col">
+      <div class="card investigate-brief-card">
+        <div class="card-title">Theme Brief <span class="badge" id="investigate-theme-brief-badge">No theme selected</span></div>
+        <div id="investigate-theme-brief" class="loading" data-skeleton="card">Select a theme — its claim, evidence, risks, and watchpoints will load here.</div>
+      </div>
+      <div class="card tint-cold investigate-regime-card">
+        <div class="card-title" style="justify-content:space-between">
+          <span>Current Regime <span class="badge" id="current-regime-badge">deterministic</span></span>
+          <div class="regime-brief-actions">
+            <button class="btn" onclick="refreshCurrentRegimeBrief(false)" title="Refresh from deterministic DB regime classifier">Refresh</button>
+            <button class="btn regime-brief-generate-btn" onclick="refreshCurrentRegimeBrief(true)" title="Generate narrative layer via Codex (~60s) — deterministic brief stays visible if Codex fails">Generate (Codex, ~60s)</button>
+          </div>
+        </div>
+        <div id="current-regime-brief-body">
+          <div class="meta-line" style="padding:8px">loading current regime brief...</div>
+        </div>
+      </div>
+      <div class="card tint-cold investigate-scenario-card">
+        <div class="card-title">Scenario Lab <span class="badge" id="scenario-regime-badge">balanced</span></div>
+        <!-- P0-5 + P1-4: Lab subtitle explains why these knobs matter. -->
+        <div class="scenario-lab-subtitle">What-if regime knobs. E2 conditioning is volatility-, rate-, and oil-linked; moving these flips theme classifications.</div>
+        <div id="scenario-lab" class="scenario-lab">
+          <div class="scenario-input" title="Vol regime (CBOE VIX). Above 30 = stress, below 15 = calm. Affects E2 risk-on/off conditioning across most themes.">
+            <label>VIX <span class="scenario-why" aria-hidden="true">?</span></label>
+            <input type="range" id="scenario-vix" min="8" max="45" step="0.5" value="19" aria-label="VIX (CBOE Volatility Index)">
+            <span class="val" id="scenario-vix-val">19</span>
+          </div>
+          <div class="scenario-input" title="10Y-2Y yield spread. Inversion (negative) historically precedes recession; steepening favors duration-sensitive themes.">
+            <label>Yield <span class="scenario-why" aria-hidden="true">?</span></label>
+            <input type="range" id="scenario-yield" min="-1" max="3" step="0.05" value="0.5" aria-label="10Y-2Y yield spread">
+            <span class="val" id="scenario-yield-val">0.50</span>
+          </div>
+          <div class="scenario-input" title="WTI Crude Oil ($/bbl). Above 95 stresses energy-importing themes; below 70 weakens energy producers.">
+            <label>Oil <span class="scenario-why" aria-hidden="true">?</span></label>
+            <input type="range" id="scenario-oil" min="40" max="150" step="1" value="92" aria-label="WTI Crude Oil price">
+            <span class="val" id="scenario-oil-val">92</span>
+          </div>
+          <div class="scenario-regime" id="scenario-regime-out">balanced</div>
+          <div class="scenario-predictions" id="scenario-predictions"><div class="meta-line" style="padding:8px">Move a slider to see which themes flip classification.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- P1-5: Investigate drawers — two collapsed sections grouped by purpose.
+       Top: trend discovery inputs (curated · lifecycle · rotation · breadth · watchlist).
+       Below: model/tactical/AI analysis labs (asset · correlation · digest · calibration). -->
+  <div class="investigate-drawers-tab-row">
+    <button class="investigate-drawers-tab" type="button" onclick="document.getElementById('investigate-trend-drawer').open = true; document.getElementById('investigate-trend-drawer').scrollIntoView({behavior:'smooth',block:'start'});">📊 Discovery · Lifecycle · Breadth · Watchlist</button>
+    <button class="investigate-drawers-tab" type="button" onclick="document.getElementById('investigate-analysis-drawer').open = true; document.getElementById('investigate-analysis-drawer').scrollIntoView({behavior:'smooth',block:'start'});">🧪 Lab · Asset · Correlation · AI Digest</button>
+    <span class="meta-line" style="font-size:10.5px;opacity:.55;flex-basis:100%">Both drawers open independently. Closed by default — Theme Brief + Regime + Scenario above is the primary read.</span>
+  </div>
+
+  <details class="investigate-reference-drawer" id="investigate-trend-drawer">
+    <summary onclick="event.preventDefault(); this.parentElement.open = !this.parentElement.open;" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.parentElement.open = !this.parentElement.open;}">
+      Discovery · Lifecycle · Breadth · Watchlist
+      <span class="investigate-reference-copy">Curated trend briefing, lifecycle pyramid, theme evolution, category breadth, and the emerging-tech deep-watch list.</span>
+    </summary>
+    <div class="investigate-reference-body">
   <!-- Curated Trend Briefing — relocated from Home (2026-04-23 layout restructure) -->
   <section class="section-block">
     <div class="section-heading">
@@ -1837,11 +2347,20 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       </div>
     </div>
     <div class="grid2" style="margin-top:12px">
-      <div class="card"><div class="card-title">Selected Topic</div><div id="emerging-tech-topic-detail" class="loading">Select a topic to inspect detail.</div></div>
-      <div class="card"><div class="card-title">Selected Report</div><div id="emerging-tech-report-detail" class="loading">Select a report to inspect detail.</div></div>
+      <div class="card"><div class="card-title">Selected Topic</div><div id="emerging-tech-topic-detail" class="loading">Click a topic in the watchlist — its drivers, recent activity, and links will load here.</div></div>
+      <div class="card"><div class="card-title">Selected Report</div><div id="emerging-tech-report-detail" class="loading">Click a report row — its findings, sources, and citations will load here.</div></div>
     </div>
   </section>
 
+    </div>
+  </details>
+
+  <details class="investigate-reference-drawer" id="investigate-analysis-drawer">
+    <summary onclick="event.preventDefault(); this.parentElement.open = !this.parentElement.open;" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); this.parentElement.open = !this.parentElement.open;}">
+      Lab · Asset · Correlation · AI Digest
+      <span class="investigate-reference-copy">Asset dossier, correlation breaks, calibration charts, tactical strategy reference, and Codex-generated weekly digest. Scenario Lab is now in the brief grid above.</span>
+    </summary>
+    <div class="investigate-reference-body">
   <details class="surface-drawer">
     <summary>Open Tactical / Trading Reference Surfaces</summary>
     <div class="reference-grid">
@@ -1943,43 +2462,9 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       </div>
     </div>
 
-    <div class="card tint-cold" style="margin-bottom:12px">
-      <div class="card-title" style="justify-content:space-between">
-        <span>Current Regime Brief <span class="badge" id="current-regime-badge">deterministic</span></span>
-        <div class="regime-brief-actions">
-          <button class="btn" onclick="refreshCurrentRegimeBrief(false)">Refresh</button>
-          <button class="btn regime-brief-generate-btn" onclick="refreshCurrentRegimeBrief(true)">Synthesize via Codex</button>
-        </div>
-      </div>
-      <div id="current-regime-brief-body">
-        <div class="meta-line" style="padding:8px">loading current regime brief...</div>
-      </div>
-    </div>
-
-    <div class="grid3" style="margin-bottom:12px">
-      <div class="card tint-cold">
-        <div class="card-title">Regime Scenario Lab <span class="badge" id="scenario-regime-badge">balanced</span></div>
-        <div id="scenario-lab" class="scenario-lab">
-          <div class="scenario-input">
-            <label>VIX</label>
-            <input type="range" id="scenario-vix" min="8" max="45" step="0.5" value="19">
-            <span class="val" id="scenario-vix-val">19</span>
-          </div>
-          <div class="scenario-input">
-            <label>Yield</label>
-            <input type="range" id="scenario-yield" min="-1" max="3" step="0.05" value="0.5">
-            <span class="val" id="scenario-yield-val">0.50</span>
-          </div>
-          <div class="scenario-input">
-            <label>Oil</label>
-            <input type="range" id="scenario-oil" min="40" max="150" step="1" value="92">
-            <span class="val" id="scenario-oil-val">92</span>
-          </div>
-          <div class="scenario-regime" id="scenario-regime-out">balanced</div>
-          <div class="scenario-predictions" id="scenario-predictions"><div class="meta-line" style="padding:8px">drag a slider to simulate</div></div>
-        </div>
-      </div>
-
+    <!-- P1-4: Scenario Lab moved up to Investigate Brief grid (3-column above fold).
+         Asset Dossier and Correlation Breaks remain in this AI Lab section. -->
+    <div class="grid2" style="margin-bottom:12px">
       <div class="card tint-profit">
         <div class="card-title">Asset Dossier <span class="badge" id="dossier-badge">—</span></div>
         <div class="dossier">
@@ -2011,6 +2496,8 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       </div>
     </div>
   </section>
+    </div>
+  </details>
   </div><!-- /surface: investigate -->
 
   <!-- ??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??亦껋꼶遊욘쾮議얜윺??-->
@@ -2057,22 +2544,31 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
       </div>
       <div id="runtime-issues-list" class="loading">Loading runtime issues...</div>
     </section>
-    <section class="section-block secondary-block">
-      <div class="section-heading">
-        <div><div class="section-kicker">Live Reference</div><div class="section-title">Monitoring Feeds</div></div>
-        <div class="section-meta">Useful context for ops monitoring, not the primary decision surface.</div>
-      </div>
+    <!-- P0-6: Monitoring Feeds demoted into a collapsed reference drawer.
+         Today's Events / Codex Discoveries / Anomalies / Pending Validation are already
+         surfaced via Inbox (discovery / proposal / approval / pending types). Issue
+         Temperature and Technology Trends belong in Investigate's discovery drawer.
+         The cards remain available here for legacy ops monitoring without dominating
+         the operator surface. Element IDs preserved so existing loaders keep working. -->
+    <details class="section-block secondary-block ops-legacy-feeds">
+      <summary class="ops-legacy-summary">
+        <div>
+          <div class="section-kicker">Legacy reference</div>
+          <div class="section-title">Monitoring feeds <span class="meta-line" style="font-weight:400;opacity:.55">(also available in Inbox &amp; Investigate)</span></div>
+        </div>
+        <div class="section-meta">Today's events, codex discoveries, anomalies, pending validation are routed to Inbox. Issue temperature and tech trends belong in Investigate. Open this only if you need the legacy ops view.</div>
+      </summary>
       <div class="grid3">
-        <div class="card"><div class="card-title"><span id="today-events-title">Today's Key Events</span></div><div id="today-events" class="loading">Loading recent events...</div></div>
-        <div class="card"><div class="card-title">Issue Temperature</div><div id="temperatures" class="loading">Loading issue temperatures...</div></div>
-        <div class="card"><div class="card-title">Technology Trends</div><div id="trends" class="loading">Loading technology trends...</div></div>
+        <div class="card"><div class="card-title"><span id="today-events-title">Today's Key Events</span> <span class="badge" style="opacity:.55">→ Inbox</span></div><div id="today-events" class="loading">Loading recent events...</div></div>
+        <div class="card"><div class="card-title">Issue Temperature <span class="badge" style="opacity:.55">→ Investigate</span></div><div id="temperatures" class="loading">Loading issue temperatures...</div></div>
+        <div class="card"><div class="card-title">Technology Trends <span class="badge" style="opacity:.55">→ Investigate</span></div><div id="trends" class="loading">Loading technology trends...</div></div>
       </div>
       <div class="grid3" style="margin-top:12px">
-        <div class="card"><div class="card-title">Codex Discoveries</div><div id="codex-latest" class="loading">Loading Codex activity...</div></div>
-        <div class="card"><div class="card-title">Anomalies</div><div id="anomalies" class="loading">Loading anomalies...</div></div>
-        <div class="card"><div class="card-title">Pending Validation</div><div id="pending" class="loading">Loading pending validations...</div></div>
+        <div class="card"><div class="card-title">Codex Discoveries <span class="badge" style="opacity:.55">→ Inbox</span></div><div id="codex-latest" class="loading">Loading Codex activity...</div></div>
+        <div class="card"><div class="card-title">Anomalies <span class="badge" style="opacity:.55">→ Inbox</span></div><div id="anomalies" class="loading">Loading anomalies...</div></div>
+        <div class="card"><div class="card-title">Pending Validation <span class="badge" style="opacity:.55">→ Inbox</span></div><div id="pending" class="loading">Loading pending validations...</div></div>
       </div>
-    </section>
+    </details>
   </div><!-- /surface: ops -->
 </div>
 
@@ -2119,13 +2615,17 @@ const state={
   currentTheme:'',
 };
 let EMBED_MODE=false;
+let initialThemeFromUrl='';
 try{
   const initialUrl=new URL(window.location.href);
   const periodParam=String(initialUrl.searchParams.get('period')||'').trim().toLowerCase();
   const themeParam=String(initialUrl.searchParams.get('theme')||'').trim().toLowerCase();
   EMBED_MODE=initialUrl.searchParams.get('embed')==='1';
   if(PERIODS[periodParam])state.period=periodParam;
-  if(themeParam&&themeParam!=='unknown')state.currentTheme=themeParam;
+  if(themeParam&&themeParam!=='unknown'){
+    state.currentTheme=themeParam;
+    initialThemeFromUrl=themeParam;
+  }
 }catch{}
 let selectedEmergingTopicId='';
 let selectedEmergingReportId='';
@@ -2315,6 +2815,43 @@ async function applyEmbeddedContext(payload){
 }
 function updateShareUrl(){try{const url=new URL(window.location.href);if(state.currentTheme)url.searchParams.set('theme',state.currentTheme);else url.searchParams.delete('theme');url.searchParams.set('period',getCurrentPeriod());history.replaceState(null,'',url.toString());}catch{}emitEmbeddedContext();}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+/* P1-8: Canonical 4-state dot — the ONLY dot variants allowed on signal cards.
+   inferLatticeDotState(item) returns one of: 'validated' | 'candidate' | 'stale' | 'provisional'.
+   - Codex/AI-generated content → provisional (violet)
+   - Stale beyond stale-threshold hours → stale (grey)
+   - E2 signals (post-hoc validated) → validated (green)
+   - Everything else (proposal/triage/discovery/approval) → candidate (amber) */
+const LATTICE_DOT_STALE_HOURS = 48;
+const LATTICE_DOT_LABEL = {
+  validated: 'validated',
+  candidate: 'candidate',
+  stale: 'stale',
+  provisional: 'provisional',
+};
+const LATTICE_DOT_DESCRIPTION = {
+  validated: 'Validated — post-hoc statistically significant (E2). Treat as primary evidence.',
+  candidate: 'Candidate — hypothesis from proposal / discovery / approval flow. Not yet validated.',
+  stale: 'Stale — has not been refreshed in the configured window. Read with caution; the upstream feed may be paused.',
+  provisional: 'Provisional — generated by Codex / model. Treat as a draft synthesis, not as evidence.',
+};
+function inferLatticeDotState(item, opts = {}) {
+  if (!item) return 'candidate';
+  if (item.provisional || item.codexGenerated || item.source === 'codex') return 'provisional';
+  const updatedAt = item.updatedAt || item.refreshedAt || item.observedAt;
+  if (updatedAt) {
+    const ageHours = (Date.now() - new Date(updatedAt).getTime()) / 3_600_000;
+    if (Number.isFinite(ageHours) && ageHours > (opts.staleHours || LATTICE_DOT_STALE_HOURS)) return 'stale';
+  }
+  if (item.type === 'e2-signal' || item.evidenceGrade === 'E2' || item.proofLevel === 'E2') return 'validated';
+  return 'candidate';
+}
+function renderLatticeDot(state, withLabel = false) {
+  const safeState = ['validated','candidate','stale','provisional'].includes(state) ? state : 'candidate';
+  const desc = LATTICE_DOT_DESCRIPTION[safeState];
+  const dot = `<span class="lattice-dot lattice-dot-${safeState}" title="${escapeHtml(desc)}" aria-label="${escapeHtml(safeState)}"></span>`;
+  if (!withLabel) return dot;
+  return `<span class="lattice-dot-with-label state-${safeState}">${dot}${LATTICE_DOT_LABEL[safeState]}</span>`;
+}
 function decodeHtmlEntities(value){const el=document.createElement('textarea');el.innerHTML=String(value??'');return el.value;}
 function asArray(value){return Array.isArray(value)?value:value==null?[]:[value];}
 function normalizeTheme(value){
@@ -2384,6 +2921,15 @@ function trustChip(level, label, title = '') {
   const t = title ? ` title="${escapeHtml(title)}"` : '';
   return `<span class="trust-chip trust-chip-${level}"${t}>${escapeHtml(label)}</span>`;
 }
+function humanFallbackLabel(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'Fallback data';
+  const lower = raw.toLowerCase();
+  if (lower.includes('selected-date') || lower.includes('fallback') || lower.includes('article_fallback')) {
+    return 'Fallback data';
+  }
+  return raw.length > 28 ? 'Fallback data' : raw;
+}
 function proofChip(level, extra = '') {
   if (!level) return '';
   const norm = String(level).toLowerCase();
@@ -2432,8 +2978,8 @@ function renderTrustRow(opts = {}) {
   }
   // Fallback mode
   if (opts.fallback) {
-    const label = typeof opts.fallback === 'string' ? opts.fallback : 'Fallback mode';
-    chips.push(trustChip('fallback', label, 'System is operating in degraded/fallback mode ??not primary data path'));
+    const label = typeof opts.fallback === 'string' ? humanFallbackLabel(opts.fallback) : 'Fallback data';
+    chips.push(trustChip('fallback', label, 'Using a secondary data path; open evidence or Ops for provenance.'));
   }
   // Not hydrated (partial state)
   if (opts.notHydrated) {
@@ -2460,7 +3006,7 @@ function renderTrustRow(opts = {}) {
     chips.push(trustChip('contradiction', `${opts.contradictionCount} contradiction${opts.contradictionCount===1?'':'s'}`, 'Number of contradicting signals detected'));
   }
   if (!chips.length) return '';
-  const why = opts.whyVisible ? `<div class="why-visible">Why shown: ${escapeHtml(opts.whyVisible)}</div>` : '';
+  const why = opts.whyVisible && opts.showWhy === true ? `<div class="why-visible">Why shown: ${escapeHtml(opts.whyVisible)}</div>` : '';
   return `<div class="trust-row">${chips.join('')}</div>${why}`;
 }
 // Snapshot badge ??prefers internal-data freshness (oldestInternalUpdatedAt or updatedAt)
@@ -2680,8 +3226,20 @@ function renderWorkspaceFocus(){
   }
   el.innerHTML=`${left}${right}`;
 }
+function getDirectThemeFromUrl(){
+  try{
+    const direct=normalizeTheme(new URL(window.location.href).searchParams.get('theme')||'');
+    return direct&&direct!=='unknown'?direct:'';
+  }catch{return'';}
+}
 function ensureCurrentTheme(){
-  if(state.currentTheme&&!isThemeMuted(state.currentTheme))return;
+  const directTheme=getDirectThemeFromUrl();
+  if(directTheme){
+    state.currentTheme=directTheme;
+    initialThemeFromUrl=directTheme;
+    return;
+  }
+  if(state.currentTheme&&(!isThemeMuted(state.currentTheme)||state.currentTheme===initialThemeFromUrl))return;
   state.currentTheme=getSuggestedThemes()[0]||'';
   persistThemeState();
   updateShareUrl();
@@ -2699,6 +3257,31 @@ async function openThemeBrief(theme){
   emitEmbeddedContext();
   scrollThemeBriefIntoView();
 }
+async function persistThemeWatchlistState(theme,stateValue){
+  const normalized=normalizeTheme(theme);
+  if(!normalized||normalized==='unknown')return;
+  try{
+    await postJson(`${API}/watchlist`,{
+      itemType:'theme',
+      itemId:normalized,
+      state:stateValue,
+      reviewer:'theme-dashboard',
+      note:`Theme workspace ${stateValue}`,
+    });
+  }catch(e){
+    console.warn('theme watchlist persistence failed', normalized, stateValue, e);
+  }
+}
+async function removeThemeWatchlistState(theme){
+  const normalized=normalizeTheme(theme);
+  if(!normalized||normalized==='unknown')return;
+  try{
+    const res=await fetch(`${API}/watchlist/theme/${encodeURIComponent(normalized)}`,{method:'DELETE'});
+    if(!res.ok)throw new Error(`watchlist delete failed (${res.status})`);
+  }catch(e){
+    console.warn('theme watchlist delete failed', normalized, e);
+  }
+}
 async function followTheme(theme){
   const normalized=normalizeTheme(theme);
   if(!normalized||normalized==='unknown')return;
@@ -2711,10 +3294,11 @@ async function followTheme(theme){
   renderWorkspaceFocus();
   await loadFollowedThemeBriefing();
   await loadThemeBrief();
+  await persistThemeWatchlistState(normalized,'follow');
   emitEmbeddedContext();
   scrollThemeBriefIntoView();
 }
-function unfollowTheme(theme){
+async function unfollowTheme(theme){
   const normalized=normalizeTheme(theme);
   state.myThemes=state.myThemes.filter((item)=>item!==normalized);
   if(state.currentTheme===normalized){state.currentTheme='';ensureCurrentTheme();}
@@ -2724,9 +3308,10 @@ function unfollowTheme(theme){
   renderWorkspaceFocus();
   loadFollowedThemeBriefing();
   loadThemeBrief();
+  await removeThemeWatchlistState(normalized);
   emitEmbeddedContext();
 }
-function muteTheme(theme){
+async function muteTheme(theme){
   const normalized=normalizeTheme(theme);
   if(!normalized||normalized==='unknown')return;
   state.myThemes=state.myThemes.filter((item)=>item!==normalized);
@@ -2738,9 +3323,10 @@ function muteTheme(theme){
   renderWorkspaceFocus();
   loadFollowedThemeBriefing();
   loadThemeBrief();
+  await persistThemeWatchlistState(normalized,'mute');
   emitEmbeddedContext();
 }
-function unmuteTheme(theme){
+async function unmuteTheme(theme){
   const normalized=normalizeTheme(theme);
   state.mutedThemes=state.mutedThemes.filter((item)=>item!==normalized);
   persistThemeState();
@@ -2748,6 +3334,7 @@ function unmuteTheme(theme){
   renderMyThemes();
   renderWorkspaceFocus();
   loadFollowedThemeBriefing();
+  await removeThemeWatchlistState(normalized);
   emitEmbeddedContext();
 }
 function compactThemeStatus(summary){
@@ -2981,6 +3568,326 @@ async function postJson(url,body){
 }
 function summarizeEvidenceClasses(items){return asArray(items).map((item)=>item?.label||item?.evidenceClass||item).filter(Boolean);}
 function splitTags(value){return String(value||'').split(',').map((item)=>item.trim()).filter(Boolean);}
+function trackedTargetStatus(message='',tone=''){
+  const el=document.getElementById('tracking-form-status');
+  if(!el)return;
+  el.textContent=message;
+  el.className=`meta-line ${tone==='error'?'neg':tone==='ok'?'pos':''}`;
+}
+function openTrackedTargetDossier(symbol){
+  if(!symbol)return;
+  switchSurface('investigate');
+  const input=document.getElementById('dossier-input');
+  if(input)input.value=String(symbol).toUpperCase();
+  setTimeout(()=>refreshAssetDossier?.(),50);
+}
+function renderTrackedTargetRow(target){
+  const flags=asArray(target.qualityFlags);
+  const latest=target.latestHitAt?` | latest ${escapeHtml(fmtDateTime(target.latestHitAt))}`:'';
+  const aliases=asArray(target.aliases).slice(0,6);
+  const symbols=asArray(target.symbols).slice(0,4);
+  const flagHtml=flags.length?`<div class="pill-row" style="margin-top:6px">${flags.slice(0,4).map((flag)=>`<span class="tag tag-neutral" title="${escapeHtml(String(flag.detail||''))}">${escapeHtml(flag.code||'flag')}</span>`).join('')}</div>`:'';
+  return `<div class="interactive-row">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+      <div>
+        <strong>${escapeHtml(target.label||target.normalizedKey||'Tracked target')}</strong>
+        <div class="meta-line">${escapeHtml(target.targetType||'keyword')} | ${escapeHtml(target.priority||'normal')} | hits ${escapeHtml(fmtWhole(target.hitCount||0))} | 7d ${escapeHtml(fmtWhole(target.recentHitCount||0))}${latest}</div>
+      </div>
+      <span class="badge">${target.pinToHome?'pinned':'tracked'}</span>
+    </div>
+    ${symbols.length?`<div class="pill-row" style="margin-top:6px">${renderTags(symbols,'tag-emerging',4)}</div>`:''}
+    ${aliases.length?`<div class="pill-row" style="margin-top:6px">${renderTags(aliases,'tag-neutral',6)}</div>`:''}
+    ${flagHtml}
+    <div class="theme-actions" style="margin-top:8px">
+      <button class="btn" onclick="backfillTrackedTarget('${escapeHtml(target.id)}',180)">Backfill 180d</button>
+      ${symbols[0]?`<button class="btn" onclick="openTrackedTargetDossier('${escapeHtml(symbols[0])}')">Asset dossier</button>`:''}
+      <button class="btn" onclick="archiveTrackedTarget('${escapeHtml(target.id)}')">Archive</button>
+    </div>
+  </div>`;
+}
+async function loadTrackedTargets(){
+  const el=document.getElementById('tracked-targets');
+  const badge=document.getElementById('tracked-targets-badge');
+  const chipsEl=document.getElementById('tracked-targets-chips');
+  if(!el && !chipsEl)return;
+  const {data,cached,cachedAt}=await f(`${API}/tracking-targets?limit=12&hits=10`,'tracking-targets');
+  const targets=asArray(data?.targets);
+  if(badge)badge.textContent=`${fmtWhole(targets.filter((target)=>target.status==='active').length)} active`;
+  /* P1-6: Render compact chip strip above the form. Click = filter inbox/investigate
+     to this target; right-click = remove menu. Empty = invitation copy. */
+  if(chipsEl){
+    if(!targets.length){
+      chipsEl.innerHTML = `<span class="tracking-chip-empty">Track a keyword or symbol — Linde · helium · LIN · liquid hydrogen — stays private to your browser.</span>`;
+    } else {
+      chipsEl.innerHTML = targets.slice(0,8).map((tgt)=>{
+        const label = tgt.label || tgt.symbol || tgt.keyword || 'target';
+        const id = tgt.id || tgt.targetId || '';
+        return `<span class="tracking-chip" data-target-id="${escapeHtml(String(id))}" title="Click: filter inbox/investigate to '${escapeHtml(label)}' · Right-click: remove">${escapeHtml(label)}</span>`;
+      }).join('') + (targets.length>8?`<span class="tracking-chip-more">+${targets.length-8} more</span>`:'');
+    }
+  }
+  if(el){
+    let html=cached?cachedBadge(cachedAt):'';
+    if(data?.isolation){
+      html+=`<div class="info-note inline-help" style="margin-bottom:8px">Isolation: writes only to ${escapeHtml(asArray(data.isolation.writeTables).join(', '))}. Canonical theme promotion remains review-gated.</div>`;
+    }
+    if(!targets.length){
+      el.innerHTML=`${html}<div class="theme-empty">No personal tracking targets yet. Add a keyword, company, or ticker above.</div>`;
+    } else {
+      el.innerHTML=`${html}<div class="brief-list">${targets.map(renderTrackedTargetRow).join('')}</div>`;
+    }
+  }
+}
+function renderCrossThemeConnectorCard(item){
+  const connector=item.connector?.name||item.supplier?.name||'Cross-theme connector';
+  const themes=asArray(item.themes).map(humanizeTheme);
+  const evidence=item.evidenceSummary||{};
+  const leftPath=asArray(item.pathway?.left).map(n=>n?.name||n?.key).filter(Boolean);
+  const rightPath=asArray(item.pathway?.right).map(n=>n?.name||n?.key).filter(Boolean);
+  const pathway=[leftPath.join(' -> '),rightPath.join(' -> ')].filter(Boolean).join(' | ');
+  const caveats=asArray(item.caveats);
+  const gaps=asArray(item.evidenceGaps);
+  const nextActions=asArray(item.nextActions);
+  const guide=item.decisionGuide||{};
+  const boundary=item.contaminationBoundary||{};
+  const directEvidence=Number(evidence.directEvidenceCount||0);
+  const rawSources=Number(evidence.sourceDiversityRaw||0);
+  const diagnostics=[];
+  if(pathway)diagnostics.push(`<div class="meta-line">Pathway: ${escapeHtml(pathway)}</div>`);
+  diagnostics.push(`<div class="meta-line">Direct evidence ${escapeHtml(fmtWhole(directEvidence))} | raw sources ${escapeHtml(fmtWhole(rawSources))} | seed similarity ${escapeHtml(fmt(evidence.seedSimilarity,2))}</div>`);
+  if(gaps.length)diagnostics.push(`<div class="warning-note"><strong>Evidence gaps</strong>: ${gaps.map(escapeHtml).join(' · ')}</div>`);
+  if(nextActions.length)diagnostics.push(`<div class="meta-line">Next: ${nextActions.map(a=>`${escapeHtml(a.label||a.action)} - ${escapeHtml(a.reason||'')}`).join(' | ')}</div>`);
+  if(caveats.length)diagnostics.push(`<div class="info-note inline-help">${caveats.map(escapeHtml).join(' ')}</div>`);
+  if(boundary.canonicalPromotion)diagnostics.push(`<div class="meta-line">Boundary: candidate-only; canonical promotion ${escapeHtml(boundary.canonicalPromotion)}.</div>`);
+  /* P0-3: Card front shows only claim + lane chip + score + evidence count + 1 primary button.
+     novelty / seed-sim / pathway / sources / diagnostics / secondary actions all live in <details>. */
+  const lane=item.lane||'exploration';
+  const themePair=themes.join(' × ')||'theme pair';
+  const evidenceN=Number(evidence.evidenceQuality||0);
+  const sourceN=Number(evidence.sourceDiversity||0);
+  const noveltyN=Number(evidence.novelty||0);
+  const directN=Number(directEvidence||0);
+  const firstThemeForBrief=themes[0]?normalizeTheme(themes[0]):null;
+  /* P1-8: Cross-theme cards always render with the candidate dot (or provisional
+     when generated by Codex). They're hypotheses — even when scored high — until
+     reviewed and promoted to canonical. Stale dot wins if updatedAt is too old. */
+  const xtcDotState = inferLatticeDotState({
+    type: 'cross-theme',
+    updatedAt: item.updatedAt || item.refreshedAt,
+    provisional: item.source === 'codex' || item.codexGenerated,
+  });
+  return `<div class="interactive-row cross-theme-card xtc-card" data-dot-state="${xtcDotState}">
+    <div class="xtc-header">
+      <div class="xtc-claim">
+        ${renderLatticeDot(xtcDotState)}<strong>${escapeHtml(connector)}</strong>
+        <div class="meta-line xtc-pair">${escapeHtml(themePair)}</div>
+      </div>
+      <div class="xtc-meta">
+        <span class="xtc-lane lane-${escapeHtml(String(lane).toLowerCase())}">${escapeHtml(lane)}</span>
+        <span class="xtc-score" title="Connection score (0-1). Higher = stronger candidate. See details for components.">score ${escapeHtml(fmt(item.score,2))}</span>
+      </div>
+    </div>
+    <div class="story-summary xtc-reason">${escapeHtml(item.reason||'Candidate generated by cross-theme graph overlap.')}</div>
+    <div class="xtc-evidence-line">
+      <span title="Direct evidence references">${escapeHtml(fmtWhole(directN))} ref${directN===1?'':'s'}</span>
+      <span class="xtc-sep">·</span>
+      <span title="Source diversity (0-1)">sources ${escapeHtml(fmt(sourceN,2))}</span>
+      ${item.status?`<span class="xtc-sep">·</span><span class="xtc-status">${escapeHtml(item.status)}</span>`:''}
+    </div>
+    <div class="xtc-actions">
+      ${firstThemeForBrief
+        ? `<button class="btn btn-primary xtc-primary" onclick="openThemeBrief('${escapeHtml(firstThemeForBrief)}')" title="Open the first theme in this connection in Investigate">Open brief <span class="inbox-arrow">→</span> <span class="inbox-dest">Investigate</span></button>`
+        : `<button class="btn btn-primary xtc-primary" disabled title="No theme available to deep-link">Open brief</button>`}
+    </div>
+    <details class="diagnostic-details xtc-details">
+      <summary>Details (novelty, pathway, diagnostics, secondary actions)</summary>
+      <div class="delta-kpi-row" style="margin-top:8px">
+        <div class="brief-stat"><div class="brief-stat-label">Evidence</div><div class="brief-stat-value">${escapeHtml(fmt(evidenceN,2))}</div></div>
+        <div class="brief-stat"><div class="brief-stat-label">Sources</div><div class="brief-stat-value">${escapeHtml(fmt(sourceN,2))}</div></div>
+        <div class="brief-stat"><div class="brief-stat-label">Novelty</div><div class="brief-stat-value">${escapeHtml(fmt(noveltyN,2))}</div></div>
+        <div class="brief-stat"><div class="brief-stat-label">Seed sim</div><div class="brief-stat-value">${escapeHtml(fmt(evidence.seedSimilarity,2))}</div></div>
+      </div>
+      ${item.stateExplanation?`<div class="info-note inline-help" style="margin-top:8px">${escapeHtml(item.stateExplanation)}</div>`:''}
+      <div style="margin-top:8px">${diagnostics.join('')}</div>
+      <div class="theme-actions xtc-secondary-actions" style="margin-top:10px">
+        <button class="btn" title="${escapeHtml(guide.accept||'Record positive review')}" onclick="reviewCrossThemeConnector('${escapeHtml(item.id)}','accept')">Accept</button>
+        <button class="btn" title="${escapeHtml(guide.watch||'Keep visible for evidence refresh')}" onclick="reviewCrossThemeConnector('${escapeHtml(item.id)}','watch')">Watch</button>
+        <button class="btn" title="${escapeHtml(guide.reject||'Suppress this pattern — used as feedback for discovery model (P2-2)')}" onclick="reviewCrossThemeConnector('${escapeHtml(item.id)}','reject')">Not useful</button>
+        <button class="btn" title="${escapeHtml(guide.trackPrivately||'Pin privately without canonical writes')}" onclick="trackCrossThemeConnector('${escapeHtml(item.id)}')">Track privately</button>
+        <button class="btn" title="${escapeHtml(guide.addSourceQuery||'Queue evidence expansion')}" onclick="queueCrossThemeSourceQuery('${escapeHtml(item.id)}')">Add source query</button>
+      </div>
+    </details>
+  </div>`;
+}
+function renderResearchOsStatus(status){
+  if(!status?.ok)return '';
+  const s=status.summary||{};
+  const approvals=status.approvals||{};
+  const candidates=status.candidates||{};
+  const autonomy=status.autonomy||{};
+  const blockers=asArray(s.blockers);
+  return `<div class="snapshot-grid" style="margin-bottom:10px">
+    <div class="mini-status-card ${s.level==='ok'?'ok':'warn'}"><div class="metric-label">Research OS</div><div class="metric-value">${escapeHtml(String(s.status||s.level||'unknown'))}</div><div class="metric-sub">${blockers.length?escapeHtml(blockers.join(' · ')):'loop healthy'}</div></div>
+    <div class="mini-status-card"><div class="metric-label">Candidates</div><div class="metric-value">${escapeHtml(fmtWhole(candidates.total||0))}</div><div class="metric-sub">validated ${escapeHtml(fmtWhole(candidates.byLane?.validated||0))} · needs evidence ${escapeHtml(fmtWhole(candidates.byLane?.needs_evidence||0))}</div></div>
+    <div class="mini-status-card"><div class="metric-label">Source Queue</div><div class="metric-value">${escapeHtml(fmtWhole((approvals['source-query:pending']||0)+(approvals['source-query:needs-fix']||0)+(approvals['source-query:exhausted']||0)))}</div><div class="metric-sub">pending ${escapeHtml(fmtWhole(approvals['source-query:pending']||0))} · needs-fix ${escapeHtml(fmtWhole(approvals['source-query:needs-fix']||0))} · exhausted ${escapeHtml(fmtWhole(approvals['source-query:exhausted']||0))}</div></div>
+    <div class="mini-status-card"><div class="metric-label">Seed Lock-in</div><div class="metric-value">${escapeHtml(fmt((autonomy.seedDependenceRatio||0)*100,0))}%</div><div class="metric-sub">target max ${escapeHtml(fmt((autonomy.guardrails?.seedDependenceRatioMax||0)*100,0))}%</div></div>
+  </div>`;
+}
+function renderResearchOsCompactStatus(status){
+  if(!status?.ok)return '';
+  const s=status.summary||{};
+  const approvals=status.approvals||{};
+  const candidates=status.candidates||{};
+  const autonomy=status.autonomy||{};
+  const blockers=asArray(s.blockers);
+  const queueTotal=(approvals['source-query:pending']||0)+(approvals['source-query:needs-fix']||0)+(approvals['source-query:exhausted']||0);
+  const level=s.level==='ok'?'ok':'warn';
+  const statusLabel=level==='ok'?'Research loop healthy':'Research loop needs review';
+  const strongSeed=Number(autonomy.strongSeedDependenceRatio??autonomy.seedDependenceRatio??0);
+  const touchedSeed=Number(autonomy.seedTouchedRatio??autonomy.seedDependenceRatio??0);
+  return `<div class="research-os-compact ${level==='ok'?'':'warn'}">
+    <div>
+      <div class="primary">${escapeHtml(statusLabel)}</div>
+      <div class="secondary">${escapeHtml(fmtWhole(candidates.total||0))} candidates · ${escapeHtml(fmtWhole(candidates.byLane?.validated||0))} validated · ${escapeHtml(fmtWhole(queueTotal))} source tasks</div>
+    </div>
+    <details class="diagnostic-details" style="min-width:260px">
+      <summary>Research diagnostics</summary>
+      <div class="meta-line" style="margin-top:8px">Status: ${escapeHtml(String(s.status||s.level||'unknown'))}</div>
+      <div class="meta-line">Blockers: ${blockers.length?escapeHtml(blockers.join(' · ')):'none'}</div>
+      <div class="meta-line">Source queue: pending ${escapeHtml(fmtWhole(approvals['source-query:pending']||0))} · needs-fix ${escapeHtml(fmtWhole(approvals['source-query:needs-fix']||0))} · exhausted ${escapeHtml(fmtWhole(approvals['source-query:exhausted']||0))}</div>
+      <div class="meta-line">Seed dependence: strong ${escapeHtml(fmt(strongSeed*100,0))}% · touched ${escapeHtml(fmt(touchedSeed*100,0))}% · target max ${escapeHtml(fmt((autonomy.guardrails?.seedDependenceRatioMax||0)*100,0))}%</div>
+    </details>
+  </div>`;
+}
+async function loadCrossThemeConnectors(includeBacklog=false){
+  const el=document.getElementById('cross-theme-connectors');
+  const badge=document.getElementById('cross-theme-connectors-badge');
+  if(!el)return;
+  const qs=includeBacklog?'limit=24&include_backlog=1':'limit=12';
+  const [{data,cached,cachedAt},statusResult]=await Promise.all([
+    f(`${API}/cross-theme-connectors?${qs}`,'cross-theme-connectors'),
+    f(`${API}/research-os/status`,'research-os-status').catch(()=>({data:null})),
+  ]);
+  const items=asArray(data?.candidates);
+  const backlogCount=Number(data?.summary?.byStatus?.research_backlog||0);
+  if(badge)badge.textContent=`${fmtWhole(items.length)} visible · ${fmtWhole(backlogCount)} backlog`;
+  let html=(cached?cachedBadge(cachedAt):'')+renderResearchOsCompactStatus(statusResult?.data)+renderResearchOsStatus(statusResult?.data);
+  html+=`<div class="theme-actions" style="margin-bottom:8px">
+    <button class="secondary" onclick="loadCrossThemeConnectors(false)">Main candidates</button>
+    <button class="secondary" onclick="loadCrossThemeConnectors(true)">Evidence backlog</button>
+  </div>`;
+  if(data?.boundary){
+    html+=`<details class="diagnostic-details" style="margin-bottom:8px"><summary>Data boundary</summary><div class="meta-line" style="margin-top:8px">Writes ${escapeHtml(asArray(data.boundary.writeTables).join(', '))}; canonical promotion is ${escapeHtml(data.boundary.canonicalPromotion||'review-gated')}.</div></details>`;
+  }
+  if(!items.length){
+    const empty=data?.emptyState;
+    el.innerHTML=`${html}<div class="theme-empty">${escapeHtml(empty?.reason||'No cross-theme connectors yet.')} ${escapeHtml(empty?.nextStep||'Run the Research OS foundation and candidate refresh tasks.')}</div>`;
+    return;
+  }
+  el.innerHTML=`${html}<div class="brief-list">${items.map(renderCrossThemeConnectorCard).join('')}</div>`;
+}
+async function reviewCrossThemeConnector(id,decision){
+  if(!id)return;
+  try{
+    /* P2-2: Reject decisions are explicitly tagged as a feedback signal so the
+       discovery model treats them as a negative training example, not a passive
+       suppression. The review endpoint already accepts a `feedbackKind` field. */
+    const payload = decision === 'reject'
+      ? { decision, feedbackKind: 'not-useful', source: 'analyst-ui' }
+      : { decision };
+    await postJson(`${API}/cross-theme-connectors/${encodeURIComponent(id)}/review`,payload);
+    invalidateClientCaches(['cross-theme-connectors']);
+    await loadCrossThemeConnectors();
+  }catch(e){
+    alert(String(e?.message||e||'Cross-theme review failed'));
+  }
+}
+async function trackCrossThemeConnector(id){
+  if(!id)return;
+  try{
+    await postJson(`${API}/cross-theme-connectors/${encodeURIComponent(id)}/track`,{pinToHome:true});
+    invalidateClientCaches(['cross-theme-connectors','tracking-targets']);
+    await Promise.all([loadCrossThemeConnectors(),loadTrackedTargets()]);
+  }catch(e){
+    alert(String(e?.message||e||'Cross-theme track failed'));
+  }
+}
+async function queueCrossThemeSourceQuery(id){
+  if(!id)return;
+  try{
+    const result=await postJson(`${API}/cross-theme-connectors/${encodeURIComponent(id)}/source-query`,{});
+    invalidateClientCaches(['cross-theme-connectors','approval-queue','proposal-inbox']);
+    await loadCrossThemeConnectors();
+    alert(`Queued ${fmtWhole(result?.queuedCount||0)} source query approval item(s).`);
+  }catch(e){
+    alert(String(e?.message||e||'Cross-theme source query failed'));
+  }
+}
+function createTrackedTargetFromConnector(label){
+  const input=document.getElementById('tracking-label-input');
+  if(input)input.value=label;
+  document.getElementById('tracking-aliases-input')?.focus();
+}
+async function createTrackedTarget(){
+  const label=document.getElementById('tracking-label-input')?.value||'';
+  const aliases=splitTags(document.getElementById('tracking-aliases-input')?.value||'');
+  const symbols=splitTags(document.getElementById('tracking-symbols-input')?.value||'');
+  const targetType=document.getElementById('tracking-type-input')?.value||'keyword';
+  const priority=document.getElementById('tracking-priority-input')?.value||'normal';
+  const pinToHome=Boolean(document.getElementById('tracking-pin-input')?.checked);
+  const backfillDays=Number(document.getElementById('tracking-backfill-input')?.value||0);
+  if(!String(label).trim()){
+    trackedTargetStatus('Label is required.','error');
+    return;
+  }
+  trackedTargetStatus(backfillDays>0?`Creating target and backfilling ${backfillDays}d...`:'Creating target...');
+  try{
+    const response=await postJson(`${API}/tracking-targets`,{
+      label,
+      aliases,
+      symbols,
+      targetType,
+      priority,
+      pinToHome,
+      backfillDays,
+      skipBackfill:backfillDays<=0,
+      promoteToMain:false,
+    });
+    document.getElementById('tracking-label-input').value='';
+    document.getElementById('tracking-aliases-input').value='';
+    document.getElementById('tracking-symbols-input').value='';
+    invalidateClientCaches(['tracking-targets']);
+    trackedTargetStatus(`Tracking ${response?.target?.label||label}. Hits ${response?.backfill?.insertedOrUpdated??0}.`,'ok');
+    await loadTrackedTargets();
+  }catch(e){
+    trackedTargetStatus(String(e?.message||e||'Tracking target failed'),'error');
+  }
+}
+async function backfillTrackedTarget(id,days=180){
+  if(!id)return;
+  trackedTargetStatus(`Backfilling target #${id}...`);
+  try{
+    const response=await postJson(`${API}/tracking-targets/${encodeURIComponent(id)}/backfill`,{lookbackDays:days});
+    invalidateClientCaches(['tracking-targets']);
+    trackedTargetStatus(`Backfill complete: ${response?.insertedOrUpdated??0} hits, ${response?.matchedAliases?.length??0} aliases.`,'ok');
+    await loadTrackedTargets();
+  }catch(e){
+    trackedTargetStatus(String(e?.message||e||'Backfill failed'),'error');
+  }
+}
+async function archiveTrackedTarget(id){
+  if(!id||!confirm('Archive this tracking target?'))return;
+  try{
+    const response=await fetch(`${API}/tracking-targets/${encodeURIComponent(id)}`,{method:'DELETE'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data?.error||`Archive failed (${response.status})`);
+    invalidateClientCaches(['tracking-targets']);
+    trackedTargetStatus('Tracking target archived.','ok');
+    await loadTrackedTargets();
+  }catch(e){
+    trackedTargetStatus(String(e?.message||e||'Archive failed'),'error');
+  }
+}
 function collectThemeNotebookForm(){
   return{
     noteMarkdown:document.getElementById('theme-brief-note-input')?.value||'',
@@ -3345,16 +4252,79 @@ function buildThemeSummaryDiagnostics(summary,meta={}){
   }
   return rows;
 }
-function renderThemeSummaryStats(summary,meta={}){
-  if(!summary)return'';
-  const diagnostics = buildThemeSummaryDiagnostics(summary, meta);
-  const metricRows = [
-    {key:'lifecycle', label:t('Lifecycle','단계'), value:summary.lifecycleStage||'n/a', className:'metric-info'},
-    {key:'yoy', label:t('YoY','전년 대비'), value:fmtPercent(summary.vsYearAgoPct,0), className:Math.abs(normalizePercent(summary.vsYearAgoPct)||0)>=1000?'metric-watch':'metric-info'},
-    {key:'acceleration', label:t('Acceleration','가속도'), value:fmtPercent(summary.acceleration,0), className:Math.abs(normalizePercent(summary.acceleration)||0)>=150?'metric-watch':'metric-info'},
-    {key:'diversity', label:t('Source Diversity','소스 다양성'), value:fmt(summary.sourceDiversity,2), className:'metric-info'},
+function scoreBriefTrustDot(metricKey, summary){
+  /* P0-4: Each meta dot = ●(strong) ◐(medium) ○(weak/none).
+     Returns one of: 'strong'|'medium'|'weak'. */
+  const stage = String(summary?.lifecycleStage||'').toLowerCase();
+  const yoy = Math.abs(normalizePercent(summary?.vsYearAgoPct)||0);
+  const accel = Math.abs(normalizePercent(summary?.acceleration)||0);
+  const div = Number(summary?.sourceDiversity||0);
+  if(metricKey==='lifecycle'){
+    if(['accelerating','growth','expansion','rising','breakout'].some(s=>stage.includes(s))) return 'strong';
+    if(['mature','stable','peak','plateau'].some(s=>stage.includes(s))) return 'medium';
+    return 'weak';
+  }
+  if(metricKey==='yoy'){
+    if(yoy>=1000) return 'medium'; // unstable spike — caveat applies
+    if(yoy>=50) return 'strong';
+    if(yoy>=10) return 'medium';
+    return 'weak';
+  }
+  if(metricKey==='acceleration'){
+    if(accel>=150) return 'medium'; // too volatile
+    if(accel>=20) return 'strong';
+    if(accel>=5) return 'medium';
+    return 'weak';
+  }
+  if(metricKey==='diversity'){
+    if(div>=0.7) return 'strong';
+    if(div>=0.4) return 'medium';
+    return 'weak';
+  }
+  return 'weak';
+}
+function renderBriefTrustPill(summary, meta={}){
+  /* P0-4: Compact ●●●○ pill summarizing lifecycle / YoY / acceleration / source diversity.
+     Hover surfaces full numbers + diagnostics. */
+  if(!summary) return '';
+  const dotChar = (level)=> level==='strong'?'●':level==='medium'?'◐':'○';
+  const metrics = [
+    {key:'lifecycle', label:t('Lifecycle','단계'), value:summary.lifecycleStage||'n/a'},
+    {key:'yoy', label:t('YoY','전년 대비'), value:fmtPercent(summary.vsYearAgoPct,0)},
+    {key:'acceleration', label:t('Acceleration','가속도'), value:fmtPercent(summary.acceleration,0)},
+    {key:'diversity', label:t('Source diversity','소스 다양성'), value:fmt(summary.sourceDiversity,2)},
   ];
-  return `<div class="brief-stats" style="margin-top:10px">${metricRows.map((metric)=>`<div class="brief-stat ${metric.className}" data-metric-key="${metric.key}" data-lattice-tip="${escapeHtml(describeBriefMetric(metric.label,metric.value,summary))}"><div class="brief-stat-label">${escapeHtml(metric.label)}</div><div class="brief-stat-value">${escapeHtml(metric.value)}</div></div>`).join('')}</div>${diagnostics.length?`<div class="metric-caveat-panel">${diagnostics.map((row)=>`<div class="metric-caveat-row ${row.level==='info'?'info':''}" data-lattice-tip="${escapeHtml(row.body)}"><span class="metric-caveat-mark">${row.level==='info'?'i':'!'}</span><div><strong>${escapeHtml(row.title)}</strong><div>${escapeHtml(row.body)}</div></div></div>`).join('')}</div>`:''}`;
+  const dots = metrics.map(m=>{
+    const lvl = scoreBriefTrustDot(m.key, summary);
+    return `<span class="brief-trust-dot brief-trust-dot-${lvl}" data-metric="${m.key}" title="${escapeHtml(`${m.label}: ${m.value} (${lvl})`)}">${dotChar(lvl)}</span>`;
+  }).join('');
+  const summaryTitle = metrics.map(m=>`${m.label}: ${m.value}`).join(' · ');
+  const detailRows = metrics.map(m=>{
+    const lvl = scoreBriefTrustDot(m.key, summary);
+    return `<div class="brief-trust-row">
+      <span class="brief-trust-dot brief-trust-dot-${lvl}">${dotChar(lvl)}</span>
+      <span class="brief-trust-label">${escapeHtml(m.label)}</span>
+      <span class="brief-trust-value">${escapeHtml(m.value)}</span>
+    </div>`;
+  }).join('');
+  const diagnostics = buildThemeSummaryDiagnostics(summary, meta);
+  return `<div class="brief-trust-pill" data-lattice-tip="${escapeHtml(summaryTitle)}">
+    <span class="brief-trust-label-lead">${escapeHtml(t('Brief Trust','브리프 신뢰도'))}</span>
+    <span class="brief-trust-dots">${dots}</span>
+    <details class="brief-trust-details">
+      <summary aria-label="${escapeHtml(t('Show trust breakdown','신뢰도 세부 보기'))}">▾</summary>
+      <div class="brief-trust-popover">
+        ${detailRows}
+        ${diagnostics.length?`<div class="brief-trust-diagnostics">${diagnostics.map((row)=>`<div class="metric-caveat-row ${row.level==='info'?'info':''}"><span class="metric-caveat-mark">${row.level==='info'?'i':'!'}</span><div><strong>${escapeHtml(row.title)}</strong><div>${escapeHtml(row.body)}</div></div></div>`).join('')}</div>`:''}
+      </div>
+    </details>
+  </div>`;
+}
+function renderThemeSummaryStats(summary,meta={}){
+  /* P0-4: Replaced 4 brief-stats with a single Trust pill. The 4 underlying numbers
+     are still surfaced (hover + details), but they no longer dominate the hero. */
+  if(!summary)return'';
+  return renderBriefTrustPill(summary, meta);
 }
 function describeOperatorTooltip(el){
   if(!el) return null;
@@ -3676,6 +4646,10 @@ function canBulkApplyDecision(decision) {
   const actionFamily = selectedItems[0].type;
   return selectedItems.every((item) => item.type === actionFamily && !!resolveInboxDecision(item, decision));
 }
+function getVisibleKeywordInboxItems() {
+  return getFilteredInboxItems()
+    .filter((item) => item.type === 'triage' && !!item.rawId && !!resolveInboxDecision(item, 'accept'));
+}
 function setInboxCountsLoading() {
   ['actionable', 'needs-fix', 'all'].forEach((t) => {
     const el = document.getElementById('inbox-count-status-' + t);
@@ -3694,6 +4668,18 @@ function updateInboxBulkState() {
   const count = document.getElementById('inbox-bulk-count');
   if (count) count.textContent = `${selectedCount} selected`;
   if (bar) bar.classList.toggle('active', selectedCount > 0);
+  /* P1-3: Bulk breakdown by type — operator sees what 'Accept all' actually does. */
+  const breakdownEl = document.getElementById('inbox-bulk-breakdown');
+  if (breakdownEl) {
+    const byType = { 'e2-signal': 0, proposal: 0, approval: 0, triage: 0 };
+    inboxItems.forEach((it) => { if (inboxSelection.has(it.id) && byType[it.type] != null) byType[it.type] += 1; });
+    const parts = [];
+    if (byType.proposal) parts.push(`${byType.proposal} → Followed`);
+    if (byType.approval) parts.push(`${byType.approval} → Run`);
+    if (byType.triage) parts.push(`${byType.triage} → Canonical`);
+    if (byType['e2-signal']) parts.push(`${byType['e2-signal']} E2 (snooze only)`);
+    breakdownEl.textContent = parts.length ? `(${parts.join(' · ')})` : '';
+  }
   const acceptButton = document.getElementById('inbox-bulk-accept');
   const rejectButton = document.getElementById('inbox-bulk-reject');
   const snoozeButton = document.getElementById('inbox-bulk-snooze');
@@ -3701,6 +4687,11 @@ function updateInboxBulkState() {
   if (acceptButton) acceptButton.disabled = selectedCount === 0 || inboxBulkBusy || !canBulkApplyDecision('accept');
   if (rejectButton) rejectButton.disabled = selectedCount === 0 || inboxBulkBusy || !canBulkApplyDecision('reject');
   if (snoozeButton) snoozeButton.disabled = selectedCount === 0 || inboxBulkBusy || !canBulkApplyDecision('snooze');
+  const keywordButton = document.getElementById('inbox-accept-keywords');
+  const keywordCount = document.getElementById('inbox-keyword-accept-count');
+  const keywordItems = getVisibleKeywordInboxItems();
+  if (keywordCount) keywordCount.textContent = String(keywordItems.length);
+  if (keywordButton) keywordButton.disabled = keywordItems.length === 0 || inboxBulkBusy || inboxLoading;
   const simulateButton = document.getElementById('inbox-bulk-simulate');
   if (simulateButton) {
     // Only approval items support dry-run simulation via /api/approval-queue/:id/review
@@ -3818,13 +4809,18 @@ function updateInboxCounts() {
     statusCounts[getInboxStatusBucket(it)] += 1;
     typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
   });
+  /* P1-2: Hide zero-count badges. Chip stays clickable, the number just disappears. */
+  const setSegCount = (el, n) => {
+    if (!el) return;
+    const num = Number(n) || 0;
+    el.textContent = num;
+    el.classList.toggle('is-zero', num === 0);
+  };
   ['actionable', 'needs-fix', 'all'].forEach((t) => {
-    const el = document.getElementById('inbox-count-status-' + t);
-    if (el) el.textContent = statusCounts[t] || 0;
+    setSegCount(document.getElementById('inbox-count-status-' + t), statusCounts[t]);
   });
   ['all', 'e2-signal', 'proposal', 'approval', 'triage'].forEach((t) => {
-    const el = document.getElementById('inbox-count-type-' + t);
-    if (el) el.textContent = typeCounts[t] || 0;
+    setSegCount(document.getElementById('inbox-count-type-' + t), typeCounts[t]);
   });
   const total = document.getElementById('inbox-total-count');
   if (total) total.textContent = statusCounts.all;
@@ -3876,9 +4872,9 @@ function renderTopDecisionCard() {
     </div>
     <div class="top-decision-actions">
       ${simulate}
-      ${retry || (resolveInboxDecision(item, acceptDecision) ? `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('${acceptDecision}','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>` : '')}
-      ${resolveInboxDecision(item, rejectDecision) ? `<button class="inbox-btn inbox-btn-reject" onclick="inboxAction('${rejectDecision}','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>` : ''}
-      <button class="inbox-btn" onclick="switchSurface('inbox');setTimeout(()=>selectInboxItem(null,'${escapeHtml(item.id)}'),50)">Preview</button>
+      ${retry || (resolveInboxDecision(item, acceptDecision) ? `<button class="inbox-btn inbox-btn-accept" onclick="inboxAction('${acceptDecision}','${escapeHtml(item.id)}')" title="${item.type==='triage'?'Promote to canonical event':item.type==='proposal'?'Execute proposal — adds to followed':'Run approval action'}">${item.type==='triage'?'Promote':'Accept'} <span class="inbox-arrow">→</span> <span class="inbox-dest">${item.type==='triage'?'Canonical':item.type==='proposal'?'Followed':'Run'}</span> <span class="inbox-shortcut">A</span></button>` : '')}
+      ${resolveInboxDecision(item, rejectDecision) ? `<button class="inbox-btn inbox-btn-reject" onclick="inboxAction('${rejectDecision}','${escapeHtml(item.id)}')" title="${item.type==='triage'?'Suppress from discovery':'Reject — moves to archive'}">${item.type==='triage'?'Suppress':'Reject'} <span class="inbox-arrow">→</span> <span class="inbox-dest">${item.type==='triage'?'Hidden':'Archive'}</span> <span class="inbox-shortcut">R</span></button>` : ''}
+      <button class="inbox-btn" onclick="switchSurface('inbox');setTimeout(()=>selectInboxItem(null,'${escapeHtml(item.id)}'),50)" title="Open Inbox and focus this item">Preview <span class="inbox-arrow">→</span> <span class="inbox-dest">Inbox</span></button>
     </div>`;
 }
 function renderInboxList() {
@@ -3901,11 +4897,14 @@ function renderInboxList() {
     const freshChip = fresh && fresh.level !== 'nohydrate' ? `<span class="trust-chip trust-chip-${fresh.level}" style="font-size:9px">${fresh.level}</span>` : '';
     const statusChip = statusBucket === 'needs-fix' ? '<span class="trust-chip trust-chip-stale" style="font-size:9px">FIX</span>' : '';
     const actionState = it.actionState ? ` ${escapeHtml(it.actionState)}` : '';
-    return `<div class="inbox-item${selected}${multiSelected}${actionState} ${statusBucket === 'needs-fix' ? 'needs-fix' : ''}" data-id="${escapeHtml(it.id)}" data-idx="${i}" onclick="selectInboxItem(event,'${escapeHtml(it.id)}')">
+    /* P1-8: Replace fresh/status mini-chips with the canonical 4-state dot.
+       Stale takes precedence over candidate so the user sees the most actionable signal first. */
+    const dotState = inferLatticeDotState(it);
+    return `<div class="inbox-item${selected}${multiSelected}${actionState} ${statusBucket === 'needs-fix' ? 'needs-fix' : ''}" data-id="${escapeHtml(it.id)}" data-idx="${i}" data-dot-state="${dotState}" onclick="selectInboxItem(event,'${escapeHtml(it.id)}')">
       <div class="inbox-item-head">
+        ${renderLatticeDot(dotState)}
         <span class="trust-chip trust-chip-sources" style="font-size:9px">${typeBadge}</span>
         ${urgencyChip}
-        ${freshChip}
         ${statusChip}
         ${it.proofLevel ? proofChip(it.proofLevel) : ''}
       </div>
@@ -4114,7 +5113,7 @@ function openEvidenceDrawer(item){
   if(!drawer || !backdrop || !titleEl || !bodyEl)return;
   if(!item){
     titleEl.textContent = 'No item selected';
-    bodyEl.innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Next step</div><div class="meta-line">Select an actionable signal or inbox item first. The drawer will then show metrics, citations, freshness, and action context.</div></div>';
+    bodyEl.innerHTML = '<div class="drawer-section"><div class="drawer-section-title">Next step</div><div class="meta-line">Click an E2 signal or an inbox row to load its proof here — metrics, citations, freshness, and the destination of each action.</div></div>';
   }else{
     const fresh = item.updatedAt ? classifyFreshness(item.updatedAt, 48) : null;
     const uplift = Number.isFinite(item.upliftPct) ? `${item.upliftPct >= 0 ? '+' : ''}${item.upliftPct.toFixed(2)}%` : '--';
@@ -4161,36 +5160,36 @@ function closeEvidenceDrawer(){
 function buildInboxActions(item) {
   if (item.type === 'proposal') {
     return `
-      <button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>
-      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="snooze" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>
-      <button class="inbox-btn inbox-btn-reject" data-inbox-action="reject" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
-      ${item.payload?.targetTheme ? `<button class="inbox-btn" onclick="openThemeBrief('${normalizeTheme(item.payload.targetTheme)}')">Open brief</button>` : ''}`;
+      <button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('accept','${escapeHtml(item.id)}')" title="Execute the proposal — adds the target theme/symbol to your followed list">Accept <span class="inbox-arrow">→</span> <span class="inbox-dest">Followed</span> <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="snooze" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('snooze','${escapeHtml(item.id)}')" title="Hide for 1 day, then resurface">Snooze <span class="inbox-dest">1d</span> <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-reject" data-inbox-action="reject" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="proposal" onclick="inboxAction('reject','${escapeHtml(item.id)}')" title="Mark as not useful — moves to archive, won't resurface">Reject <span class="inbox-arrow">→</span> <span class="inbox-dest">Archive</span> <span class="inbox-shortcut">R</span></button>
+      ${item.payload?.targetTheme ? `<button class="inbox-btn" onclick="openThemeBrief('${normalizeTheme(item.payload.targetTheme)}')" title="Open the target theme's brief in Investigate">Open brief <span class="inbox-arrow">→</span> <span class="inbox-dest">Investigate</span></button>` : ''}`;
   }
   if (item.type === 'approval') {
     const probeState = getApprovalProbeState(item);
     const acceptButton = probeState.blocked
-      ? `<button class="inbox-btn inbox-btn-accept" data-inbox-action="retry" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('retry','${escapeHtml(item.id)}')" title="Re-run validation and execute only if the source passes current gates">Retry Check <span class="inbox-shortcut">A</span></button>`
-      : `<button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('accept','${escapeHtml(item.id)}')">Accept <span class="inbox-shortcut">A</span></button>`;
+      ? `<button class="inbox-btn inbox-btn-accept" data-inbox-action="retry" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('retry','${escapeHtml(item.id)}')" title="Re-run validation and execute only if the source passes current gates">Retry check <span class="inbox-arrow">→</span> <span class="inbox-dest">Re-validate</span> <span class="inbox-shortcut">A</span></button>`
+      : `<button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('accept','${escapeHtml(item.id)}')" title="Run the approval action against production">Accept <span class="inbox-arrow">→</span> <span class="inbox-dest">Run</span> <span class="inbox-shortcut">A</span></button>`;
     const repairHint = probeState.blocked
-      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)} Retry Check re-runs the same server-side gates before any execution.</span>`
+      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)} Retry check re-runs the same server-side gates before any execution.</span>`
       : '';
     return `
-      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="simulate" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('simulate','${escapeHtml(item.id)}')">Simulate <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="simulate" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('simulate','${escapeHtml(item.id)}')" title="Dry-run: show what Accept would do, no state change">Simulate <span class="inbox-dest">(dry-run)</span> <span class="inbox-shortcut">S</span></button>
       ${acceptButton}
-      <button class="inbox-btn inbox-btn-reject" data-inbox-action="reject" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('reject','${escapeHtml(item.id)}')">Reject <span class="inbox-shortcut">R</span></button>
+      <button class="inbox-btn inbox-btn-reject" data-inbox-action="reject" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('reject','${escapeHtml(item.id)}')" title="Reject — moves to archive, won't run">Reject <span class="inbox-arrow">→</span> <span class="inbox-dest">Archive</span> <span class="inbox-shortcut">R</span></button>
       ${repairHint}`;
   }
   if (item.type === 'triage') {
     return `
-      <button class="inbox-btn inbox-btn-accept" data-inbox-action="canonical" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('canonical','${escapeHtml(item.id)}')">Canonical <span class="inbox-shortcut">A</span></button>
-      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="watch" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('watch','${escapeHtml(item.id)}')">Watch <span class="inbox-shortcut">S</span></button>
-      <button class="inbox-btn inbox-btn-reject" data-inbox-action="suppress" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('suppress','${escapeHtml(item.id)}')">Suppress <span class="inbox-shortcut">R</span></button>`;
+      <button class="inbox-btn inbox-btn-accept" data-inbox-action="canonical" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('canonical','${escapeHtml(item.id)}')" title="Promote — becomes a tracked canonical event">Promote <span class="inbox-arrow">→</span> <span class="inbox-dest">Canonical</span> <span class="inbox-shortcut">A</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="watch" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('watch','${escapeHtml(item.id)}')" title="Watch — added to private tracking strip on Home">Watch <span class="inbox-arrow">→</span> <span class="inbox-dest">Tracking</span> <span class="inbox-shortcut">S</span></button>
+      <button class="inbox-btn inbox-btn-reject" data-inbox-action="suppress" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="triage" onclick="inboxAction('suppress','${escapeHtml(item.id)}')" title="Suppress — hide from discovery, won't surface again">Suppress <span class="inbox-arrow">→</span> <span class="inbox-dest">Hidden</span> <span class="inbox-shortcut">R</span></button>`;
   }
   if (item.type === 'e2-signal') {
     const themeParam = item.theme ? `'${normalizeTheme(item.theme)}'` : 'null';
     return `
-      <button class="inbox-btn" onclick="openThemeBrief(${themeParam})">Open evidence</button>
-      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="snooze" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="e2-signal" onclick="inboxAction('snooze','${escapeHtml(item.id)}')">Snooze <span class="inbox-shortcut">S</span></button>`;
+      <button class="inbox-btn" onclick="openThemeBrief(${themeParam})" title="Open evidence drawer with citations">Evidence <span class="inbox-arrow">→</span> <span class="inbox-dest">Drawer</span></button>
+      <button class="inbox-btn inbox-btn-snooze" data-inbox-action="snooze" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="e2-signal" onclick="inboxAction('snooze','${escapeHtml(item.id)}')" title="Hide for 1 day, then resurface">Snooze <span class="inbox-dest">1d</span> <span class="inbox-shortcut">S</span></button>`;
   }
   return '';
 }
@@ -4358,6 +5357,46 @@ function renderInboxActionResult(item, decision, response, errorMessage = '') {
     </div>
   `;
 }
+/* P2-3: Custom snooze duration. Default snooze is 1 day; this lets analysts
+   pick hours/days/until-specific-date via a prompt. Wired to Shift-S keyboard. */
+async function inboxSnoozeCustom(id) {
+  const item = inboxItems.find((x) => x.id === id);
+  if (!item) return;
+  const input = (window.prompt('Snooze duration — examples: 4h, 2d, 1w, or YYYY-MM-DD', '2d') || '').trim();
+  if (!input) return;
+  let snoozeUntilMs = null;
+  const dateMatch = input.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (dateMatch) {
+    const t = new Date(input + 'T09:00:00').getTime();
+    if (Number.isFinite(t) && t > Date.now()) snoozeUntilMs = t;
+  } else {
+    const m = input.match(/^(\d+(?:\.\d+)?)\s*([hdw])$/i);
+    if (m) {
+      const num = Number(m[1]);
+      const unit = m[2].toLowerCase();
+      const ms = unit === 'h' ? 3_600_000 : unit === 'd' ? 86_400_000 : 7 * 86_400_000;
+      snoozeUntilMs = Date.now() + num * ms;
+    }
+  }
+  if (!snoozeUntilMs) {
+    alert(`Could not parse "${input}". Try 4h, 2d, 1w, or a YYYY-MM-DD date.`);
+    return;
+  }
+  try {
+    /* The /review endpoints accept a snoozeUntil ISO field — this is a no-op for
+       backends that don't support it (they fall back to the default snooze). */
+    if (item.type === 'proposal') {
+      await postJson(`${API}/codex-proposals/${encodeURIComponent(item.rawId)}/review`, { decision: 'snooze', reviewer: 'theme-dashboard', snoozeUntil: new Date(snoozeUntilMs).toISOString() });
+    } else if (item.type === 'approval') {
+      await postJson(`${API}/approval-queue/${encodeURIComponent(item.rawId)}/review`, { decision: 'snooze', reviewer: 'theme-dashboard', snoozeUntil: new Date(snoozeUntilMs).toISOString() });
+    }
+    item.actionState = 'snoozed';
+    renderInboxList();
+    updateInboxCounts();
+  } catch (e) {
+    alert(String(e?.message || e || 'Custom snooze failed'));
+  }
+}
 async function inboxAction(decision, id) {
   const item = inboxItems.find(x => x.id === id);
   if (!item) return;
@@ -4506,6 +5545,76 @@ function inboxClearSelection() {
   updateInboxBulkState();
   renderInboxList();
 }
+async function inboxAcceptAllKeywords() {
+  const items = getVisibleKeywordInboxItems();
+  if (!items.length) return;
+  const topicIds = Array.from(new Set(items.map((item) => String(item.rawId || '').trim()).filter(Boolean)));
+  if (!topicIds.length) return;
+  if (!confirm(`Accept ${topicIds.length} keyword topics as canonical themes?`)) return;
+  inboxBulkBusy = true;
+  updateInboxBulkState();
+  const resultEl = document.getElementById('inbox-bulk-sim-result');
+  if (resultEl) {
+    resultEl.innerHTML = `<div class="bulk-sim-panel"><div class="bs-head"><span>Keyword bulk accept</span></div><div class="bs-row">accepting ${topicIds.length} discovery topics...</div></div>`;
+  }
+  try {
+    const response = await postJson(`${API}/discovery-triage/bulk-review`, {
+      ids: topicIds,
+      decision: 'canonical',
+      reviewer: 'theme-dashboard',
+      reason: `Decision Inbox bulk keyword accept (${topicIds.length} visible topics)`,
+    });
+    const results = Array.isArray(response?.results) ? response.results : [];
+    const acceptedTopicIds = new Set(results.filter((row) => row?.ok).map((row) => String(row.topicId || row.id || '')));
+    const acceptedInboxIds = new Set([...acceptedTopicIds].map((id) => `triage-${id}`));
+    inboxItems.forEach((item) => {
+      if (acceptedInboxIds.has(item.id)) {
+        item.actionState = 'accepted';
+        item.decisionState = 'canonical';
+      }
+    });
+    inboxItems = inboxItems.filter((item) => !acceptedInboxIds.has(item.id));
+    [...inboxSelection].forEach((id) => {
+      if (acceptedInboxIds.has(id)) inboxSelection.delete(id);
+    });
+    if (acceptedInboxIds.has(inboxSelectedId)) inboxSelectedId = null;
+    invalidateClientCaches(['discovery-triage-watch', 'proposal-inbox']);
+    updateInboxCounts();
+    renderInboxList();
+    renderTopDecisionCard();
+    renderSelectedProofCard(sortedInboxItemsForDecision()[0] || null);
+    if (resultEl) {
+      const failed = results.filter((row) => !row?.ok);
+      const failedHtml = failed.length
+        ? failed.slice(0, 5).map((row) => `<div class="bs-row"><span class="bs-outcome fail">fail</span><span></span><span>${escapeHtml(String(row.topicId || row.id || 'unknown'))}: ${escapeHtml(String(row.error || 'failed'))}</span><span></span></div>`).join('')
+        : '<div class="bs-row"><span class="bs-outcome accept">ok</span><span></span><span>all visible keyword topics accepted</span><span></span></div>';
+      resultEl.innerHTML = `<div class="bulk-sim-panel"><div class="bs-head"><span>Keyword bulk accept</span><button class="bs-close" onclick="document.getElementById('inbox-bulk-sim-result').innerHTML=''">Close</button></div>${failedHtml}<div class="bs-summary">${acceptedTopicIds.size} accepted · ${failed.length} failed</div></div>`;
+    }
+    Promise.all([
+      loadDiscoveryTriage(),
+      refreshTrendSurfaces(),
+      loadProposalInbox(),
+      refreshDecisionInbox(),
+    ]).catch(() => {});
+  } catch (e) {
+    const errorMsg = String(e?.message || e || 'Keyword bulk accept failed');
+    if (resultEl) {
+      resultEl.innerHTML = `<div class="bulk-sim-panel"><div class="bs-head"><span>Keyword bulk accept failed</span><button class="bs-close" onclick="document.getElementById('inbox-bulk-sim-result').innerHTML=''">Close</button></div><div class="bs-row"><span class="bs-outcome fail">fail</span><span></span><span>${escapeHtml(errorMsg)}</span><span></span></div></div>`;
+    }
+    postJson(`${API}/runtime-issues`, {
+      surface: 'decision-inbox',
+      action: 'inbox.bulk-keyword-accept',
+      itemType: 'discovery',
+      requestBody: { ids: topicIds, decision: 'canonical', reviewer: 'theme-dashboard' },
+      errorMessage: errorMsg,
+      classification: 'api-contract',
+      severity: 'review',
+    }).catch(() => {});
+  } finally {
+    inboxBulkBusy = false;
+    updateInboxBulkState();
+  }
+}
 async function inboxBulkAction(decision) {
   const ids = [...inboxSelection];
   if (!ids.length) return;
@@ -4579,12 +5688,25 @@ document.addEventListener('keydown', (ev) => {
     ev.preventDefault();
     const decision = selectedItem?.type === 'triage' ? 'suppress' : 'reject';
     runSelected(decision);
-  } else if ((ev.key === 's' || ev.key === 'S') && inboxSelectedId) {
+  } else if ((ev.key === 's' || ev.key === 'S') && inboxSelectedId && !ev.shiftKey) {
     ev.preventDefault();
     runSelected(selectedItem?.type === 'approval' ? 'simulate' : 'snooze');
+  } else if (ev.key === 'S' && inboxSelectedId && ev.shiftKey) {
+    /* P2-3: Shift-S = custom snooze duration picker. */
+    ev.preventDefault();
+    inboxSnoozeCustom(inboxSelectedId);
   } else if (ev.key === ' ' && inboxSelectedId) {
     ev.preventDefault();
     if (selectedItem) renderInboxPreview(selectedItem);
+  } else if ((ev.key === 'b' || ev.key === 'B') && inboxSelection.size > 0) {
+    /* P1-3 / P2-6: B opens the Bulk… dropdown when items are selected. */
+    ev.preventDefault();
+    const menu = document.getElementById('inbox-bulk-menu');
+    if (menu) {
+      menu.open = true;
+      const summary = document.getElementById('inbox-bulk-menu-summary');
+      summary?.focus();
+    }
   } else if (ev.key === 'Escape') {
     inboxSelectedId = null;
     inboxSelection.clear();
@@ -5107,6 +6229,43 @@ async function refreshCurrentRegimeBrief(useCodex=false){
   }
 }
 
+/* P2-1: Scenario URL share. Encode VIX/Yield/Oil into the URL hash so the
+   scenario state is bookmarkable and shareable. Read on load + write on change. */
+function encodeScenarioToUrl(vix, yieldV, oil) {
+  try {
+    const params = new URLSearchParams();
+    params.set('s.vix', vix.toFixed(1));
+    params.set('s.yield', yieldV.toFixed(2));
+    params.set('s.oil', oil.toFixed(0));
+    const url = new URL(window.location.href);
+    /* Merge with any existing query params; remove if at default. */
+    const isDefault = (Math.abs(vix - 19) < 0.5 && Math.abs(yieldV - 0.5) < 0.05 && Math.abs(oil - 92) < 1);
+    ['s.vix','s.yield','s.oil'].forEach(k => url.searchParams.delete(k));
+    if (!isDefault) {
+      url.searchParams.set('s.vix', vix.toFixed(1));
+      url.searchParams.set('s.yield', yieldV.toFixed(2));
+      url.searchParams.set('s.oil', oil.toFixed(0));
+    }
+    history.replaceState(null, '', url.toString());
+  } catch {}
+}
+function applyScenarioFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const vixEl = document.getElementById('scenario-vix');
+    const yieldEl = document.getElementById('scenario-yield');
+    const oilEl = document.getElementById('scenario-oil');
+    if (!vixEl || !yieldEl || !oilEl) return false;
+    const vix = params.get('s.vix');
+    const yieldV = params.get('s.yield');
+    const oil = params.get('s.oil');
+    let any = false;
+    if (vix != null && Number.isFinite(Number(vix))) { vixEl.value = vix; any = true; }
+    if (yieldV != null && Number.isFinite(Number(yieldV))) { yieldEl.value = yieldV; any = true; }
+    if (oil != null && Number.isFinite(Number(oil))) { oilEl.value = oil; any = true; }
+    return any;
+  } catch { return false; }
+}
 async function refreshScenarioLab(){
   const vixEl = document.getElementById('scenario-vix');
   const yieldEl = document.getElementById('scenario-yield');
@@ -5116,6 +6275,7 @@ async function refreshScenarioLab(){
   document.getElementById('scenario-vix-val').textContent = vix.toFixed(1);
   document.getElementById('scenario-yield-val').textContent = yieldV.toFixed(2);
   document.getElementById('scenario-oil-val').textContent = oil.toFixed(0);
+  encodeScenarioToUrl(vix, yieldV, oil);
   try {
     const res = await fetch(`${API}/regime-scenario?vix=${vix}&yieldSpread=${yieldV}&oilPrice=${oil}`);
     const data = await res.json();
@@ -5123,16 +6283,41 @@ async function refreshScenarioLab(){
     const badge = document.getElementById('scenario-regime-badge');
     const out = document.getElementById('scenario-regime-out');
     const preds = document.getElementById('scenario-predictions');
+    const drivers = Array.isArray(data.regimeDrivers) ? data.regimeDrivers : [];
+    const driverText = drivers.map((d) => {
+      const contribution = Number(d.contribution || 0);
+      const signed = `${contribution >= 0 ? '+' : ''}${contribution.toFixed(2)}`;
+      return `${d.input || 'input'}: ${d.stance || 'n/a'} (${signed})`;
+    }).join(' | ');
+    const driverHtml = driverText
+      ? `<div class="meta-line" style="padding:6px 8px" title="${escapeHtml(drivers.map((d)=>d.detail||'').filter(Boolean).join(' | '))}">drivers: ${escapeHtml(driverText)}</div>`
+      : '';
     if(badge) badge.textContent = data.targetRegime;
-    if(out) out.textContent = `Predicted regime: ${data.targetRegime}  ·  ${data.summary.totalPairs} pairs  ·  ${data.summary.posAvg} positive / ${data.summary.negAvg} negative`;
+    if(out){
+      out.textContent = `Predicted regime: ${data.targetRegime}  ·  ${data.summary.totalPairs} pairs  ·  ${data.summary.posAvg} positive / ${data.summary.negAvg} negative${Number.isFinite(Number(data.regimeScore)) ? ` · score ${Number(data.regimeScore).toFixed(2)}` : ''}`;
+      if(driverText) out.title = driverText;
+    }
     if(preds){
       if(!data.predictions?.length){
-        preds.innerHTML = '<div class="meta-line" style="padding:8px">no data for this regime — adjust sliders</div>';
+        /* P0-5: Empty predictions are not silent — explain why and suggest specific knob moves
+           that historically produce flips. The thresholds below come from the same regime
+           classification logic used by /regime-scenario (balanced ↔ stress/calm transitions). */
+        const vixDelta = vix - 19;
+        const yieldDelta = yieldV - 0.5;
+        const oilDelta = oil - 92;
+        const suggestions = [];
+        if(Math.abs(vixDelta) < 11) suggestions.push('VIX above 30 (stress) or below 13 (calm)');
+        if(Math.abs(yieldDelta) < 0.45) suggestions.push('Yield by ±0.5');
+        if(Math.abs(oilDelta) < 9) suggestions.push('Oil by ±10');
+        const tip = suggestions.length
+          ? `Try ${suggestions.slice(0,2).join(', or ')}.`
+          : 'Try resetting and moving one knob at a time — combined extremes can fall outside any historical regime.';
+        preds.innerHTML = driverHtml + `<div class="scenario-empty-explainer"><strong>No theme classifications change for these inputs.</strong><div class="meta-line" style="margin-top:4px">${escapeHtml(tip)}</div></div>`;
       } else {
         const header = `<div class="scenario-pred-row" style="color:var(--text-soft);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--c-border-hair);font-family:var(--font-sans);padding-bottom:6px;margin-bottom:4px" title="If an event in this theme fires while regime matches, expected reaction on the symbol over the post-event window.">
           <span>theme</span><span>symbol</span><span style="text-align:right">avg %</span><span style="text-align:right">hit rate</span><span style="text-align:right">×regime</span>
         </div>`;
-        preds.innerHTML = header + data.predictions.slice(0, 20).map(p => {
+        preds.innerHTML = driverHtml + header + data.predictions.slice(0, 20).map(p => {
           const ret = p.avgReturn;
           const retCls = ret > 0 ? 'pos' : ret < 0 ? 'neg' : '';
           const retTxt = ret == null ? '—' : (ret > 0 ? '+' : '') + ret.toFixed(2) + '%';
@@ -5324,6 +6509,8 @@ function initScenarioLab(){
   const yieldEl = document.getElementById('scenario-yield');
   const oilEl = document.getElementById('scenario-oil');
   if(!vixEl) return;
+  /* P2-1: If URL has shared scenario params, apply them before first refresh. */
+  applyScenarioFromUrl();
   let scenarioDebounce = null;
   const trigger = () => {
     if(scenarioDebounce) clearTimeout(scenarioDebounce);
@@ -5397,6 +6584,31 @@ async function refreshSinceStrip(){
   setSinceItem('hotE2', current.hotE2, prev?.hotE2);
   setSinceItem('inbox', current.inbox, prev?.inbox);
   setSinceItem('synd', current.synd, prev?.synd);
+  /* P1-7: Compact summary line + push deltas into Trust Strip pillar tooltips. */
+  const fmtDelta = (cur, prv) => {
+    if(cur == null) return '—';
+    const num = Number(cur);
+    const display = Number.isFinite(num) ? (Math.round(num*10)/10) : cur;
+    if(prv == null || !Number.isFinite(Number(prv))) return String(display);
+    const d = num - Number(prv);
+    if(Math.abs(d) < 0.01) return `${display} (·)`;
+    return `${display} (${d>0?'+':''}${Math.round(d*10)/10})`;
+  };
+  const summaryEl = document.getElementById('since-summary-text');
+  if(summaryEl){
+    const parts = [
+      `articles 24h ${fmtDelta(current.articles24h, prev?.articles24h)}`,
+      `hot E2 ${fmtDelta(current.hotE2, prev?.hotE2)}`,
+      `inbox ${fmtDelta(current.inbox, prev?.inbox)}`,
+      `synd% ${fmtDelta(current.synd, prev?.synd)}`,
+    ];
+    summaryEl.textContent = parts.join(' · ');
+  }
+  /* Append deltas to Trust Strip pillar tooltips so the deltas are not hidden — DATA gets articles24h, SOURCE gets synd. */
+  const dataChunk = document.querySelector('.lattice-trust-strip [data-trust="data"]');
+  if(dataChunk) dataChunk.title = `Data freshness and article ingestion — click to open Ops · since last look: articles 24h ${fmtDelta(current.articles24h, prev?.articles24h)}, hot E2 ${fmtDelta(current.hotE2, prev?.hotE2)}`;
+  const sourceChunk = document.querySelector('.lattice-trust-strip [data-trust="source"]');
+  if(sourceChunk) sourceChunk.title = `Source diversity and syndicator share — click to open Ops · since last look: synd% ${fmtDelta(current.synd, prev?.synd)}, inbox ${fmtDelta(current.inbox, prev?.inbox)}`;
   // Update snapshot only on explicit reset or first visit (keep stable delta across refreshes within a session)
   if(!prev) saveSinceSnapshot(current);
 }
@@ -5545,7 +6757,7 @@ function togglePeek(){
 function showHelpOverlay(){
   const overlay = ensurePeekOverlay();
   overlay.innerHTML = `
-    <div class="peek-head"><span>KEYBOARD HELP</span><span style="color:var(--text-muted);font-size:10px">? to close</span></div>
+    <div class="peek-head"><span>KEYBOARD HELP</span><span style="color:var(--text-muted);font-size:10px">? to close · F to show first-run guide</span></div>
     <div class="peek-row"><span class="peek-key">Ctrl / Cmd K</span>open command search for surfaces, filters, and actions</div>
     <div class="peek-row"><span class="peek-key">J / K</span>navigate rows (hot events, inbox)</div>
     <div class="peek-row"><span class="peek-key">Space</span>peek event detail (uplift, hawkes, articles)</div>
@@ -5556,10 +6768,69 @@ function showHelpOverlay(){
     <div class="peek-row"><span class="peek-key">G V</span>go to Investigate</div>
     <div class="peek-row"><span class="peek-key">G M</span>go to Geo (map)</div>
     <div class="peek-row"><span class="peek-key">G O</span>go to Ops</div>
+    <div class="peek-row"><span class="peek-key">G T</span>open Theme Brief in Investigate</div>
     <div class="peek-row"><span class="peek-key">A / R / S</span>accept / reject / simulate in Inbox</div>
+    <div class="peek-row"><span class="peek-key">Shift S</span>custom snooze duration (Inbox)</div>
+    <div class="peek-row"><span class="peek-key">B</span>open Bulk menu (Inbox, when items selected)</div>
+    <div class="peek-row"><span class="peek-key">D</span>toggle reference drawer for the active surface</div>
+    <div class="peek-row"><span class="peek-key">O</span>open / collapse all details on the active surface</div>
+    <div class="peek-row"><span class="peek-key">F</span>show the 5-surface tour (first-run guide)</div>
     <div class="peek-row"><span class="peek-key">Esc</span>clear focus / close overlay</div>
   `;
   overlay.classList.add('active');
+}
+/* P2-7: First-run modal — replaces the "How To Use This Dashboard" home card.
+   Shown automatically once (per browser, gated by localStorage). Available on
+   demand via F key or by clicking the help button. */
+const FIRSTRUN_STORAGE_KEY = 'lattice:first-run-shown';
+function showFirstRunModal(force = false){
+  if (!force) {
+    try { if (localStorage.getItem(FIRSTRUN_STORAGE_KEY) === '1') return; } catch {}
+  }
+  let dialog = document.getElementById('lattice-firstrun');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'lattice-firstrun';
+    dialog.className = 'lattice-firstrun';
+    dialog.innerHTML = `
+      <div class="firstrun-head">
+        <div>
+          <div class="section-kicker">Welcome to Lattice</div>
+          <div class="section-title">Five surfaces, one decision flow</div>
+        </div>
+        <button class="btn" onclick="document.getElementById('lattice-firstrun').close()" aria-label="Close">×</button>
+      </div>
+      <div class="firstrun-grid">
+        <div class="firstrun-step"><span class="step-index">1</span><div><strong>Home</strong> — today's validated signals (E2). Cockpit + tracking + cross-theme. Press <kbd>G H</kbd>.</div></div>
+        <div class="firstrun-step"><span class="step-index">2</span><div><strong>Inbox</strong> — process incoming items. Each action shows its destination. <kbd>J/K</kbd> nav, <kbd>A/R/S</kbd> act, <kbd>B</kbd> bulk.</div></div>
+        <div class="firstrun-step"><span class="step-index">3</span><div><strong>Investigate</strong> — Theme Brief · Regime · Scenario above the fold. Discovery and labs in drawers below. <kbd>G T</kbd> jumps here.</div></div>
+        <div class="firstrun-step"><span class="step-index">4</span><div><strong>Geo Lens</strong> — spatial view of theme pressure. Map filters propagate from other surfaces.</div></div>
+        <div class="firstrun-step"><span class="step-index">5</span><div><strong>Ops</strong> — operator surface. Skip when everything is green. <kbd>G O</kbd>.</div></div>
+      </div>
+      <div class="firstrun-foot">
+        <div class="meta-line">Press <kbd>?</kbd> for the full keyboard cheatsheet, <kbd>F</kbd> to reopen this guide.</div>
+        <button class="btn btn-primary" onclick="dismissFirstRunModal()">Got it</button>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+  }
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+}
+function dismissFirstRunModal(){
+  try { localStorage.setItem(FIRSTRUN_STORAGE_KEY, '1'); } catch {}
+  const dialog = document.getElementById('lattice-firstrun');
+  if (dialog) {
+    if (typeof dialog.close === 'function') dialog.close();
+    else dialog.removeAttribute('open');
+  }
+}
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => showFirstRunModal(false));
+  } else {
+    setTimeout(() => showFirstRunModal(false), 1000);
+  }
 }
 function isHelpKey(e){
   return e.key === '?' || (e.shiftKey && (e.key === '/' || e.code === 'Slash'));
@@ -5584,7 +6855,7 @@ function globalKeyHandler(e){
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
 
-  // G-chord: goto surface (+ G+K = scroll KPI strip to top)
+  // G-chord: goto surface (+ G+K = scroll KPI strip to top, G+T = Theme Brief)
   if(keyChord === 'g'){
     const map = { h:'home', i:'inbox', v:'investigate', m:'geo', o:'ops' };
     const target = map[e.key.toLowerCase()];
@@ -5595,15 +6866,47 @@ function globalKeyHandler(e){
       if(kpi) kpi.scrollIntoView({block:'start', behavior:'auto'});
       keyChord = null; e.preventDefault(); return;
     }
+    /* P2-6: G T = open Investigate with last-viewed theme (deep link). */
+    if(e.key.toLowerCase() === 't'){
+      switchSurface('investigate');
+      const briefCard = document.getElementById('theme-brief-card') || document.getElementById('investigate-brief-section');
+      if(briefCard) briefCard.scrollIntoView({block:'start', behavior:'smooth'});
+      keyChord = null; e.preventDefault(); return;
+    }
   }
 
   if(e.key === 'g' || e.key === 'G'){ setKeyChord('g'); return; }
+
+  /* P2-6: Standalone shortcuts D / O. */
+  if(e.key === 'd' || e.key === 'D'){
+    /* D = toggle the surface-appropriate reference drawer. */
+    const surface = document.body.getAttribute('data-surface') || 'home';
+    let drawerId = null;
+    if(surface === 'home') drawerId = 'home-reference-drawer';
+    else if(surface === 'investigate') drawerId = 'investigate-trend-drawer';
+    if(drawerId){
+      const drawer = document.getElementById(drawerId);
+      if(drawer){ drawer.open = !drawer.open; e.preventDefault(); return; }
+    }
+  }
+  if(e.key === 'o' || e.key === 'O'){
+    /* O = open all <details> on the active surface (Cross-Theme details, brief secondary, etc.). */
+    const activeSurface = document.querySelector('.surface.active') || document.body;
+    const allDetails = activeSurface.querySelectorAll('details:not([data-no-bulk-open])');
+    if(allDetails.length){
+      const allOpen = Array.from(allDetails).every((d) => d.open);
+      allDetails.forEach((d) => { d.open = !allOpen; });
+      e.preventDefault();
+      return;
+    }
+  }
 
   if(e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown'){ moveFocus(1); e.preventDefault(); return; }
   if(e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp'){ moveFocus(-1); e.preventDefault(); return; }
   if(e.key === 'e' || e.key === 'E'){ showPeekForFocusedAny(); e.preventDefault(); return; }
   if(e.key === ' '){ togglePeekAny(); e.preventDefault(); return; }
   if(isHelpKey(e)){ showHelpOverlay(); e.preventDefault(); return; }
+  if(e.key === 'f' || e.key === 'F'){ showFirstRunModal(true); e.preventDefault(); return; }
   if(e.key === '/' && !e.shiftKey){ if(focusSurfaceFilter()) e.preventDefault(); return; }
   if(e.key === 'Escape'){
     // Esc cascades: (1) close peek/help overlay first if open,
@@ -5847,10 +7150,13 @@ async function refreshAll(){
   updateInboxBulkState();
   document.getElementById('last-update').textContent='Updating...';
   const decisionInboxReady=refreshDecisionInbox();
+  ensureCurrentTheme();
+  renderMyThemes();
+  const primaryBriefReady=loadThemeBrief().catch((error)=>console.warn('primary theme brief failed', error));
   await Promise.all([
     decisionInboxReady,
     loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadCodexQuality(),loadModelHealth(),loadDataFreshnessAudit(),
-    loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),
+    loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),loadTrackedTargets(),loadCrossThemeConnectors(),
     loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
     refreshTrustStrip(),refreshHotEventsRows(),refreshSinceStrip(),refreshThemeSpectrum(),
@@ -5859,6 +7165,7 @@ async function refreshAll(){
   if (typeof initScenarioLab === 'function') initScenarioLab();
   ensureCurrentTheme();
   renderMyThemes();
+  await primaryBriefReady;
   await loadThemeBrief();
   await loadFollowedThemeBriefing();
   document.getElementById('last-update').textContent=`Updated ${fmtTime(new Date())}`;
@@ -6268,21 +7575,29 @@ async function loadThemeEvolution(){
 async function loadThemeBrief(){
   const el=document.getElementById('theme-brief');
   const badge=document.getElementById('theme-brief-badge');
+  const investigateEl=document.getElementById('investigate-theme-brief');
+  const investigateBadge=document.getElementById('investigate-theme-brief-badge');
   if(!el||!badge)return;
   if(!state.currentTheme){
     badge.textContent='No theme selected';
-    el.innerHTML='<div class="theme-empty">Pick a theme from the digest, lifecycle pyramid, or evolution table to inspect structural change.</div>';
+    const emptyHtml='<div class="theme-empty">Select a theme — from Cross-Theme, Inbox, or the picker — to load its claim, evidence, risks, and watchpoints.</div>';
+    el.innerHTML=emptyHtml;
+    if(investigateBadge)investigateBadge.textContent='No theme selected';
+    if(investigateEl)investigateEl.innerHTML=emptyHtml;
     renderWorkspaceFocus();
     return;
   }
   badge.textContent=humanizeTheme(state.currentTheme);
+  if(investigateBadge)investigateBadge.textContent=humanizeTheme(state.currentTheme);
   const previousViewedAt=themeLastViewed[state.currentTheme]||null;
   const params=new URLSearchParams({period:getCurrentPeriod()});
   if(previousViewedAt)params.set('since',previousViewedAt);
   const cacheKey=`theme-brief-${state.currentTheme}-${getCurrentPeriod()}-${cacheToken(previousViewedAt||'first')}`;
   const {data,cached,cachedAt}=await f(`${API}/theme-brief/${encodeURIComponent(state.currentTheme)}?${params.toString()}`,cacheKey);
   if(!data?.sections){
-    el.innerHTML='<div class="theme-empty">Theme Brief data is not available for the selected theme yet.</div>';
+    const unavailableHtml='<div class="theme-empty">Theme Brief data is not available for the selected theme yet.</div>';
+    el.innerHTML=unavailableHtml;
+    if(investigateEl)investigateEl.innerHTML=unavailableHtml;
     return;
   }
   themeBriefCache[state.currentTheme]=data;
@@ -6362,13 +7677,31 @@ async function loadThemeBrief(){
   const selectedMovement=sections.subtopicMovement?.selectedTheme;
   const peers=sections.subtopicMovement?.peerThemes||[];
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Subtopic Movement</div><span class="badge">${escapeHtml(humanizeTheme(data.parentTheme||'theme'))}</span></div>${selectedMovement?`<div class="brief-item"><strong>${escapeHtml(selectedMovement.label||selectedMovement.theme)}</strong><div class="meta-line">Rank ${fmtWhole(selectedMovement.rank||0)} | share ${pct(selectedMovement.lastSharePct,0)} | delta ${fmtPercent(selectedMovement.deltaSharePct,1)}</div></div>`:''}<div class="brief-list">${peers.slice(0,5).map((item)=>`<div class="brief-item"><strong>${escapeHtml(item.label||item.theme)}</strong><div class="meta-line">Share ${pct(item.lastSharePct,0)} | delta ${fmtPercent(item.deltaSharePct,1)} | rank ${fmtWhole(item.rank||0)}</div></div>`).join('')||'<div class="theme-empty">Subtopic movement is not available yet.</div>'}</div></div>`;
-  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Related Entities</div><span class="badge">${fmtWhole((sections.relatedEntities?.entities||[]).length)} linked</span></div>${renderEntityCards(sections.relatedEntities)}</div>`;
-  html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Adjacent Pathways</div><span class="badge">${fmtWhole(asArray(sections.adjacentPathways?.items||sections.adjacentPathways).length)} routes</span></div>${renderAdjacentPathways(sections.adjacentPathways)}</div>`;
+  /* P0-4: Risks + Watch Next stay primary. Related Entities + Adjacent Pathways
+     demoted into one collapsed <details> with count badges and chip preview in the
+     summary so analysts see whether opening is worth it. */
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Risks</div><span class="badge">${fmtWhole((sections.risks||[]).length)} watchouts</span></div>${renderRiskWatchouts(sections.risks)}</div>`;
   html+=`<div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Watch Next</div><span class="badge">${fmtWhole((sections.watchpoints||[]).length)} prompts</span></div>${renderWatchNextChecklist(sections.watchpoints)}</div>`;
+  const entitiesArr = sections.relatedEntities?.entities||[];
+  const pathwaysArr = asArray(sections.adjacentPathways?.items||sections.adjacentPathways);
+  const entityChipPreview = entitiesArr.slice(0,3).map(e=>escapeHtml(e.name||e.label||e.entity||'')).filter(Boolean).join(' · ');
+  const pathwayChipPreview = pathwaysArr.slice(0,2).map(p=>escapeHtml(p.label||p.name||p.title||'')).filter(Boolean).join(' · ');
+  html+=`<details class="brief-section brief-secondary-details">
+    <summary class="brief-secondary-summary">
+      <span class="brief-section-title">Related Entities &amp; Adjacent Pathways</span>
+      <span class="badge">${fmtWhole(entitiesArr.length)} linked</span>
+      <span class="badge">${fmtWhole(pathwaysArr.length)} routes</span>
+      ${entityChipPreview?`<span class="brief-secondary-preview">${entityChipPreview}${pathwayChipPreview?` · ${pathwayChipPreview}`:''}</span>`:pathwayChipPreview?`<span class="brief-secondary-preview">${pathwayChipPreview}</span>`:''}
+    </summary>
+    <div class="brief-secondary-body">
+      <div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Related Entities</div><span class="badge">${fmtWhole(entitiesArr.length)} linked</span></div>${renderEntityCards(sections.relatedEntities)}</div>
+      <div class="brief-section"><div class="brief-section-head"><div class="brief-section-title">Adjacent Pathways</div><span class="badge">${fmtWhole(pathwaysArr.length)} routes</span></div>${renderAdjacentPathways(sections.adjacentPathways)}</div>
+    </div>
+  </details>`;
   html+=renderNotebookHooks(sections.notebookHooks||{});
   html+='</div>';
   el.innerHTML=html;
+  if(investigateEl)investigateEl.innerHTML=html;
   renderMyThemes();
   renderWorkspaceFocus();
 }
@@ -6801,8 +8134,12 @@ function normalizeSignalToReviewItem(s, idx = 0) {
     matchedControls: Number(s.n_controls || s.nControls || s.matched_controls_count || s.control_count) || null,
     sourceCount: Number(s.source_count) || null,
     updatedAt: s.updated_at || s.computed_at || null,
+    freshnessLane: s.freshness_lane || 'validated',
+    ageDays: Number.isFinite(Number(s.age_days)) ? Number(s.age_days) : null,
     decisionState: s.decision_state || 'pending',
-    whyVisible: tStat ? `promoted E2: t-stat ${tStat.toFixed(2)} with quality gates passed` : 'promoted E2 evidence grade',
+    whyVisible: tStat
+      ? `${s.freshness_lane === 'fresh_validated' ? 'fresh validated' : 'validated archive'} E2: t-stat ${tStat.toFixed(2)} with quality gates passed`
+      : `${s.freshness_lane === 'fresh_validated' ? 'fresh validated' : 'validated archive'} E2 evidence grade`,
     sources: Array.isArray(s.sources) ? s.sources : [],
     raw: s,
   };
@@ -6891,12 +8228,76 @@ async function loadE2SignalQueue(){
     window.__lastE2Items = items;
     queue.style.display = '';
     countBadge.textContent = items.length;
-    container.innerHTML = items.map(renderReviewItemCard).join('');
+    const meta = data.meta || {};
+    const hasFresh = Number(meta.freshSignalCount || 0) > 0;
+    const latest = meta.latestValidatedAt ? ` Latest validated: ${escapeHtml(fmtDate(meta.latestValidatedAt))}.` : '';
+    const statusNote = hasFresh
+      ? `<div class="signal-status-note">Fresh validated queue. ${latest}</div>`
+      : `<div class="signal-status-note warning">No fresh E2 signal is available yet; showing the strongest historical validated signals while outcomes mature.${latest}</div>`;
+    container.innerHTML = statusNote + items.map(renderReviewItemCard).join('');
     if (items[0]) renderSelectedProofCard(items[0]);
   } catch (e) { console.warn('E2 signal queue failed', e); }
 }
 // Citation popover for Theme Brief dossier (P2)
 let citePopoverEl = null;
+/* P2-5: Reference drawer last-open persistence. Each <details> with id is
+   tracked in localStorage so the open/closed state survives reloads and
+   surface switches. Run once on DOMContentLoaded. */
+const DRAWER_STORAGE_KEY = 'lattice:drawer-open';
+const PERSISTENT_DRAWER_IDS = [
+  'home-reference-drawer',
+  'investigate-trend-drawer',
+  'investigate-analysis-drawer',
+];
+function persistDrawerOpenState() {
+  PERSISTENT_DRAWER_IDS.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    /* Apply stored value once. */
+    try {
+      const stored = JSON.parse(localStorage.getItem(DRAWER_STORAGE_KEY) || '{}');
+      if (typeof stored[id] === 'boolean') el.open = stored[id];
+    } catch {}
+    /* Listen for future changes. */
+    el.addEventListener('toggle', () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem(DRAWER_STORAGE_KEY) || '{}');
+        stored[id] = el.open;
+        localStorage.setItem(DRAWER_STORAGE_KEY, JSON.stringify(stored));
+      } catch {}
+    });
+  });
+}
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', persistDrawerOpenState);
+  } else {
+    persistDrawerOpenState();
+  }
+}
+function buildCitationMarkdown(cite, num) {
+  /* P2-4: Build a portable citation in plain markdown + a BibTeX line. */
+  const title = cite.title || 'Reference';
+  const source = cite.source || 'source';
+  const date = cite.date ? fmtDate(cite.date) : '';
+  const url = cite.url || '';
+  const md = url
+    ? `[${num}] [${title}](${url}) — ${source}${date?` (${date})`:''}`
+    : `[${num}] ${title} — ${source}${date?` (${date})`:''}`;
+  const safeKey = String(title).toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || `cite${num}`;
+  const bib = `@misc{${safeKey},\n  title={${title}},\n  howpublished={${source}},${date?`\n  year={${date.slice(0,4)}},`:''}${url?`\n  url={${url}},`:''}\n  note={Lattice brief citation [${num}]}\n}`;
+  return { md, bib };
+}
+function copyCitation(num, format) {
+  const cite = (window.__briefCitations || [])[num - 1];
+  if (!cite) return;
+  const { md, bib } = buildCitationMarkdown(cite, num);
+  const text = format === 'bibtex' ? bib : md;
+  navigator.clipboard?.writeText(text).then(
+    () => { try { window.__lastCitationCopyAck = `Copied citation [${num}] (${format})`; } catch {} },
+    () => alert('Copy failed — clipboard permission denied.'),
+  );
+}
 function showCitationPopover(ev, num) {
   ev.stopPropagation();
   const cites = window.__briefCitations || [];
@@ -6912,6 +8313,10 @@ function showCitationPopover(ev, num) {
     <div class="cite-popover-meta">${escapeHtml(cite.source || 'source')} | ${escapeHtml(cite.kind)} ${freshChip}</div>
     ${cite.date ? `<div class="cite-popover-meta" style="margin-top:4px">${escapeHtml(fmtDate(cite.date))}</div>` : ''}
     ${cite.url ? `<div style="margin-top:6px"><a href="${escapeHtml(cite.url)}" target="_blank" rel="noreferrer" style="color:var(--accent);font-size:11px">Open source</a></div>` : ''}
+    <div class="cite-popover-actions" style="margin-top:8px;display:flex;gap:6px">
+      <button class="btn" style="font-size:10.5px;padding:4px 10px" onclick="copyCitation(${num},'markdown')" title="Copy as markdown link">Copy MD</button>
+      <button class="btn" style="font-size:10.5px;padding:4px 10px" onclick="copyCitation(${num},'bibtex')" title="Copy as BibTeX entry">Copy BibTeX</button>
+    </div>
   `;
   document.body.appendChild(pop);
   const rect = ev.target.getBoundingClientRect();
