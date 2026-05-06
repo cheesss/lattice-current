@@ -39,11 +39,47 @@
   --blue-info: #3b82f6;
   --graphite: #4b5563;
 
-  /* Text scale */
-  --text-loud: rgba(255, 255, 255, .95);
-  --text-base: rgba(255, 255, 255, .75);
-  --text-soft: rgba(255, 255, 255, .45);
-  --text-muted: rgba(255, 255, 255, .25);
+  /* Text scale — opacities tuned for WCAG AA on small text against bg-void.
+     Previous: .95 / .75 / .45 / .25. The .45 muted at 9-11px failed AA
+     contrast; bumped to .60 / .42 to keep the visual hierarchy while
+     keeping body text legible without straining at typical viewing
+     distances. */
+  --text-loud: rgba(255, 255, 255, .96);
+  --text-base: rgba(255, 255, 255, .80);
+  --text-soft: rgba(255, 255, 255, .60);
+  --text-muted: rgba(255, 255, 255, .42);
+
+  /* Type scale — semantic sizes. Use these instead of inline font-size:9px etc.
+     Caps (uppercase labels) and body have separate rails because uppercase
+     text needs more letter-spacing and a higher floor for legibility. */
+  --fs-caps-xs:   10.5px;     /* uppercase eyebrow / kicker / pillar label */
+  --fs-caps-sm:   11.5px;     /* uppercase section title */
+  --fs-2xs:       11px;       /* shortcut chips, micro-meta */
+  --fs-xs:        12px;       /* metadata, badges, deltas */
+  --fs-sm:        13px;       /* compact body */
+  --fs-md:        14px;       /* default body */
+  --fs-lg:        16px;       /* card titles */
+  --fs-xl:        20px;       /* hero numbers */
+  --fs-2xl:       26px;       /* surface hero */
+  --fs-3xl:       32px;       /* page hero */
+
+  /* Line heights — default 1.5 for body, 1.3 for compact rows, 1.65 for prose */
+  --lh-tight:    1.2;
+  --lh-snug:     1.35;
+  --lh-default:  1.5;
+  --lh-relaxed:  1.6;
+
+  /* Letter spacing — uppercase labels need .08-.14em depending on size */
+  --ls-caps-tight:  .06em;
+  --ls-caps:        .1em;
+  --ls-caps-loose:  .14em;
+
+  /* Font weights — Geist supports 300-700 */
+  --fw-light:    300;
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semi:     600;
+  --fw-bold:     700;
 
   /* Fonts */
   --font-sans: 'Geist', Inter, system-ui, sans-serif;

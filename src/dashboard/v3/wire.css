@@ -160,9 +160,10 @@ body[data-v3-cheat-open] #lang-toggle {
 }
 .v3-ticker-label {
   color: var(--v3-text-soft);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 9.5px;
+  font-size: var(--fs-caps-xs, 10.5px);
+  font-weight: 600;
 }
 .v3-ticker-val {
   color: var(--v3-text-loud);

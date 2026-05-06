@@ -12,13 +12,19 @@
   --bg-void:#07080a;--bg-base:#0d0f13;--bg-surface:#13161d;--bg-elevated:#1c2028;--bg-overlay:rgba(13,15,19,.92);
   --border-dim:rgba(255,255,255,.04);--border-base:rgba(255,255,255,.08);--border-focus:rgba(255,255,255,.18);
   --signal-green:#16c784;--amber-risk:#f59e0b;--red-critical:#ef4444;--blue-info:#3b82f6;--graphite:#4b5563;
-  --text-loud:rgba(255,255,255,.95);--text-base:rgba(255,255,255,.75);--text-soft:rgba(255,255,255,.45);--text-muted:rgba(255,255,255,.25);
+  /* Text + typography tokens — kept in sync with shared/tokens.css for the
+     period until the inline duplicate is removed. WCAG-tuned opacities. */
+  --text-loud:rgba(255,255,255,.96);--text-base:rgba(255,255,255,.80);--text-soft:rgba(255,255,255,.60);--text-muted:rgba(255,255,255,.42);
   --font-sans:'Geist',Inter,system-ui,sans-serif;--font-mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+  --fs-caps-xs:10.5px;--fs-caps-sm:11.5px;--fs-2xs:11px;--fs-xs:12px;--fs-sm:13px;--fs-md:14px;--fs-lg:16px;--fs-xl:20px;--fs-2xl:26px;
+  --lh-tight:1.2;--lh-snug:1.35;--lh-default:1.5;--lh-relaxed:1.6;
+  --ls-caps-tight:.06em;--ls-caps:.1em;--ls-caps-loose:.14em;
+  --fw-regular:400;--fw-medium:500;--fw-semi:600;--fw-bold:700;
   --bg:var(--bg-void);--surface:var(--bg-surface);--surface2:var(--bg-elevated);--border:var(--border-base);--text:var(--text-loud);--muted:var(--text-soft);
   --accent:#d8f99d;--accent2:var(--signal-green);--amber:var(--amber-risk);--red:var(--red-critical);--teal:#67d1c5;--blue:var(--blue-info)
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:radial-gradient(circle at top left,rgba(22,199,132,.1),transparent 26%),radial-gradient(circle at top right,rgba(59,130,246,.08),transparent 24%),linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 48%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:12px;line-height:1.55;font-feature-settings:"tnum" 1,"ss01" 1}
+body{background:radial-gradient(circle at top left,rgba(22,199,132,.1),transparent 26%),radial-gradient(circle at top right,rgba(59,130,246,.08),transparent 24%),linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 48%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:13px;line-height:1.55;font-feature-settings:"tnum" 1,"ss01" 1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 a{color:var(--text)}
 .container{max-width:1680px;margin:0 auto;padding:18px}
 .hero,.section-block,.surface-drawer{border:1px solid rgba(255,255,255,.05);border-radius:18px;background:rgba(17,23,15,.8)}
@@ -1786,6 +1792,186 @@ body:not([data-surface="home"]) .surface-context-bar{display:flex}
   .home-orientation{grid-template-columns:1fr}
   .command-palette{top:58px}
   .drawer-metrics{grid-template-columns:1fr}
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ *  TYPOGRAPHY & COLOR READABILITY PASS (post-IA refinement)
+ *  Goal: lift small text above the 11px floor, normalize letter-spacing,
+ *  apply tabular-nums to numerics, and set line-heights that don't crowd.
+ *  Strategy: this block lives at the end of the cascade so overrides win
+ *  without editing every existing rule. Specific classes the audit flagged
+ *  are reset here; the type-scale tokens drive consistency.
+ * ───────────────────────────────────────────────────────────────────── */
+
+/* Body baseline + font feature settings */
+body{font-size:var(--fs-sm);line-height:var(--lh-default);letter-spacing:.005em}
+
+/* Numeric content — tabular alignment + slashed zero everywhere */
+.brief-stat-value,.kpi-chip-value,.tstrip-value,.since-value,.since-delta,
+.scenario-pred-row .ret,.scenario-pred-row .mult,.scenario-pred-row .sym,
+.regime-brief-kpi .val,.metric-value,.lattice-since-summary,
+.tracking-chip-more,.seg-count,.cite-num,.story-rank,.kpi-regime-badge,
+.xtc-score,.brief-trust-value,.inbox-bulk-breakdown,
+[data-numeric],[class*="-value"],[class*="-count"]{
+  font-variant-numeric:tabular-nums slashed-zero;
+}
+
+/* Uppercase eyebrow / kicker / pillar / brief section title — normalized */
+.section-kicker,.cockpit-kicker,.drawer-kicker,
+.brief-section-title,.brief-stat-label,.brief-trust-label-lead,
+.tstrip-label,.since-summary-head,.since-head,.since-label,
+.ts-head,.metric-label,
+.lattice-dot-with-label,.scenario-lab-subtitle ~ * .label{
+  font-size:var(--fs-caps-xs);
+  letter-spacing:var(--ls-caps);
+  text-transform:uppercase;
+  font-weight:var(--fw-semi);
+}
+
+/* Section titles — slightly larger, tighter line height, semi weight */
+.section-title{font-size:var(--fs-lg);line-height:var(--lh-tight);font-weight:var(--fw-semi);letter-spacing:-.005em}
+.section-kicker{color:var(--text-soft);margin-bottom:3px}
+
+/* Card titles — clearer hierarchy */
+.card-title{font-size:var(--fs-md);line-height:var(--lh-snug);font-weight:var(--fw-semi);letter-spacing:-.003em}
+
+/* Body / meta-line / inline help — bumped from 10-11px to 12px with relaxed line-height */
+.meta-line{font-size:var(--fs-xs);line-height:var(--lh-default);color:var(--text-soft)}
+.section-meta{font-size:var(--fs-xs);line-height:var(--lh-default);color:var(--text-soft)}
+.desc-text,.subtitle{font-size:var(--fs-sm);line-height:var(--lh-default);color:var(--text-base)}
+
+/* Badges — caps, 11px, +14% letter-spacing for legibility at small size */
+.badge{font-size:var(--fs-2xs);letter-spacing:.06em;font-weight:var(--fw-medium);padding:2px 8px}
+
+/* Trust strip pillars — pillar label was 10px, value was 11px — bumped */
+.tstrip-label{font-size:var(--fs-caps-xs);color:var(--text-soft)}
+.tstrip-value{font-size:var(--fs-xs);font-weight:var(--fw-medium)}
+
+/* Inbox shortcut chips — were 9px (too small) — minimum 10.5px */
+.inbox-shortcut{font-size:var(--fs-caps-xs);padding:1px 6px;letter-spacing:.04em}
+.inbox-arrow{font-size:var(--fs-xs)}
+.inbox-dest{font-size:var(--fs-caps-xs);letter-spacing:.04em;font-weight:var(--fw-medium)}
+
+/* Cross-theme card — claim text bumped, lane chip + score normalized */
+.xtc-card .xtc-claim strong{font-size:var(--fs-md);font-weight:var(--fw-semi);line-height:var(--lh-snug);letter-spacing:-.003em}
+.xtc-pair{font-size:var(--fs-2xs);color:var(--text-soft)}
+.xtc-lane{font-size:var(--fs-caps-xs);letter-spacing:var(--ls-caps);font-weight:var(--fw-semi);padding:3px 9px}
+.xtc-score{font-size:var(--fs-2xs);color:var(--text-base)}
+.xtc-reason{font-size:var(--fs-sm);line-height:var(--lh-default);color:var(--text-base)}
+.xtc-evidence-line{font-size:var(--fs-2xs);color:var(--text-soft)}
+.xtc-details summary{font-size:var(--fs-2xs);color:var(--text-soft)}
+
+/* Brief Trust pill — was 9.5-11px — bumped to 11.5-12px */
+.brief-trust-pill{font-size:var(--fs-xs);padding:6px 12px}
+.brief-trust-label-lead{font-size:var(--fs-caps-xs);color:var(--text-soft)}
+.brief-trust-dots{font-size:15px;gap:4px}
+.brief-trust-popover{font-size:var(--fs-xs);min-width:300px}
+.brief-trust-row{padding:5px 0}
+.brief-trust-label{font-size:var(--fs-xs);color:var(--text-base)}
+.brief-trust-value{font-size:var(--fs-xs);color:var(--text-loud)}
+
+/* Scenario lab — slider labels and predictions */
+.scenario-lab-subtitle{font-size:var(--fs-2xs);color:var(--text-soft);line-height:var(--lh-default)}
+.scenario-input label{font-size:var(--fs-xs);color:var(--text-base);font-weight:var(--fw-medium)}
+.scenario-input .val{font-size:var(--fs-xs);font-weight:var(--fw-semi)}
+.scenario-pred-row{font-size:var(--fs-2xs);line-height:var(--lh-snug)}
+.scenario-empty-explainer{font-size:var(--fs-xs);line-height:var(--lh-default)}
+.scenario-empty-explainer strong{font-size:var(--fs-sm);color:var(--text-loud);display:block;margin-bottom:4px}
+
+/* Inbox filter chips + segmented + help text — clearer */
+.inbox-filter-seg{font-size:var(--fs-xs);font-weight:var(--fw-medium);padding:6px 14px}
+.inbox-filter-seg.active{font-weight:var(--fw-semi)}
+.inbox-filter-chip{font-size:var(--fs-2xs);padding:4px 12px;font-weight:var(--fw-medium)}
+.inbox-filter-help{font-size:var(--fs-2xs);color:var(--text-soft);letter-spacing:.02em;line-height:var(--lh-default)}
+.seg-count{font-size:10px;color:var(--text-soft)}
+
+/* Inbox list rows — title clearer, meta less crowded */
+.inbox-item-title{font-size:var(--fs-sm);font-weight:var(--fw-medium);line-height:var(--lh-snug)}
+.inbox-item-meta{font-size:var(--fs-2xs);color:var(--text-soft);line-height:var(--lh-default)}
+.inbox-item-head{gap:5px}
+.inbox-preview-empty{font-size:var(--fs-sm);line-height:var(--lh-default);color:var(--text-base);padding:24px}
+
+/* Bulk menu summary + breakdown */
+.inbox-bulk-bar{font-size:var(--fs-xs)}
+#inbox-bulk-count{font-weight:var(--fw-semi);font-size:var(--fs-xs);color:var(--text-loud)}
+.inbox-bulk-breakdown{font-size:var(--fs-2xs);color:var(--text-soft)}
+.inbox-bulk-menu > summary{font-size:var(--fs-xs);font-weight:var(--fw-semi);padding:6px 14px}
+
+/* Tracking chips — bumped from 11.5px and add hover tone */
+.tracking-chip{font-size:var(--fs-xs);font-weight:var(--fw-medium);padding:5px 13px;letter-spacing:.005em}
+.tracking-chip-empty,.tracking-chip-more{font-size:var(--fs-2xs);color:var(--text-soft)}
+.tracking-add-summary{font-size:var(--fs-sm)}
+
+/* Investigate drawer tab buttons */
+.investigate-drawers-tab{font-size:var(--fs-xs);font-weight:var(--fw-medium)}
+
+/* 4-state lattice dot — slightly bigger + stronger glow for the validated state */
+.lattice-dot{width:8px;height:8px;margin-right:6px}
+.lattice-dot-validated{box-shadow:0 0 8px rgba(52,211,153,.55)}
+.lattice-dot-provisional{box-shadow:0 0 7px rgba(167,139,250,.45)}
+.lattice-dot-with-label{font-size:var(--fs-caps-xs);letter-spacing:var(--ls-caps);font-weight:var(--fw-medium);gap:6px}
+
+/* Compact since-summary line — bumped legibility */
+.lattice-since-summary{font-size:var(--fs-2xs);padding:6px 14px;color:var(--text-base)}
+.lattice-since-summary .since-summary-head{font-size:var(--fs-caps-xs);color:var(--text-soft)}
+.lattice-since-summary #since-summary-text{color:var(--text-base)}
+
+/* Ops legacy feeds collapsed summary — visible enough to be clickable */
+.ops-legacy-summary{font-size:var(--fs-sm)}
+.ops-legacy-summary .section-title{font-size:var(--fs-md)}
+.ops-legacy-summary .section-meta{font-size:var(--fs-xs)}
+
+/* Citation popover */
+.cite-popover{font-size:var(--fs-xs);line-height:var(--lh-default)}
+.cite-popover-title{font-size:var(--fs-sm);font-weight:var(--fw-semi);line-height:var(--lh-snug)}
+.cite-popover-meta{font-size:var(--fs-2xs);color:var(--text-soft)}
+.cite-num{font-size:var(--fs-2xs);font-weight:var(--fw-semi)}
+
+/* First-run modal — readable body copy */
+.lattice-firstrun .firstrun-step{font-size:var(--fs-sm);line-height:var(--lh-default)}
+.lattice-firstrun .firstrun-step strong{font-size:var(--fs-md);font-weight:var(--fw-semi)}
+.lattice-firstrun .firstrun-step kbd{font-size:var(--fs-2xs)}
+.lattice-firstrun .firstrun-foot .meta-line{font-size:var(--fs-2xs)}
+
+/* General buttons — keep button text legible */
+.btn{font-size:var(--fs-xs);font-weight:var(--fw-medium);padding:6px 14px;letter-spacing:.005em}
+.inbox-btn{font-size:var(--fs-xs);padding:6px 14px;font-weight:var(--fw-semi)}
+
+/* Code-like elements */
+kbd,code{font-family:var(--font-mono);font-size:var(--fs-2xs);padding:1px 6px;background:rgba(0,0,0,.32);border:1px solid var(--border-dim,rgba(255,255,255,.06));border-radius:4px;letter-spacing:.02em}
+
+/* Anything still using inline 9-10px is forced up to 10.5px floor for readability */
+[style*="font-size:9px"],[style*="font-size: 9px"],[style*="font-size:10px"],[style*="font-size: 10px"]{
+  font-size:var(--fs-caps-xs) !important;
+}
+
+/* Color refinement — selected hover/focus states */
+.inbox-filter-seg.active{
+  background:rgba(126,224,129,.18);
+  color:#9bee9d;
+  border-color:rgba(126,224,129,.4);
+  box-shadow:inset 0 0 0 1px rgba(126,224,129,.15);
+}
+.tracking-chip{background:rgba(126,224,129,.10);border-color:rgba(126,224,129,.28);color:#9bee9d}
+.tracking-chip:hover{background:rgba(126,224,129,.20);border-color:rgba(126,224,129,.45);transform:translateY(-1px);transition:.15s ease}
+
+/* Cross-theme lane chips — stronger semantic separation */
+.xtc-lane.lane-validated{background:rgba(52,211,153,.18);color:#5eebac;border:1px solid rgba(52,211,153,.32)}
+.xtc-lane.lane-exploration,.xtc-lane.lane-research{background:rgba(96,165,250,.18);color:#7eb6fa;border:1px solid rgba(96,165,250,.32)}
+.xtc-lane.lane-needs_evidence,.xtc-lane.lane-needs-evidence{background:rgba(251,191,36,.18);color:#fcc94c;border:1px solid rgba(251,191,36,.32)}
+.xtc-lane.lane-noise{background:rgba(100,116,139,.20);color:#cbd5e1;border:1px solid rgba(100,116,139,.32)}
+
+/* Focus-visible for keyboard users — clearer ring across interactive elements */
+button:focus-visible,a:focus-visible,details > summary:focus-visible,
+[role="tab"]:focus-visible,input:focus-visible,select:focus-visible{
+  outline:2px solid rgba(34,211,238,.6);
+  outline-offset:2px;
+  border-radius:6px;
+}
+
+/* High-contrast media query — boost text opacity for users who request it */
+@media (prefers-contrast:more){
+  :root{--text-loud:#fff;--text-base:rgba(255,255,255,.92);--text-soft:rgba(255,255,255,.78);--text-muted:rgba(255,255,255,.62)}
 }
 </style>
 <!-- S-Tier banner overlay (G2 dashboard split, first slice). Renders
