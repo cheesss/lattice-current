@@ -1,4 +1,5 @@
 import { buildTypedAnalystSections } from './report-analyst-typed.mjs';
+import { generateCodexNarrative, validateCodexNarrative, narrativeToAnalystBlocks } from './report-codex-narrator.mjs';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -431,12 +432,50 @@ export function generateDeterministicAnalystDraft(bundle = {}) {
 }
 
 export async function generateReportAnalystDraft(bundle = {}, options = {}) {
-  if (options.provider && options.provider !== 'deterministic') {
-    return {
-      ...generateDeterministicAnalystDraft(bundle),
-      provider: 'deterministic',
-      providerFallbackReason: 'External LLM providers are intentionally disabled until budget, key, and validation policy are configured.',
-    };
+  /* Always start with the deterministic / typed draft. It's the floor. */
+  const draft = generateDeterministicAnalystDraft(bundle);
+  if (options.provider !== 'codex') return draft;
+
+  /* Phase 4: Codex narrative on top of typed sections. The narrative is
+   * additive — typed sections still render. If Codex fails or output fails
+   * validation, keep typed-only. */
+  const typed = buildTypedAnalystSections(bundle);
+  let narrativeAttempt;
+  try {
+    narrativeAttempt = await generateCodexNarrative(bundle, typed, { timeoutMs: options.codexTimeoutMs || 90_000 });
+  } catch (e) {
+    return { ...draft, codexAttempted: true, codexError: String(e?.message || e) };
   }
-  return generateDeterministicAnalystDraft(bundle);
+  if (!narrativeAttempt.ok || !narrativeAttempt.parsed) {
+    return { ...draft, codexAttempted: true, codexError: narrativeAttempt.error || 'unknown', codexMessage: narrativeAttempt.message };
+  }
+  /* Validate against bundle's allow-lists. We re-import the validator's
+   * helpers via a small inline shim — the validator module is the source
+   * of truth, but importing it here would cause a cycle. */
+  const { knownNumericStrings, allowedTickerStrings } = await import('./report-validator-helpers.mjs').catch(async () => {
+    /* Inline fallback if helpers module not present — replicate minimal
+     * logic. Real implementation will live in report-validator-helpers.mjs
+     * exported for both narrator and validator. */
+    const v = await import('./report-validator.mjs');
+    return { knownNumericStrings: v.knownNumericStrings || (() => new Set()), allowedTickerStrings: v.allowedTickerStrings || (() => new Set()) };
+  });
+  const knownNumbers = knownNumericStrings(bundle);
+  const allowedTickers = allowedTickerStrings(bundle);
+  const validated = validateCodexNarrative(narrativeAttempt.parsed, bundle, knownNumbers, allowedTickers);
+  const blocks = narrativeToAnalystBlocks(validated.sections, bundle);
+  if (!blocks) {
+    return { ...draft, codexAttempted: true, codexValidatedSections: validated.sections, codexDropped: validated.dropped, codexAttachFailed: 'no validated sections' };
+  }
+  return {
+    ...draft,
+    provider: 'codex+typed',
+    model: 'codex+rule-based-typed-analyst',
+    codexAttempted: true,
+    codexNarrativeHead: blocks.narrativeHead,
+    codexBullThesis: blocks.bullThesis,
+    codexBearThesis: blocks.bearThesis,
+    codexInvalidator: blocks.invalidator,
+    codexDropped: validated.dropped,
+    codexRaw: narrativeAttempt.raw,
+  };
 }
