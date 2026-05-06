@@ -87,6 +87,9 @@ function buildBundleDigest(bundle) {
       })),
     } : null,
     diagnosticSignals: bundle.metadata?.diagnosticSignals || {},
+    /* P5: cross-asset graph paths and historical analogues */
+    crossAssetPaths: bundle.metadata?.crossAssetPaths || null,
+    historicalAnalogues: bundle.metadata?.historicalAnalogues || null,
   };
 }
 
@@ -148,7 +151,21 @@ EVID-ARTICLE-155833) where relevant. Do NOT introduce new ids.
 
 If the bundle's diagnosticSignals.hasAggregateOrphan is true, the
 narrative head must acknowledge that the aggregate is orphaned and that
-the event timeline + knowledge graph are the trustworthy lenses.`;
+the event timeline + knowledge graph are the trustworthy lenses.
+
+CROSS-ASSET FRAMING (when crossAssetPaths.available is true):
+The narrative head should trace at least one 2-hop path through the
+graph (theme → component → endpoint entity) to ground the discussion
+in supply-chain reasoning. Use the relation_type and confidence from
+the path. Example phrasing: "Cloud Infrastructure → data-center power
+(component, evidence_count=20, confidence=0.55) → grid (technology)".
+
+HISTORICAL ANALOGUE FRAMING (when historicalAnalogues.available is
+true): If the top analogue similarity exceeds 0.85, mention it as a
+pattern reference: "the current 30-day intensity profile most closely
+matches the window starting 2026-02-01 (similarity 0.92), where
+canonical events <ID> and <ID> drove activity." Cite analogue
+similarity numbers from historicalAnalogues; do not invent.`;
 
 export async function generateCodexNarrative(bundle, typed, { timeoutMs = 90_000, dryRun = false } = {}) {
   const bundleDigest = buildBundleDigest(bundle);

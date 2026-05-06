@@ -20,6 +20,8 @@ import {
 } from './report-subject-fidelity.mjs';
 import { applyReportDataDiagnostics } from './report-data-diagnostics.mjs';
 import { loadThemeContext, themeContextToBundleAdditions } from './report-theme-context.mjs';
+import { loadCrossAssetPaths, crossAssetPathsToBundleAdditions } from './report-cross-asset-paths.mjs';
+import { loadThemeHistoricalAnalogues, tagAnalogueContext, historicalAnaloguesToBundleAdditions } from './report-historical-analogues.mjs';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -209,6 +211,16 @@ export async function buildDbThemeReportBundle(client, input = {}) {
    * evidence arrays plus a metadata.themeContext snapshot. */
   const themeCtx = await loadThemeContext(client, row.theme, { periodType });
   const themeAdditions = themeContextToBundleAdditions(themeCtx, row.theme);
+  /* P5: cross-asset paths (2-hop graph traversal) + historical analogues
+   * (cosine similarity on Hawkes intensity profile). Both gracefully no-op
+   * when the underlying graph or history is sparse. */
+  const crossAsset = await loadCrossAssetPaths(client, row.theme);
+  const crossAssetAdditions = crossAssetPathsToBundleAdditions(crossAsset);
+  const analogueResult = await loadThemeHistoricalAnalogues(client, row.theme);
+  if (analogueResult.available) {
+    analogueResult.analogues = await tagAnalogueContext(client, row.theme, analogueResult.analogues);
+  }
+  const analogueAdditions = historicalAnaloguesToBundleAdditions(analogueResult);
 
   const articles = await recentThemeArticles(client, row.theme, Number(input.evidenceLimit || 6));
   const evidence = articles.map(articleEvidence);
@@ -245,6 +257,8 @@ export async function buildDbThemeReportBundle(client, input = {}) {
       { metricId: 'MET-THEME-SHARE', kind: 'theme_trend', name: 'theme_share_pct', value: num(row.theme_share_pct), unit: 'percent', window: row.period_type, asOf: iso(row.computed_at) },
       { metricId: 'MET-THEME-NOVELTY', kind: 'theme_trend', name: 'novelty_score', value: num(row.novelty_score), unit: 'score', window: row.period_type, asOf: iso(row.computed_at) },
       ...themeAdditions.metrics,
+      ...crossAssetAdditions.metrics,
+      ...analogueAdditions.metrics,
     ],
     caveats: aggregateEvidenceMismatch ? [{
       caveatId: 'CAV-THEME-AGGREGATE-EVIDENCE-MISMATCH',
@@ -281,7 +295,13 @@ export async function buildDbThemeReportBundle(client, input = {}) {
       claimIds: ['CLM-001'],
     }],
     dataFreshness: [{ dataset: 'theme_trend_aggregates', freshnessStatus: freshnessFromTimestamp(row.computed_at, 24), lastUpdatedAt: iso(row.computed_at), slaHours: 24 }],
-    metadata: { dbBacked: true, row, ...(themeAdditions.extension || {}) },
+    metadata: {
+      dbBacked: true,
+      row,
+      ...(themeAdditions.extension || {}),
+      ...(crossAssetAdditions.extension || {}),
+      ...(analogueAdditions.extension || {}),
+    },
   }));
   attachSubjectFidelity(bundle, {
     requestedSubject: requestedSubject || themeKey,

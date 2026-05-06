@@ -49,6 +49,11 @@ export function knownNumericStrings(bundle) {
     ctx.peerSymbols?.counts?.total || 0, ctx.peerSymbols?.counts?.positive || 0, ctx.peerSymbols?.counts?.negative || 0,
     asArray(bundle.evidence).length, asArray(bundle.marketReactions).length, asArray(bundle.caveats).length,
     asArray(ctx.events).filter((e) => e.isSurge).length,
+    /* P5: cross-asset path counts + historical analogue similarities */
+    ...(asArray(bundle.metadata?.crossAssetPaths?.paths)).flatMap((p) => [p.score, p.hop1?.confidence, p.hop2?.confidence, p.pathLength]),
+    ...(asArray(bundle.metadata?.historicalAnalogues?.analogues)).flatMap((a) => [a.similarity, a.profile?.mean, a.profile?.max, a.profile?.surge]),
+    bundle.metadata?.crossAssetPaths?.paths?.length || 0,
+    bundle.metadata?.historicalAnalogues?.analogues?.length || 0,
   ].filter((value) => Number.isFinite(Number(value)));
   const out = new Set();
   for (const value of numbers) {
