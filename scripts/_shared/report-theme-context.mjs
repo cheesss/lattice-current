@@ -45,15 +45,20 @@ async function many(client, sql, params = []) {
  * appear only as sub_theme. The query handles both.
  */
 async function loadSubtopics(client, themeKey, periodType = 'week') {
-  return many(client, `
-    SELECT parent_theme, sub_theme, theme_label, period_type, period_start, period_end,
+  /* Dedup per sub_theme — keep the latest period row only. Otherwise the
+   * same subtopic appears twice with conflicting momentum/accel from
+   * different periods, which the prose then reports as inconsistent reads. */
+  const rows = await many(client, `
+    SELECT DISTINCT ON (sub_theme)
+           parent_theme, sub_theme, theme_label, period_type, period_start, period_end,
            article_count, share_pct, rank_in_parent, acceleration, lifecycle_stage, momentum_score
     FROM theme_evolution
     WHERE period_type = $1
       AND (parent_theme = $2 OR sub_theme = $2)
-    ORDER BY period_end DESC NULLS LAST, article_count DESC NULLS LAST
-    LIMIT 8
+    ORDER BY sub_theme, period_end DESC NULLS LAST
   `, [periodType, themeKey]).catch(() => []);
+  /* Then sort by article_count for the report's "top movers" framing */
+  return rows.sort((a, b) => (num(b.article_count) || 0) - (num(a.article_count) || 0)).slice(0, 8);
 }
 
 /*
@@ -70,11 +75,20 @@ async function loadPeerSymbols(client, themeKey) {
     ORDER BY ABS(sensitivity_zscore) DESC NULLS LAST, sample_size DESC NULLS LAST
     LIMIT 12
   `, [themeKey]).catch(() => []);
-  /* Bucket by sign and significance for downstream prose */
-  const positive = rows.filter((r) => num(r.sensitivity_zscore) > 1).slice(0, 5);
-  const negative = rows.filter((r) => num(r.sensitivity_zscore) < -1).slice(0, 3);
-  const neutral = rows.filter((r) => Math.abs(num(r.sensitivity_zscore) || 0) <= 1).slice(0, 2);
-  return { all: rows, positive, negative, neutral };
+  /* Bucket by sign and significance for downstream prose. Dedup by symbol —
+   * stock_sensitivity_matrix can contain multiple rows per (theme, symbol) at
+   * different horizons; keep the row with the largest |zscore|. */
+  const bySymbolMaxZ = new Map();
+  for (const row of rows) {
+    const z = Math.abs(num(row.sensitivity_zscore) || 0);
+    const prev = bySymbolMaxZ.get(row.symbol);
+    if (!prev || Math.abs(num(prev.sensitivity_zscore) || 0) < z) bySymbolMaxZ.set(row.symbol, row);
+  }
+  const deduped = [...bySymbolMaxZ.values()];
+  const positive = deduped.filter((r) => num(r.sensitivity_zscore) > 1).sort((a, b) => Math.abs(num(b.sensitivity_zscore) || 0) - Math.abs(num(a.sensitivity_zscore) || 0)).slice(0, 5);
+  const negative = deduped.filter((r) => num(r.sensitivity_zscore) < -1).sort((a, b) => Math.abs(num(b.sensitivity_zscore) || 0) - Math.abs(num(a.sensitivity_zscore) || 0)).slice(0, 3);
+  const neutral = deduped.filter((r) => Math.abs(num(r.sensitivity_zscore) || 0) <= 1).slice(0, 2);
+  return { all: deduped, positive, negative, neutral };
 }
 
 /*
@@ -90,16 +104,27 @@ async function loadRegimeImpacts(client, themeKey) {
     ORDER BY sample_size DESC NULLS LAST, ABS(regime_multiplier) DESC NULLS LAST
     LIMIT 24
   `, [themeKey]).catch(() => []);
-  /* Group by symbol so the consumer can see same-symbol regime variation */
+  /* Group by symbol; dedup by (symbol, regime, horizon) to avoid same-regime
+   * duplicates from multiple updates. Then keep only symbols that appear in
+   * 2+ DISTINCT regimes (not just multiple rows of the same regime). */
   const bySymbol = new Map();
   for (const row of rows) {
-    if (!bySymbol.has(row.symbol)) bySymbol.set(row.symbol, []);
-    bySymbol.get(row.symbol).push(row);
+    if (!bySymbol.has(row.symbol)) bySymbol.set(row.symbol, new Map());
+    const inner = bySymbol.get(row.symbol);
+    const k = `${row.regime}|${row.horizon}`;
+    if (!inner.has(k)) inner.set(k, row);
   }
   const grouped = Array.from(bySymbol.entries())
-    .map(([symbol, list]) => ({ symbol, regimes: list, regimeCount: list.length }))
-    .filter((g) => g.regimeCount >= 2) // only symbols observed in multiple regimes
-    .sort((a, b) => b.regimeCount - a.regimeCount)
+    .map(([symbol, inner]) => {
+      const regimes = [...inner.values()];
+      const distinctRegimes = new Set(regimes.map((r) => r.regime));
+      return { symbol, regimes, regimeCount: regimes.length, distinctRegimeCount: distinctRegimes.size };
+    })
+    /* Keep symbols with at least 2 observations across any (regime, horizon)
+     * — useful for prose even if both rows share a regime label, since the
+     * horizon differs. */
+    .filter((g) => g.regimeCount >= 2)
+    .sort((a, b) => b.distinctRegimeCount - a.distinctRegimeCount || b.regimeCount - a.regimeCount)
     .slice(0, 5);
   return { all: rows, grouped };
 }
