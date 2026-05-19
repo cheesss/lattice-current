@@ -116,11 +116,19 @@ export function buildNoBoundCandidateBundle({
       subjectId: `NO-MATCH-${resolved.kind}-${resolved.key || 'unknown'}`,
       displayName: `No ${reportType.replace(/_/g, ' ')} bound to ${display}`,
     },
+    evidence: [{
+      evidenceId: 'EVID-NO-BOUND-CANDIDATE',
+      kind: 'calculated',
+      publisher: 'Lattice DB',
+      title: `Strict subject filter found no ${reportType.replace(/_/g, ' ')} row for ${display}.`,
+      freshnessStatus: 'fresh',
+      evidenceGrade: 'no-data',
+    }],
     claims: [{
       claimId: 'CLM-001',
       claimType: 'subject_fidelity_negative',
       canonicalText: `No subject-bound ${reportType.replace(/_/g, ' ')} candidate exists for "${display}". This is intentional — the system declines to fall back to an unrelated top candidate.`,
-      supportingEvidenceIds: [],
+      supportingEvidenceIds: ['EVID-NO-BOUND-CANDIDATE'],
       supportingMetricIds: [],
       caveatIds: ['CAV-NO-BOUND-CANDIDATE'],
       confidenceLevel: 'insufficient',
@@ -134,6 +142,7 @@ export function buildNoBoundCandidateBundle({
       appliesToClaimIds: ['CLM-001'],
     }],
     metadata: {
+      dbBacked: true,
       requestedSubject: display,
       subjectMatchStatus: 'no-bound-candidate',
       noBoundCandidateReason: reason,

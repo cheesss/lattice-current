@@ -1,0 +1,10 @@
+[
+  {
+    "themes": ["space", "quantum-computing"],
+    "wrongConnectors": ["social media advertising", "consumer streaming", "promo codes"]
+  },
+  {
+    "themes": ["ai-ml", "cloud-infrastructure"],
+    "wrongConnectors": ["celebrity memes", "sports betting", "general software"]
+  }
+]

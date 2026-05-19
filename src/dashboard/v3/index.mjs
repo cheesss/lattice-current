@@ -18,3 +18,4 @@ import './phase1-state.mjs';
 import './phase2-chrome.mjs';
 import './phase3-additive.mjs';
 import './wire.mjs';
+import '../surfaces/index.mjs';

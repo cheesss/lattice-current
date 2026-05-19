@@ -158,6 +158,28 @@ async function persistPromptMetrics(metrics) {
   await writeFile(CODEX_PROMPT_METRICS_PATH, JSON.stringify(metrics, null, 2));
 }
 
+function terminateProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    try {
+      const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      killer.on('error', () => {
+        try { child.kill('SIGKILL'); } catch {}
+      });
+      return;
+    } catch {
+      // Fall through to the portable kill path.
+    }
+  }
+  try { child.kill('SIGTERM'); } catch {}
+  setTimeout(() => {
+    try { child.kill('SIGKILL'); } catch {}
+  }, 1500).unref?.();
+}
+
 async function recordPromptMetric(meta, result, durationMs) {
   const label = String(meta?.label || 'unlabeled').trim() || 'unlabeled';
   const metrics = await loadPromptMetrics();
@@ -242,7 +264,7 @@ async function runCodexJsonPromptLegacy(prompt, timeoutMs = 95_000, meta = {}) {
     // but small enough to prevent OOM during silent infinite-loop replies.
     const MAX_OUTPUT_BYTES = Number(process.env.CODEX_MAX_OUTPUT_BYTES) || 20 * 1024 * 1024;
     const timer = setTimeout(() => {
-      child.kill('SIGTERM');
+      terminateProcessTree(child);
     }, timeoutMs);
 
     child.stdin?.write(String(prompt || ''));
@@ -253,7 +275,7 @@ async function runCodexJsonPromptLegacy(prompt, timeoutMs = 95_000, meta = {}) {
       if (stdout.length > MAX_OUTPUT_BYTES) {
         oversized = true;
         stdout += `\n[truncated at ${MAX_OUTPUT_BYTES} bytes — likely runaway response]\n`;
-        try { child.kill('SIGTERM'); } catch {}
+        terminateProcessTree(child);
       }
     });
     child.stderr?.on('data', (chunk) => {
@@ -262,7 +284,7 @@ async function runCodexJsonPromptLegacy(prompt, timeoutMs = 95_000, meta = {}) {
       if (stderr.length > MAX_OUTPUT_BYTES) {
         oversized = true;
         stderr += '\n[truncated]\n';
-        try { child.kill('SIGTERM'); } catch {}
+        terminateProcessTree(child);
       }
     });
     child.on('close', (code) => {
@@ -331,11 +353,11 @@ function buildCodexArgs(model) {
 }
 
 function classifyCodexFailure(result) {
-  if (result.parsed) return null;
   const combined = `${result.stdout || ''}\n${result.stderr || ''}\n${result.message || ''}`.toLowerCase();
   if (combined.includes('requires a newer version of codex')) return 'incompatible_model';
   if (combined.includes('invalid_request_error')) return 'invalid_request';
-  if (combined.includes('timed out') || combined.includes('timeout')) return 'timeout';
+  if (Number(result.code ?? 0) === 124 || combined.includes('timed out') || combined.includes('timeout')) return 'timeout';
+  if (result.parsed) return null;
   if (result.code !== 0) return 'execution_error';
   return 'parse_error';
 }
@@ -383,7 +405,7 @@ async function runCodexJsonAttempt({ command, args, prompt, timeoutMs, model, at
     const MAX_OUTPUT_BYTES = Number(process.env.CODEX_MAX_OUTPUT_BYTES) || 20 * 1024 * 1024;
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill('SIGTERM'); } catch {}
+      terminateProcessTree(child);
     }, timeoutMs);
 
     child.stdin?.write(String(prompt || ''));
@@ -394,7 +416,7 @@ async function runCodexJsonAttempt({ command, args, prompt, timeoutMs, model, at
       if (stdout.length > MAX_OUTPUT_BYTES) {
         oversized = true;
         stdout += `\n[truncated at ${MAX_OUTPUT_BYTES} bytes - likely runaway response]\n`;
-        try { child.kill('SIGTERM'); } catch {}
+        terminateProcessTree(child);
       }
     });
     child.stderr?.on('data', (chunk) => {
@@ -403,7 +425,7 @@ async function runCodexJsonAttempt({ command, args, prompt, timeoutMs, model, at
       if (stderr.length > MAX_OUTPUT_BYTES) {
         oversized = true;
         stderr += '\n[truncated]\n';
-        try { child.kill('SIGTERM'); } catch {}
+        terminateProcessTree(child);
       }
     });
     child.on('close', (code) => {

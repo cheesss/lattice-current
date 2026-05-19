@@ -22,9 +22,22 @@ import { applyReportDataDiagnostics } from './report-data-diagnostics.mjs';
 import { loadThemeContext, themeContextToBundleAdditions } from './report-theme-context.mjs';
 import { loadCrossAssetPaths, crossAssetPathsToBundleAdditions } from './report-cross-asset-paths.mjs';
 import { loadThemeHistoricalAnalogues, tagAnalogueContext, historicalAnaloguesToBundleAdditions } from './report-historical-analogues.mjs';
+import { attachDeepResearchPack } from './report-deep-research-pack.mjs';
+import { inferFrontierNodeEvidence } from './cross-theme-discovery-quality.mjs';
+import {
+  buildIssuerDiscoveryMap,
+  candidateIssuerUniverseFromMap,
+  groupIssuerDiscoveryMap,
+  issuerDiscoverySummary,
+  themeHintsForIssuerDiscovery,
+} from './report-issuer-discovery-map.mjs';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function uniqueStrings(values = []) {
+  return [...new Set(asArray(values).map((value) => String(value || '').trim()).filter(Boolean))];
 }
 
 function slugify(value) {
@@ -32,6 +45,24 @@ function slugify(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'unknown';
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function humanizeKey(value) {
+  return String(value || '')
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.length <= 3 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || 'Unknown';
+}
+
+function meaningfulLabel(label, fallbackKey) {
+  const cleaned = String(label || '').trim();
+  if (!cleaned || /^unknown$/i.test(cleaned)) return humanizeKey(fallbackKey);
+  return cleaned;
 }
 
 function num(value, fallback = 0) {
@@ -68,6 +99,115 @@ function sourceSummaryFromEvidence(evidence = [], fallback = {}) {
     distinctSources,
     sourceDiversityScore,
     lowDiversityFlag: explicitLow === true ? distinctSources <= 1 : distinctSources <= 1,
+  };
+}
+
+const ADJACENT_REPORT_READY_STATUSES = new Set([
+  'ready_for_deep_report',
+  'review_ready',
+  'non_obvious_bottleneck_ready',
+]);
+
+function strictAdjacentStatusReconcile(adjacent = {}) {
+  const metadata = adjacent.metadata || {};
+  const strictEndogenousAdjacent = metadata.discoveryNamespace === 'strict_endogenous_adjacent'
+    || metadata.frontierDiscovery === true;
+  if (!strictEndogenousAdjacent || !ADJACENT_REPORT_READY_STATUSES.has(adjacent.status)) return adjacent;
+
+  const frontierNodeSupported = metadata.frontierNodeSupported === true;
+  const sourceDerivedNodeCount = num(metadata.sourceDerivedNodeCount, 0);
+  const scarcityEvidenceScore = num(metadata.scarcityEvidenceScore, 0);
+  if (frontierNodeSupported && sourceDerivedNodeCount >= 1 && scarcityEvidenceScore >= 0.28) return adjacent;
+
+  const consensusPenalty = num(metadata.nonObviousDiscovery?.consensusPenalty ?? metadata.consensusPenalty, 0);
+  const effectiveStatus = consensusPenalty >= 0.4 ? 'consensus_suppressed' : 'needs_scarcity_evidence';
+  const reconcileReason = !sourceDerivedNodeCount
+    ? 'missing_source_derived_frontier_node'
+    : (!frontierNodeSupported ? 'frontier_node_not_supported' : 'scarcity_evidence_below_threshold');
+  return {
+    ...adjacent,
+    status: effectiveStatus,
+    failure_reason: effectiveStatus === 'consensus_suppressed' ? 'consensus_suppressed' : 'source_coverage_gap',
+    next_action: effectiveStatus === 'consensus_suppressed'
+      ? 'Keep the broad consensus narrative below narrower bottleneck nodes; collect direct scarcity evidence before re-ranking.'
+      : 'Collect source-derived frontier-node scarcity evidence before treating this adjacent candidate as report-ready.',
+    metadata: {
+      ...metadata,
+      storedStatus: adjacent.status,
+      effectiveStatus,
+      statusReconciledBy: 'report-db-adapter-frontier-gate',
+      statusReconcileReason: reconcileReason,
+    },
+  };
+}
+
+function reconcileAdjacentFrontierSupportFromEvidence(adjacent = {}, evidence = []) {
+  const metadata = adjacent.metadata || {};
+  const strictEndogenousAdjacent = metadata.discoveryNamespace === 'strict_endogenous_adjacent'
+    || metadata.frontierDiscovery === true;
+  if (!strictEndogenousAdjacent) return adjacent;
+
+  const promotionEvidence = asArray(evidence).filter((row) => (
+    row.metadata?.promotionEligible === true
+    || row.metadata?.evidenceUse === 'promotion_candidate'
+    || row.evidenceGrade === 'promotion_candidate'
+  ));
+  const support = inferFrontierNodeEvidence(promotionEvidence);
+  if (!support.supported) return adjacent;
+
+  const restoredStatus = ADJACENT_REPORT_READY_STATUSES.has(metadata.storedStatus)
+    ? metadata.storedStatus
+    : (ADJACENT_REPORT_READY_STATUSES.has(adjacent.status)
+      ? adjacent.status
+      : 'non_obvious_bottleneck_ready');
+  const scarcityEvidenceScore = Math.max(
+    num(metadata.scarcityEvidenceScore, 0),
+    Math.min(1, 0.28 + support.scarcityHitCount * 0.14 + support.officialHitCount * 0.08),
+  );
+
+  return {
+    ...adjacent,
+    status: restoredStatus,
+    failure_reason: null,
+    metadata: {
+      ...metadata,
+      effectiveStatus: restoredStatus,
+      frontierNodeSupported: true,
+      sourceDerivedNodeCount: Math.max(num(metadata.sourceDerivedNodeCount, 0), support.sourceDerivedNodeCount),
+      scarcityEvidenceScore,
+      frontierEvidenceReconciledBy: 'report-db-adapter-provider-evidence',
+      sourceDerivedNodeBasis: metadata.sourceDerivedNodeBasis || 'provider_evidence',
+      inferredFrontierNodeKeys: support.nodeKeys,
+      inferredFrontierOfficialHitCount: support.officialHitCount,
+      inferredFrontierScarcityHitCount: support.scarcityHitCount,
+    },
+  };
+}
+
+function themeAccelerationContext(row = {}) {
+  const counts = row.metadata?.comparisonCounts || row.metadata?.comparison_counts || {};
+  const current = num(counts.current, NaN);
+  const previous = num(counts.previous, NaN);
+  const previousPrevious = num(counts.previousPrevious ?? counts.previous_previous, NaN);
+  const yearAgo = num(counts.yearAgo ?? counts.year_ago, NaN);
+  const acceleration = num(row.trend_acceleration, NaN);
+  const limitations = [];
+  if (Number.isFinite(acceleration) && Math.abs(acceleration) > 100) limitations.push('baseline_distortion');
+  if (Number.isFinite(previous) && previous <= 1) limitations.push('sparse_previous_period');
+  if (Number.isFinite(previousPrevious) && previousPrevious <= 1 && Number.isFinite(previous) && previous > 0) {
+    limitations.push('sparse_previous_growth_baseline');
+  }
+  if (Number.isFinite(yearAgo) && yearAgo <= 1) limitations.push('sparse_year_ago_baseline');
+  if (Number.isFinite(current) && current <= 5) limitations.push('sparse_current_period');
+  return {
+    limitations: [...new Set(limitations)],
+    metadata: {
+      comparisonCounts: counts,
+      rawTrendAcceleration: Number.isFinite(acceleration) ? acceleration : null,
+      interpretation: limitations.length
+        ? 'directional_only_due_to_sparse_or_zero_baseline'
+        : 'magnitude_usable',
+    },
   };
 }
 
@@ -116,6 +256,225 @@ function calculatedEvidence({ id, title, publisher = 'Lattice DB', grade = 'calc
   };
 }
 
+async function buildAdjacentThemeCrossThemeBundle(client, input = {}, requestedSubject = '') {
+  const subject = String(requestedSubject || resolveSubjectString(input) || '').trim();
+  if (!subject) return null;
+  const adjacent = await one(client, `
+    SELECT *
+      FROM adjacent_theme_candidates
+     WHERE candidate_key = $1
+        OR lower(label) = lower($1)
+     ORDER BY updated_at DESC, confidence_score DESC
+     LIMIT 1
+  `, [subject]).catch(() => null);
+  if (!adjacent) return null;
+  let reportAdjacent = strictAdjacentStatusReconcile(adjacent);
+  const parentSubject = reportAdjacent.parent_subject || reportAdjacent.parent_subject_key || '';
+  const adjacentDisplayLabel = parentSubject
+    ? String(reportAdjacent.label || '').replace(new RegExp(`\\s*:\\s*${escapeRegex(parentSubject)}\\s*$`, 'i'), '').trim()
+    : String(reportAdjacent.label || '').trim();
+  const displayLabel = adjacentDisplayLabel || reportAdjacent.label || reportAdjacent.candidate_key;
+  const strictEndogenousAdjacent = reportAdjacent.metadata?.discoveryNamespace === 'strict_endogenous_adjacent'
+    || reportAdjacent.metadata?.frontierDiscovery === true;
+  const adjacentIssuerUniverse = strictEndogenousAdjacent
+    ? []
+    : asArray(reportAdjacent.metadata?.issuerUniverseSourceSymbols || reportAdjacent.metadata?.issuerUniverse || []);
+
+  const evidenceRows = await many(client, `
+    SELECT *
+      FROM research_evidence_bundles
+     WHERE metadata->>'adjacentCandidateKey' = $1
+        OR metadata->>'candidateId' = $1
+        OR metadata->>'adjacentCandidateKey' = $2
+        OR metadata->>'candidateId' = $2
+        OR metadata->>'reportId' ILIKE $3
+        OR metadata->>'latestReportId' ILIKE $3
+     ORDER BY CASE metadata->>'evidenceUse'
+                WHEN 'promotion_candidate' THEN 0
+                WHEN 'supporting_context' THEN 1
+                WHEN 'negative_control_candidate' THEN 2
+                WHEN 'weak_noise' THEN 3
+                ELSE 4
+              END,
+              relevance_score DESC NULLS LAST,
+              created_at DESC NULLS LAST
+     LIMIT 24
+  `, [
+    reportAdjacent.candidate_key,
+    reportAdjacent.metadata?.adjacentCandidateKey || reportAdjacent.metadata?.candidateKey || '',
+    `%${reportAdjacent.candidate_key}%`,
+  ]).catch(() => []);
+
+  const evidence = evidenceRows.map((row, index) => ({
+    evidenceId: `EVID-ADJACENT-${row.id || index + 1}`,
+    kind: row.source_type || 'adjacent_candidate_evidence',
+    sourceId: row.source_id || String(row.id || index + 1),
+    publisher: row.metadata?.sourceProvider || row.metadata?.provider || row.metadata?.source || row.source_type || 'adjacent-candidate-evidence',
+    title: row.title || 'Adjacent candidate evidence',
+    url: row.url || null,
+    publishedAt: iso(row.published_at),
+    ingestedAt: iso(row.created_at),
+    evidenceGrade: row.metadata?.evidenceUse || 'supporting_context',
+    excerpt: row.text_excerpt || null,
+    textExcerpt: row.text_excerpt || null,
+    factText: row.text_excerpt || null,
+    symbol: row.metadata?.issuerSymbol || row.metadata?.symbol || null,
+    ticker: row.metadata?.issuerSymbol || row.metadata?.symbol || null,
+    freshnessStatus: freshnessFromTimestamp(row.created_at, 168),
+    sourceQualityScore: row.relevance_score ?? 0.55,
+    atomicFacts: row.text_excerpt ? [{ factId: `FACT-ADJACENT-${row.id || index + 1}`, text: row.text_excerpt }] : [],
+    metadata: {
+      ...(row.metadata || {}),
+      adjacentCandidateKey: reportAdjacent.candidate_key,
+      adjacentLane: reportAdjacent.lane,
+      evidenceUse: row.metadata?.evidenceUse || null,
+      desiredEvidenceClass: row.metadata?.desiredEvidenceClass || null,
+      providerRoutePlan: row.metadata?.providerRoutePlan || null,
+      closureReason: row.metadata?.closureReason || null,
+      promotionEligible: row.metadata?.promotionEligible ?? (row.metadata?.evidenceUse === 'promotion_candidate'),
+    },
+  }));
+
+  reportAdjacent = reconcileAdjacentFrontierSupportFromEvidence(reportAdjacent, evidence);
+
+  if (!evidence.length) {
+    evidence.push(calculatedEvidence({
+      id: `EVID-ADJACENT-${adjacent.id}`,
+      title: reportAdjacent.next_action || `${displayLabel} adjacent candidate`,
+      publisher: 'adjacent_theme_candidates',
+      grade: reportAdjacent.status || 'candidate',
+      metadata: {
+        adjacentCandidateKey: reportAdjacent.candidate_key,
+        adjacentLane: reportAdjacent.lane,
+        failureReason: reportAdjacent.failure_reason,
+      },
+    }));
+  }
+
+  const closure = reportAdjacent.metadata?.sourceQueryClosure || {};
+  const adjacentThemes = asArray(reportAdjacent.metadata?.themes).filter(Boolean);
+  const themes = adjacentThemes.length
+    ? adjacentThemes
+    : uniqueStrings([
+      reportAdjacent.parent_subject || reportAdjacent.parent_subject_key,
+    ].filter(Boolean));
+  const xtcBundle = planReportFigures(buildCrossThemeBottleneckReportBundle({
+    candidate: {
+      id: reportAdjacent.candidate_key,
+      name: displayLabel,
+      supplier: displayLabel,
+      connector: parentSubject || displayLabel,
+      themes,
+      symbols: adjacentIssuerUniverse,
+      score: num(reportAdjacent.confidence_score, 0) / 100,
+      evidenceScore: Math.min(1, (num(closure.contextCount, 0) + num(closure.executedCount, 0)) / 5),
+      seedSimilarity: 0,
+      lane: reportAdjacent.lane,
+      discovery: {
+        ontologyKey: reportAdjacent.metadata?.ontologyKey || null,
+        connector: reportAdjacent.parent_subject || null,
+        mechanism: reportAdjacent.next_action || null,
+        triggerTerms: [...asArray(reportAdjacent.seed_terms), ...asArray(reportAdjacent.source_terms)].slice(0, 24),
+        adjacentCandidateKey: reportAdjacent.candidate_key,
+        adjacentLane: reportAdjacent.lane,
+        generatedLane: Boolean(reportAdjacent.metadata?.generatedLane),
+        frontierDiscovery: Boolean(reportAdjacent.metadata?.frontierDiscovery),
+        nonObviousDiscovery: reportAdjacent.metadata?.nonObviousDiscovery || null,
+        concreteBottleneckNodes: asArray(reportAdjacent.metadata?.concreteBottleneckNodes).slice(0, 8),
+        concreteBottleneckNodeSummary: reportAdjacent.metadata?.concreteBottleneckNodeSummary || null,
+        discoveryNamespace: reportAdjacent.metadata?.discoveryNamespace || 'static_adjacent_playbook',
+        evidenceQuotes: asArray(reportAdjacent.metadata?.evidenceQuotes).slice(0, 8),
+      },
+      discoveryFit: num(reportAdjacent.confidence_score, 0) / 100,
+      constraintCriticality: Math.min(1, num(reportAdjacent.confidence_score, 0) / 100),
+      geopoliticalRelevance: themes.includes('defense-industrial') ? 0.7 : 0.45,
+    },
+    evidence,
+    sourceSummary: sourceSummaryFromEvidence(evidence),
+    dataFreshness: [{
+      dataset: 'adjacent_theme_candidates',
+      freshnessStatus: freshnessFromTimestamp(adjacent.updated_at, 48),
+      lastUpdatedAt: iso(adjacent.updated_at),
+      slaHours: 48,
+    }],
+    metadata: {
+      dbBacked: true,
+      adjacentCandidate: reportAdjacent,
+      adjacentCandidateKey: reportAdjacent.candidate_key,
+      adjacentLane: reportAdjacent.lane,
+      issuerUniverse: adjacentIssuerUniverse,
+      generatedLane: Boolean(reportAdjacent.metadata?.generatedLane),
+      frontierDiscovery: Boolean(reportAdjacent.metadata?.frontierDiscovery),
+      frontierNodeSupported: Boolean(reportAdjacent.metadata?.frontierNodeSupported),
+      sourceDerivedNodeCount: num(reportAdjacent.metadata?.sourceDerivedNodeCount, 0),
+      scarcityEvidenceScore: num(reportAdjacent.metadata?.scarcityEvidenceScore, 0),
+      nonObviousDiscovery: reportAdjacent.metadata?.nonObviousDiscovery || null,
+      concreteBottleneckNodes: asArray(reportAdjacent.metadata?.concreteBottleneckNodes).slice(0, 8),
+      concreteBottleneckNodeSummary: reportAdjacent.metadata?.concreteBottleneckNodeSummary || null,
+      discoveryNamespace: reportAdjacent.metadata?.discoveryNamespace || 'static_adjacent_playbook',
+      seedLeakageScore: num(reportAdjacent.metadata?.seedLeakageScore, 0),
+      sourceDiversity: num(reportAdjacent.metadata?.sourceDiversity, 0),
+      relationSupport: num(reportAdjacent.metadata?.relationSupport, 0),
+      sourceQueryClosure: closure,
+    },
+  }));
+  xtcBundle.issuerUniverse = adjacentIssuerUniverse;
+  xtcBundle.metadata = {
+    ...(xtcBundle.metadata || {}),
+    issuerUniverse: adjacentIssuerUniverse,
+    candidateIssuerUniverse: adjacentIssuerUniverse,
+  };
+  const issuerThemeHints = themeHintsForIssuerDiscovery({ bundle: xtcBundle });
+  const autoThemeSymbolRows = !strictEndogenousAdjacent && issuerThemeHints.length
+    ? await many(client, `
+      SELECT theme, symbol, avg_abs_reaction, reaction_count, correlation, method
+        FROM auto_theme_symbols
+       WHERE theme = ANY($1::text[])
+       ORDER BY reaction_count DESC NULLS LAST, avg_abs_reaction DESC NULLS LAST, correlation DESC NULLS LAST
+       LIMIT 24
+    `, [issuerThemeHints]).catch(() => [])
+    : [];
+  const issuerDiscoveryMap = buildIssuerDiscoveryMap({
+    bundle: xtcBundle,
+    rows: {
+      research: evidenceRows,
+      autoThemeSymbols: autoThemeSymbolRows.map((row) => ({
+        ...row,
+        source_type: 'auto_theme_symbols',
+        metadata: {
+          theme: row.theme,
+          method: row.method,
+        },
+      })),
+    },
+    candidateIssuerUniverse: adjacentIssuerUniverse,
+    strictEndogenous: strictEndogenousAdjacent,
+    suppressedConsensusSymbols: reportAdjacent.metadata?.suppressedConsensusSymbols,
+  });
+  const candidateIssuerUniverse = candidateIssuerUniverseFromMap(issuerDiscoveryMap);
+  xtcBundle.metadata = {
+    ...(xtcBundle.metadata || {}),
+    issuerDiscoveryVersion: 'issuer-discovery-map-v1',
+    issuerDiscoveryMap,
+    autoIssuerGroups: groupIssuerDiscoveryMap(issuerDiscoveryMap),
+    issuerBridgeSummary: issuerDiscoverySummary(issuerDiscoveryMap),
+    candidateIssuerUniverse,
+    candidateSources: {
+      adjacentIssuerUniverse,
+      autoThemeSymbolCount: autoThemeSymbolRows.length,
+      themeHints: issuerThemeHints,
+    },
+  };
+  attachSubjectFidelity(xtcBundle, {
+    requestedSubject: subject,
+    matchStatus: 'subject-bound',
+    resolvedSubjectKey: reportAdjacent.candidate_key,
+    fallbackReason: null,
+  });
+  applyReportDataDiagnostics(xtcBundle);
+  return xtcBundle;
+}
+
 export function createReportDbClient(overrides = {}) {
   loadOptionalEnvFile();
   return new pg.Client(resolveNasPgConfig(overrides));
@@ -162,6 +521,38 @@ async function recentThemeArticles(client, theme, limit = 6) {
   `, [theme, limit]);
 }
 
+async function repairEmptyThemeAggregate(client, row, periodType, evidenceCount) {
+  if (!row || num(row.article_count) > 0 || Number(evidenceCount || 0) <= 0) {
+    return { row, repaired: false, repair: null };
+  }
+  const repaired = await one(client, `
+    SELECT *
+    FROM theme_trend_aggregates
+    WHERE period_type = $1
+      AND theme = $2
+      AND article_count > 0
+      AND period_end >= (CURRENT_DATE - INTERVAL '45 days')::date
+    ORDER BY period_end DESC NULLS LAST, computed_at DESC NULLS LAST
+    LIMIT 1
+  `, [periodType, row.theme]).catch(() => null);
+  if (!repaired) return { row, repaired: false, repair: null };
+  return {
+    row: repaired,
+    repaired: true,
+    repair: {
+      reason: 'latest aggregate row had zero articles while fresh evidence exists; selected the latest non-empty completed aggregate window',
+      originalPeriodStart: row.period_start,
+      originalPeriodEnd: row.period_end,
+      originalComputedAt: row.computed_at,
+      originalArticleCount: row.article_count,
+      repairedPeriodStart: repaired.period_start,
+      repairedPeriodEnd: repaired.period_end,
+      repairedComputedAt: repaired.computed_at,
+      repairedArticleCount: repaired.article_count,
+    },
+  };
+}
+
 export async function buildDbThemeReportBundle(client, input = {}) {
   const subject = resolveSubjectString(input);
   const requestedSubject = subject || input.theme || '';
@@ -205,6 +596,9 @@ export async function buildDbThemeReportBundle(client, input = {}) {
   if (matchStatus === 'subject-bound') {
     matchStatus = classifySubjectMatch({ requested: requestedSubject || themeKey, actual: row.theme });
   }
+  const articles = await recentThemeArticles(client, row.theme, Number(input.evidenceLimit || 6));
+  const aggregateRepair = await repairEmptyThemeAggregate(client, row, periodType, articles.length);
+  row = aggregateRepair.row;
   /* P2: load enriched theme context — subtopics, peer symbols, multi-regime
    * impacts, knowledge graph paths, event timeline. The bundle keeps its
    * existing shape; the enrichment is appended via metrics/marketReactions/
@@ -222,7 +616,6 @@ export async function buildDbThemeReportBundle(client, input = {}) {
   }
   const analogueAdditions = historicalAnaloguesToBundleAdditions(analogueResult);
 
-  const articles = await recentThemeArticles(client, row.theme, Number(input.evidenceLimit || 6));
   const evidence = articles.map(articleEvidence);
   const marketRows = await many(client, `
     SELECT *
@@ -232,6 +625,7 @@ export async function buildDbThemeReportBundle(client, input = {}) {
     LIMIT 5
   `, [row.theme]).catch(() => []);
   const aggregateEvidenceMismatch = num(row.article_count) <= 0 && evidence.length > 0;
+  const accelerationContext = themeAccelerationContext(row);
   const sourceSummary = sourceSummaryFromEvidence(evidence, {
     distinctSources: row.unique_sources,
     sourceDiversityScore: row.source_diversity,
@@ -241,13 +635,15 @@ export async function buildDbThemeReportBundle(client, input = {}) {
     subject: {
       subjectType: 'theme',
       subjectId: row.theme,
-      displayName: row.theme_label || row.theme,
+      displayName: meaningfulLabel(row.theme_label, row.theme),
     },
     theme: {
       key: row.theme,
-      label: row.theme_label || row.theme,
+      label: meaningfulLabel(row.theme_label, row.theme),
       yoy: num(row.vs_year_ago_pct),
       acceleration: num(row.trend_acceleration),
+      accelerationLimitations: accelerationContext.limitations,
+      accelerationMetadata: accelerationContext.metadata,
       sourceDiversity: sourceSummary.sourceDiversityScore,
     },
     period: row.period_type,
@@ -298,6 +694,7 @@ export async function buildDbThemeReportBundle(client, input = {}) {
     metadata: {
       dbBacked: true,
       row,
+      aggregateRepair,
       ...(themeAdditions.extension || {}),
       ...(crossAssetAdditions.extension || {}),
       ...(analogueAdditions.extension || {}),
@@ -481,6 +878,8 @@ export async function buildDbCrossThemeBottleneckReportBundle(client, input = {}
   let xtcMatchStatus = candidate ? 'subject-bound' : null;
   let xtcFallbackReason = null;
   if (!candidate) {
+    const adjacentBundle = await buildAdjacentThemeCrossThemeBundle(client, input, subject || resolvedSubject.raw);
+    if (adjacentBundle) return adjacentBundle;
     if (!allowFallback) {
       const noData = buildNoBoundCandidateBundle({
         reportType: REPORT_TYPES.CROSS_THEME,
@@ -540,6 +939,7 @@ export async function buildDbCrossThemeBottleneckReportBundle(client, input = {}
     }));
   }
   const summary = candidate.evidence_summary || {};
+  const discovery = summary.discovery || candidate.metadata?.discovery || {};
   const name = candidate.supplier_name || candidate.connector_name || subject || 'Cross-theme connector';
   const xtcBundle = planReportFigures(buildCrossThemeBottleneckReportBundle({
     candidate: {
@@ -552,6 +952,10 @@ export async function buildDbCrossThemeBottleneckReportBundle(client, input = {}
       evidenceScore: num(summary.evidenceQuality ?? summary.evidence_score ?? summary.evidence),
       seedSimilarity: num(summary.seedSimilarity),
       lane: candidate.lane,
+      discovery,
+      discoveryFit: num(summary.discoveryFit ?? discovery.discoveryFit),
+      constraintCriticality: num(summary.constraintCriticality ?? discovery.constraintScore),
+      geopoliticalRelevance: num(summary.geopoliticalRelevance ?? discovery.geopoliticalRelevance),
     },
     evidence,
     sourceSummary: sourceSummaryFromEvidence(evidence, {
@@ -560,7 +964,7 @@ export async function buildDbCrossThemeBottleneckReportBundle(client, input = {}
       lowDiversityFlag: num(summary.sourceDiversityRaw ?? summary.sourceDiversity) <= 1,
     }),
     dataFreshness: [{ dataset: 'cross_theme_candidates', freshnessStatus: freshnessFromTimestamp(candidate.updated_at, 48), lastUpdatedAt: iso(candidate.updated_at), slaHours: 48 }],
-    metadata: { dbBacked: true, candidate },
+    metadata: { dbBacked: true, candidate, discovery },
   }));
   attachSubjectFidelity(xtcBundle, {
     requestedSubject: subject || resolvedSubject.raw,
@@ -798,11 +1202,21 @@ function columnSla(table) {
 
 export async function buildDbReportBundle(client, input = {}) {
   const type = input.reportType || input.type || REPORT_TYPES.THEME;
-  if (type === REPORT_TYPES.THEME || type === 'theme') return buildDbThemeReportBundle(client, input);
-  if (type === REPORT_TYPES.EVENT_SIGNAL || type === 'event' || type === 'event_signal') return buildDbEventSignalReportBundle(client, input);
-  if (type === REPORT_TYPES.CROSS_THEME || type === 'cross-theme' || type === 'cross_theme') return buildDbCrossThemeBottleneckReportBundle(client, input);
-  if (type === REPORT_TYPES.REGIME || type === 'regime') return buildDbRegimeTransmissionReportBundle(client, input);
-  if (type === REPORT_TYPES.SYMBOL || type === 'symbol') return buildDbSymbolSignalReportBundle(client, input);
-  if (type === REPORT_TYPES.SYSTEM_QUALITY || type === 'system' || type === 'ops') return buildDbSystemQualityReportBundle(client, input);
-  return planReportFigures(createEvidenceBundle({ ...input, reportType: type }));
+  const build = async () => {
+    if (type === REPORT_TYPES.THEME || type === 'theme') return buildDbThemeReportBundle(client, input);
+    if (type === REPORT_TYPES.EVENT_SIGNAL || type === 'event' || type === 'event_signal') return buildDbEventSignalReportBundle(client, input);
+    if (type === REPORT_TYPES.CROSS_THEME || type === 'cross-theme' || type === 'cross_theme') return buildDbCrossThemeBottleneckReportBundle(client, input);
+    if (type === REPORT_TYPES.REGIME || type === 'regime') return buildDbRegimeTransmissionReportBundle(client, input);
+    if (type === REPORT_TYPES.SYMBOL || type === 'symbol') return buildDbSymbolSignalReportBundle(client, input);
+    if (type === REPORT_TYPES.SYSTEM_QUALITY || type === 'system' || type === 'ops') return buildDbSystemQualityReportBundle(client, input);
+    return planReportFigures(createEvidenceBundle({ ...input, reportType: type }));
+  };
+  const base = await build();
+  const useDeep = input.depth !== 'standard' && input.deep !== false;
+  if (!useDeep) return base;
+  const deep = await attachDeepResearchPack(base, {
+    client,
+    ensureSchema: input.ensureResearchSchema !== false,
+  });
+  return planReportFigures(applyReportDataDiagnostics(deep));
 }

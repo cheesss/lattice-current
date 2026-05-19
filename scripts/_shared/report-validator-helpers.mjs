@@ -15,6 +15,7 @@ const COMMON_UPPERCASE_WORDS = new Set([
   'EVID', 'MET', 'FIG', 'CAV', 'CLM', 'WATCH', 'ETF', 'SEC', 'SLA',
   'AI', 'ML',
   'CEO', 'CTO', 'CFO', 'COO', 'PPA', 'IPO', 'GDP', 'CPI', 'GPU', 'CPU',
+  'ARR', 'NRR', 'MRR', 'ACV', 'TCV', 'RPO', 'NDR',
   'EV', 'EU', 'US', 'UK', 'NA', 'EDP', 'TPU', 'IO', 'OS',
   'AND', 'OR', 'NOT', 'IT', 'IS', 'OK', 'MW', 'GW', 'KWH', 'MWH', 'GWH',
   'YOY', 'QOQ', 'WOW', 'DOD',
@@ -28,7 +29,15 @@ export function knownNumericStrings(bundle) {
   const numbers = [
     ...asArray(bundle.metrics).map((metric) => metric.value),
     ...asArray(bundle.marketReactions).flatMap((reaction) => [
-      reaction.relativeReturnPct, reaction.uplift, reaction.tStat, reaction.alpha,
+      reaction.relativeReturnPct,
+      reaction.uplift,
+      reaction.tStat,
+      reaction.alpha,
+      reaction.sampleSize,
+      reaction.sample_size,
+      ...asArray(reaction.controls).flatMap((control) => (
+        String(control).match(/[-+]?\d+(?:\.\d+)?/g) || []
+      )),
     ]),
     ...asArray(ctx.subtopics).flatMap((s) => [s.momentum_score, s.acceleration, s.rank_in_parent, s.article_count, s.share_pct]),
     ...asArray(ctx.peerSymbols?.positive).flatMap((p) => [p.sensitivity_zscore, p.avg_return, p.baseline_return, p.sample_size, p.hit_rate, p.return_vol]),
@@ -52,6 +61,28 @@ export function knownNumericStrings(bundle) {
     /* P5: cross-asset path counts + historical analogue similarities */
     ...(asArray(bundle.metadata?.crossAssetPaths?.paths)).flatMap((p) => [p.score, p.hop1?.confidence, p.hop2?.confidence, p.pathLength]),
     ...(asArray(bundle.metadata?.historicalAnalogues?.analogues)).flatMap((a) => [a.similarity, a.profile?.mean, a.profile?.max, a.profile?.surge]),
+    ...(asArray(bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.rows)).flatMap((row) => [
+      row.sampleSize,
+      row.relativeReturnPct,
+      row.tStat,
+      row.regimeSupportCount,
+      row.regimeDistinctCount,
+      row.regimeHorizonCount,
+    ]),
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.decisionGradeRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.screeningGradeRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.controlledRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.regimeSupportRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.maxSampleSize,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.maxAbsTStat,
+    ...(asArray(bundle.metadata?.deepResearch?.packs?.issuerThesisPack?.cards)).flatMap((card) => [
+      card.expectationSpreadPct,
+      card.metadata?.expectationSpreadPct,
+      ...(String(card.expectationBridge || card.metadata?.expectationBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...(String(card.valuationBridge || card.metadata?.valuationBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...(String(card.fundamentalBridge || card.metadata?.fundamentalBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...(String(card.marketBridge || card.metadata?.marketBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+    ]),
     bundle.metadata?.crossAssetPaths?.paths?.length || 0,
     bundle.metadata?.historicalAnalogues?.analogues?.length || 0,
   ].filter((value) => Number.isFinite(Number(value)));

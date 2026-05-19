@@ -62,6 +62,7 @@ The same repository still powers multiple variants:
 - Real-time monitoring across curated feeds, strategic assets, and market data
 - AI and statistical analysis layers for summaries, trend detection, evidence handling, and operator briefs
 - Canonical event resolution that sits between raw article rows and usable signal objects
+- Evidence-first intelligence report generation with client memo, audit appendix, source-query queue, and investment-readiness caps
 - Python compute lane for heavy batch analytics while TypeScript remains the orchestration layer
 - Ontology graph, transmission graph, and historical validation tooling
 - Desktop runtime with Tauri sidecar, local services, and offline-capable workflows
@@ -73,7 +74,8 @@ The same repository still powers multiple variants:
 - Evidence handling: event resolution, source quality, corroboration handling, and data quality operations
 - Research workflow: Codex-assisted expansion, automation governance, ontology and graph views
 - Validation workflow: historical fetch/import, replay, abnormal-return computation, and loader/storage verification
-- Decision support: operator briefs, transmission interpretation, and guarded recommendations
+- Report workflow: evidence bundles, signal cards, long-form analyst memos, exhibits, audit appendices, and source-query/backfill tasks
+- Decision support: operator briefs, transmission interpretation, watchlist refinement, and guarded recommendations
 - Operations: scheduler loops, pipeline heartbeats, retention, and blocker visibility
 
 ## Execution boundary
@@ -129,6 +131,9 @@ npm run public:sync
 ## Documentation
 
 - Technical docs index: [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)
+- Report generator plan: [docs/INTELLIGENCE_REPORT_GENERATOR_PLAN_2026-05-06.md](docs/INTELLIGENCE_REPORT_GENERATOR_PLAN_2026-05-06.md)
+- Report output layer: [docs/REPORT_OUTPUT_LAYER_OVERHAUL_2026-05-09.md](docs/REPORT_OUTPUT_LAYER_OVERHAUL_2026-05-09.md)
+- Report handoff: [docs/INTELLIGENCE_REPORT_HANDOFF_2026-05-07.md](docs/INTELLIGENCE_REPORT_HANDOFF_2026-05-07.md)
 - User guide: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Algorithms: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)

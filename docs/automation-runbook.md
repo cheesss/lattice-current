@@ -69,8 +69,11 @@ Codex-driven source, theme, and dataset automation only fires when all of the fo
 23. Apply macro kill-switch and hedge overlay before any idea can remain in `deploy`
 24. Downgrade ideas into `shadow`, `watch`, or `abstain` if calibrated confidence is not strong enough
 25. Keep rollback armed if the recent shadow book deteriorates
-26. Release lock
-27. Apply retention to artifacts, scheduler history, and experiment snapshots
+26. Generate or refresh evidence-first report artifacts when scheduled report cadence is due
+27. Drain report-generated backfill/source-query tasks through bounded review-gated execution
+28. Recompute report quality caps after new provider data lands
+29. Release lock
+30. Apply retention to artifacts, scheduler history, and experiment snapshots
 
 ## Commands
 
@@ -111,6 +114,66 @@ It tries to install as `SYSTEM` on startup first.
 If that fails, it falls back to a current-user logon task.
 If task registration is blocked by policy, it writes a Startup-folder fallback command file for the current user instead.
 The wrapper reloads `.env.local` on each cycle, so newly added provider keys are picked up without changing the registry again.
+
+Run a DB-backed deep report manually:
+
+```bash
+node scripts/generate-intelligence-report.mjs --db --depth deep --type theme_report --subject "AI / Machine Learning"
+```
+
+Run free external provider backfill for a monitored report universe:
+
+```bash
+node scripts/collect-free-external-data.mjs --theme ai-ml --label "AI / Machine Learning" --providers fmp --symbols MSFT,AMD,NVDA,META,GOOGL --force --throttle-hours 0
+```
+
+Plan a provider-specific evidence contract backfill cycle from the latest report artifact:
+
+```bash
+node scripts/run-evidence-contract-backfill-cycle.mjs --latest --limit 25
+```
+
+Apply the closure cycle for a specific report artifact, execute only report-created source queries, compute local market validation, refresh the dashboard summary, and regenerate the report:
+
+```bash
+node scripts/run-evidence-contract-backfill-cycle.mjs --report-dir data/reports/universal-contract-cross-theme-16776-check-v3 --apply --auto-report-source-query --market-validation --dashboard-summary --regenerate --subject "solid rocket motor capacity" --type cross_theme_bottleneck_report
+```
+
+Run bounded closure across the latest report artifacts:
+
+```bash
+node scripts/run-evidence-contract-backfill-cycle.mjs --all-reports --apply --auto-report-source-query --market-validation --dashboard-summary --report-limit 5 --limit 40
+```
+
+Provider backfill is now ontology-aware:
+
+- `collect-free-external-data.mjs` resolves issuer symbols from explicit CLI symbols, `theme_entity_exposure`, `regime_conditional_impact`, `tracked_targets`, report backfill metadata, approval payloads, and recent provider runs.
+- Universal Evidence Contract route plans now carry `desiredEvidenceClass`, executable collectors, source-provider families, query variants, issuer universe, and negative-control intent from report tasks into approvals and private research bundles.
+- `run-evidence-contract-backfill-cycle.mjs` keeps a terminal-state file at `data/runtime/evidence-contract-backfill-cycle-state.json` in apply mode so exhausted class/query/provider combinations are not retried in a tight loop.
+- Cross-theme reports expose a separate evidence-state diagnostic so "not an investment call" is not confused with "bad investment." The states are `More evidence needed`, `Targeted backfill needed`, `Market validation pending`, `Search exhausted, not validated`, `Negative-control reject`, and `Decision review ready`.
+- Continue class-specific backfill only when the diagnostic is `More evidence needed`, `Targeted backfill needed`, or `Market validation pending`. Stop broad automated backfill when the diagnostic says `Search exhausted, not validated` or `Negative-control reject`; use manual expert research only for named unresolved classes.
+- `market_validation` is closed from local controlled market data first (`event_uplift`, matched controls, market returns/quotes). Source-query results can explain the mechanism, but they do not satisfy decision-grade market validation.
+- The dashboard API exposes `/api/reports/backfill-closure` and the dashboard has a `Report Backfill` panel with `pending`, `running`, `blocked`, `review-ready`, and `rejected` filters. The modern cockpit view renders a class-level closure matrix (`Class`, `State`, `Provider`, `Tier`, `Latest run`, `Closure reason`, `Next action`) and keeps raw provider/query details inside the audit drawer. This panel is an operations surface; canonical proposals/RSS/source registration still use the approval queue.
+- ETF, macro, policy, unit, and acronym tokens such as `ITA`, `UUP`, `SMH`, `BDRY`, `ICLN`, `NATO`, `EU`, `DOD`, `MW`, and `LLM` are excluded from issuer transcript/fundamental collection.
+- SEC collection auto-seeds missing or stale issuer `companyfacts` and recent `10-K`/`10-Q`/`8-K` filing metadata before extracting management-commentary evidence. It also opens SEC accession `index.json` directories and prioritizes EX-99.1 earnings releases and investor-presentation exhibits, so issuer commentary and operating KPI language can be collected when the primary filing is sparse.
+- USAspending contract awards are collected without a paid key for defense issuer universes and stored as official award/procurement evidence. These rows can strengthen contract-award and procurement evidence, but they are explicitly not treated as issuer `book-to-bill`, guidance, or transcript evidence.
+- Report-created source-query evidence is attributed back to the requested data pack, but a critical ontology KPI is satisfied only when the evidence text matches that specific KPI. Pack presence alone does not clear investment-readiness blockers.
+- FMP/Polygon/SEC provider attempts write `external_provider_backfill_runs`. `deferred_provider` and `retry_wait` runs are throttled like successful runs so a rate limit does not create a tight retry loop.
+- For defense, official War.gov contract RSS fills contract awards, procurement funds, missile/air-defense demand, and shipyard-throughput evidence without a paid key. Issuer-level `book-to-bill` is only cleared by direct filing/transcript/provider wording such as `book to bill` or a ratio-style observation; generic `bookings` alone remains insufficient.
+
+Run the full coverage-closure loop:
+
+```bash
+npm run research:coverage -- --report-subject-limit 3 --provider-limit 50
+```
+
+The loop is intentionally bounded but recursive inside each run. It discovers subjects from sources, approvals, report gaps, tracking targets, and research signals; executes provider backfill; materializes ontology/generic KPI observations; drains report-created gaps into source-query approvals; executes approved source queries; re-enters provider/KPI collection for new targets; and regenerates reports when same-loop evidence or collection work lands. Use `UNIVERSAL_RESEARCH_COVERAGE_PASSES`, `UNIVERSAL_RESEARCH_CLOSURE_PASSES`, `UNIVERSAL_RESEARCH_PROVIDERS`, and `UNIVERSAL_RESEARCH_PROVIDER_THROTTLE_HOURS` to tune daemon behavior without code changes.
+
+Drain report-created backfill tasks:
+
+```bash
+node scripts/drain-report-backfill-tasks.mjs --limit 10
+```
 
 ## Locking
 
@@ -192,6 +255,16 @@ Use the in-app `Codex Ops` panel to inspect these conditions directly.
 ## Important limitation
 
 Codex can propose backtest themes and candidate assets, but it is still not the final execution engine. The scheduler policy and universe policy remain the deterministic gates.
+
+Report generation follows the same rule. Codex/LLM layers may write analyst
+interpretation, alternative explanations, watch triggers, and source-query
+drafts, but they may not directly clear validation gates or promote a report to
+investment readiness.
+
+Direct call transcript coverage, controlled market validation, and causal
+mechanism support are deterministic quality gates. If provider backfill is rate
+limited, the report should keep the blocker visible and queue the collection
+task rather than hiding the gap.
 
 ## Windows unattended startup
 
@@ -297,6 +370,104 @@ It can:
 - auto-approve and auto-activate API sources using health/schema/ToS/rate-limit signals plus category and base-url caps
 
 This does not remove manual override. It removes the need to click through routine approvals.
+
+## Auto-curate backfill criteria
+
+The emerging-tech auto-curate path is:
+
+1. `scripts/auto-curate.mjs`
+2. `scripts/_shared/auto-curate-support.mjs`
+3. `src/services/server/codex-dataset-proposer.ts`
+4. `scripts/proposal-executor.mjs`
+
+The intent is to separate three different operator actions:
+
+- `backfill-source` when history is missing
+- `add-rss` when a new direct or adjacent feed is missing
+- `add-theme` when repeated evidence suggests the taxonomy itself is missing
+
+### Weak-area thresholds
+
+`collectAutoCurateContext()` marks a weak area when any of these conditions are true:
+
+- `corpus-volume`: total `articles` rows are below `10,000`
+- `source-diversity`: distinct article `source` count is below `4`
+- `theme-classification`: 30-day `auto_article_themes.auto_theme='unknown'` rate is above `0.20`
+- `topic-discovery`: 30-day `discovery_topics.created_at` count is below `5`
+- `category:<name>`: summed `discovery_topics.article_count` for a category is below `50`
+- `emerging-tech-coverage`: no category coverage is present at all
+
+The supporting inputs come from:
+
+- `articles` grouped by `source`
+- `discovery_topics` total and 30-day recent counts
+- `auto_article_themes` 30-day unknown-theme rate
+
+### Action selection rule
+
+`proposeBackfillActions()` must keep proposals narrow and concrete:
+
+- maximum `3` actions per curation pass
+- prefer `backfill-source` when the gap is historical depth or corpus breadth
+- use `add-rss` for a missing direct feed or a credible adjacent evidence lane
+- use `add-theme` only when a structurally distinct recurring theme keeps appearing
+- every action must include `reason`, `expectedImpact`, and a short transmission explanation
+- do not exceed the active budget snapshot
+
+### Default fallback mapping
+
+If Codex is unavailable or returns unusable output, the fallback planner maps weak areas like this:
+
+- `source-diversity` or `corpus-volume`
+  - `backfill-source`
+  - source: `hackernews`
+  - args: `limit=10000`, `minScore=50`
+  - priority: `high`
+- `topic-discovery` or any `category:*`
+  - `backfill-source`
+  - source: `arxiv`
+  - args: `categories=['cs.AI','cs.LG','q-bio.QM']`, `from='2024-01-01'`, `limit=8000`
+  - priority: `high`
+- `emerging-tech-coverage`
+  - `backfill-source`
+  - source: `gdelt-articles`
+  - args: `keywords=['emerging technology','robotics','semiconductor']`, `from='2024-01-01'`, `limit=12000`
+  - priority: `medium`
+
+If daily `backfillCalls.remaining <= 0`, the fallback planner proposes no automated backfill.
+
+### Guardrails before execution
+
+`backfill-source` proposals are not executable just because they were queued.
+
+They must still pass:
+
+- whitelist validation from `scripts/_shared/backfill-whitelist.mjs`
+- source-specific `minIntervalHours`
+- hourly, daily, and weekly automation budget checks
+- approval checks for sources marked `requiresApproval`
+
+Current whitelisted sources:
+
+- `hackernews`
+  - min interval: `24h`
+  - args: `since?`, `limit<=50000`, `minScore<=1000`
+- `arxiv`
+  - min interval: `24h`
+  - args: `categories` required, `from` required, `limit<=30000`
+- `gdelt-articles`
+  - min interval: `48h`
+  - args: `keywords?`, `from` required, `limit<=100000`
+- `guardian-keyword`
+  - min interval: `24h`
+  - args: `query` required, `from` required, `limit<=5000`
+  - approval required: `true`
+
+Current shared automation budget defaults:
+
+- hourly: `backfillCalls=2`, `codexCalls=40`
+- daily: `backfillCalls=5`, `backfillItems=100000`, `codexCalls=300`
+- weekly: `backfillCalls=20`, `backfillItems=500000`
 
 ## Candidate expansion automation
 

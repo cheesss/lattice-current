@@ -1,12 +1,12 @@
 ---
 title: Architecture
-summary: Operator shell, canonical event layer, TypeScript/Python runtime boundary, and storage flows.
+summary: Operator shell, canonical event layer, evidence-first reports, TypeScript/Python runtime boundary, and storage flows.
 status: stable
 variants:
   - full
   - tech
   - finance
-updated: 2026-04-12
+updated: 2026-05-10
 owner: core
 ---
 
@@ -26,6 +26,7 @@ The architecture stack below is interactive. Click a layer to inspect its runtim
 - ingestion and normalization services for feeds, macro, market, and event sources
 - canonical event layer that resolves raw article rows into reusable signal objects
 - interpretation and decision-support services for briefs, proposals, approvals, and diagnostics
+- evidence-first report pipeline that separates client memo, audit appendix, exhibits, validation, and source-query/backfill tasks
 - Python batch compute lane for clustering, return analytics, and model training
 - historical replay and archive services for downstream calibration
 - desktop sidecar and local APIs for desktop-aware execution
@@ -60,10 +61,36 @@ This keeps product surfaces in TypeScript while moving heavy batch compute to th
 1. raw feeds and structured sources are collected and normalized
 2. canonical event resolution groups related evidence before scoring
 3. interpretation services build theme briefs, proposals, and operator context
-4. Python batch compute writes reusable results back to PostgreSQL
-5. replay and historical validation evaluate whether the live logic stays calibrated
+4. report services compile evidence bundles, signal cards, analyst synthesis, long-form memo sections, exhibits, and audit appendices
+5. Python batch compute writes reusable results back to PostgreSQL
+6. replay and historical validation evaluate whether the live logic stays calibrated
 
 The important design change is that raw rows are no longer treated as final signal objects, and heavy compute is no longer forced through handwritten Node loops.
+
+## Evidence-first report boundary
+
+Reports are compiled from stored evidence, metrics, market reactions, caveats,
+and figure specs. The client memo is the readable analyst layer; provenance and
+raw ledgers stay in the audit appendix.
+
+The report pipeline is:
+
+```text
+DB/API/cache data
+-> evidence bundle
+-> deep research packs
+-> signal cards
+-> analyst synthesis
+-> semantic narrative blueprint
+-> long-form client memo
+-> validator and quality gates
+-> source-query/backfill tasks
+```
+
+Quality is intentionally split. A report can be a strong research-prioritization
+memo while still not being investment-ready. Direct transcript coverage,
+controlled market validation, and independently supported causal mechanisms are
+hard gates for stronger claims.
 
 ## Reference docs
 
@@ -74,6 +101,8 @@ The important design change is that raw rows are no longer treated as final sign
 - [Phase 7 implementation notes](https://github.com/cheesss/lattice-current/blob/main/docs/PHASE7_IMPLEMENTATION_NOTES.md)
 - [Intelligence server schema](https://github.com/cheesss/lattice-current/blob/main/docs/intelligence-server-schema.sql)
 - [Service server plan](https://github.com/cheesss/lattice-current/blob/main/docs/service-server-plan.md)
+- [Intelligence report generator](https://github.com/cheesss/lattice-current/blob/main/docs/INTELLIGENCE_REPORT_GENERATOR_PLAN_2026-05-06.md)
+- [Report output layer](https://github.com/cheesss/lattice-current/blob/main/docs/REPORT_OUTPUT_LAYER_OVERHAUL_2026-05-09.md)
 
 ## Public boundary
 

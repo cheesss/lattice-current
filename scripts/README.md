@@ -16,6 +16,10 @@ This folder is the operational toolbox for the project.
   - local runtime launchers
 - `intelligence-*.mjs`
   - automation and scheduler entry points
+- `report-*.mjs`
+  - evidence-bound report bundle, validation, rendering, export, and storage helpers
+- `collect-*.mjs`
+  - provider and research data collection entry points
 
 ## Important scripts
 
@@ -37,6 +41,41 @@ This folder is the operational toolbox for the project.
   - Codex-driven labeling of pending discovery topics
 - `generate-tech-report.mjs`
   - operator-facing report generation into canonical `tech_reports`
+- `generate-intelligence-report.mjs`
+  - evidence-first intelligence report generator for DB-backed or sample reports
+- `build-report-bundle.mjs`
+  - builds report evidence bundles without rendering final artifacts
+- `validate-intelligence-report.mjs`
+  - validates generated reports for unsupported claims, stale disclosure, numeric consistency, duplicate sections, and investment-language violations
+- `render-intelligence-report.mjs`
+  - renders an existing bundle/analysis pair into report artifacts
+- `export-intelligence-report.mjs`
+  - exports report artifacts such as HTML, Markdown, and presentation files
+- `schedule-intelligence-reports.mjs`
+  - generates scheduled report artifacts into the local registry
+- `collect-free-external-data.mjs`
+  - collects external provider data such as fundamentals, valuations, peers, estimates, call transcripts, SEC filing/exhibit commentary, official War.gov defense contract announcements, and public USAspending contract awards; maps provider excerpts into theme-ontology KPI observations so reports can clear or narrow specific readiness blockers
+  - reads evidence contract route metadata from report backfill tasks and source-query approvals, then narrows provider execution by class; for example procurement routes prefer War.gov/USAspending while market validation routes prefer Polygon/FMP and power constraints prefer EIA/utility-style collection
+  - resolves issuer symbols generically from theme exposure tables, regime impacts, tracked targets, report backfill task metadata, approval payloads, and recent provider runs before deciding whether SEC/FMP/Polygon are safe to execute; ETF/acronym/unit tokens such as `ICLN`, `MW`, and `LLM` are filtered out of issuer-only provider calls
+  - auto-seeds missing/stale SEC companyfacts and recent 10-K/10-Q/8-K filing metadata for issuer symbols before SEC management-commentary extraction, then inspects SEC accession `index.json` attachments to pull EX-99.1 earnings releases and investor-presentation exhibits when primary filings are too sparse
+  - treats `deferred_provider` and `retry_wait` runs as throttle-eligible attempts, so provider rate limits do not create tight retry loops
+- `drain-report-backfill-tasks.mjs`
+  - drains report-created backfill/source-query tasks through a bounded execution path
+- `run-evidence-contract-backfill-cycle.mjs`
+  - turns Universal Evidence Contract gaps into provider-specific route plans, drains/enqueues source-query approvals, runs matching free providers, optionally executes source-query approvals, and can regenerate the report; default mode is dry-run, use `--apply` for DB/state mutation
+  - `--auto-report-source-query` only approves report-created `source-query` work; canonical cross-theme proposals, RSS/source registration, and generic backfill approvals remain review-gated
+  - `--market-validation` computes report-scoped `market_validation` from local controlled market data (`event_uplift`, matched controls, market returns/quotes) and stores the resulting tier as private report evidence
+  - provider wrapper timeouts are disabled by default for long closure runs; set `EVIDENCE_BACKFILL_PROVIDER_STEP_TIMEOUT_MS` to a positive millisecond value to re-enable a cap. Step start/finish entries are written to `data/runtime/evidence-contract-backfill-cycle.steps.jsonl`
+  - `--all-reports --dashboard-summary` builds the report closure ledger used by the dashboard `Report Backfill` panel
+  - cross-theme regenerated reports include an evidence-state diagnostic that separates insufficient validation from a negative-control rejection; keep collecting only for `More evidence needed`, `Targeted backfill needed`, or `Market validation pending`, and stop broad automation for `Search exhausted, not validated` or `Negative-control reject`
+- `run-universal-research-orchestrator.mjs`
+  - generic research collection loop that plans subject-specific data needs across themes, symbols, sources, policies, research, and industry indicators
+  - scans recent report artifacts for no-seed adjacent theme candidates before subject selection; Space/SRM/Defense reports can create evidence-seeking lanes such as launch fueling/cryogenic infrastructure, range operations/ground systems support, propulsion input materials, and qualification testing without a user-provided company or keyword seed
+  - adjacent candidates are persisted to `adjacent_theme_candidates`; only candidates that meet the evidence/confidence threshold become universal research subjects, while weaker candidates stay in `needs_evidence` with a root-cause reason such as `source_coverage_gap` or `vocabulary_gap`
+  - runs bounded coverage-closure passes: provider backfill, ontology/generic KPI materialization, Research OS, report-gap drain, report-only source-query execution, market validation, provider/KPI re-entry, and report regeneration until no same-loop evidence or collection work lands
+  - provider backfill wrapper timeouts are disabled by default; set `UNIVERSAL_RESEARCH_PROVIDER_STEP_TIMEOUT_MS` or `UNIVERSAL_RESEARCH_TIMEOUT_MS` to a positive millisecond value to restore caps. Step logs are written to `data/runtime/universal-research-orchestrator.steps.jsonl`
+  - adjacent expansion is enabled by default; use `--no-adjacent-expansion` to disable it, `--adjacent-limit` to cap scanned reports, and `--auto-report-mode` to record the scheduler mode for operator review
+  - use `npm run research:coverage -- --report-subject-limit 3` for an operator-safe multi-theme loop; provider rate limits are recorded as deferred work and throttled instead of retried in a tight loop
 - `generate-weekly-digest.mjs`
   - weekly digest synthesis over reports and top topics
 - `fetch-gdelt-articles.mjs`
@@ -110,6 +149,40 @@ Important shared modules:
   - approval queue for higher-risk autonomous actions
 - `backfill-whitelist.mjs`
   - executable whitelist and argument validation for autonomous backfills
+- `report-evidence-bundle.mjs`
+  - claim/evidence/metric/caveat bundle construction for report generation
+- `report-deep-research-pack.mjs`
+  - market, fundamental, filing, transcript, industry, research, policy, causal, historical, and feedback evidence lanes
+- `report-adjacent-expansion.mjs`
+  - converts report evidence gaps, ontology hints, source-query drafts, and watch vocabulary into no-seed adjacent theme candidates with status, confidence, root-cause failure reason, source terms, class-specific query variants, and unverified issuer candidates
+- `report-signal-cards.mjs`
+  - attention/fundamental/market/constraint/causal/research signal-card synthesis
+- `report-analyst-synthesis.mjs`
+  - evidence-bound thesis, counter-thesis, scenario, market implication, and research action synthesis
+- `report-narrative-plan.mjs`
+  - semantic blueprint and long-form memo renderer
+- `report-chart-planner.mjs`
+  - claim-bound figure specs and exhibit takeaways
+- `report-compiler.mjs`
+  - client memo and audit appendix renderer
+- `report-validator.mjs`
+  - report safety and quality gates
+- `report-quality.mjs`
+  - artifact, triage, analyst memo, and investment-readiness scoring
+- `external-data/fmp.mjs`
+  - FMP adapter for fundamentals, valuations, estimates, peers, calendar, and earnings call transcripts; HTTP 429s are retryable/deferred provider failures, not successful backfills
+- `collect-free-external-data.mjs --providers dod-contracts`
+  - no-key official War.gov contract announcement ingestion for defense ontology KPI evidence such as contract awards, procurement funds, missile/air-defense demand, and shipyard throughput
+- `theme-ontology.mjs`
+  - deterministic archetype registry and readiness gate; pack evidence must match the specific required KPI, so a generic source-query hit cannot clear `book-to-bill`, direct commentary, or other investment-critical gaps by pack name alone
+- `evidence-provider-router.mjs`
+  - maps `desiredEvidenceClass` plus subject, ontology, and issuer universe into executable collectors, source-provider families, and query variants. It preserves negative-control separation and filters ETF/macro proxies out of issuer-only routes.
+- `report-backfill-closure.mjs`
+  - normalizes report task, approval, evidence, market-validation, and artifact state into per-class closure ledgers for reports and dashboard summaries.
+- `report-market-validation.mjs`
+  - derives decision/screening/weak/missing market-validation tiers from local controlled event/uplift rows and persists report-scoped market evidence without creating canonical promotion rows. It now resolves a report-scoped issuer universe before querying controlled market rows and records missing reasons such as `no_issuer_universe`, `no_event_candidates`, `no_event_uplift_rows`, `weak_controls`, and `below_tstat`.
+- `report-issuer-universe.mjs`
+  - resolves the issuer universe for report closure from artifact symbols, ontology supplier symbols, report pack rows, source-query evidence metadata, and legacy issuer aliases such as `AJRD -> LHX`; issuer-only providers are blocked with `blocked_missing_issuer_universe` instead of falling back to broad source-query when no investable issuer can be resolved.
 
 ## Design intent
 
@@ -130,6 +203,8 @@ Important shared modules:
 - An AI-analysis script is not complete when it writes rows. It is complete only after those rows are grounded, queryable, and consumable by the intended runtime surface.
 - An emerging-tech discovery script is not complete when it finds keywords only. It is complete when topic membership is durable and operator-visible.
 - An emerging-tech reporting script is not complete when it writes text only. It is complete when the report is attached to canonical topic membership, includes source-quality context, and is exposed through API or dashboard surfaces.
+- An intelligence report script is not complete when it writes `report.html`. It is complete only when the client memo is free of raw pipeline language, the audit appendix preserves provenance, quality caps reflect real data readiness, and any missing evidence becomes a source-query or backfill task.
+- A provider backfill script is not complete when an HTTP request succeeds. It is complete only when inserted rows are usable by the deep research pack and can change report quality or blockers.
 - A resilience script is not complete when it catches an error. It is complete only when the failure is durable in state, logs, or an alert sink.
 - Structured logging for long-lived scripts must use `scripts/_shared/structured-logger.mjs`.
   Do not add a second ad-hoc logger format for daemon or dashboard scripts.
@@ -173,6 +248,23 @@ Focused coverage:
 If a script change affects structured logging, request metrics, or daemon health
 reporting, the change is not complete until it passes `test:ci:data-integrity`.
 
+## Report generation contract
+
+Report scripts must preserve the client memo / audit appendix boundary:
+
+- `report.html` and `report.md` are for human-readable analyst narrative.
+- `audit_appendix.html`, `audit_appendix.json`, `evidence_table.csv`, `bundle.json`, and `manifest.json` hold provenance and raw ledger detail.
+- The client memo must not expose `refs`, claim IDs, metric IDs, query manifests, pack names, or source queue internals.
+- Missing evidence must become source-query/backfill tasks rather than nicer prose.
+- Direct transcript coverage is a hard investment-readiness gate for company/thematic operating claims.
+
+Focused verification:
+
+```powershell
+node --import tsx --test .\tests\report-*.test.mjs .\tests\universal-research-orchestrator.test.mjs .\tests\external-provider-backfill-targets.test.mjs
+node .\scripts\generate-intelligence-report.mjs --db --depth deep --type theme_report --subject "AI / Machine Learning"
+```
+
 ## Emerging-tech discovery contract
 
 Canonical durable tables:
@@ -212,6 +304,21 @@ Autonomous backfill execution contract:
 
 - allowed sources are declared only in `scripts/_shared/backfill-whitelist.mjs`
 - `backfill-source` actions must pass whitelist validation, min-interval checks, budget checks, and approval checks
+- weak-area defaults come from `scripts/_shared/auto-curate-support.mjs`:
+  - `corpus-volume`: total articles `< 10000`
+  - `source-diversity`: distinct sources `< 4`
+  - `theme-classification`: 30-day unknown-theme rate `> 0.20`
+  - `topic-discovery`: 30-day discovery topics `< 5`
+  - `category:<name>`: category article sum `< 50`
+  - `emerging-tech-coverage`: no category coverage
+- default action split comes from `src/services/server/codex-dataset-proposer.ts`:
+  - prefer `backfill-source` for historical depth and corpus breadth gaps
+  - use `add-rss` for missing direct or adjacent feed coverage
+  - use `add-theme` only for repeated structurally distinct themes
+- default budget ceilings come from `scripts/_shared/automation-budget.mjs`:
+  - hourly `backfillCalls=2`
+  - daily `backfillCalls=5`, `backfillItems=100000`
+  - weekly `backfillCalls=20`, `backfillItems=500000`
 - `add-rss` actions must pass trusted-domain and quality checks before registration
 - background backfills must write stdout/stderr to `data/backfill-logs/`
 - `proposal-executor.mjs --dry-run` must validate the same path without launching child processes

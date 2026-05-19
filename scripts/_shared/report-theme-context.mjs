@@ -130,6 +130,45 @@ async function loadRegimeImpacts(client, themeKey) {
 }
 
 /*
+ * Controlled event uplifts — matched-control event studies already computed by
+ * the event engine. These are stronger market evidence than broad
+ * stock_sensitivity_matrix rows because they carry explicit n_controls and
+ * event_uplift evidence grades.
+ *
+ * n_controls can be small on a single event row because the matched-control
+ * engine stores per-event control sets. Report evidence is a symbol/horizon
+ * aggregate, so the control gate is applied in HAVING after grouping.
+ */
+async function loadControlledEventUplifts(client, themeKey) {
+  const rows = await many(client, `
+    SELECT
+      eu.symbol,
+      eu.horizon,
+      COUNT(*)::int AS event_count,
+      SUM(COALESCE(eu.n_controls, 0))::int AS n_controls,
+      AVG(eu.uplift)::float AS avg_uplift,
+      AVG(eu.event_alpha)::float AS avg_event_alpha,
+      AVG(eu.control_avg_return)::float AS avg_control_return,
+      MAX(ABS(eu.t_stat))::float AS max_abs_t_stat,
+      AVG(eu.t_stat)::float AS representative_t_stat,
+      (AVG(eu.uplift) / NULLIF(STDDEV_SAMP(eu.uplift) / SQRT(COUNT(*)), 0))::float AS aggregate_t_stat,
+      (ARRAY_AGG(eu.evidence_grade ORDER BY CASE WHEN eu.evidence_grade IN ('E4','E3','E2') THEN 0 ELSE 1 END, ABS(eu.t_stat) DESC NULLS LAST))[1] AS top_evidence_grade,
+      MAX(ce.event_date) AS latest_event_date
+    FROM event_uplift eu
+    JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+    WHERE ce.theme = $1
+      AND eu.evidence_grade IN ('E2','E3','E4')
+      AND ce.event_date >= CURRENT_DATE - INTERVAL '730 days'
+    GROUP BY eu.symbol, eu.horizon
+    HAVING SUM(COALESCE(eu.n_controls, 0)) >= 30
+       AND COUNT(*) >= 5
+    ORDER BY ABS(AVG(eu.t_stat)) DESC NULLS LAST, SUM(COALESCE(eu.n_controls, 0)) DESC NULLS LAST
+    LIMIT 8
+  `, [themeKey]).catch(() => []);
+  return rows;
+}
+
+/*
  * Knowledge graph paths — entities (companies/components/materials) connected
  * to the theme via knowledge_edges.
  */
@@ -231,17 +270,19 @@ async function loadHawkesSeries(client, themeKey, days = 30) {
  */
 export async function loadThemeContext(client, themeKey, { periodType = 'week', days = 30 } = {}) {
   if (!themeKey) {
-    return { subtopics: [], peerSymbols: { all: [], positive: [], negative: [], neutral: [] }, regimeImpacts: { all: [], grouped: [] }, knowledge: { nodes: [], connections: [] }, events: [], hawkes: [] };
+    return { subtopics: [], peerSymbols: { all: [], positive: [], negative: [], neutral: [] }, regimeImpacts: { all: [], grouped: [] }, controlledUplifts: [], knowledge: { nodes: [], connections: [] }, events: [], hawkes: [] };
   }
-  const [subtopics, peerSymbols, regimeImpacts, knowledge, events, hawkes] = await Promise.all([
-    loadSubtopics(client, themeKey, periodType),
-    loadPeerSymbols(client, themeKey),
-    loadRegimeImpacts(client, themeKey),
-    loadKnowledgePaths(client, themeKey),
-    loadEventTimeline(client, themeKey, days),
-    loadHawkesSeries(client, themeKey, days),
-  ]);
-  return { subtopics, peerSymbols, regimeImpacts, knowledge, events, hawkes };
+  /* pg@8 warns when multiple queries run concurrently on the same client.
+   * The report builder passes one checked-out client through the pipeline, so
+   * keep this loader sequential instead of using Promise.all. */
+  const subtopics = await loadSubtopics(client, themeKey, periodType);
+  const peerSymbols = await loadPeerSymbols(client, themeKey);
+  const regimeImpacts = await loadRegimeImpacts(client, themeKey);
+  const controlledUplifts = await loadControlledEventUplifts(client, themeKey);
+  const knowledge = await loadKnowledgePaths(client, themeKey);
+  const events = await loadEventTimeline(client, themeKey, days);
+  const hawkes = await loadHawkesSeries(client, themeKey, days);
+  return { subtopics, peerSymbols, regimeImpacts, controlledUplifts, knowledge, events, hawkes };
 }
 
 /*
@@ -260,6 +301,57 @@ export function themeContextToBundleAdditions(context, themeKey) {
   const marketReactions = [];
   const evidence = [];
 
+  if (context.controlledUplifts?.length) {
+    metrics.push({
+      metricId: 'MET-CONTROLLED-EVENT-UPLIFT-COUNT',
+      kind: 'controlled_event_study',
+      name: 'controlled_event_uplift_rows',
+      value: context.controlledUplifts.length,
+      unit: 'rows',
+      metadata: {
+        topRows: context.controlledUplifts.slice(0, 5).map((row) => ({
+          symbol: row.symbol,
+          horizon: row.horizon,
+          tStat: num(row.representative_t_stat ?? row.max_abs_t_stat),
+          aggregateTStat: num(row.aggregate_t_stat),
+          nControls: num(row.n_controls),
+          eventCount: num(row.event_count),
+          evidenceGrade: row.top_evidence_grade,
+        })),
+      },
+    });
+    for (const row of context.controlledUplifts.slice(0, 6)) {
+      const tStat = num(row.representative_t_stat ?? row.max_abs_t_stat);
+      marketReactions.push({
+        reactionId: `MRKT-CONTROLLED-${row.symbol}-${row.horizon}`,
+        symbol: row.symbol,
+        benchmark: 'matched_controls',
+        eventWindow: row.horizon,
+        relativeReturnPct: num(row.avg_uplift),
+        uplift: num(row.avg_uplift),
+        tStat,
+        alpha: num(row.avg_event_alpha),
+        controls: [
+          'benchmark=matched_controls',
+          'factor=macro_regime_matched_controls',
+          `n_controls=${num(row.n_controls) || 0}`,
+          `event_count=${num(row.event_count) || 0}`,
+          `evidence_grade=${row.top_evidence_grade || 'unknown'}`,
+        ],
+        validationStatus: num(row.n_controls) >= 30 ? 'validated' : 'candidate',
+        metadata: {
+          source: 'event_uplift',
+          evidenceGrade: row.top_evidence_grade,
+          latestEventDate: iso(row.latest_event_date),
+          controlledEventCount: num(row.event_count),
+          aggregateTStat: num(row.aggregate_t_stat),
+          maxAbsEventTStat: num(row.max_abs_t_stat),
+          limitation: 'symbol_horizon_aggregate; overlapping event windows may inflate repeated-event confidence',
+        },
+      });
+    }
+  }
+
   /* Subtopic metrics */
   if (context.subtopics?.length) {
     metrics.push({
@@ -276,6 +368,10 @@ export function themeContextToBundleAdditions(context, themeKey) {
   /* Peer symbol metrics + reactions */
   const peers = context.peerSymbols;
   if (peers?.all?.length) {
+    const regimeBySymbol = new Map((context.regimeImpacts?.grouped || []).map((group) => [
+      String(group.symbol || '').toUpperCase(),
+      group,
+    ]));
     metrics.push({
       metricId: 'MET-PEER-COUNT',
       kind: 'symbol_sensitivity',
@@ -286,6 +382,14 @@ export function themeContextToBundleAdditions(context, themeKey) {
     });
     /* Promote peers to marketReactions for prose / chart consumption */
     for (const symbol of peers.positive.concat(peers.negative).slice(0, 6)) {
+      const regime = regimeBySymbol.get(String(symbol.symbol || '').toUpperCase());
+      const regimeLabels = [...new Set((regime?.regimes || []).map((row) => row.regime).filter(Boolean))];
+      const regimeControls = regime
+        ? [
+          `regime_count=${regimeLabels.length || regime.regimeCount || 0}`,
+          `regime_labels=${regimeLabels.slice(0, 4).join('|') || 'available'}`,
+        ]
+        : [];
       marketReactions.push({
         reactionId: `MRKT-PEER-${symbol.symbol}-${symbol.horizon}`,
         symbol: symbol.symbol,
@@ -295,9 +399,9 @@ export function themeContextToBundleAdditions(context, themeKey) {
         uplift: num(symbol.sensitivity_zscore),
         tStat: num(symbol.sensitivity_zscore),
         alpha: num(symbol.avg_return) - num(symbol.baseline_return),
-        controls: [`sample_size=${num(symbol.sample_size)}`, `hit_rate=${num(symbol.hit_rate)}`],
+        controls: [`benchmark=baseline_return`, `sample_size=${num(symbol.sample_size)}`, `hit_rate=${num(symbol.hit_rate)}`, ...regimeControls],
         validationStatus: num(symbol.sample_size) >= 30 ? 'validated' : 'candidate',
-        metadata: { interpretation: symbol.interpretation, theme: symbol.theme },
+        metadata: { interpretation: symbol.interpretation, theme: symbol.theme, regimeControls: regime || null },
       });
     }
   }
@@ -364,6 +468,7 @@ export function themeContextToBundleAdditions(context, themeKey) {
       themeContext: {
         themeKey,
         loadedAt: new Date().toISOString(),
+        controlledUplifts: context.controlledUplifts?.slice(0, 8) || [],
         subtopics: context.subtopics?.slice(0, 8) || [],
         peerSymbols: {
           positive: peers?.positive || [],

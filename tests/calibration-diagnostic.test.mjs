@@ -40,3 +40,26 @@ test('computeCalibrationDiagnostic reads joined prediction rows from queryable',
   assert.equal(typeof diagnostic.ece, 'number');
   assert.equal(typeof diagnostic.brierScore, 'number');
 });
+
+test('computeCalibrationDiagnostic labels sensitivity drift alerts accurately', async () => {
+  const alerts = [];
+  await computeCalibrationDiagnostic({
+    async query() {
+      return {
+        rows: [
+          { predicted: 0.95, actual: 0 },
+          { predicted: 0.95, actual: 0 },
+          { predicted: 0.95, actual: 0 },
+        ],
+      };
+    },
+  }, {
+    alertFn: async (severity, message, context) => {
+      alerts.push({ severity, message, context });
+    },
+  });
+
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].context.type, 'sensitivity_calibration_drift');
+  assert.match(alerts[0].message, /^Sensitivity calibration drift:/);
+});

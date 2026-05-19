@@ -6,7 +6,7 @@
  *   - article_count = 0 in the aggregate window, but acceleration = -145%
  *     (the YoY/acceleration math is computed on a different window or the
  *     row simply has stale aggregate values that have not been recomputed
- *     against the current articles.theme→count mapping)
+ *     against the current article-to-theme mapping)
  *   - recent_evidence_items > 0 while the aggregate metric for the same
  *     window reports 0 articles
  *   - regime_multiplier > 5 with sample_size < 10 (almost certainly overfit)
@@ -33,6 +33,20 @@ function getMetricValue(bundle, name) {
   return metric ? num(metric.value) : null;
 }
 
+function getMetricLimitations(bundle, name) {
+  const metric = findMetric(bundle, (m) => m.name === name);
+  return metric ? (metric.limitations || []).map((item) => String(item || '')) : [];
+}
+
+function envInt(name, fallback, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  const parsed = Math.floor(Number(process.env[name]));
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+const LOW_ATTENTION_SAMPLE_ARTICLES = envInt('REPORT_TRIAGE_MIN_ARTICLES', 10, 1, 1_000);
+const INVESTMENT_MEMO_SAMPLE_ARTICLES = envInt('REPORT_INVESTMENT_MIN_ARTICLES', 30, LOW_ATTENTION_SAMPLE_ARTICLES, 1_000);
+
 /*
  * Run all diagnostics. Returns { caveats, signals } where:
  *   caveats — appendable to bundle.caveats
@@ -48,6 +62,7 @@ export function runReportDataDiagnostics(bundle) {
     hasBaselineDistortion: false,
     hasUnsampledTStat: false,
     hasRecentEvidenceWithEmptyAggregate: false,
+    hasLowAttentionSample: false,
   };
   if (!bundle) return { caveats, signals };
 
@@ -55,7 +70,24 @@ export function runReportDataDiagnostics(bundle) {
   const recentEvidence = getMetricValue(bundle, 'recent_evidence_items');
   const yoy = getMetricValue(bundle, 'YoY');
   const acceleration = getMetricValue(bundle, 'acceleration');
+  const accelerationLimitations = getMetricLimitations(bundle, 'acceleration');
   const novelty = getMetricValue(bundle, 'novelty_score');
+
+  /* (0) Sample-size boundary: trend/lifecycle metrics can be useful for
+   * triage with small samples, but they should not be read as industry-cycle
+   * conclusions or investment-memo evidence. */
+  if (bundle.reportType === 'theme_report'
+    && articleCount !== null
+    && articleCount < LOW_ATTENTION_SAMPLE_ARTICLES) {
+    signals.hasLowAttentionSample = true;
+    caveats.push({
+      caveatId: 'CAV-DIAG-LOW-ATTENTION-SAMPLE',
+      severity: articleCount < 5 ? 'high' : 'medium',
+      type: 'low_attention_sample',
+      text: `Theme lifecycle and attention momentum are based on ${articleCount} article${articleCount === 1 ? '' : 's'} in the aggregate window. This is enough for signal triage, not enough for an investment memo; industry-cycle claims require at least ${INVESTMENT_MEMO_SAMPLE_ARTICLES} articles plus independent industry, fundamental, and market data.`,
+      appliesToClaimIds: bundle.claims?.map((c) => c.claimId) || [],
+    });
+  }
 
   /* (1) Aggregate orphan: aggregate metrics exist but the article_count is 0 */
   if (articleCount === 0
@@ -65,7 +97,7 @@ export function runReportDataDiagnostics(bundle) {
       caveatId: 'CAV-DIAG-AGGREGATE-ORPHAN',
       severity: 'high',
       type: 'aggregate_orphan',
-      text: 'The selected aggregate row reports article_count=0 yet computed YoY/acceleration/novelty are non-zero. The aggregate was likely produced against a different window than the current article→theme mapping. Treat the aggregate metrics as stale.',
+      text: 'The selected trend aggregate reports zero articles, but its year-over-year, acceleration, and novelty metrics are non-zero. It was likely produced against a different window than the current article-to-theme mapping. Treat the aggregate metrics as stale.',
       appliesToClaimIds: bundle.claims?.map((c) => c.claimId) || [],
     });
   }
@@ -83,15 +115,19 @@ export function runReportDataDiagnostics(bundle) {
     });
   }
 
-  /* (3) Baseline distortion — |acceleration| > 500% means the base period was
-   *     near zero, so the multiplier is not a meaningful trend strength. */
-  if (acceleration !== null && Math.abs(acceleration) > 500) {
+  /* (3) Baseline distortion. For theme trend aggregates, values above 100%
+   *     usually mean the comparison window was zero/sparse rather than a
+   *     trustworthy magnitude reading. */
+  if (
+    acceleration !== null
+    && (Math.abs(acceleration) > 100 || accelerationLimitations.some((item) => /baseline|sparse|zero/i.test(item)))
+  ) {
     signals.hasBaselineDistortion = true;
     caveats.push({
       caveatId: 'CAV-DIAG-BASELINE-DISTORTION',
       severity: 'medium',
       type: 'baseline_distortion',
-      text: `Acceleration is ${acceleration.toFixed(0)}% — the previous-period baseline is near zero. Treat the acceleration sign as directional only; the magnitude is not a meaningful trend strength.`,
+      text: `Acceleration is ${acceleration.toFixed(0)}%, but the comparison baseline is sparse or unstable. Treat the sign as directional only; the magnitude is not a meaningful trend-strength reading.`,
       appliesToClaimIds: bundle.claims?.map((c) => c.claimId) || [],
     });
   }
@@ -101,7 +137,7 @@ export function runReportDataDiagnostics(bundle) {
     const mult = num(reaction.uplift ?? reaction.multiplier);
     const controls = (reaction.controls || []).join(' ');
     const sampleSize = (() => {
-      const m = controls.match(/sample_size=(\d+)/);
+      const m = controls.match(/(?:sample_size|n_controls|event_count|n)=(\d+)/);
       return m ? Number(m[1]) : null;
     })();
     if (mult !== null && Math.abs(mult) > 5 && sampleSize !== null && sampleSize < 10) {

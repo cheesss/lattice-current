@@ -1,0 +1,22 @@
+[
+  {
+    "themes": ["space", "quantum-computing"],
+    "expectedConnectors": ["cryogenic cooling", "helium-3", "dilution refrigerator", "liquid hydrogen"],
+    "expectedSuppliers": ["Linde", "Air Liquide", "Bluefors", "Chart Industries"]
+  },
+  {
+    "themes": ["fusion-energy", "quantum-computing"],
+    "expectedConnectors": ["superconducting magnets", "cryogenics", "vacuum systems"],
+    "expectedSuppliers": ["Oxford Instruments", "Bluefors", "Linde"]
+  },
+  {
+    "themes": ["ai-ml", "cloud-infrastructure"],
+    "expectedConnectors": ["data center power", "liquid cooling", "transformers", "grid interconnect"],
+    "expectedSuppliers": ["Vertiv", "Eaton", "Schneider Electric", "GE Vernova"]
+  },
+  {
+    "themes": ["space", "clean-energy"],
+    "expectedConnectors": ["fuel cell", "hydrogen", "cryogenic propellant"],
+    "expectedSuppliers": ["Linde", "Air Liquide", "Plug Power"]
+  }
+]

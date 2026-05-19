@@ -18,12 +18,28 @@ import psycopg2.extras
 
 DRY_RUN = "--dry-run" in sys.argv
 
+def first_env(*keys, default=None):
+    for key in keys:
+        value = os.environ.get(key)
+        if value:
+            return value
+    return default
+
+def require_pg_password():
+    password = first_env("PG_PASSWORD", "PGPASSWORD", "INTEL_PG_PASSWORD", "NAS_PG_PASSWORD")
+    if not password:
+        raise RuntimeError(
+            "Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, "
+            "INTEL_PG_PASSWORD, or NAS_PG_PASSWORD."
+        )
+    return password
+
 PG = {
-    "host": os.environ.get("PG_HOST", "192.168.0.2"),
-    "port": int(os.environ.get("PG_PORT", 5433)),
-    "user": os.environ.get("PG_USER", "postgres"),
+    "host": first_env("INTEL_PG_HOST", "NAS_PG_HOST", "PG_HOST", default="192.168.0.2"),
+    "port": int(first_env("INTEL_PG_PORT", "NAS_PG_PORT", "PG_PORT", default=5433)),
+    "user": first_env("INTEL_PG_USER", "NAS_PG_USER", "PG_USER", "PGUSER", default="postgres"),
     "password": require_pg_password(),
-    "dbname": os.environ.get("PG_DATABASE", "lattice"),
+    "dbname": first_env("INTEL_PG_DATABASE", "NAS_PG_DATABASE", "PG_DATABASE", "PGDATABASE", default="lattice"),
 }
 
 SECTOR_ETF_MAP = {

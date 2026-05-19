@@ -123,6 +123,7 @@ data/openclaw-webhook-events.jsonl
 data/openclaw-webhook.json
 data/runtime-issues/
 data/runtime-logs/
+data/reports/
 data/verification-screenshots/
 data/meta-*.calibration.json
 data/meta-*.pt

@@ -141,7 +141,9 @@ const ZOOM_PRESET_ZOOMS: Record<LensZoomPresetId, number> = {
   country: 4.7,
   city: 7.25,
 };
-const BASE_SIGNAL_LAYERS: Array<keyof MapLayers> = ['hotspots'];
+const BASE_SIGNAL_LAYERS: Array<keyof MapLayers> = [
+  'hotspots',
+];
 const RELATIONSHIP_LAYER_KEYS: Array<keyof MapLayers> = [
   'tradeRoutes',
   'waterways',
@@ -298,7 +300,10 @@ function buildTechnologyPreset(): LensPreset {
     label: 'Technology and science',
     description: 'Technology preset keeps compute geography and cyber/event signals visible without turning on relationship overlays.',
     view: 'global',
-    layers: createBudgetedLayers(['datacenters', 'cyberThreats']),
+    layers: createBudgetedLayers([
+      'conflicts',
+      'datacenters',
+    ]),
   };
 }
 
@@ -308,7 +313,10 @@ function buildMacroPreset(): LensPreset {
     label: 'Macro and market impact',
     description: 'Macro preset prioritizes event/E2 markers with market geography; relationship arcs stay opt-in.',
     view: 'global',
-    layers: createBudgetedLayers(['economic', 'stockExchanges']),
+    layers: createBudgetedLayers([
+      'conflicts',
+      'economic',
+    ]),
   };
 }
 
@@ -318,7 +326,10 @@ function buildClimatePreset(): LensPreset {
     label: 'Climate and resilience',
     description: 'Climate preset keeps anomaly and event evidence first; infrastructure spillovers require relationship mode.',
     view: 'global',
-    layers: createBudgetedLayers(['climate', 'natural']),
+    layers: createBudgetedLayers([
+      'conflicts',
+      'climate',
+    ]),
   };
 }
 

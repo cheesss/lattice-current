@@ -94,16 +94,18 @@ export async function computeCalibrationDiagnostic(queryable, options = {}) {
 
   const summary = summarizeCalibrationRows(result?.rows ?? []);
 
-  // Emit alert if calibration drift exceeds threshold
+  // Emit alert if calibration drift exceeds threshold. This diagnostic is for
+  // the stock_sensitivity_matrix calibration surface, not the active
+  // meta-model registry.
   if (summary.ece > 0.15 && options.alertFn) {
     const severity = summary.ece > 0.3 ? 'critical' : 'warning';
     try {
-      await options.alertFn(severity, `Meta-model calibration drift: ECE=${summary.ece} Brier=${summary.brierScore} (threshold: 0.15)`, {
-        type: 'model_drift',
+      await options.alertFn(severity, `Sensitivity calibration drift: ECE=${summary.ece} Brier=${summary.brierScore} (threshold: 0.15)`, {
+        type: 'sensitivity_calibration_drift',
         ece: summary.ece,
         brierScore: summary.brierScore,
         sampleSize: summary.sampleSize,
-        suggestedAction: 'python scripts/train-meta-model.py --epochs 50',
+        suggestedAction: 'refresh stock_sensitivity_matrix or inspect stale labeled_outcomes joins',
       });
     } catch { /* alert delivery failure should not break calibration response */ }
   }

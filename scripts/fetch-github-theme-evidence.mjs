@@ -373,6 +373,7 @@ export async function runGitHubThemeEvidence(options = {}, runtime = {}) {
 
   try {
     const summaries = [];
+    const errors = [];
     let totalRepos = 0;
     let totalEvidence = 0;
 
@@ -384,7 +385,11 @@ export async function runGitHubThemeEvidence(options = {}, runtime = {}) {
       }
       const response = await fetchImpl(buildGitHubSearchUrl(themeKey, options), { headers });
       if (!response.ok) {
-        throw new Error(`GitHub search failed for ${themeKey}: ${response.status} ${response.statusText}`);
+        const error = `GitHub search failed for ${themeKey}: ${response.status} ${response.statusText}`;
+        errors.push(error);
+        summaries.push({ theme: themeKey, skipped: true, reason: error });
+        if (response.status === 403 || response.status === 429) break;
+        continue;
       }
       const payload = await response.json();
       const repositories = dedupeStrings((payload.items || []).map((item) => item.full_name), Number(options.maxRepos || DEFAULT_MAX_REPOS))
@@ -409,12 +414,13 @@ export async function runGitHubThemeEvidence(options = {}, runtime = {}) {
     }
 
     return {
-      ok: true,
+      ok: totalRepos > 0 || errors.length < themes.length,
       dryRun,
       themeCount: themes.length,
       repoCount: totalRepos,
       evidenceCount: totalEvidence,
       themes: summaries,
+      errors,
     };
   } finally {
     if (client) await client.end();

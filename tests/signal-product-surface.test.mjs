@@ -105,6 +105,18 @@ describe('signal-first product surface guardrails', () => {
     assert.equal(dashboardSource.includes('loadSystemHealth(),loadDataQuality(),loadCodexQuality()'), true);
   });
 
+  it('loads the modern cyan cockpit surface layer without replacing the dashboard route', () => {
+    const v3Source = readFileSync(repoPath('src/dashboard/v3/index.mjs'), 'utf8');
+    const cssSource = readFileSync(repoPath('src/dashboard/surfaces/surfaces.css'), 'utf8');
+    const statusSource = readFileSync(repoPath('src/dashboard/surfaces/status-vocabulary.mjs'), 'utf8');
+    assert.equal(v3Source.includes("import '../surfaces/index.mjs';"), true);
+    assert.equal(cssSource.includes('--cockpit-accent: #22d3ee'), true);
+    assert.equal(cssSource.includes('--cockpit-success: #34d399'), true);
+    assert.equal(cssSource.includes('prefers-reduced-motion'), true);
+    assert.equal(statusSource.includes("Appr: '승인'"), true);
+    assert.equal(statusSource.includes("HI: '고우선순위'"), true);
+  });
+
   it('keeps absorbed legacy geo, transmission, and source-ops summaries visible in the theme shell', () => {
     const dashboardSource = readFileSync(repoPath('event-dashboard.html'), 'utf8');
     assert.equal(dashboardSource.includes('id="geo-pressure-snapshot"'), true);

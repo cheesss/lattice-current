@@ -43,7 +43,7 @@ export const AUTOMATION_SCHEMA_STATEMENTS = [
       action_type TEXT NOT NULL,
       payload JSONB NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix')),
+        CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix', 'context-collected', 'negative-control-collected', 'weak-noise-collected')),
       reasoning TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       reviewed_at TIMESTAMPTZ,
@@ -53,16 +53,10 @@ export const AUTOMATION_SCHEMA_STATEMENTS = [
   `
     DO $$
     BEGIN
-      IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'approval_queue_status_check'
-          AND conrelid = 'approval_queue'::regclass
-      ) THEN
-        ALTER TABLE approval_queue
-          ADD CONSTRAINT approval_queue_status_check
-          CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix'));
-      END IF;
+      ALTER TABLE approval_queue DROP CONSTRAINT IF EXISTS approval_queue_status_check;
+      ALTER TABLE approval_queue
+        ADD CONSTRAINT approval_queue_status_check
+        CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix', 'context-collected', 'negative-control-collected', 'weak-noise-collected'));
     END
     $$;
   `,

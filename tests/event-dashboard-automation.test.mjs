@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import { readFileSync } from 'node:fs';
 
 import {
   loadApprovalById,
@@ -23,6 +24,9 @@ process.env.PGUSER ||= 'test';
 process.env.PGDATABASE ||= 'test';
 process.env.PGPASSWORD ||= 'test';
 
+const dashboardApiSource = readFileSync(new URL('../scripts/event-dashboard-api.mjs', import.meta.url), 'utf8');
+const dashboardHtmlSource = readFileSync(new URL('../event-dashboard.html', import.meta.url), 'utf8');
+
 function normalizeSql(text) {
   return String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -30,7 +34,58 @@ function normalizeSql(text) {
 test('automation schema allows needs-fix approval queue status', () => {
   const schema = AUTOMATION_SCHEMA_STATEMENTS.join('\n');
   assert.match(schema, /needs-fix/);
+  assert.match(schema, /context-collected/);
+  assert.match(schema, /negative-control-collected/);
+  assert.match(schema, /weak-noise-collected/);
   assert.match(schema, /approval_queue_status_check/);
+});
+
+test('dashboard exposes report backfill closure summary without approval execution controls', () => {
+  const routeStart = dashboardApiSource.indexOf("segments[2] === 'backfill-closure'");
+  const routeBlock = dashboardApiSource.slice(routeStart, routeStart + 1800);
+  assert.match(dashboardApiSource, /backfill-closure/);
+  assert.match(dashboardApiSource, /loadReportBackfillClosureSummaries/);
+  assert.match(dashboardApiSource, /openClasses/);
+  assert.match(dashboardApiSource, /marketTier/);
+  assert.match(dashboardApiSource, /negativeControlStatus/);
+  assert.match(dashboardApiSource, /classRows/);
+  assert.match(dashboardApiSource, /primaryBlocker/);
+  assert.match(dashboardApiSource, /nextAction/);
+  assert.match(dashboardApiSource, /visualStatus/);
+  assert.match(dashboardApiSource, /adjacent-theme-candidates/);
+  assert.match(dashboardApiSource, /loadAdjacentThemeCandidateSummaries/);
+  assert.match(dashboardApiSource, /generatedLane/);
+  assert.match(dashboardApiSource, /seedLeakageScore/);
+  assert.match(dashboardApiSource, /relationSupport/);
+  assert.match(dashboardApiSource, /candidateIssuerCount/);
+  assert.match(dashboardApiSource, /bridgeAttachedCount/);
+  assert.match(dashboardApiSource, /issuerMappingGapCount/);
+  assert.match(dashboardApiSource, /latestReportPath/);
+  assert.notEqual(routeStart, -1);
+  assert.doesNotMatch(routeBlock, /markApprovalReviewed|markApprovalReviewed\(/);
+  assert.match(dashboardHtmlSource, /Report Backfill/);
+  assert.match(dashboardHtmlSource, /Adjacent Themes/);
+  assert.match(dashboardHtmlSource, /loadAdjacentThemeCandidates/);
+  assert.match(dashboardHtmlSource, /loadReportBackfillClosure/);
+  assert.match(dashboardHtmlSource, /review-ready/);
+  assert.match(dashboardHtmlSource, /rejected/);
+  const modernSurfaces = readFileSync(new URL('../src/dashboard/surfaces/report-backfill.mjs', import.meta.url), 'utf8');
+  assert.match(modernSurfaces, /Evidence closure matrix/);
+  assert.match(modernSurfaces, /renderClosureMatrix/);
+  assert.match(modernSurfaces, /Audit details/);
+});
+
+test('approval queue review routes source-query approvals to source-query executor', () => {
+  const routeStart = dashboardApiSource.indexOf('async function reviewApprovalQueueItem');
+  const routeBlock = dashboardApiSource.slice(routeStart, routeStart + 5200);
+  assert.notEqual(routeStart, -1);
+  assert.match(dashboardApiSource, /executeSourceQueryApproval/);
+  assert.match(routeBlock, /action_type[\s\S]+source-query/);
+  assert.match(routeBlock, /executeSourceQueryApproval/);
+  assert.ok(
+    routeBlock.indexOf('executeSourceQueryApproval') < routeBlock.indexOf('executeProposal'),
+    'source-query approvals must not fall through to generic proposal executor',
+  );
 });
 
 function createApprovalQueueClient(seed = {}) {
@@ -111,7 +166,7 @@ function createProposalClient(seed = {}) {
       const sql = normalizeSql(text);
       calls.push({ sql, values });
 
-      if (sql.startsWith('create table') || sql.startsWith('create index') || sql.startsWith('alter table')) {
+      if (sql.startsWith('create table') || sql.startsWith('create index') || sql.startsWith('alter table') || sql.startsWith('do $$')) {
         return { rows: [] };
       }
 
@@ -184,6 +239,14 @@ test('event dashboard exposes automation observability routes', { concurrency: f
     assert.equal(approvalResponse.status, 200);
     const approvalPayload = await approvalResponse.json();
     assert.ok(Array.isArray(approvalPayload.approvals));
+
+    const surfaceModuleResponse = await fetch(`http://127.0.0.1:${port}/src/dashboard/surfaces/index.mjs`);
+    assert.equal(surfaceModuleResponse.status, 200);
+    assert.match(surfaceModuleResponse.headers.get('content-type') || '', /text\/javascript/);
+
+    const surfaceCssResponse = await fetch(`http://127.0.0.1:${port}/src/dashboard/surfaces/surfaces.css`);
+    assert.equal(surfaceCssResponse.status, 200);
+    assert.match(surfaceCssResponse.headers.get('content-type') || '', /text\/css/);
   } finally {
     await closeServer(server);
     await restorePool();

@@ -193,6 +193,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     lookbackYears: DEFAULT_LOOKBACK_YEARS,
     fromDate: '',
     dryRun: false,
+    summaryOnly: false,
     mailto: '',
     userAgent: '',
   };
@@ -229,6 +230,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
       if (Number.isFinite(value) && value > 0) parsed.lookbackYears = Math.floor(value);
     } else if (arg === '--dry-run') {
       parsed.dryRun = true;
+    } else if (arg === '--summary-only') {
+      parsed.summaryOnly = true;
     } else if (arg === '--mailto' && argv[index + 1]) {
       parsed.mailto = argv[++index];
     } else if (arg === '--user-agent' && argv[index + 1]) {
@@ -700,18 +703,21 @@ export async function runOpenAlexThemeEvidence(options = {}, dependencies = {}) 
       await queryable.query('COMMIT');
     }
 
-    return {
+    const summary = {
       ok: true,
       dryRun: config.dryRun,
       themeCount: themes.length,
       workCount: summaries.reduce((sum, item) => sum + Number(item.storedCount || 0), 0),
       evidenceCount: summaries.reduce((sum, item) => sum + Number(item.storedCount || 0), 0),
       themes: summaries.map((item) => ({ theme: item.theme, query: item.query, storedCount: item.storedCount })),
-      sample: {
-        works: summaries.flatMap((item) => item.sample || []).slice(0, 5),
-      },
-      summaries,
     };
+    if (!config.summaryOnly) {
+      summary.sample = {
+        works: summaries.flatMap((item) => item.sample || []).slice(0, 5),
+      };
+      summary.summaries = summaries;
+    }
+    return summary;
   } catch (error) {
     if (!config.dryRun) {
       await queryable.query('ROLLBACK').catch(() => {});

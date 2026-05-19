@@ -34,14 +34,26 @@ const DEFAULT_RANGE = '1y';
 const DEFAULT_INTERVAL = '1d';
 
 function parseArgs(argv) {
-  const args = { dryRun: false, symbols: null, range: DEFAULT_RANGE };
+  const args = { dryRun: false, symbols: null, range: DEFAULT_RANGE, includeAutoThemeSymbols: false };
   for (let i = 0; i < argv.length; i += 1) {
     const t = argv[i];
     if (t === '--dry-run') args.dryRun = true;
+    else if (t === '--include-auto-theme-symbols') args.includeAutoThemeSymbols = true;
     else if (t === '--symbols') args.symbols = String(argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean);
     else if (t === '--range') args.range = String(argv[++i] || DEFAULT_RANGE);
   }
   return args;
+}
+
+async function loadAutoThemeSymbols(pool, limit = 160) {
+  const { rows } = await pool.query(`
+    SELECT DISTINCT symbol
+      FROM auto_theme_symbols
+     WHERE symbol IS NOT NULL AND symbol <> ''
+     ORDER BY symbol
+     LIMIT $1
+  `, [Math.max(1, Math.min(500, Number(limit) || 160))]);
+  return rows.map((row) => row.symbol);
 }
 
 async function fuseFromWarmStore(pool, symbol) {
@@ -149,12 +161,15 @@ async function bootstrapSymbol(pool, symbol, { dryRun, range }) {
 async function main() {
   loadOptionalEnvFile();
   const args = parseArgs(process.argv.slice(2));
-  const symbols = args.symbols && args.symbols.length ? args.symbols : getAllRequiredSymbols();
-
-  console.log(`bootstrap ${symbols.length} symbols (dryRun=${args.dryRun}, range=${args.range})`);
   const pool = new Pool({ ...resolveNasPgConfig(), max: 4 });
   const reports = [];
   try {
+    const autoSymbols = args.includeAutoThemeSymbols ? await loadAutoThemeSymbols(pool) : [];
+    const symbols = Array.from(new Set([
+      ...(args.symbols && args.symbols.length ? args.symbols : getAllRequiredSymbols()),
+      ...autoSymbols,
+    ])).sort();
+    console.log(`bootstrap ${symbols.length} symbols (dryRun=${args.dryRun}, range=${args.range})`);
     if (!args.dryRun) await ensureMarketQuotesSchema(pool);
     for (const sym of symbols) {
       const r = await bootstrapSymbol(pool, sym, args);

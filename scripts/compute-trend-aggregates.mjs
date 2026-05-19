@@ -689,8 +689,15 @@ function computeAggregateRecord({
       comparisonCounts: {
         current: Number(currentReferenceCount.toFixed(4)),
         previous: Number(previousReferenceCount.toFixed(4)),
+        previousPrevious: Number(previousPreviousCount.toFixed(4)),
         yearAgo: Number(yearAgoReferenceCount.toFixed(4)),
         threeYearAgo: Number(threeYearAgoReferenceCount.toFixed(4)),
+      },
+      comparisonReliability: {
+        trendAcceleration: previousPreviousCount <= 1 || previousReferenceCount <= 1
+          ? 'directional_only_sparse_baseline'
+          : 'magnitude_usable',
+        yearAgo: yearAgoReferenceCount <= 1 ? 'directional_only_sparse_baseline' : 'magnitude_usable',
       },
     },
   };

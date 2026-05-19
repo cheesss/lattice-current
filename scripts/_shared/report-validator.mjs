@@ -18,9 +18,11 @@ const COMMON_UPPERCASE_WORDS = new Set([
   /* Common business / domain abbreviations that appear in article titles
    * and analyst prose. Not tickers. */
   'CEO', 'CTO', 'CFO', 'COO', 'PPA', 'IPO', 'GDP', 'CPI', 'GPU', 'CPU',
-  'EV', 'EU', 'US', 'UK', 'NA', 'EDP', 'SLA', 'TPU', 'IO', 'OS',
+  'KPI', 'MD', 'MD&A', 'CAPEX', 'OPEX', 'R&D',
+  'ARR', 'NRR', 'MRR', 'ACV', 'TCV', 'RPO', 'NDR',
+  'EV', 'EU', 'US', 'UK', 'NA', 'EDP', 'SLA', 'TPU', 'IO', 'OS', 'FX',
   'AND', 'OR', 'NOT', 'IT', 'IS', 'OK', 'MW', 'GW', 'KWH', 'MWH', 'GWH',
-  'YOY', 'QOQ', 'WOW', 'DOD',
+  'YOY', 'QOQ', 'WOW', 'DOD', 'NATO',
 ]);
 
 /* ISO-date detection — used to skip "2026-05-04" tokenization */
@@ -36,6 +38,26 @@ function idSet(rows, key) {
 
 function add(list, type, message, extra = {}) {
   list.push({ type, message, ...extra });
+}
+
+function validateAdaptiveNarrativeStructure(analysis = {}, blockers = []) {
+  const structure = analysis.narrativeStructure || analysis.narrativePlan?.narrativeStructure;
+  if (!structure) return;
+  const coverage = Number(structure.requiredRoleCoverage ?? 0);
+  if (!(coverage >= 1)) {
+    add(blockers, 'adaptive_narrative_role_coverage_incomplete', `Adaptive narrative role coverage is incomplete: ${coverage}.`, {
+      missingRoles: asArray(structure.missingRoles),
+    });
+  }
+  if (asArray(structure.validationErrors).length && structure.provider === 'llm') {
+    add(blockers, 'adaptive_narrative_outline_invalid', 'LLM narrative outline failed validation and cannot be used.', {
+      errors: asArray(structure.validationErrors),
+    });
+  }
+  const titles = asArray(structure.sections).map((section) => String(section.title || '').trim().toLowerCase()).filter(Boolean);
+  if (titles.length !== new Set(titles).size) {
+    add(blockers, 'adaptive_narrative_duplicate_titles', 'Adaptive narrative structure contains duplicate section titles.');
+  }
 }
 
 function claimHasSupport(claim) {
@@ -63,6 +85,11 @@ function knownNumericStrings(bundle) {
       reaction.uplift,
       reaction.tStat,
       reaction.alpha,
+      reaction.sampleSize,
+      reaction.sample_size,
+      ...asArray(reaction.controls).flatMap((control) => (
+        String(control).match(/[-+]?\d+(?:\.\d+)?/g) || []
+      )),
     ]),
     /* themeContext numbers — subtopic momentum/accel/rank, peer zscores,
      * regime multipliers, knowledge edge confidence/evidence_count, event
@@ -72,7 +99,7 @@ function knownNumericStrings(bundle) {
     ...asArray(ctx.peerSymbols?.negative).flatMap((p) => [p.sensitivity_zscore, p.avg_return, p.baseline_return, p.sample_size, p.hit_rate, p.return_vol]),
     ...asArray(ctx.regimeBySymbol).flatMap((g) => asArray(g.regimes).flatMap((r) => [r.regime_multiplier, r.avg_return, r.sample_size, r.hit_rate])),
     ...asArray(ctx.knowledgeConnections).flatMap((c) => [c.confidence, c.evidenceCount, c.sourceDiversity]),
-    ...asArray(ctx.events).flatMap((e) => [e.articleCount, e.sourceCount, e.sourceDiversity, e.hawkesIntensity, e.normalizedTemperature, e.topSourceShare]),
+    ...asArray(ctx.events).flatMap((e) => [e.eventId, e.id, e.articleCount, e.sourceCount, e.sourceDiversity, e.hawkesIntensity, e.normalizedTemperature, e.topSourceShare]),
     ...asArray(ctx.hawkesSeries).flatMap((h) => [h.hawkes_intensity, h.normalized_temperature, h.article_count]),
     /* Symbol report sensitivity row */
     sym.sensitivity_zscore, sym.sample_size, sym.avg_return, sym.baseline_return, sym.hit_rate, sym.return_vol,
@@ -98,6 +125,59 @@ function knownNumericStrings(bundle) {
     /* P5: cross-asset paths + historical analogues */
     ...(asArray(bundle.metadata?.crossAssetPaths?.paths)).flatMap((p) => [p.score, p.hop1?.confidence, p.hop2?.confidence, p.pathLength]),
     ...(asArray(bundle.metadata?.historicalAnalogues?.analogues)).flatMap((a) => [a.similarity, a.profile?.mean, a.profile?.max, a.profile?.surge]),
+    ...(asArray(bundle.metadata?.deepResearch?.packs?.historicalAnalogPack?.analogues)).flatMap((a) => [
+      a.similarityScore,
+      a.metadata?.vsPreviousPeriodPct,
+      a.metadata?.vsYearAgoPct,
+      a.metadata?.trendAcceleration,
+      a.metadata?.lifecycleConfidence,
+      ...(String(a.analogName || a.name || a.title || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...asArray(a.similarityDrivers).flatMap((text) => (String(text).match(/[-+]?\d+(?:\.\d+)?/g) || [])),
+    ]),
+    ...(Object.values(bundle.metadata?.deepResearch?.packProfiles || {})).flatMap((profile) => [
+      profile.rowCount,
+      profile.sourceRefCount,
+      asArray(profile.sourceKinds).length,
+      asArray(profile.subjectBindings).length,
+      profile.kpiCoverage,
+      profile.kpiMappedCount,
+      profile.kpiObservationCount,
+      profile.kpiGapCount,
+    ]),
+    bundle.metadata?.deepResearch?.dataDepthScore,
+    bundle.metadata?.deepResearch?.causalChainScore,
+    bundle.metadata?.deepResearch?.historicalContextScore,
+    bundle.metadata?.deepResearch?.kpiRegistry?.coverage,
+    bundle.metadata?.deepResearch?.kpiRegistry?.mappedCount,
+    bundle.metadata?.deepResearch?.kpiRegistry?.definitionCount,
+    bundle.metadata?.deepResearch?.kpiRegistry?.observationCount,
+    bundle.metadata?.deepResearch?.kpiRegistry?.missingCount,
+    bundle.metadata?.deepResearch?.kpiRegistry?.jobCount,
+    bundle.metadata?.deepResearch?.gaps?.length || 0,
+    ...(asArray(bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.rows)).flatMap((row) => [
+      row.sampleSize,
+      row.relativeReturnPct,
+      row.tStat,
+      row.decisionGradeRowCount,
+      row.screeningGradeRowCount,
+      row.regimeSupportCount,
+      row.regimeDistinctCount,
+      row.regimeHorizonCount,
+    ]),
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.decisionGradeRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.screeningGradeRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.controlledRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.regimeSupportRowCount,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.maxSampleSize,
+    bundle.metadata?.deepResearch?.investmentReadiness?.marketValidation?.maxAbsTStat,
+    ...(asArray(bundle.metadata?.deepResearch?.packs?.issuerThesisPack?.cards)).flatMap((card) => [
+      card.expectationSpreadPct,
+      card.metadata?.expectationSpreadPct,
+      ...(String(card.expectationBridge || card.metadata?.expectationBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...(String(card.valuationBridge || card.metadata?.valuationBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...(String(card.fundamentalBridge || card.metadata?.fundamentalBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+      ...(String(card.marketBridge || card.metadata?.marketBridge || '').match(/[-+]?\d+(?:\.\d+)?/g) || []),
+    ]),
     bundle.metadata?.crossAssetPaths?.paths?.length || 0,
     bundle.metadata?.historicalAnalogues?.analogues?.length || 0,
   ].filter((value) => Number.isFinite(Number(value)));
@@ -134,6 +214,14 @@ function allowedTickerStrings(bundle) {
   }
   for (const item of asArray(bundle.metadata?.allowedTickers)) {
     tickers.add(String(item).toUpperCase());
+  }
+  const ctx = bundle.metadata?.themeContext || {};
+  for (const item of [
+    ...asArray(ctx.peerSymbols?.positive),
+    ...asArray(ctx.peerSymbols?.negative),
+    ...asArray(ctx.regimeBySymbol),
+  ]) {
+    if (item?.symbol) tickers.add(String(item.symbol).toUpperCase());
   }
   const evidenceText = [
     bundle.subject?.displayName,
@@ -179,8 +267,10 @@ function validateAnalysisText(bundle, analysis, blockers, warnings) {
     const normalizedText = String(text)
       .replace(/&#\d+;|&[a-z]+;/gi, ' ')
       .replace(ISO_DATE_REGEX, ' ')
+      .replace(/\b(\d+)\s*-\s*(\d+)\b/g, '$1 $2')
       .replace(/\b\d{4}\/\d{2}\/\d{2}\b/g, ' ')
       .replace(/"[^"]*"/g, ' ')                // double-quoted titles
+      .replace(/\b[A-Za-z][A-Za-z0-9_-]*\d+(?:\.\d+)+(?:[A-Za-z0-9_.-]*)\b/g, ' ') // product/model versions like V3.3
       .replace(/“[^”]*”/g, ' ');               // smart-quoted titles
     for (const phrase of FORBIDDEN_INVESTMENT_PHRASES) {
       if (phrase.test(text)) {
@@ -222,6 +312,9 @@ function validateAnalysisReferences(bundle, analysis, blockers) {
     ...(analysis.whatChanged || []),
     ...(analysis.thesis || []),
     ...(analysis.catalysts || []),
+    ...(analysis.dataDepth || []),
+    ...(analysis.causalChain || []),
+    ...(analysis.historicalAnalogues || []),
     ...(analysis.evidenceSynthesis || []),
     ...(analysis.timeline || []),
     ...(analysis.marketTransmission || []),
@@ -229,12 +322,14 @@ function validateAnalysisReferences(bundle, analysis, blockers) {
     ...(analysis.risks || []),
     ...(analysis.analyticalAssessment || []),
     ...(analysis.decisionUse || []),
+    ...(analysis.feedbackLearning || []),
     ...(analysis.analystConclusion || []),
     ...(analysis.alternativeExplanations || []),
     ...(analysis.informationGaps || []),
     ...(analysis.watchNext || []),
     ...(analysis.sourceQueries || []),
     ...(analysis.analystNotes || []),
+    ...asArray(analysis.longFormSections).flatMap((section) => asArray(section.paragraphs)),
   ];
   for (const [index, item] of buckets.entries()) {
     const hasAny = ['claimIds', 'evidenceIds', 'metricIds', 'figureIds', 'caveatIds'].some((key) => Array.isArray(item[key]) && item[key].length);
@@ -277,6 +372,317 @@ function validateRenderedFigures(bundle, blockers) {
   }
 }
 
+function normalizeClientMemoText(value = '') {
+  return String(value || '')
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*\|/.test(line))
+    .join('\n')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s/-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function markdownSection(markdown = '', heading = '') {
+  const escaped = String(heading).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = String(markdown || '').match(new RegExp(`(?:^|\\n)##\\s+${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|$)`, 'i'));
+  return match ? match[1].trim() : '';
+}
+
+function tokenSet(value = '') {
+  return new Set(normalizeClientMemoText(value)
+    .split(/\s+/)
+    .filter((token) => token.length > 3 && !['this', 'that', 'with', 'from', 'should', 'would', 'could'].includes(token)));
+}
+
+function sectionSimilarity(a = '', b = '') {
+  const left = tokenSet(a);
+  const right = tokenSet(b);
+  if (!left.size || !right.size) return 0;
+  const intersection = [...left].filter((token) => right.has(token)).length;
+  const union = new Set([...left, ...right]).size || 1;
+  return intersection / union;
+}
+
+function repeatedClientPhrases(markdown = {}, minWords = 10) {
+  const text = normalizeClientMemoText(markdown);
+  const words = text.split(/\s+/).filter(Boolean);
+  const seen = new Map();
+  const repeats = [];
+  for (let i = 0; i <= words.length - minWords; i += 1) {
+    const phrase = words.slice(i, i + minWords).join(' ');
+    if (phrase.length < 70) continue;
+    const previous = seen.get(phrase) || 0;
+    if (previous === 1) repeats.push(phrase);
+    seen.set(phrase, previous + 1);
+  }
+  return repeats;
+}
+
+function phraseCount(value = '', pattern) {
+  return (String(value || '').match(pattern) || []).length;
+}
+
+function sectionWordCount(markdown = '', heading = '') {
+  return normalizeClientMemoText(markdownSection(markdown, heading)).split(/\s+/).filter(Boolean).length;
+}
+
+function sectionWordCountByKey(markdown = '', analysis = {}, key = '', fallbackHeading = '') {
+  const section = asArray(analysis.longFormSections).find((item) => item.key === key);
+  const heading = section?.title || fallbackHeading;
+  if (heading) {
+    const words = sectionWordCount(markdown, heading);
+    if (words > 0) return { heading, words };
+  }
+  const directWords = asArray(section?.paragraphs)
+    .map((paragraph) => paragraph.text || paragraph.label || paragraph.summary || paragraph.rationale || '')
+    .join(' ');
+  return {
+    heading: heading || fallbackHeading || key,
+    words: normalizeClientMemoText(directWords).split(/\s+/).filter(Boolean).length,
+  };
+}
+
+function validateRenderedArtifacts(renderedArtifacts = {}, blockers, warnings, analysis = {}) {
+  const startBlockerCount = blockers.length;
+  const startWarningCount = warnings.length;
+  const html = String(renderedArtifacts.html || '');
+  const markdown = String(renderedArtifacts.markdown || '');
+  if (!html || !markdown) {
+    add(blockers, 'missing_rendered_artifact', 'Rendered HTML and Markdown artifacts are required for export validation.');
+    return 0;
+  }
+  const combined = `${html}\n${markdown}`;
+  const forbidden = [
+    /\bnumeric detail\b/i,
+    /\bNaN\b/,
+    /\bundefined\b/i,
+    /\bnull%?\b/i,
+    /\[object Object\]/i,
+    /\bInvalid Date\b/i,
+  ];
+  for (const pattern of forbidden) {
+    if (pattern.test(combined)) {
+      add(blockers, 'render_placeholder_leak', `Rendered report contains placeholder or invalid value: ${pattern}`);
+    }
+  }
+  const adaptiveSections = asArray(analysis.narrativeStructure?.sections || analysis.narrativePlan?.narrativeStructure?.sections)
+    .filter((section) => section?.title);
+  const requiredSections = adaptiveSections.length
+    ? adaptiveSections.map((section) => [section.title])
+    : [
+    ['Executive Judgment', 'Executive View', 'Executive Brief'],
+    ['Core View', 'Working Thesis', 'Context and What Changed'],
+    ['Context', 'Context and What Changed'],
+    ['What Changed', 'Context and What Changed'],
+    ['Evidence Assessment', 'Research Depth'],
+    ['Economic Mechanism', 'Causal Chain'],
+    ['Historical Analogues', 'Evidence Assessment'],
+    ['Market Implication', 'Market and Transmission', 'Market Implication and Scenarios'],
+    ['Scenario Matrix', 'Market Implication and Scenarios'],
+    ['Counter-Thesis', 'Alternative Explanations', 'Counter-Thesis, Risks, and Caveats'],
+    ['Risks and Counterpoints', 'Counter-Thesis, Risks, and Caveats'],
+    ['Watch Next', 'What to Watch and Research Agenda'],
+    ['What Would Change Our Mind', 'Decision Use', 'What to Watch and Research Agenda'],
+    ['Research Agenda', 'What to Watch and Research Agenda'],
+    ['Analyst Conclusion'],
+    ];
+  for (const alternatives of requiredSections) {
+    if (!alternatives.some((section) => html.includes(`<h2>${section}</h2>`))) {
+      add(blockers, 'html_missing_required_section', `Rendered HTML is missing section: ${alternatives[0]}`);
+    }
+    if (!alternatives.some((section) => markdown.includes(`## ${section}`))) {
+      add(blockers, 'markdown_missing_required_section', `Rendered Markdown is missing section: ${alternatives[0]}`);
+    }
+  }
+  const clientForbidden = [
+    /\bevidence-backed\b/i,
+    /\brefs\s+\d+\b/i,
+    /\bsource queue\b/i,
+    /\bresearch pack(?:s)?\b/i,
+    /\bMetric Ledger\b/i,
+    /\bQuery Manifest\b/i,
+    /\bKPI spine\b/i,
+    /\b(?:fundamentalPack|filingPack|transcriptPack|industryPack|marketPack|causalPack|historicalAnalogPack)\b/i,
+    /\bartifact\s+[SABCD]\b/i,
+    /\bfinal\s+[SABCD]\b/i,
+    /\bstatus\s+warning\b/i,
+    /\bevent intensity was\s+0\b/i,
+    /\bmarket reaction row\(s\) are attached\b/i,
+    /\bHawkes-profile analogue\s+\d+/i,
+    /\bOn \d{4}-\d{2}-\d{2},\s+"/i,
+    /\bclaim:[A-Z0-9_-]+/i,
+    /\bmetric:[A-Z0-9_-]+/i,
+    /\bevidence:[A-Z0-9_-]+/i,
+    /\bfigure:[A-Z0-9_-]+/i,
+    /\bcaveat:[A-Z0-9_-]+/i,
+  ];
+  for (const pattern of clientForbidden) {
+    if (pattern.test(`${html}\n${markdown}`)) {
+      add(blockers, 'client_memo_audit_leak', `Client memo leaks audit/log notation: ${pattern}`);
+    }
+  }
+  const combinedWatchResearch = markdownSection(markdown, 'What to Watch and Research Agenda');
+  const watchNextRaw = markdownSection(markdown, 'Watch Next');
+  const researchAgendaRaw = markdownSection(markdown, 'Research Agenda');
+  const watchNext = combinedWatchResearch ? '' : watchNextRaw;
+  const researchAgenda = combinedWatchResearch ? '' : researchAgendaRaw;
+  const counterThesis = markdownSection(markdown, 'Counter-Thesis');
+  const risks = markdownSection(markdown, 'Risks and Counterpoints');
+  if (watchNextRaw && researchAgendaRaw && sectionSimilarity(watchNextRaw, researchAgendaRaw) > 0.72) {
+    add(blockers, 'duplicate_memo_sections', 'Watch Next and Research Agenda overlap too much; monitoring language must be separate from executable research tasks.');
+  }
+  if (!markdownSection(markdown, 'Counter-Thesis, Risks, and Caveats') && counterThesis && risks && sectionSimilarity(counterThesis, risks) > 0.72) {
+    add(blockers, 'duplicate_memo_sections', 'Counter-Thesis and Risks overlap too much; alternative interpretation must be separate from method/data risks.');
+  }
+  const mentionBudgets = [
+    ['core_thesis_repeat', /\bnarrative rotation, not thesis failure\b/gi, 1],
+    ['full_driver_list_repeat', /\bcapex, cloud revenue, accelerator orders, data-center utilization, and power-demand proxies\b/gi, 1],
+    ['direct_transcript_gap_repeat', /\bdirect call-transcript evidence is still missing\b/gi, 2],
+    ['scope_warning_repeat', /\bresearch-prioritization memo, not a final investment memo\b/gi, 1],
+  ];
+  for (const [type, pattern, max] of mentionBudgets) {
+    const count = phraseCount(markdown, pattern);
+    if (count > max) {
+      add(blockers, 'mention_budget_exceeded', `Client memo repeats ${type} ${count} times; maximum is ${max}.`);
+    }
+  }
+  if (combinedWatchResearch) {
+    if (!/\b(watch|monitor|external confirmation)\b/i.test(combinedWatchResearch)) {
+      add(blockers, 'section_contract_violation', 'Combined watch/research section must preserve external monitoring language.');
+    }
+    if (!/\b(collect|pull|extract|recompute|backfill|task|run|validate)\b/i.test(combinedWatchResearch)) {
+      add(blockers, 'section_contract_violation', 'Combined watch/research section must include executable collection or validation tasks.');
+    }
+  } else {
+    if (/\b(collect|pull|extract|recompute|backfill|task)\b/i.test(watchNext)) {
+      add(blockers, 'section_contract_violation', 'Watch Next contains executable task language; move collection work to Research Agenda.');
+    }
+    if (researchAgenda && !/\b(collect|pull|extract|recompute|backfill|task|run|validate)\b/i.test(researchAgenda)) {
+      add(blockers, 'section_contract_violation', 'Research Agenda must contain executable collection or validation tasks.');
+    }
+  }
+  if (markdownSection(markdown, 'Context and What Changed')) {
+    const longFormMinimums = [
+      ['executiveJudgment', 'Executive Judgment', 120],
+      ['contextAndWhatChanged', 'Context and What Changed', 180],
+      ['evidenceAssessment', 'Evidence Assessment', 180],
+      ['economicMechanism', 'Economic Mechanism', 180],
+      ['marketImplicationAndScenarios', 'Market Implication and Scenarios', 160],
+      ['counterRisksCaveats', 'Counter-Thesis, Risks, and Caveats', 150],
+      ['watchAndResearchAgenda', 'What to Watch and Research Agenda', 150],
+    ];
+    for (const [key, fallbackHeading, minimum] of longFormMinimums) {
+      const { heading, words } = sectionWordCountByKey(markdown, analysis, key, fallbackHeading);
+      if (words < minimum) {
+        add(blockers, 'long_form_section_too_short', `${heading} is too short for long-form memo mode: ${words}/${minimum} words.`);
+      }
+    }
+  }
+  const repeatedPhrases = repeatedClientPhrases(markdown);
+  if (repeatedPhrases.length) {
+    add(blockers, 'repeated_client_phrase', 'Client memo repeats long phrases across sections.', { phrase: repeatedPhrases[0] });
+  }
+  if (renderedArtifacts.auditAppendixHtml) {
+    const audit = String(renderedArtifacts.auditAppendixHtml || '');
+    for (const section of ['Appendix: Audit Trail', 'Metric Ledger', 'Evidence Base', 'Validation', 'Query Manifest']) {
+      if (!audit.includes(section)) {
+        add(blockers, 'audit_appendix_missing_required_section', `Audit appendix is missing section: ${section}`);
+      }
+    }
+  }
+  if (!/<img\b|figure-placeholder/.test(html)) {
+    add(warnings, 'html_without_figure_surface', 'Rendered HTML does not expose a figure surface.');
+  }
+  if (blockers.length > startBlockerCount) return 0;
+  if (warnings.length > startWarningCount) return 0.85;
+  return 1;
+}
+
+function metricValue(bundle, metricId) {
+  return Number(asArray(bundle.metrics).find((metric) => metric.metricId === metricId)?.value);
+}
+
+function closeNumber(a, b, epsilon = 0.001) {
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= epsilon;
+}
+
+function validateDeepResearchContract(bundle, blockers, warnings) {
+  const deep = bundle.metadata?.deepResearch;
+  if (!deep) return;
+  const packs = deep.packs || {};
+  const gaps = asArray(deep.gaps);
+  const causalEdges = asArray(packs.causalPack?.edges);
+  const analogues = asArray(packs.historicalAnalogPack?.analogues);
+  const dataDepth = Number(deep.dataDepthScore);
+  if (!closeNumber(metricValue(bundle, 'MET-DEEP-DATA-DEPTH'), dataDepth)) {
+    add(blockers, 'deep_metric_mismatch', 'MET-DEEP-DATA-DEPTH does not match metadata.deepResearch.dataDepthScore.');
+  }
+  if (!closeNumber(metricValue(bundle, 'MET-DEEP-GAPS'), gaps.length)) {
+    add(blockers, 'deep_metric_mismatch', 'MET-DEEP-GAPS does not match metadata.deepResearch.gaps length.');
+  }
+  if (!closeNumber(metricValue(bundle, 'MET-DEEP-CAUSAL-EDGES'), causalEdges.length)) {
+    add(blockers, 'deep_metric_mismatch', 'MET-DEEP-CAUSAL-EDGES does not match causal edge count.');
+  }
+  if (!closeNumber(metricValue(bundle, 'MET-DEEP-HISTORICAL-ANALOGS'), analogues.length)) {
+    add(blockers, 'deep_metric_mismatch', 'MET-DEEP-HISTORICAL-ANALOGS does not match historical analogue count.');
+  }
+  const kpiCoverageMetric = asArray(bundle.metrics).find((metric) => metric.metricId === 'MET-DEEP-KPI-COVERAGE');
+  if (kpiCoverageMetric && !closeNumber(Number(kpiCoverageMetric.value), Number(deep.kpiRegistry?.coverage ?? 0))) {
+    add(blockers, 'deep_metric_mismatch', 'MET-DEEP-KPI-COVERAGE does not match metadata.deepResearch.kpiRegistry.coverage.');
+  }
+
+  const profiles = deep.packProfiles || {};
+  for (const [packName, profile] of Object.entries(profiles)) {
+    const isAvailable = String(profile.status || packs[packName]?.status || '').toLowerCase() === 'available';
+    const rowCount = Number(profile.rowCount || 0);
+    const sourceKinds = asArray(profile.sourceKinds);
+    if (isAvailable && rowCount <= 0 && !['marketPack', 'feedbackPack'].includes(packName)) {
+      add(blockers, 'deep_available_pack_without_rows', `${packName} is marked available without backing rows.`);
+    }
+    if (isAvailable && rowCount > 0 && sourceKinds.length === 0) {
+      add(blockers, 'deep_pack_without_provenance', `${packName} is marked available without source provenance.`);
+    }
+  }
+
+  for (const [index, edge] of causalEdges.entries()) {
+    if (!edge.sourceNode || !edge.targetNode || !edge.mechanism || !edge.edgeType) {
+      add(blockers, 'deep_causal_edge_incomplete', 'Causal edge is missing source, target, mechanism, or edgeType.', { index });
+    }
+    const isHypothesis = /hypothesis|graph|relation/i.test(`${edge.edgeType} ${edge.mechanism}`);
+    const hasCaveat = asArray(edge.caveatIds).length > 0 || asArray(bundle.caveats).some((caveat) => /causality|hypothesis/i.test(`${caveat.type} ${caveat.text}`));
+    if (isHypothesis && !hasCaveat) {
+      add(blockers, 'deep_causal_hypothesis_without_caveat', 'Graph-derived causal hypotheses must carry a caveat.', { index });
+    }
+  }
+
+  for (const [index, analogue] of analogues.entries()) {
+    const required = [
+      analogue.analogName,
+      analogue.period,
+      asArray(analogue.similarityDrivers).length,
+      asArray(analogue.differences).length,
+      analogue.marketOutcome,
+      analogue.whatBrokeTheAnalogy,
+      asArray(analogue.invalidatingIndicators).length,
+    ];
+    if (required.some((item) => !item)) {
+      add(blockers, 'deep_historical_analogue_incomplete', 'Historical analogue is missing drivers, differences, outcome, break condition, or invalidators.', { index });
+    }
+  }
+
+  if (Number(deep.limitations?.transcriptProxyCount || 0) > 0) {
+    const hasProxyCaveat = asArray(bundle.caveats).some((caveat) => /transcript.*proxy|management-commentary context/i.test(`${caveat.type} ${caveat.text}`));
+    if (!hasProxyCaveat) {
+      add(blockers, 'deep_transcript_proxy_without_caveat', 'Transcript proxy evidence must be explicitly caveated.');
+    } else {
+      add(warnings, 'deep_transcript_proxy', 'Transcript pack uses SEC/filing proxy evidence until a call transcript adapter is available.');
+    }
+  }
+}
+
 export function validateReportBundle(bundle = {}, options = {}) {
   const blockers = [];
   const warnings = [];
@@ -315,6 +721,9 @@ export function validateReportBundle(bundle = {}, options = {}) {
     if (!REPORT_CHART_TYPES.includes(figure.chartType)) add(blockers, 'unsupported_chart_type', `Unsupported chart type: ${figure.chartType}`, { figureId: figure.figureId });
   }
   if (options.requireRenderedFigures) validateRenderedFigures(bundle, blockers);
+  const exportIntegrity = options.renderedArtifacts
+    ? validateRenderedArtifacts(options.renderedArtifacts, blockers, warnings, options.analysis)
+    : undefined;
 
   const hasStale = asArray(bundle.dataFreshness).some((item) => ['stale', 'degraded'].includes(String(item.freshnessStatus || '').toLowerCase()));
   const hasStaleCaveat = asArray(bundle.caveats).some((item) => /stale|freshness|degraded/i.test(`${item.type} ${item.text}`));
@@ -326,15 +735,30 @@ export function validateReportBundle(bundle = {}, options = {}) {
 
   validateAnalysisReferences(bundle, options.analysis, blockers);
   validateAnalysisText(bundle, options.analysis, blockers, warnings);
+  validateAdaptiveNarrativeStructure(options.analysis, blockers);
   validateRemediationPath(bundle, options.analysis, blockers);
+  validateDeepResearchContract(bundle, blockers, warnings);
 
-  const validation = {
+  let validation = {
     ok: blockers.length === 0,
     status: blockers.length ? 'blocked' : warnings.length ? 'warning' : 'passed',
     generatedAt: new Date().toISOString(),
     blockers,
     warnings,
+    ...(exportIntegrity == null ? {} : { exportIntegrity }),
   };
+  const quality = computeReportQuality(bundle, validation, options.analysis);
+  if (!quality.publishable && !blockers.length) {
+    const publishabilityWarnings = asArray(quality.publishabilityReasons).map((reason) => ({
+      type: 'not_publishable',
+      message: reason,
+    }));
+    validation = {
+      ...validation,
+      status: 'warning',
+      warnings: [...warnings, ...publishabilityWarnings],
+    };
+  }
   return {
     ...validation,
     quality: computeReportQuality(bundle, validation, options.analysis),
