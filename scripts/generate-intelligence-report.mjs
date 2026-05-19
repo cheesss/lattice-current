@@ -61,6 +61,9 @@ async function main() {
     || args.enqueueBackfill === 'false'
     || args['enqueue-backfill'] === 'false'
   );
+  if (!shouldEnqueueDbBackfill) {
+    adapterInput.ensureResearchSchema = false;
+  }
 
   let dbBackfillQueue = null;
   const result = useDb

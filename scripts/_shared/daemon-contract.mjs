@@ -31,6 +31,7 @@ export const DAEMON_TASK_INTERVALS_MS = Object.freeze({
   'generate-followed-theme-briefings': DAY_1_MS,
   'auto-curate': WEEK_1_MS,
   'coverage-gap-analysis': DAY_1_MS,
+  'mechanism-seed-generation': HOUR_6_MS,
 });
 
 export function getDaemonTaskIntervalMs(taskName) {

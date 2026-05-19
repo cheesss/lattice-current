@@ -167,7 +167,13 @@ function collectText(value, depth = 0, out = []) {
 }
 
 function rowText(row = {}) {
-  return compact(collectText(row).join(' ')).toLowerCase();
+  return compact([
+    collectText(row).join(' '),
+    row.excerpt,
+    row.text_excerpt,
+    row.textExcerpt,
+    row.text,
+  ].join(' ')).toLowerCase();
 }
 
 const OFFICIAL_ISSUER_SOURCE_PATTERN = /\b(sec|edgar|10-k|10-q|8-k|filing|transcript|earnings|investor|company_ir|company ir|management commentary|fmp)\b/i;
@@ -318,8 +324,58 @@ function rowMentionsFrontierFamily(row = {}, bundle = {}) {
   return frontierFamilyMatchSpans(row, bundle).length > 0;
 }
 
+const STRONG_FRONTIER_FAMILY_TERMS = new Set([
+  'substation equipment',
+  'switchgear',
+  'transformer',
+  'protection relay',
+  'circuit breaker',
+  'power distribution',
+  'interconnection study',
+  'interconnection queue',
+  'grid planning',
+  'transmission study',
+  'qualified supplier',
+  'approved supplier',
+  'supplier qualification',
+  'certification',
+  'test facility',
+  'validation testing',
+  'specialty alloy',
+  'rare earth',
+  'magnet',
+  'copper',
+  'steel',
+  'insulation',
+  'feedstock',
+  'commissioning',
+  'EPC',
+].map((term) => term.toLowerCase()));
+
+function rowMentionsStrongFrontierFamily(row = {}, bundle = {}) {
+  const text = compact([
+    rowText(row),
+    row.excerpt,
+    row.text_excerpt,
+    row.textExcerpt,
+    row.text,
+  ].join(' ')).toLowerCase();
+  if (rowMentionsFrontierNode(row, bundle)) return true;
+  if (/\b(substation|transformer|switchgear|protection relay|circuit breaker|interconnection study|interconnection queue|qualified supplier|approved supplier|supplier qualification|test facility|validation testing)\b/i.test(text)) {
+    return true;
+  }
+  return frontierFamilyMatchSpans(row, bundle)
+    .some((span) => STRONG_FRONTIER_FAMILY_TERMS.has(String(span.term || '').toLowerCase()));
+}
+
 function frontierFamilyMatchSpans(row = {}, bundle = {}) {
-  const text = rowText(row);
+  const text = compact([
+    rowText(row),
+    row.excerpt,
+    row.text_excerpt,
+    row.textExcerpt,
+    row.text,
+  ].join(' ')).toLowerCase();
   if (!text) return [];
   const spans = [];
   for (const term of frontierNodeFamilyTerms(bundle)) {
@@ -421,6 +477,15 @@ function frontierNodeCandidateEvidence(row = {}, bundle = {}) {
   if (!rowHasOperatingExposureFact(row)) return false;
   if (rowMentionsFrontierNode(row, bundle)) return true;
   return rowMentionsFrontierFamily(row, bundle) && frontierMatchHasIssuerProximity(row, bundle);
+}
+
+function frontierNodeDirectOfficialEvidence(row = {}, bundle = {}) {
+  const symbol = row.symbol || row.ticker || row.metadata?.symbol || row.metadata?.issuerSymbol;
+  if (!symbolCandidates(symbol).length) return false;
+  if (!officialIssuerSource(row)) return false;
+  if (!rowHasOperatingExposureFact(row)) return false;
+  if (!rowMentionsStrongFrontierFamily(row, bundle)) return false;
+  return frontierMatchHasIssuerProximity(row, bundle);
 }
 
 function normalizeThemeHint(value = '') {
@@ -855,8 +920,9 @@ export function buildIssuerDiscoveryMap(input = {}) {
     const marketBridgeClass = klass === 'market_validation';
     const collecting = issuerBridgeClass || marketBridgeClass;
     const nodeDirect = directNodeEvidence(row) && use === 'promotion_candidate';
+    const officialNodeDirect = frontierParentScoped && frontierNodeDirectOfficialEvidence(row, bundle);
     const frontierCandidate = frontierParentScoped && frontierNodeCandidateEvidence(row, bundle);
-    if (frontierParentScoped && !issuerBridgeClass && !marketBridgeClass && !nodeDirect && !frontierCandidate) {
+    if (frontierParentScoped && !issuerBridgeClass && !marketBridgeClass && !nodeDirect && !officialNodeDirect && !frontierCandidate) {
       continue;
     }
     const direct = issuerBridgeClass
@@ -865,9 +931,9 @@ export function buildIssuerDiscoveryMap(input = {}) {
     const marketAttached = marketBridgeClass && use === 'promotion_candidate';
     const status = direct
       ? 'issuer_exposure_attached'
-      : marketAttached
-        ? 'market_attached'
-      : nodeDirect
+        : marketAttached
+          ? 'market_attached'
+      : (nodeDirect || officialNodeDirect)
         ? 'direct_node_exposure_attached'
       : frontierCandidate
         ? 'frontier_node_candidate'
@@ -882,7 +948,7 @@ export function buildIssuerDiscoveryMap(input = {}) {
     collectExplicitFields(explicitRow, add, {
       sourceType: row.source_type || row.kind || row.metadata?.sourceProvider || 'evidence_row',
       status,
-      confidence: direct || nodeDirect || marketAttached ? 0.9 : (frontierCandidate ? 0.66 : (collecting ? 0.68 : 0.5)),
+      confidence: direct || nodeDirect || officialNodeDirect || marketAttached ? 0.9 : (frontierCandidate ? 0.66 : (collecting ? 0.68 : 0.5)),
       sourceTerms: [
         row.title,
         row.topic,

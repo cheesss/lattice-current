@@ -123,8 +123,14 @@ data/openclaw-webhook-events.jsonl
 data/openclaw-webhook.json
 data/runtime-issues/
 data/runtime-logs/
+data/runtime/
 data/reports/
 data/verification-screenshots/
+data/_registry.jsonl
+data/_source-query-queue.jsonl
+data/index.html
+output/
+.playwright-cli/
 data/meta-*.calibration.json
 data/meta-*.pt
 .tmp/

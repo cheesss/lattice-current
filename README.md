@@ -1,6 +1,6 @@
 # Lattice Current
 
-Theme-led signal intelligence workspace for live monitoring, canonical event resolution, operator review, and validation.
+Evidence-first research operating system for live signal monitoring, mechanism seed generation, evidence contract closure, guarded provider backfill, and operator review.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -8,13 +8,16 @@ Theme-led signal intelligence workspace for live monitoring, canonical event res
 
 ## What It Is
 
-Lattice Current is a public research fork of a multi-variant intelligence platform centered on one operator shell that combines:
+Lattice Current is a public research fork of a multi-variant intelligence platform centered on one operator shell and one evidence-bound research loop. It combines:
 
 - live global news and OSINT collection
 - AI-assisted summaries, deduction, and Q&A
 - map-based geopolitical, infrastructure, and market visualization
 - ontology and graph-based relation analysis
 - canonical event resolution before downstream interpretation
+- mechanism-based research seed generation
+- universal evidence contracts and class-specific backfill planning
+- report closure diagnostics that separate discovery quality from investment readiness
 - replay and historical validation surfaces used to calibrate signal quality
 - batch compute pipelines that write reusable outputs back to PostgreSQL
 
@@ -26,6 +29,9 @@ The current emphasis is:
 
 - one integrated theme shell for live signal intake, theme briefs, geo context, proposal review, validation, and runtime diagnostics
 - canonical event resolution between ingestion and candidate generation
+- mechanism seed generation from hot themes, adjacent lanes, ontology, and report artifacts
+- evidence contract closure across issuer exposure, market validation, negative controls, operating evidence, and provider gaps
+- dashboard visibility for Research Seeds, Provider Gap Review, and Report Backfill Closure
 - evidence quality and transmission analysis
 - operator-facing decision support
 - TypeScript for product surfaces, APIs, and orchestration
@@ -48,6 +54,9 @@ The heavy backtest-ML modules were removed from the main branch and preserved on
 - `2D Geo Lens`: flat map surface with legacy risk-region, infrastructure, and event overlays preserved without the globe-first UI
 - `Proposal Inbox`: Codex-suggested sources, themes, and exposures with accept or reject review in place
 - `Approval Queue`: human-gated actions that execute directly from the shell once accepted
+- `Research Seeds`: mechanism seed candidates with score, bias/source-gap audit, evidence plan, and guarded review actions
+- `Provider Gap Review`: review-gated proposals for missing DART, EDINET, TDnet, EU TED, patent, grid queue, and trade-media coverage
+- `Report Backfill Closure`: evidence contract matrix, provider route, latest run, tier, blocker, next action, and contradiction warnings
 - `Signal And Validation Snapshots`: compact risk, macro, investment, and replay surfaces kept inside the same operator loop
 - `Operator Diagnostics`: automation telemetry, system health, data quality, and Codex quality
 
@@ -63,6 +72,9 @@ The same repository still powers multiple variants:
 - AI and statistical analysis layers for summaries, trend detection, evidence handling, and operator briefs
 - Canonical event resolution that sits between raw article rows and usable signal objects
 - Evidence-first intelligence report generation with client memo, audit appendix, source-query queue, and investment-readiness caps
+- Mechanism seed pipeline that turns themes into `Activity -> Process -> Input -> Bottleneck -> Supplier -> Evidence / Counter-evidence`
+- Evidence provider routing and closure ledgers that prevent stale or weak evidence from becoming false promotion
+- Conservative dashboard readiness: `visualStatus` is the operating source of truth; `productTier` is evidence-tier context unless closure is complete
 - Python compute lane for heavy batch analytics while TypeScript remains the orchestration layer
 - Ontology graph, transmission graph, and historical validation tooling
 - Desktop runtime with Tauri sidecar, local services, and offline-capable workflows
@@ -73,6 +85,7 @@ The same repository still powers multiple variants:
 - Signal intake: live feeds, OSINT, macro, market, and conflict-oriented datasets
 - Evidence handling: event resolution, source quality, corroboration handling, and data quality operations
 - Research workflow: Codex-assisted expansion, automation governance, ontology and graph views
+- Mechanism workflow: seed generation, seed storage/review lifecycle, evidence planning, provider gap review, and seed-to-report closure
 - Validation workflow: historical fetch/import, replay, abnormal-return computation, and loader/storage verification
 - Report workflow: evidence bundles, signal cards, long-form analyst memos, exhibits, audit appendices, and source-query/backfill tasks
 - Decision support: operator briefs, transmission interpretation, watchlist refinement, and guarded recommendations
@@ -95,7 +108,30 @@ Batch compute should write results to NAS PostgreSQL so frontend and API code ca
 - `src-tauri/`: desktop runtime and local sidecar
 - `docs/`: technical reference and deep-dive docs
 - `site/`: GitHub Pages documentation site
-- `scripts/`: build, packaging, historical data tooling, and Python-first batch compute entrypoints
+- `scripts/`: report generation, evidence backfill, mechanism seed lifecycle, provider gap review, daemon tasks, build tooling, and Python-first batch compute entrypoints
+
+## Research operating loop
+
+The current Lattice loop is:
+
+```text
+hot theme / signal / report artifact
+-> mechanism seed
+-> evidence plan and universal evidence contract
+-> missing evidence class detection
+-> provider/source-query backfill
+-> report closure and contradiction detection
+-> provider gap proposal
+-> dashboard review and bounded daemon self-improvement
+```
+
+Important boundaries:
+
+- seed generation is safe to run as dry-run and does not mutate canonical state by default
+- evidence enqueue is explicit and seed/report scoped
+- canonical graph, source registry, RSS registration, and provider activation remain review-gated
+- negative-control and market-validation evidence are separated from promotion evidence
+- stale or pre-reconciliation report artifacts are blocked from appearing review-ready
 
 ## Getting started
 
@@ -122,6 +158,9 @@ npm run typecheck
 npm run build
 npm run docs:dev
 npm run docs:build
+npm run report:deep:db -- --type cross_theme_bottleneck_report --subject "solid rocket motor capacity"
+node --import tsx scripts/run-mechanism-seed-generation.mjs --dry-run --plan-evidence --limit 25
+node --import tsx scripts/run-evidence-contract-backfill-cycle.mjs --latest --passes 1 --limit 10
 npm run canonical:build -- --dry-run
 npm run returns:abnormal -- --dry-run
 npm run public:sync:dry
@@ -140,6 +179,8 @@ npm run public:sync
 - AI and intelligence: [docs/AI_INTELLIGENCE.md](docs/AI_INTELLIGENCE.md)
 - Decision-support playbook: [docs/investment-usage-playbook.md](docs/investment-usage-playbook.md)
 - Public sync workflow: [docs/public-sync.md](docs/public-sync.md)
+- Automation runbook: [docs/automation-runbook.md](docs/automation-runbook.md)
+- Script operations guide: [scripts/README.md](scripts/README.md)
 
 ## Naming note
 

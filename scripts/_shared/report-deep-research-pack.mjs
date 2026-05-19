@@ -1100,6 +1100,16 @@ function searchTermsFromBundle(bundle = {}) {
     bundle.metadata?.adjacentCandidateKey,
     bundle.metadata?.resolvedSubjectKey,
   ].map(compactText).filter(Boolean));
+  const reportScopedKeys = unique([
+    key,
+    display,
+    rawSubjectId,
+    metadata.candidateId,
+    metadata.adjacentCandidateKey,
+    discovery.adjacentCandidateKey,
+    bundle.metadata?.adjacentCandidateKey,
+    bundle.metadata?.resolvedSubjectKey,
+  ].map(compactText).filter(Boolean));
   const baseTerms = unique([
     display,
     key,
@@ -1132,7 +1142,7 @@ function searchTermsFromBundle(bundle = {}) {
     slugify(discovery.connector || ''),
     ...aliasKeys,
   ].map(compactText).filter(Boolean));
-  return { key, theme, display, exactKeys, providerExactKeys, themeKeys, terms, likePatterns, providerTargetKeyPatterns };
+  return { key, theme, display, exactKeys, providerExactKeys, reportScopedKeys, themeKeys, terms, likePatterns, providerTargetKeyPatterns };
 }
 
 async function loadThemeSymbols(client, bundle, { key, theme } = {}) {
@@ -1198,7 +1208,7 @@ async function loadThemeSymbols(client, bundle, { key, theme } = {}) {
 async function loadOptionalPackRows(client, bundle) {
   if (!client) return {};
   const search = searchTermsFromBundle(bundle);
-  const { key, theme, display, exactKeys, providerExactKeys, themeKeys, likePatterns, providerTargetKeyPatterns } = search;
+  const { key, theme, display, exactKeys, providerExactKeys, reportScopedKeys, themeKeys, likePatterns, providerTargetKeyPatterns } = search;
   const evidencePattern = evidenceDiscoveryRegex(bundle, search);
   const symbols = await loadThemeSymbols(client, bundle, { key, theme });
   const kpiState = await loadThemeKpiCollectionState(client, {
@@ -1619,14 +1629,10 @@ async function loadOptionalPackRows(client, bundle) {
        AND aq.id = (reb.metadata->>'approvalId')::bigint
       WHERE (
            COALESCE(reb.metadata->>'theme', '') = ANY($1::text[])
-        OR reb.metadata->>'reportId' = $3::text
-        OR reb.metadata->>'latestReportId' = $3::text
+        OR reb.metadata->>'reportId' = $2::text
+        OR reb.metadata->>'latestReportId' = $2::text
         OR reb.metadata->>'reportSubjectKey' = ANY($1::text[])
         OR reb.metadata->>'adjacentCandidateKey' = ANY($1::text[])
-        OR reb.metadata::text ILIKE ANY($2::text[])
-        OR reb.title ILIKE ANY($2::text[])
-        OR reb.text_excerpt ILIKE ANY($2::text[])
-        OR aq.payload->'subject'->>'displayName' ILIKE ANY($2::text[])
         OR aq.payload->>'subjectKey' = ANY($1::text[])
       )
       AND NOT (
@@ -1654,7 +1660,7 @@ async function loadOptionalPackRows(client, bundle) {
         reb.published_at DESC NULLS LAST,
         reb.created_at DESC
       LIMIT 180
-    `, [exactKeys, likePatterns, bundle.reportId || '']);
+    `, [exactKeys, bundle.reportId || '']);
   const marketValidationBundles = await safeRows(client, 'research_evidence_bundles', `
       SELECT reb.id::text AS id,
              COALESCE(reb.source_type, reb.metadata->>'source', 'local-market-validation') AS source_type,
@@ -1840,53 +1846,31 @@ async function loadOptionalPackRows(client, bundle) {
     },
     created_at: row.computed_at,
   }));
-  const reportBackfillTasks = await safeRows(client, 'report_backfill_tasks', `
+  const includeBackfillQueueRows = process.env.REPORT_DEEP_PACK_INCLUDE_BACKFILL_ROWS === '1';
+  const reportBackfillTasks = includeBackfillQueueRows ? await safeRows(client, 'report_backfill_tasks', `
       SELECT id::text AS id, report_id, subject_key, pack_name, task_type, query, status, priority, metadata, created_at, updated_at
       FROM report_backfill_tasks
-      WHERE (
-           report_id = $1
-        OR subject_key = ANY($2::text[])
-        OR metadata->>'reportId' = $1
-        OR metadata->>'latestReportId' = $1
-        OR metadata->>'subjectKey' = ANY($2::text[])
-      )
-      AND NOT (
-           subject_key ILIKE 'NO-MATCH-%'
-        OR query ILIKE 'No cross theme bottleneck report bound%'
-        OR COALESCE(metadata->>'reportId', metadata->>'latestReportId', '') ILIKE '%no-match%'
-        OR metadata::text ILIKE '%No cross theme bottleneck report bound%'
-      )
+      WHERE report_id = $1
       ORDER BY COALESCE(updated_at, created_at) DESC NULLS LAST, priority DESC
       LIMIT 80
-    `, [bundle.reportId || '', exactKeys]);
-  const sourceQueryApprovals = await safeRows(client, 'approval_queue', `
+    `, [bundle.reportId || '']) : [];
+  const sourceQueryApprovals = includeBackfillQueueRows ? await safeRows(client, 'approval_queue', `
       SELECT id::text AS id, payload, status, reasoning, created_at, reviewed_at
       FROM approval_queue
       WHERE action_type = 'source-query'
         AND (
           payload->>'reportId' = $1
           OR payload->>'latestReportId' = $1
-          OR payload->>'subjectKey' = ANY($2::text[])
-          OR payload->'subject'->>'displayName' ILIKE ANY($3::text[])
-          OR payload->>'reportBackfillTaskId' IN (
-            SELECT id::text FROM report_backfill_tasks
-            WHERE report_id = $1
-               OR subject_key = ANY($2::text[])
-               OR metadata->>'reportId' = $1
-               OR metadata->>'latestReportId' = $1
-               OR metadata->>'subjectKey' = ANY($2::text[])
-          )
         )
         AND NOT (
              COALESCE(payload->>'subjectKey', '') ILIKE 'NO-MATCH-%'
           OR COALESCE(payload->>'reportId', payload->>'latestReportId', '') ILIKE '%no-match%'
           OR COALESCE(payload->'subject'->>'displayName', '') ILIKE 'No cross theme bottleneck report bound%'
-          OR payload::text ILIKE '%No cross theme bottleneck report bound%'
         )
       ORDER BY COALESCE(reviewed_at, created_at) DESC NULLS LAST
       LIMIT 80
-    `, [bundle.reportId || '', exactKeys, likePatterns]);
-  const providerRunRows = await safeRows(client, 'external_provider_backfill_runs', `
+    `, [bundle.reportId || '']) : [];
+  const providerRunRows = includeBackfillQueueRows ? await safeRows(client, 'external_provider_backfill_runs', `
       SELECT *
       FROM external_provider_backfill_runs
       WHERE (
@@ -1899,7 +1883,7 @@ async function loadOptionalPackRows(client, bundle) {
       )
       ORDER BY created_at DESC
       LIMIT 80
-    `, [bundle.reportId || '', providerExactKeys, providerTargetKeyPatterns]);
+    `, [bundle.reportId || '', providerExactKeys, providerTargetKeyPatterns]) : [];
   return {
     atomicFacts: await safeRows(client, 'research_atomic_facts', `
       SELECT * FROM research_atomic_facts

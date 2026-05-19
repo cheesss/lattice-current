@@ -346,6 +346,50 @@ test('frontier parent issuer discovery keeps node-family SEC evidence as collect
   assert.equal(summary.bridgeAttachedCount, 0);
 });
 
+test('frontier parent issuer discovery promotes official strong node-family SEC evidence to direct node bridge', () => {
+  const rows = buildIssuerDiscoveryMap({
+    bundle: {
+      reportType: 'cross_theme_bottleneck_report',
+      subject: {
+        subjectId: 'endogenous-frontier-parent-1-substation-equipment-lead-time',
+        displayName: 'substation equipment lead time',
+        metadata: {
+          discovery: {
+            discoveryNamespace: 'strict_endogenous_adjacent',
+            concreteBottleneckNodes: [{
+              node: 'substation equipment lead time',
+              nodeType: 'physical_equipment',
+            }],
+          },
+        },
+      },
+      metadata: {
+        candidate: {
+          evidence_summary: { frontierParentCollectionEligible: true },
+        },
+      },
+    },
+    rows: {
+      transcripts: [{
+        symbol: 'PWR',
+        issuerName: 'Quanta Services, Inc.',
+        title: 'PWR 10-K direct management commentary',
+        source_type: 'sec_direct_management_commentary',
+        excerpt: 'Quanta is well positioned to provide turnkey infrastructure solutions for data center facilities, including high-voltage substation, transformer and transmission interconnection infrastructure to connect the facilities to the power grid.',
+        metadata: { provider: 'sec-edgar', filingType: '10-K' },
+      }],
+    },
+  });
+
+  const pwr = rows.find((row) => row.symbol === 'PWR');
+  assert.equal(pwr?.status, 'direct_node_exposure_attached');
+  assert.equal(pwr?.promotionEligible, true);
+  assert.equal(pwr?.candidateOnly, false);
+  const summary = issuerDiscoverySummary(rows);
+  assert.equal(summary.bridgeAttachedCount, 1);
+  assert.equal(summary.directNodeBridgeCount, 1);
+});
+
 test('frontier parent issuer discovery rejects node mentions in unrelated executive biographies', () => {
   const rows = buildIssuerDiscoveryMap({
     bundle: {

@@ -1157,6 +1157,31 @@ async function taskResearchOsPolicyAdvisor() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskMechanismSeedGeneration() {
+  log('>> mechanism-seed-generation: bounded operator seed generation, audit, adapter proposal, and self-improvement cycle');
+  const limit = Math.max(1, Math.min(250, Math.floor(Number(process.env.MECHANISM_SEED_GENERATION_LIMIT || 25))));
+  const statuses = String(process.env.MECHANISM_SEED_DAEMON_STATUSES || 'review_ready,needs_evidence,evidence_running,rejected,report_candidate')
+    .split(',')
+    .map((status) => status.trim())
+    .filter(Boolean)
+    .join(',');
+  const auditStatuses = String(process.env.MECHANISM_SEED_AUDIT_STATUSES || 'review_ready,needs_evidence,evidence_running')
+    .split(',')
+    .map((status) => status.trim())
+    .filter(Boolean)
+    .join(',');
+  const timeoutMs = optionalTimeoutMs(process.env.MECHANISM_SEED_DAEMON_TIMEOUT_MS, 900_000, 300_000, 24 * HOUR_1_MS);
+  const skipStorage = process.env.MECHANISM_SEED_DAEMON_SKIP_STORAGE === 'true';
+  const args = [
+    '--limit', limit,
+    '--statuses', statuses,
+    '--audit-statuses', auditStatuses,
+  ];
+  if (skipStorage) args.push('--skip-storage');
+  const result = runNodeScript('scripts/run-mechanism-seed-daemon-cycle.mjs', args, timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskSourceSelfHeal() {
   log('>> source-self-heal: validating and activating approved healing candidates');
   const result = run('node --import tsx scripts/self-heal-sources.mjs --limit 1', 300_000);
@@ -1403,6 +1428,7 @@ const TASKS = {
   'promote-trusted-graph': { interval: DAY_1_MS, fn: taskPromoteTrustedGraph },
   'adjacency-autoresearch': { interval: DAY_1_MS, fn: taskAdjacencyAutoresearch },
   'research-os-policy-advisor': { interval: DAY_1_MS, fn: taskResearchOsPolicyAdvisor },
+  'mechanism-seed-generation': { interval: HOUR_6_MS, fn: taskMechanismSeedGeneration },
   'auto-curate': { interval: WEEK_1_MS, fn: taskAutoCurate },
 };
 
@@ -1426,6 +1452,7 @@ async function main() {
   process.stderr.write('  daily: bootstrap-market-quote-history, event-engine-full-controls (matched_controls + event_uplift grading)\n');
   process.stderr.write('  6h:    signal refresh, master-pipeline, executor, data quality, arxiv, hackernews, discovery, report schedule, report closure, self-heal, generic KPI collection, universal research coverage-closure\n');
     process.stderr.write('  3-12h: Research OS foundation/evidence/relation/candidate refresh with approval-gated source expansion\n');
+    process.stderr.write('  6h:    mechanism seed generation/audit/provider adapter proposal/self-improvement cycle (no evidence enqueue)\n');
     process.stderr.write('  opt-in: duckdb-sync only when ENABLE_LEGACY_DUCKDB_SYNC=true\n');
   process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');
     process.stderr.write('  daily: FRED backfill, pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');

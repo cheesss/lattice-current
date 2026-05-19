@@ -574,3 +574,126 @@ test('frontier parent backfill tasks bind graph-overlap parent evidence to the p
   assert.equal(tasks[0].metadata.providerRoutePlan.discoveryNamespace, 'strict_endogenous_frontier_parent');
   assert.equal(tasks.some((task) => task.metadata.desiredEvidenceClass === 'market_validation'), false);
 });
+
+function buildBroadGridRow(id, label) {
+  return {
+    id,
+    label,
+    connector_type: 'physical_equipment',
+    themes: ['clean-energy', 'grid-reliability'],
+    score: 0.7,
+    lane: 'needs_evidence',
+    status: 'new',
+    evidence_summary: {
+      parentReadyForAdjacent: true,
+      parentReadinessState: 'parent_frontier_ready',
+      sourceDiversityRaw: 3,
+      nonObviousDiscovery: {
+        frontierScore: 92,
+        bottleneckSpecificityScore: 0.62,
+        scarcitySignalScore: 0.55,
+        themeDistanceScore: 0.3,
+        surpriseScore: 0.3,
+      },
+    },
+    metadata: { role: 'connector' },
+  };
+}
+
+function buildDiverseSpaceRow(id, label) {
+  return {
+    id,
+    label,
+    connector_type: 'operations_process',
+    themes: ['space', 'defense-industrial'],
+    score: 0.7,
+    lane: 'needs_evidence',
+    status: 'new',
+    evidence_summary: {
+      parentReadyForAdjacent: true,
+      parentReadinessState: 'parent_frontier_ready',
+      sourceDiversityRaw: 3,
+      nonObviousDiscovery: {
+        frontierScore: 72,
+        bottleneckSpecificityScore: 0.6,
+        scarcitySignalScore: 0.55,
+        themeDistanceScore: 0.7,
+        surpriseScore: 0.7,
+      },
+    },
+    metadata: { role: 'connector' },
+  };
+}
+
+test('frontier parent selector suppresses domain after quota-exhausted recent selections without narrow cue', () => {
+  const recentAt = new Date().toISOString();
+  const state = {
+    parents: {},
+    domainSelectionHistory: [
+      { domain: 'grid_energy', at: recentAt, parentKey: 'physical_equipment::a' },
+      { domain: 'grid_energy', at: recentAt, parentKey: 'physical_equipment::b' },
+      { domain: 'grid_energy', at: recentAt, parentKey: 'physical_equipment::c' },
+    ],
+  };
+  const rows = [buildBroadGridRow(101, 'grid capacity expansion backlog'), buildDiverseSpaceRow(102, 'launch range scheduling capacity')];
+  const result = selectFrontierParentCandidates(rows, { state, parentLimit: 4 });
+  const gridCandidate = result.candidates.find((candidate) => candidate.id === 101);
+  assert.ok(gridCandidate);
+  assert.equal(gridCandidate.primaryDomain, 'grid_energy');
+  assert.equal(gridCandidate.frontierParent.parentHasNarrowCue, false);
+  assert.equal(gridCandidate.frontierParent.frontierParentState, 'domain_quota_exhausted');
+  assert.equal(gridCandidate.frontierParent.frontierParentReportReady, false);
+});
+
+test('frontier parent selector queue split picks at least one frontier-diverse parent before evidence-ready grid', () => {
+  const state = { parents: {}, domainSelectionHistory: [] };
+  const rows = [
+    buildBroadGridRow(201, 'protection relay qualification lead time'),
+    buildBroadGridRow(202, 'substation switchgear lead time'),
+    buildDiverseSpaceRow(203, 'launch range scheduling capacity'),
+  ];
+  const result = selectFrontierParentCandidates(rows, { state, parentLimit: 3 });
+  const domainsSelected = new Set(result.selected.map((candidate) => candidate.primaryDomain || candidate.metadata?.primaryDomain || 'unknown'));
+  assert.ok(domainsSelected.size >= 2, `expected at least 2 domains in selection, got ${[...domainsSelected].join(',')}`);
+  assert.ok(result.frontierDiverseReadyCount >= 1);
+});
+
+test('frontier parent selector exposes selectedDomainCounts and domainHistoryLength for diagnostics', () => {
+  const recentAt = new Date().toISOString();
+  const state = {
+    parents: {},
+    domainSelectionHistory: [
+      { domain: 'grid_energy', at: recentAt, parentKey: 'x' },
+      { domain: 'space_defense', at: recentAt, parentKey: 'y' },
+    ],
+  };
+  const rows = [
+    buildBroadGridRow(301, 'protection relay qualification lead time'),
+    buildDiverseSpaceRow(302, 'launch range scheduling capacity'),
+  ];
+  const result = selectFrontierParentCandidates(rows, { state, parentLimit: 2 });
+  assert.equal(result.domainHistoryLength, 2);
+  assert.ok(result.selectedDomainCounts);
+  const total = Object.values(result.selectedDomainCounts).reduce((sum, count) => sum + count, 0);
+  assert.equal(total, result.selected.length);
+});
+
+test('frontier parent selector domain history applies penalty only when concentration exceeds floor', () => {
+  const recentAt = new Date().toISOString();
+  const lightHistory = { parents: {}, domainSelectionHistory: [{ domain: 'grid_energy', at: recentAt, parentKey: 'x' }] };
+  const heavyHistory = {
+    parents: {},
+    domainSelectionHistory: [
+      { domain: 'grid_energy', at: recentAt, parentKey: 'a' },
+      { domain: 'grid_energy', at: recentAt, parentKey: 'b' },
+      { domain: 'grid_energy', at: recentAt, parentKey: 'c' },
+      { domain: 'grid_energy', at: recentAt, parentKey: 'd' },
+    ],
+  };
+  const rows = [buildBroadGridRow(401, 'substation switchgear lead time')];
+  const lightResult = selectFrontierParentCandidates(rows, { state: lightHistory, parentLimit: 2 });
+  const heavyResult = selectFrontierParentCandidates(rows, { state: heavyHistory, parentLimit: 2 });
+  const lightScore = lightResult.candidates[0].frontierParent.frontierParentScore;
+  const heavyScore = heavyResult.candidates[0].frontierParent.frontierParentScore;
+  assert.ok(heavyScore <= lightScore, `expected heavy-history score (${heavyScore}) <= light-history score (${lightScore})`);
+});

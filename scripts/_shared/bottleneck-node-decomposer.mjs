@@ -124,6 +124,66 @@ const CONCRETE_NODE_ARCHETYPES = [
       'issuer cost, backlog, or margin exposure to the input',
     ],
   },
+  {
+    key: 'semiconductor_fab_capacity',
+    cues: [/\b(wafer|fab|foundry|euv|advanced packaging|hbm|interposer|substrate|photoresist|cmp|lithography)\b/i],
+    node: 'wafer fab or advanced-packaging capacity',
+    nodeType: 'physical_equipment',
+    evidenceClasses: ['supplier_capacity', 'technical_qualification', 'substitution_limit'],
+    acceptanceCriteria: [
+      'wafer-fab utilization, packaging backlog, or tool delivery lead time',
+      'qualified supplier or substitution barrier evidence',
+      'issuer exposure to fab tools, packaging, or substrate supply',
+    ],
+  },
+  {
+    key: 'biotech_manufacturing_capacity',
+    cues: [/\b(gmp|fill[-\s]?finish|drug substance|drug product|biologics manufacturing|cell therapy|gene therapy|cdmo|fda inspection)\b/i],
+    node: 'GMP biologics manufacturing capacity',
+    nodeType: 'regulated_production_process',
+    evidenceClasses: ['supplier_capacity', 'technical_qualification', 'policy_funding'],
+    acceptanceCriteria: [
+      'GMP facility utilization, fill-finish slot, or CDMO lead time',
+      'regulatory approval or qualified-supplier dependency evidence',
+      'issuer exposure to biologics or cell/gene-therapy manufacturing capacity',
+    ],
+  },
+  {
+    key: 'clinical_trial_site_capacity',
+    cues: [/\b(clinical trial|trial site|patient enrollment|recruiting|principal investigator|cro)\b/i],
+    node: 'clinical trial site or enrollment capacity',
+    nodeType: 'clinical_process',
+    evidenceClasses: ['supplier_capacity', 'policy_funding', 'historical_analog'],
+    acceptanceCriteria: [
+      'trial site backlog, enrollment lead time, or CRO capacity evidence',
+      'historical enrollment or completion benchmark',
+      'issuer exposure to clinical-trial throughput or site network',
+    ],
+  },
+  {
+    key: 'incident_response_capacity',
+    cues: [/\b(incident response|breach response|forensics?|dfir|threat hunting|soc analyst|response retainer)\b/i],
+    node: 'cyber incident-response analyst capacity',
+    nodeType: 'specialist_service',
+    evidenceClasses: ['supplier_capacity', 'substitution_limit', 'technical_qualification'],
+    acceptanceCriteria: [
+      'incident-response staffing, retainer backlog, or response-time evidence',
+      'qualified analyst or vendor substitution constraint',
+      'issuer exposure to DFIR, MSSP, or incident-retainer revenue',
+    ],
+  },
+  {
+    key: 'munitions_production_capacity',
+    cues: [/\b(munitions?|ammunition|artillery shell|solid rocket motor|interceptor production|missile production|propellant supply|warhead)\b/i],
+    node: 'munitions or propulsion production capacity',
+    nodeType: 'physical_equipment',
+    evidenceClasses: ['mission_award', 'policy_funding', 'supplier_capacity'],
+    acceptanceCriteria: [
+      'production-rate, backlog, or expansion-funding evidence',
+      'sole-source or qualified-supplier dependency',
+      'issuer exposure to munitions, propulsion, or specialty energetics',
+    ],
+  },
 ];
 
 const SOURCE_DERIVED_FRONTIER_NODES = [
