@@ -2,6 +2,10 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import {
+  detectReportReadinessContradictions,
+} from './report-contradiction-detector.mjs';
+
 function asArray(value) {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
@@ -356,9 +360,97 @@ function labelForEvidenceState(state) {
   }[state] || state || 'More evidence needed';
 }
 
-function visualStatusForLedger({ evidenceState, visibleStatus, counts = {}, marketTier = 'missing', negativeStatus = 'unchecked' } = {}) {
+const EVIDENCE_TIER_PRODUCT_TIERS = new Set([
+  'graph_adjacency',
+  'research_lead',
+  'evidence_backed_bottleneck_candidate',
+  'review_ready_bottleneck',
+]);
+
+function productTierDisplayLabel(tier = '', fallback = '') {
+  const normalized = normalizeStatusToken(tier);
+  return ({
+    graph_adjacency: 'Graph adjacency',
+    research_lead: 'Research lead',
+    evidence_backed_bottleneck_candidate: 'Evidence-supported research candidate',
+    review_ready_bottleneck: 'Review-ready evidence tier',
+    signal_triage: 'Signal triage',
+    thesis_validation: 'Thesis validation',
+    investment_memo_candidate: 'Investment memo candidate',
+  })[normalized] || fallback || String(tier || '').replace(/[_-]+/g, ' ') || 'Evidence tier tracked';
+}
+
+function productTierRole(tier = '') {
+  const normalized = normalizeStatusToken(tier);
+  if (EVIDENCE_TIER_PRODUCT_TIERS.has(normalized)) return 'evidence_tier';
+  if (['investment_memo_candidate', 'thesis_validation'].includes(normalized)) return 'actionability_tier';
+  return 'report_tier';
+}
+
+function artifactSchemaStatusForClosure({ quality = {}, diagnostic = {}, reportType = '' } = {}) {
+  const hasCoverageReconciliation =
+    diagnostic.coverageReconciliation?.policy === 'matrix_missing_overrides_raw_coverage' ||
+    quality.decisionDiagnostic?.coverageReconciliation?.policy === 'matrix_missing_overrides_raw_coverage';
+  const isCrossThemeClosure =
+    String(reportType || '').includes('cross_theme') ||
+    quality.crossThemeDiscoveryQuality ||
+    EVIDENCE_TIER_PRODUCT_TIERS.has(normalizeStatusToken(quality.productTier));
+  if (isCrossThemeClosure && !hasCoverageReconciliation) return 'pre_reconciliation';
+  return 'current';
+}
+
+function artifactSchemaWarningForStatus(status) {
+  if (status !== 'pre_reconciliation') return null;
+  return {
+    code: 'PRE_RECONCILIATION_ARTIFACT',
+    severity: 'warning',
+    message: 'Artifact predates coverage reconciliation; regenerate before readiness review.',
+    nextAction: 'regenerate report artifact with current closure schema',
+  };
+}
+
+const REVIEW_READY_BLOCKING_STATES = new Set([
+  'targeted_backfill_required',
+  'more_evidence_needed',
+  'source_expansion_required',
+  'under_researched',
+  'market_validation_pending',
+  'evidence_exhausted_no_support',
+  'provider_deferred',
+  'collecting_low_signal',
+  'collecting_context_evidence',
+  'probable_bridge_found',
+  'direct_bridge_pending',
+]);
+
+const CRITICAL_OPEN_CLASSES = new Set([
+  'issuer_exposure',
+  'negative_control',
+  'market_validation',
+  'mechanism_validation',
+  'operating_kpi',
+  'primary_filing',
+  'issuer_commentary',
+]);
+
+function criticalOpenClasses(openClasses = []) {
+  return [...new Set(asArray(openClasses).map(normalizeEvidenceClass).filter((cls) => CRITICAL_OPEN_CLASSES.has(cls)))];
+}
+
+function visualStatusForLedger({ evidenceState, visibleStatus, counts = {}, marketTier = 'missing', negativeStatus = 'unchecked', openClasses = [] } = {}) {
   if (negativeStatus === 'invalidator' || evidenceState === 'evidence_backed_reject') return 'rejected';
-  if (evidenceState === 'decision_ready_review' || marketTier === 'decision_grade') return 'review-ready';
+  const openCritical = criticalOpenClasses(openClasses);
+  if (evidenceState === 'decision_ready_review' && openCritical.length === 0) {
+    return 'review-ready';
+  }
+  if (
+    marketTier === 'decision_grade'
+    && openCritical.length === 0
+    && visibleStatus === 'review-ready'
+    && !REVIEW_READY_BLOCKING_STATES.has(normalizeStatusToken(evidenceState))
+  ) {
+    return 'review-ready';
+  }
   if (['collecting_low_signal', 'collecting_context_evidence', 'probable_bridge_found', 'direct_bridge_pending', 'provider_deferred'].includes(evidenceState)) return 'running';
   if (counts.running || counts.approved || visibleStatus === 'running') return 'running';
   if (counts.pending || visibleStatus === 'pending') return 'pending';
@@ -721,9 +813,16 @@ export function buildReportBackfillClosureLedger({
     return !['promotion_collected', 'negative_collected', 'complete'].includes(status);
   }))];
   const diagnostic = diagnosticFromArtifact(artifact);
+  const quality = artifact.validation?.quality || artifact.bundle?.quality || {};
   const researchUtility = researchUtilityFromArtifact(artifact);
   const marketTier = marketValidation?.tier || investmentMarketTier(artifact);
   const negativeStatus = negativeControlStatus(artifact, classMap);
+  const artifactSchemaStatus = artifactSchemaStatusForClosure({
+    quality,
+    diagnostic,
+    reportType: reportTypeFromArtifact(artifact),
+  });
+  const artifactSchemaWarning = artifactSchemaWarningForStatus(artifactSchemaStatus);
   let evidenceState = diagnostic.status || diagnostic.evidenceState || 'under_researched';
   if (negativeStatus === 'invalidator' || evidenceState === 'evidence_backed_reject') evidenceState = 'evidence_backed_reject';
   else if (counts.provider_rate_limited || counts.deferred_provider) evidenceState = 'provider_deferred';
@@ -746,11 +845,58 @@ export function buildReportBackfillClosureLedger({
           : counts.pending
           ? 'pending'
             : 'blocked';
-  const visualStatus = visualStatusForLedger({ evidenceState, visibleStatus, counts, marketTier, negativeStatus });
-  const primaryBlocker = primaryBlockerForLedger({ evidenceState, openClasses, marketTier, negativeStatus, counts });
-  const nextAction = nextActionForLedger({ primaryBlocker, openClasses, marketTier, negativeStatus, counts });
+  let visualStatus = visualStatusForLedger({ evidenceState, visibleStatus, counts, marketTier, negativeStatus, openClasses });
+  let primaryBlocker = primaryBlockerForLedger({ evidenceState, openClasses, marketTier, negativeStatus, counts });
+  let nextAction = nextActionForLedger({ primaryBlocker, openClasses, marketTier, negativeStatus, counts });
+  if (artifactSchemaStatus === 'pre_reconciliation' && ['review-ready', 'complete'].includes(visualStatus)) {
+    visualStatus = 'blocked';
+    primaryBlocker = 'pre_reconciliation_schema';
+    nextAction = artifactSchemaWarning.nextAction;
+  }
   const classLedger = [...classMap.values()].sort((a, b) => a.evidenceClass.localeCompare(b.evidenceClass));
   const classRows = classRowsForLedger({ classLedger, openClasses, marketTier, primaryBlocker });
+  const summaryForContradictions = {
+    reportId: reportIdFromArtifact(artifact),
+    evidenceState,
+    visibleStatus,
+    visualStatus,
+    openClasses,
+    marketTier,
+    negativeControlStatus: negativeStatus,
+    classRows,
+    sourceBreadth: artifact.bundle?.sourceSummary?.sourceDiversityScore
+      || artifact.validation?.quality?.sourceSummary?.sourceDiversityScore
+      || artifact.validation?.quality?.investmentReadiness?.sourceDiversity
+      || artifact.bundle?.metadata?.deepResearch?.investmentReadiness?.sourceDiversity,
+    conviction: artifact.validation?.quality?.conviction
+      || artifact.bundle?.quality?.conviction
+      || artifact.bundle?.metadata?.quality?.conviction,
+  };
+  const productTier = quality.productTier || quality.crossThemeDiscoveryQuality?.tier || quality.investmentReadiness?.tier || null;
+  const productTierLabel = productTierDisplayLabel(productTier, quality.crossThemeDiscoveryQuality?.label || quality.bottleneckReadiness?.label || '');
+  const productTierSemanticRole = productTierRole(productTier);
+  const deepResearch = artifact.bundle?.metadata?.deepResearch || artifact.validation?.quality?.deepResearch || {};
+  const actionability = deepResearch.crossThemeActionBridge
+    || artifact.bundle?.crossThemeActionBridge
+    || artifact.validation?.quality?.crossThemeActionBridge
+    || {};
+  const issuerBridge = deepResearch.issuerBridge
+    || deepResearch.actionBridge
+    || actionability
+    || artifact.bundle?.issuerBridge
+    || {};
+  const contradictions = detectReportReadinessContradictions({
+    summary: summaryForContradictions,
+    matrix: classRows,
+    quality: {
+      ...quality,
+      investmentReadiness: quality.investmentReadiness || deepResearch.investmentReadiness || artifact.bundle?.investmentReadiness,
+      decisionDiagnostic: quality.decisionDiagnostic || diagnostic,
+    },
+    actionability,
+    issuerBridge,
+    marketValidation: marketValidation || artifact.bundle?.marketValidation || quality.marketValidation || quality.investmentReadiness?.marketValidation,
+  });
 
   return {
     reportId: reportIdFromArtifact(artifact),
@@ -766,7 +912,14 @@ export function buildReportBackfillClosureLedger({
     counts,
     classLedger,
     classRows,
+    contradictions,
     visualStatus,
+    artifactSchemaStatus,
+    artifactSchemaWarning,
+    productTier,
+    productTierLabel,
+    productTierRole: productTierSemanticRole,
+    productTierPrimary: productTierSemanticRole !== 'evidence_tier' && ['review-ready', 'complete'].includes(visualStatus),
     primaryBlocker,
     nextAction,
     severity: severityForVisualStatus(visualStatus),

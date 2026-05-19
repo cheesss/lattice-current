@@ -85,6 +85,10 @@ function uniqueStrings(values = []) {
   return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
 }
 
+function normalizeEvidenceClass(value = '') {
+  return String(value || '').trim().toLowerCase().replace(/-/g, '_');
+}
+
 function recentSourceQueryTierStats(approvalTiers = {}, limit = 10) {
   const rows = Object.values(approvalTiers || {})
     .filter((row) => row && typeof row === 'object')
@@ -158,7 +162,17 @@ function computeDecisionDiagnostic(bundle = {}, components = {}) {
       ...asArray(crossThemeDiscoveryQuality?.metrics?.missingEvidenceClasses),
       ...asArray(crossThemeActionability?.metrics?.missingClasses),
     ]);
-  const coveredClasses = uniqueStrings(crossThemeDiscoveryQuality?.metrics?.evidenceClassesCovered || []);
+  const rawCoveredClasses = uniqueStrings(crossThemeDiscoveryQuality?.metrics?.evidenceClassesCovered || []);
+  const reconciliationMissingClasses = uniqueStrings([
+    ...missingClasses,
+    ...asArray(crossThemeActionability?.metrics?.missingClasses),
+    ...asArray(crossThemeActionability?.missingClasses),
+  ]);
+  const missingClassKeys = new Set(reconciliationMissingClasses.map(normalizeEvidenceClass));
+  const coveredClasses = rawCoveredClasses
+    .filter((evidenceClass) => !missingClassKeys.has(normalizeEvidenceClass(evidenceClass)));
+  const demotedCoveredClasses = rawCoveredClasses
+    .filter((evidenceClass) => missingClassKeys.has(normalizeEvidenceClass(evidenceClass)));
   const negativeControlStatus = completionLedger?.negativeControlStatus
     || crossThemeActionability?.metrics?.negativeControlStatus
     || 'unchecked';
@@ -257,6 +271,13 @@ function computeDecisionDiagnostic(bundle = {}, components = {}) {
     invalidationStatus: invalidated ? 'invalidated' : negativeControlStatus,
     missingEvidenceClasses: missingClasses,
     coveredEvidenceClasses: coveredClasses,
+    coverageReconciliation: {
+      rawCoveredEvidenceClasses: rawCoveredClasses,
+      acceptedCoveredEvidenceClasses: coveredClasses,
+      demotedCoveredEvidenceClasses: demotedCoveredClasses,
+      reconciliationMissingClasses,
+      policy: 'matrix_missing_overrides_raw_coverage',
+    },
     reasons,
     metrics: {
       sourceQuery,
@@ -266,6 +287,8 @@ function computeDecisionDiagnostic(bundle = {}, components = {}) {
       negativeControlStatus,
       missingClassCount: missingClasses.length,
       coveredClassCount: coveredClasses.length,
+      rawCoveredClassCount: rawCoveredClasses.length,
+      demotedCoveredEvidenceClasses: demotedCoveredClasses,
     },
   };
 }

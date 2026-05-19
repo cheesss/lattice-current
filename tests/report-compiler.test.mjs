@@ -239,7 +239,7 @@ test('compiler surfaces decision diagnostic without raw source-query mechanics',
       productTier: 'evidence_backed_bottleneck_candidate',
       publishable: true,
       publishabilityReasons: [],
-      bottleneckReadiness: { label: 'Evidence-supported bottleneck candidate' },
+      bottleneckReadiness: { tier: 'evidence_backed_bottleneck_candidate', label: 'Evidence-supported bottleneck candidate' },
       crossThemeDiscoveryQuality: { grade: 'S' },
       crossThemeActionability: { label: 'Discovery-to-action bridge' },
       researchUtility: {
@@ -264,9 +264,14 @@ test('compiler surfaces decision diagnostic without raw source-query mechanics',
   assert.match(html, /Investment Actionability/);
   assert.match(html, /Not investment-ready/);
   assert.match(html, /Evidence Closure/);
+  assert.match(html, /evidence tier/i);
+  assert.match(html, /Evidence-supported research candidate/);
+  assert.doesNotMatch(html, /bottleneck readiness/i);
   assert.match(md, /Discovery Readiness: Strong discovery \(S\)/);
   assert.match(md, /Research Priority: Research Priority B/);
   assert.match(md, /Investment Actionability: Not investment-ready/);
+  assert.match(md, /Evidence tier: Evidence-supported research candidate/);
+  assert.doesNotMatch(md, /Bottleneck readiness:/);
   assert.match(html, /evidence state/i);
   assert.match(html, /Targeted backfill needed/);
   assert.match(md, /Evidence state: Targeted backfill needed/);

@@ -891,8 +891,8 @@ export function discoveryTierLabel(tier = '') {
   return ({
     graph_adjacency: 'Graph adjacency',
     research_lead: 'Research lead',
-    evidence_backed_bottleneck_candidate: 'Evidence-supported bottleneck candidate',
-    review_ready_bottleneck: 'Review-ready bottleneck',
+    evidence_backed_bottleneck_candidate: 'Evidence-supported research candidate',
+    review_ready_bottleneck: 'Review-ready evidence tier',
   })[tier] || titleCase(tier || 'cross-theme discovery');
 }
 

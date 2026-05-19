@@ -457,8 +457,9 @@ test('cross-theme report exposes discovery readiness separately from investment 
   assert.equal(validation.quality.investmentReadiness?.tier, 'signal_triage');
   assert.equal(['evidence_backed_bottleneck_candidate', 'review_ready_bottleneck'].includes(validation.quality.crossThemeDiscoveryQuality.tier), true);
   assert.equal(validation.quality.productTier, validation.quality.crossThemeDiscoveryQuality.tier);
-  assert.match(html, /bottleneck readiness/i);
-  assert.match(html, /evidence-supported bottleneck candidate|review-ready bottleneck/i);
+  assert.match(html, /evidence tier/i);
+  assert.match(html, /evidence-supported research candidate|review-ready evidence tier/i);
+  assert.doesNotMatch(html, /bottleneck readiness/i);
 });
 
 test('cross-theme memo explains non-obviousness and keeps noisy deep-pack evidence out of the body', () => {

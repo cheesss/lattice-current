@@ -1570,7 +1570,7 @@ function buildCrossThemeNarrativeBlueprint(bundle = {}, signalCards = {}) {
   };
 }
 
-function buildCrossThemeLongFormSections(blueprint = {}) {
+export function buildCrossThemeLongFormSections(blueprint = {}) {
   const profile = blueprint.crossTheme || crossThemeProfile({});
   const refs = blueprint.refs || {};
   const name = profile.subject || blueprint.subject || 'The candidate';
@@ -1599,14 +1599,25 @@ function buildCrossThemeLongFormSections(blueprint = {}) {
   const actionIssuerRows = asArray(actionBridge.exposedIssuers).slice(0, 5);
   const autoIssuerAllRows = asArray(actionBridge.autoDiscoveredIssuers);
   const autoIssuerRows = autoIssuerAllRows.slice(0, 8);
+  const autoDirectAttachedRows = autoIssuerAllRows.filter((issuer) => (
+    issuer.status === 'direct_node_exposure_attached'
+    || issuer.status === 'issuer_exposure_attached'
+  ));
+  const autoDirectAttachedCount = autoDirectAttachedRows.length;
+  const autoDirectAttachedText = autoDirectAttachedRows.slice(0, 5)
+    .map((issuer) => `${issuer.symbol} (${humanReadable(issuer.status)})`)
+    .join(', ');
+  const autoFollowUpCount = Math.max(0, autoIssuerAllRows.length - autoDirectAttachedCount);
   const autoIssuerText = autoIssuerRows.length
     ? autoIssuerRows.slice(0, 5).map((issuer) => `${issuer.symbol} (${humanReadable(issuer.issuerBridgeRole || issuer.role || 'candidate')})`).join(', ')
     : '';
   const actionIssuerText = actionIssuerRows.length
     ? actionIssuerRows.map((issuer) => `${issuer.symbol} (${humanReadable(issuer.status)})`).join(', ')
-    : (autoIssuerText
-      ? `candidate map exists (${autoIssuerText}), but direct issuer translation is not attached yet`
-      : 'no issuer translation is attached yet');
+    : (autoDirectAttachedCount
+      ? `partial bridge attached (${autoDirectAttachedText})${autoFollowUpCount ? `, with ${countPhrase(autoFollowUpCount, 'candidate issuer')} still requiring direct bridge evidence` : ''}`
+      : (autoIssuerText
+        ? `candidate map exists (${autoIssuerText}), but direct issuer translation is not attached yet`
+        : 'no issuer translation is attached yet'));
   const directIssuerCount = actionIssuerRows.filter((issuer) => issuer.status === 'issuer_exposure_attached').length;
   const operatingIssuerCount = actionIssuerRows.filter((issuer) => issuer.status === 'operating_anchor_attached').length;
   const followUpIssuerCount = actionIssuerRows.filter((issuer) => issuer.status !== 'issuer_exposure_attached' && issuer.status !== 'operating_anchor_attached').length;
@@ -1616,14 +1627,40 @@ function buildCrossThemeLongFormSections(blueprint = {}) {
         operatingIssuerCount ? `${countPhrase(operatingIssuerCount, 'issuer')} with operating anchors but not issuer-level economics` : null,
         followUpIssuerCount ? `${countPhrase(followUpIssuerCount, 'issuer')} still requiring issuer follow-up` : null,
       ].filter(Boolean).join('; ')
-    : (autoIssuerRows.length
-      ? `candidate issuer map exists with ${countPhrase(autoIssuerAllRows.length, 'issuer')}; direct bridge evidence is still missing`
-      : 'no issuer translation is attached yet');
+    : (autoDirectAttachedCount
+      ? [
+          `${countPhrase(autoDirectAttachedCount, 'issuer')} with direct node-exposure bridge attached (${autoDirectAttachedText})`,
+          autoFollowUpCount ? `${countPhrase(autoFollowUpCount, 'candidate issuer')} still requiring direct bridge evidence` : null,
+          'operating, market, and issuer-commentary classes still required for promotion',
+        ].filter(Boolean).join('; ')
+      : (autoIssuerRows.length
+        ? `candidate issuer map exists with ${countPhrase(autoIssuerAllRows.length, 'issuer')}; direct bridge evidence is still missing`
+        : 'no issuer translation is attached yet'));
   const actionMissingClasses = asArray(actionBridge.missingClasses).map(humanReadable).filter(Boolean);
   const actionMissingClassText = evidenceLaneSummary(actionMissingClasses);
   const actionMarketText = actionBridge.marketTranslation?.status === 'attached'
     ? `Market translation is attached at ${humanReadable(actionBridge.marketTranslation.tier || 'unknown')} with ${countPhrase(actionBridge.marketTranslation.rowCount, 'row')}.`
     : 'Market translation is not yet attached; discovery can still be valid while tradable expression remains unresolved.';
+  const valuationReadiness = actionBridge.valuationReadiness || profile.valuationReadiness || null;
+  const valuationSummary = valuationReadiness?.summary || null;
+  const actionValuationText = valuationSummary
+    ? (() => {
+        const tier = humanReadable(valuationSummary.tier || 'unknown');
+        if (valuationSummary.tier === 'overheated') {
+          return `Run-up check flags ${countPhrase(valuationSummary.overheatedSymbolCount, 'overheated issuer')}; the candidate is best treated as a watchlist lead until momentum cools.`;
+        }
+        if (valuationSummary.tier === 'extended') {
+          return `Run-up check shows ${countPhrase(valuationSummary.extendedSymbolCount, 'extended issuer')} without a meaningful drawdown; size only after consolidation.`;
+        }
+        if (valuationSummary.tier === 'cheap') {
+          return `Run-up check leaves the resolved issuer universe in a cheap-to-fair range relative to the benchmark; verify there is no value-trap risk.`;
+        }
+        if (valuationSummary.tier === 'unknown' || valuationSummary.tier === 'mixed') {
+          return `Run-up check is partial (${tier}); ${(valuationSummary.missingClass || []).map(humanReadable).join(', ') || 'awaiting market quote coverage'}.`;
+        }
+        return `Run-up check tier is ${tier}; valuation gate is clear for issuer promotion.`;
+      })()
+    : 'Run-up check is not yet attached; defer overheated/cheap judgment until market quote coverage and valuation snapshot are loaded.';
   const bodyEvidenceCount = Number(discoveryMetrics.bodyEvidenceCount || 0);
   const highFitAnchorCount = Number(discoveryMetrics.highFitAnchorCount || 0);
   const negativeControlPass = Number(discoveryMetrics.negativeControlPass || 0) >= 1;
@@ -1696,7 +1733,7 @@ function buildCrossThemeLongFormSections(blueprint = {}) {
       }, refs),
       paragraph({
         claim: `The current action bridge is ${actionBridgeLabel}.`,
-        context: `Issuer translation is partial: ${actionIssuerSummaryText}. ${actionMarketText}`,
+        context: `Issuer translation is partial: ${actionIssuerSummaryText}. ${actionMarketText} ${actionValuationText}`,
         interpretation: `This keeps discovery quality separate from tradable expression. The bottleneck idea can be strong while the system still needs issuer, market, and validation evidence before an analyst can use it in a portfolio context.`,
         implication: `The next report should improve the action bridge by filling ${actionMissingClassText}.`,
       }, refs),
@@ -1754,7 +1791,7 @@ function buildCrossThemeLongFormSections(blueprint = {}) {
     longSection('whyNonObvious', 'Why This Is Non-Obvious', [
       paragraph({
         claim: `${displayName} is interesting only if the connection is non-obvious in the evidence, not merely unusual in wording.`,
-        context: `The current bottleneck readiness tier is ${bottleneckTier}, which is intentionally separate from investment readiness.`,
+        context: `The current evidence tier is ${bottleneckTier}, which is intentionally separate from investment readiness.`,
         interpretation: `That combination is the product signal. A common connector inside one crowded theme is less valuable than a specific component, material, process, or supplier layer that bridges distant themes and did not simply echo the original seed vocabulary.`,
         implication: `The report should therefore treat novelty as an evidence-supported discovery dimension, separate from investment readiness or broad theme momentum.`,
       }, refs),
@@ -1785,9 +1822,9 @@ function buildCrossThemeLongFormSections(blueprint = {}) {
     ], { targetWords: 270 }),
     longSection('evidenceLadder', 'Evidence Ladder', [
       paragraph({
-        claim: `The evidence ladder is graph adjacency -> research lead -> evidence-supported bottleneck candidate -> review-ready bottleneck.`,
+        claim: `The evidence ladder is graph adjacency -> research lead -> evidence-supported research candidate -> review-ready evidence tier.`,
         context: `The current tier is ${bottleneckTier}; movement up the ladder requires stronger direct operating anchors and independent source breadth.`,
-        interpretation: `Graph adjacency says the idea is worth inspecting. A research lead has enough specificity to open source queries. An evidence-supported bottleneck candidate has direct operating anchors. A review-ready bottleneck has multiple independent, high-fit anchors plus negative-control discipline.`,
+        interpretation: `Graph adjacency says the idea is worth inspecting. A research lead has enough specificity to open source queries. An evidence-supported research candidate has direct operating anchors. A review-ready evidence tier has multiple independent, high-fit anchors plus negative-control discipline.`,
         implication: `This tiering lets the system celebrate discovery quality without pretending the same artifact is already an investment memo.`,
       }, refs),
       paragraph({
@@ -1906,7 +1943,7 @@ function buildCrossThemeLongFormSections(blueprint = {}) {
         claim: `Promotion requires evidence that the connector is operationally binding across more than one theme.`,
         context: `The strongest promotion evidence would tie operating scarcity, qualification difficulty, procurement timing, practical non-substitutability, issuer exposure, and negative-control results to the same connector without collapsing them into one score.`,
         interpretation: `Those evidence classes prove different parts of the bottleneck thesis: scarcity, technical difficulty, timing pressure, practical non-substitutability, and market expression.`,
-        implication: `If accepted evidence appears in two or more of those classes, the next report can consider moving from research lead to evidence-supported bottleneck candidate or review-ready bottleneck.`,
+        implication: `If accepted evidence appears in two or more of those classes, the next report can consider moving from research lead to an evidence-supported research candidate or a review-ready evidence tier.`,
       }, refs),
       paragraph({
         claim: `Rejection should be equally explicit.`,

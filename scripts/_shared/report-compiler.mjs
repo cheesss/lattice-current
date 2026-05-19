@@ -332,6 +332,16 @@ function discoveryReadinessLabelForGrade(grade = '', fallback = 'Tracked discove
   return `Early discovery (${grade})`;
 }
 
+function evidenceTierDisplayLabel(tier = '', fallback = '') {
+  const normalized = String(tier || '').trim();
+  return ({
+    evidence_backed_bottleneck_candidate: 'Evidence-supported research candidate',
+    review_ready_bottleneck: 'Review-ready evidence tier',
+    research_lead: 'Research lead',
+    graph_adjacency: 'Graph adjacency',
+  })[normalized] || fallback || tableStatusLabel(normalized || 'evidence tier tracked');
+}
+
 function evidenceClassClosureMap(research = {}) {
   const ledger = research.reportClosureLedger || research.completionLedger || research.closureLedger || {};
   const rows = asArray(ledger.classRows).length ? asArray(ledger.classRows) : asArray(ledger.classLedger);
@@ -904,7 +914,10 @@ function renderQualityRibbon(validation = {}) {
   const primaryBlocker = translateClientBlocker(asArray(quality.investmentReadiness?.blockers)[0] || '');
   const hasDecisionGradeMarketValidation = quality.investmentReadiness?.marketValidation?.tier === 'decision_grade';
   const portfolioUse = portfolioUseLabel(quality);
-  const bottleneckLabel = bottleneckReadiness?.label || String(productTier || '').replace(/[_-]+/g, ' ');
+  const bottleneckLabel = evidenceTierDisplayLabel(
+    bottleneckReadiness?.tier || productTier,
+    bottleneckReadiness?.label || String(productTier || '').replace(/[_-]+/g, ' '),
+  );
   const actionBridgeLabel = crossThemeActionability?.label || 'Action bridge pending';
   const investmentGateLabel = quality.investmentReadiness?.tier
     ? String(quality.investmentReadiness.tier).replace(/[_-]+/g, ' ')
@@ -923,20 +936,23 @@ function renderQualityRibbon(validation = {}) {
         : 'Not investment-ready')
     : portfolioUseLabel(quality);
   const evidenceClosureLabel = decisionDiagnostic?.label || (quality.publishable === false ? 'Evidence repair needed' : 'Audit linked');
+  const crossThemeClosureBlocked = isCrossThemeDiscovery
+    && decisionDiagnostic
+    && decisionDiagnostic.status !== 'decision_ready_review';
   const conviction = isCrossThemeDiscovery
-    ? bottleneckLabel
+    ? (crossThemeClosureBlocked ? 'Evidence-limited; closure blocked' : bottleneckLabel)
     : primaryBlocker ? 'Evidence-limited' : (isMemoCandidate || isThesisValidation) ? 'Review-ready, not decision-ready' : 'Evidence-bound';
   const clientReasons = publishabilityReasons
     .slice(0, 4)
     .map(translateClientBlocker)
     .filter(Boolean)
     .join(' ');
-  const publishability = quality.publishable === false
+  const publishability = quality.publishable === false || crossThemeClosureBlocked
     ? isCrossThemeDiscovery
       ? `<div class="publishability publishability-blocked"><strong>${escapeHtml(researchPriorityLabel)}; not an investment memo.</strong><p>${escapeHtml(decisionDiagnostic?.nextAction || researchUtility?.nextAction || clientReasons || 'Use this as a research-priority memo until issuer exposure, procurement/substitution evidence, and closure gaps are resolved.')}</p></div>`
       : `<div class="publishability publishability-blocked"><strong>Research memo still needs evidence repair.</strong><p>${escapeHtml(clientReasons) || 'Unresolved evidence-depth or trust gaps remain.'}</p></div>`
     : isCrossThemeDiscovery
-      ? `<div class="publishability publishability-ready"><strong>${escapeHtml(bottleneckLabel)}.</strong><p>${escapeHtml(decisionDiagnostic?.nextAction || 'Use this memo to validate a non-obvious cross-theme bottleneck candidate. Investment readiness remains a separate gate.')}</p></div>`
+      ? `<div class="publishability publishability-ready"><strong>${escapeHtml(bottleneckLabel)}; investment readiness is a separate gate.</strong><p>${escapeHtml(decisionDiagnostic?.nextAction || 'Use this memo to validate a non-obvious cross-theme bottleneck candidate. Investment readiness remains a separate gate.')}</p></div>`
       : productTier === 'signal_triage'
       ? `<div class="publishability publishability-ready"><strong>Research-prioritization memo.</strong><p>Use this memo to decide what to monitor, what to collect, and whether the theme should remain in discovery or move toward active watchlist status.</p></div>`
       : isMemoCandidate
@@ -952,7 +968,7 @@ function renderQualityRibbon(validation = {}) {
       <div><span>decision use</span><strong>${escapeHtml(decisionUse)}</strong></div>
       <div><span>conviction</span><strong>${escapeHtml(conviction)}</strong></div>
       ${isCrossThemeDiscovery ? `<div><span>discovery quality</span><strong>${escapeHtml(quality.crossThemeDiscoveryQuality?.grade || 'tracked')}</strong></div>` : ''}
-      ${isCrossThemeDiscovery ? `<div><span>bottleneck readiness</span><strong>${escapeHtml(bottleneckLabel)}</strong></div>` : ''}
+      ${isCrossThemeDiscovery ? `<div><span>evidence tier</span><strong>${escapeHtml(bottleneckLabel)}</strong></div>` : ''}
       ${isCrossThemeDiscovery ? `<div><span>action bridge</span><strong>${escapeHtml(actionBridgeLabel)}</strong></div>` : ''}
       ${isCrossThemeDiscovery ? `<div><span>investment gate</span><strong>${escapeHtml(investmentGateLabel)}</strong></div>` : ''}
       ${isCrossThemeDiscovery && researchUtility?.closureState ? `<div><span>research closure</span><strong>${escapeHtml(tableStatusLabel(researchUtility.closureState))}</strong></div>` : ''}
@@ -1221,7 +1237,7 @@ export function renderReportMarkdown(bundle = {}, options = {}) {
     const grade = quality.crossThemeDiscoveryQuality?.grade;
     const discoveryLabel = grade
       ? discoveryReadinessLabelForGrade(grade)
-      : (bottleneckReadiness.label || productTier);
+      : evidenceTierDisplayLabel(bottleneckReadiness.tier || productTier, bottleneckReadiness.label || productTier);
     lines.push(`- Discovery Readiness: ${discoveryLabel}`);
   }
   if (isCrossThemeDiscovery) lines.push(`- Research Priority: ${quality.researchUtility?.label || 'Research priority tracked'}`);
@@ -1235,7 +1251,7 @@ export function renderReportMarkdown(bundle = {}, options = {}) {
     lines.push(`- Investment Actionability: ${investmentActionabilityLabel}`);
   }
   if (isCrossThemeDiscovery) lines.push(`- Evidence Closure: ${decisionDiagnostic?.label || 'Evidence repair needed'}`);
-  if (isCrossThemeDiscovery) lines.push(`- Bottleneck readiness: ${bottleneckReadiness.label || productTier}`);
+  if (isCrossThemeDiscovery) lines.push(`- Evidence tier: ${evidenceTierDisplayLabel(bottleneckReadiness.tier || productTier, bottleneckReadiness.label || productTier)}`);
   if (decisionDiagnostic) lines.push(`- Evidence state: ${decisionDiagnostic.label}`);
   if (isMemoCandidate || isThesisValidation) lines.push(`- Portfolio use: ${portfolioUseLabel(quality)}`);
   lines.push('');

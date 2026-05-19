@@ -3032,14 +3032,15 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             limit: Number(params.get('limit') || 10),
           });
           const reports = summaries
-            .filter((summary) => !statusFilter || summary.visibleStatus === statusFilter)
+            .filter((summary) => !statusFilter || summary.visualStatus === statusFilter)
             .map((summary) => ({
               reportId: summary.reportId,
               subject: summary.subject,
               reportType: summary.reportType,
               evidenceState: summary.evidenceState,
               evidenceStateLabel: summary.evidenceStateLabel,
-              status: summary.visibleStatus,
+              status: summary.visualStatus,
+              rawVisibleStatus: summary.visibleStatus,
               openClasses: summary.openClasses,
               marketTier: summary.marketTier,
               negativeControlStatus: summary.negativeControlStatus,
@@ -3051,6 +3052,13 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
               primaryBlocker: summary.primaryBlocker,
               nextAction: summary.nextAction,
               classRows: summary.classRows,
+              contradictions: summary.contradictions || [],
+              artifactSchemaStatus: summary.artifactSchemaStatus,
+              artifactSchemaWarning: summary.artifactSchemaWarning,
+              productTier: summary.productTier,
+              productTierLabel: summary.productTierLabel,
+              productTierRole: summary.productTierRole,
+              productTierPrimary: summary.productTierPrimary,
               lastUpdatedAt: summary.lastUpdatedAt,
               severity: summary.severity,
             }));

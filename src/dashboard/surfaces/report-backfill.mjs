@@ -100,9 +100,34 @@ function renderReportCard(report, index) {
     report.evidenceStateLabel || report.evidenceState || 'More evidence needed',
     report.lastUpdatedAt ? `updated ${report.lastUpdatedAt}` : '',
   ].filter(Boolean).join(' | ');
+  const productTierLine = report.productTierLabel ? `
+    <div class="modern-meta-line">
+      Evidence tier ${escapeHtml(report.productTierLabel)}
+      ${report.productTierRole === 'evidence_tier' ? ' | separate from investment readiness' : ''}
+      ${report.productTierPrimary === false ? ' | closure status is authoritative' : ''}
+    </div>
+  ` : '';
+  const artifactSchemaLine = report.artifactSchemaStatus && report.artifactSchemaStatus !== 'current' ? `
+    <div class="modern-meta-line">
+      Artifact schema ${escapeHtml(report.artifactSchemaStatus)}
+      ${report.artifactSchemaWarning?.message ? ` | ${escapeHtml(report.artifactSchemaWarning.message)}` : ''}
+    </div>
+  ` : '';
   const reportAction = report.reportId
     ? `<button type="button" class="modern-btn" data-modern-open-report="${escapeHtml(report.reportId)}">Open report</button>`
     : '';
+  const contradictions = Array.isArray(report.contradictions) ? report.contradictions : [];
+  const contradictionLane = contradictions.length ? `
+    <div class="modern-warning-lane" role="status" aria-label="Contradiction Warning">
+      <div class="modern-meta-line"><strong>Contradiction Warning</strong></div>
+      ${contradictions.slice(0, 3).map((item) => `
+        <div class="modern-meta-line">
+          ${statusChip(item.severity || 'warning', { title: item.code || '' })}
+          <span class="modern-clamp">${escapeHtml(item.code || 'CONTRADICTION')}: ${escapeHtml(item.message || 'Readiness contradiction detected.')}</span>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
   return `
     <article class="modern-report-card" data-report-index="${index}">
       <div class="modern-report-head">
@@ -112,6 +137,8 @@ function renderReportCard(report, index) {
             ${statusChip(status, { title: report.primaryBlocker || report.nextAction || '' })}
           </div>
           <div class="modern-meta-line">${escapeHtml(meta)}</div>
+          ${productTierLine}
+          ${artifactSchemaLine}
           <div class="modern-meta-line">
             Market ${escapeHtml(report.marketTier || 'missing')} | negative ${escapeHtml(report.negativeControlStatus || 'unchecked')} | blocker ${escapeHtml(report.primaryBlocker || 'not classified')}
           </div>
@@ -121,6 +148,7 @@ function renderReportCard(report, index) {
           <button type="button" class="modern-btn" data-modern-audit-index="${index}">Audit details</button>
         </div>
       </div>
+      ${contradictionLane}
       ${renderClosureMatrix(rows)}
     </article>
   `;
@@ -179,6 +207,13 @@ function bindReportBackfillEvents(root) {
         negativeControlStatus: report.negativeControlStatus,
         primaryBlocker: report.primaryBlocker,
         nextAction: report.nextAction,
+        productTier: report.productTier,
+        productTierLabel: report.productTierLabel,
+        productTierRole: report.productTierRole,
+        productTierPrimary: report.productTierPrimary,
+        artifactSchemaStatus: report.artifactSchemaStatus,
+        artifactSchemaWarning: report.artifactSchemaWarning,
+        contradictions: report.contradictions || [],
         classRows: report.classRows || [],
       });
     });
