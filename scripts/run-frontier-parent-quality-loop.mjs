@@ -7,7 +7,12 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { runRefreshCrossThemeCandidates } from './refresh-cross-theme-candidates.mjs';
-import { evaluateFrontierParentCandidate, sortFrontierParentCandidates } from './_shared/frontier-parent-selection.mjs';
+import {
+  applyDomainHistoryPenalty,
+  evaluateFrontierParentCandidate,
+  sortFrontierParentCandidates,
+} from './_shared/frontier-parent-selection.mjs';
+import { inferDiscoveryCategories } from './_shared/non-obvious-bottleneck-discovery.mjs';
 import {
   deriveConcreteBottleneckNodes,
   summarizeConcreteBottleneckNodes,
@@ -69,11 +74,19 @@ function hasDerivedAdjacentTheme(candidate = {}) {
   return asArray(candidate.themes).some((theme) => /^(adjacent|endogenous-adjacent|frontier-parent)-/i.test(String(theme || '')));
 }
 
+const DOMAIN_HISTORY_FIFO_LIMIT = 24;
+const DOMAIN_OVER_CONCENTRATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DOMAIN_OVER_CONCENTRATION_THRESHOLD = 3;
+const DOMAIN_COOLDOWN_EXTENSION_MS = 24 * 60 * 60 * 1000;
+
 function loadLoopState() {
   const state = readJsonIfExists(STATE_PATH) || {};
   return {
     version: 'frontier-parent-quality-loop-state-v1',
     parents: state.parents && typeof state.parents === 'object' ? state.parents : {},
+    domainSelectionHistory: Array.isArray(state.domainSelectionHistory)
+      ? state.domainSelectionHistory.slice(-DOMAIN_HISTORY_FIFO_LIMIT)
+      : [],
   };
 }
 
@@ -83,7 +96,31 @@ function writeLoopState(state = {}) {
     version: 'frontier-parent-quality-loop-state-v1',
     updatedAt: new Date().toISOString(),
     parents: state.parents || {},
+    domainSelectionHistory: Array.isArray(state.domainSelectionHistory)
+      ? state.domainSelectionHistory.slice(-DOMAIN_HISTORY_FIFO_LIMIT)
+      : [],
   }, null, 2));
+}
+
+function recentDomainSelections(state = {}, windowMs = DOMAIN_OVER_CONCENTRATION_WINDOW_MS, now = Date.now()) {
+  const cutoff = now - windowMs;
+  return asArray(state.domainSelectionHistory).filter((entry) => {
+    if (!entry?.domain) return false;
+    const at = entry.at ? Date.parse(entry.at) : 0;
+    return Number.isFinite(at) && at >= cutoff;
+  });
+}
+
+function domainConcentrationFromState(state = {}, primaryDomain = '', now = Date.now()) {
+  if (!primaryDomain) return { recent: 0, total: 0, concentration: 0 };
+  const recent = recentDomainSelections(state, DOMAIN_OVER_CONCENTRATION_WINDOW_MS, now);
+  const total = recent.length;
+  const sameDomain = recent.filter((entry) => entry.domain === primaryDomain).length;
+  return {
+    recent: sameDomain,
+    total,
+    concentration: total ? sameDomain / total : 0,
+  };
 }
 
 function parentCooldownActive(candidate = {}, state = {}, now = Date.now()) {
@@ -92,7 +129,24 @@ function parentCooldownActive(candidate = {}, state = {}, now = Date.now()) {
     return false;
   }
   const until = entry?.cooldownUntil ? Date.parse(entry.cooldownUntil) : 0;
-  return Number.isFinite(until) && until > now;
+  if (Number.isFinite(until) && until > now) return true;
+  const primaryDomain = candidate.primaryDomain || candidate.metadata?.primaryDomain || null;
+  if (primaryDomain && entry?.lastAttemptAt) {
+    const { recent } = domainConcentrationFromState(state, primaryDomain, now);
+    const frontierScore = num(candidate.frontierParent?.frontierParentScore, 0);
+    if (recent >= DOMAIN_OVER_CONCENTRATION_THRESHOLD && frontierScore < 0.65) {
+      const extendedUntil = Date.parse(entry.lastAttemptAt) + DOMAIN_COOLDOWN_EXTENSION_MS;
+      if (Number.isFinite(extendedUntil) && extendedUntil > now) return true;
+    }
+  }
+  return false;
+}
+
+function appendDomainSelectionHistory(history = [], { domain, parentKey, now = Date.now() } = {}) {
+  if (!domain) return Array.isArray(history) ? history.slice(-DOMAIN_HISTORY_FIFO_LIMIT) : [];
+  const next = Array.isArray(history) ? history.slice() : [];
+  next.push({ domain, parentKey: parentKey || null, at: new Date(now).toISOString() });
+  return next.slice(-DOMAIN_HISTORY_FIFO_LIMIT);
 }
 
 function updateParentAttemptState(state = {}, candidate = {}, review = {}, reportDir = '') {
@@ -103,6 +157,8 @@ function updateParentAttemptState(state = {}, candidate = {}, review = {}, repor
   const hedgeFundReady = Boolean(review.hedgeFundReady);
   const backfillOnly = !reportDir && /^execute_(node_specific|parent)_backfill/i.test(String(review.nextAction || ''));
   const cooldownMs = hedgeFundReady || backfillOnly ? 0 : 6 * 60 * 60 * 1000;
+  const primaryDomain = candidate.primaryDomain || candidate.metadata?.primaryDomain || null;
+  const shouldTrackDomain = Boolean(primaryDomain && (reportDir || review.attemptedReportGeneration));
   return {
     ...state,
     parents: {
@@ -118,8 +174,12 @@ function updateParentAttemptState(state = {}, candidate = {}, review = {}, repor
         lastHedgeFundReady: hedgeFundReady,
         lastMissing: review.missing || [],
         lastNextAction: review.nextAction || null,
+        lastPrimaryDomain: primaryDomain,
       },
     },
+    domainSelectionHistory: shouldTrackDomain
+      ? appendDomainSelectionHistory(state.domainSelectionHistory, { domain: primaryDomain, parentKey: key })
+      : (state.domainSelectionHistory || []),
   };
 }
 
@@ -322,6 +382,22 @@ function mapCandidateRow(row = {}) {
       };
     }
   }
+  const domains = inferDiscoveryCategories({
+    themes: row.themes || [],
+    ontologyKey: metadata.ontologyKey || evidenceSummary?.ontologyKey || metadata.parentOntologyKey,
+    parentSubject: label,
+    sourceTerms: [
+      ...asArray(metadata.sourceTerms),
+      ...asArray(evidenceSummary?.sourceTerms),
+    ],
+    corpus: [
+      label,
+      row.reason,
+      ...asArray(metadata.connector_canonical_name ? [metadata.connector_canonical_name] : []),
+      ...asArray(row.themes || []),
+    ].filter(Boolean).join(' '),
+  });
+  const primaryDomain = domains[0] || null;
   return {
     id: row.id,
     deterministicId: row.deterministic_id,
@@ -337,11 +413,15 @@ function mapCandidateRow(row = {}) {
     supplierId: row.supplier_id,
     edgeEvidence: scopedEdgeEvidence || row.edge_evidence || [],
     evidenceSummary,
+    primaryDomain,
+    domains,
     metadata: {
       ...metadata,
       parentSourceContaminationScore: asArray(row.edge_evidence).length
         ? Math.round((1 - (scopedEdgeEvidence.length / asArray(row.edge_evidence).length)) * 1000) / 1000
         : 0,
+      primaryDomain,
+      domains,
     },
     frontierParent,
   };
@@ -936,8 +1016,19 @@ function decomposeParentCandidate(candidate = {}, { perParentLimit = 4, provider
   });
 }
 
+function isFrontierDiverseCandidate(candidate = {}, recentDomains = []) {
+  const non = candidate.evidenceSummary?.nonObviousDiscovery || candidate.metadata?.nonObviousDiscovery || {};
+  const themeDistance = num(non.themeDistanceScore, 0);
+  const surprise = num(non.surpriseScore, 0);
+  const primaryDomain = candidate.primaryDomain || candidate.metadata?.primaryDomain || null;
+  if (themeDistance >= 0.55) return true;
+  if (surprise >= 0.55) return true;
+  if (primaryDomain && !recentDomains.includes(primaryDomain)) return true;
+  return false;
+}
+
 export function selectFrontierParentCandidates(rows = [], options = {}) {
-  const state = options.state || { parents: {} };
+  const state = options.state || { parents: {}, domainSelectionHistory: [] };
   const now = Date.now();
   const providerEvidenceByCandidateKey = normalizeProviderEvidenceMap(options.providerEvidenceByCandidateKey);
   const parentCandidates = rows.map(mapCandidateRow);
@@ -946,7 +1037,24 @@ export function selectFrontierParentCandidates(rows = [], options = {}) {
     providerEvidenceByCandidateKey,
   }));
   const candidates = [...decomposedCandidates, ...parentCandidates];
-  const sortedRaw = sortFrontierParentCandidates(candidates.map((candidate) => ({
+  const domainHistory = asArray(state.domainSelectionHistory)
+    .slice(-DOMAIN_HISTORY_FIFO_LIMIT)
+    .map((entry) => ({ domain: entry?.domain || null, at: entry?.at || null }))
+    .filter((entry) => entry.domain);
+  const recentDomainsOrdered = recentDomainSelections(state, DOMAIN_OVER_CONCENTRATION_WINDOW_MS, now)
+    .slice(-3)
+    .map((entry) => entry.domain);
+  const candidatesWithDomainCtx = candidates.map((candidate) => {
+    const primaryDomain = candidate.primaryDomain || candidate.metadata?.primaryDomain || null;
+    const adjustedFrontierParent = applyDomainHistoryPenalty(
+      candidate.frontierParent || {},
+      primaryDomain,
+      domainHistory,
+      { quotaCap: DOMAIN_OVER_CONCENTRATION_THRESHOLD },
+    );
+    return { ...candidate, frontierParent: adjustedFrontierParent };
+  });
+  const sortedRaw = sortFrontierParentCandidates(candidatesWithDomainCtx.map((candidate) => ({
     ...candidate,
     label: candidate.label,
     node: { nodeType: candidate.nodeType, canonicalName: candidate.label },
@@ -987,16 +1095,43 @@ export function selectFrontierParentCandidates(rows = [], options = {}) {
     && candidate.frontierParent.frontierParentCollectionEligible
   ));
   const decomposedCollectionEligible = collectionEligible.filter((candidate) => candidate.decomposedFromParent);
-  const selected = reportReady.length
-    ? reportReady
-    : (decomposedCollectionEligible.length ? decomposedCollectionEligible : collectionEligible);
+  const parentLimit = Math.max(1, Math.min(50, num(options.parentLimit, 6)));
+  const diverseQuota = Math.max(1, Math.ceil(parentLimit / 3));
+  const frontierDiverseReady = reportReady.filter((candidate) => isFrontierDiverseCandidate(candidate, recentDomainsOrdered));
+  const evidenceReady = reportReady.filter((candidate) => !isFrontierDiverseCandidate(candidate, recentDomainsOrdered));
+  let selected;
+  if (reportReady.length) {
+    const diversePicked = frontierDiverseReady.slice(0, diverseQuota);
+    const remainingSlots = Math.max(0, parentLimit - diversePicked.length);
+    const evidencePicked = evidenceReady.slice(0, remainingSlots);
+    let combined = [...diversePicked, ...evidencePicked];
+    if (combined.length < parentLimit) {
+      const fillers = frontierDiverseReady
+        .slice(diversePicked.length)
+        .concat(evidenceReady.slice(evidencePicked.length))
+        .filter((candidate) => !combined.includes(candidate));
+      combined = combined.concat(fillers).slice(0, parentLimit);
+    }
+    selected = combined;
+  } else {
+    selected = decomposedCollectionEligible.length ? decomposedCollectionEligible : collectionEligible;
+  }
+  const selectedDomainCounts = selected.reduce((acc, candidate) => {
+    const domain = candidate.primaryDomain || candidate.metadata?.primaryDomain || 'unknown';
+    acc[domain] = (acc[domain] || 0) + 1;
+    return acc;
+  }, {});
   return {
     candidates: sorted,
-    selected: selected.slice(0, Math.max(1, Math.min(50, num(options.parentLimit, 6)))),
+    selected,
     reportReadyCount: reportReady.length,
     collectionEligibleCount: collectionEligible.length,
     blockedCount: blocked.length,
     cooldownCount: sorted.length - activeSorted.length,
+    frontierDiverseReadyCount: frontierDiverseReady.length,
+    evidenceReadyCount: evidenceReady.length,
+    selectedDomainCounts,
+    domainHistoryLength: domainHistory.length,
     stateCounts: sorted.reduce((acc, candidate) => {
       const key = candidate.frontierParent.frontierParentState || 'unknown';
       acc[key] = (acc[key] || 0) + 1;

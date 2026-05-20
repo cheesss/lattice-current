@@ -7,6 +7,8 @@ import test from 'node:test';
 import {
   buildEvidenceBackfillCyclePlan,
   extractEvidenceContractTasksFromArtifact,
+  loadDbBackfillTasks,
+  loadTasksFromDbIfNeeded,
   runEvidenceContractBackfillCycle,
   summarizeUnblockDelta,
 } from '../scripts/run-evidence-contract-backfill-cycle.mjs';
@@ -441,6 +443,116 @@ test('evidence contract backfill cycle creates parent-first routes for graph-ove
     assert.ok(tasks.some((task) => task.query.includes('direct evidence official provider')));
     assert.equal(plan.routes.some((row) => row.route.parentReadyForAdjacent === false), true);
     assert.equal(plan.routes.some((row) => row.route.parentReadinessState === 'graph_overlap_only'), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+function recordingClient(rowsToReturn = []) {
+  const captured = [];
+  return {
+    async query(sql, params) {
+      captured.push({ sql, params });
+      return { rows: rowsToReturn };
+    },
+    captured,
+  };
+}
+
+test('loadDbBackfillTasks scopes SQL to reportId/subjectKey and excludes terminal closure states', async () => {
+  const client = recordingClient([]);
+  await loadDbBackfillTasks(client, { reportId: 'RPT-test', subjectKey: 'subject-key', limit: 12 });
+  assert.equal(client.captured.length, 1);
+  const { sql, params } = client.captured[0];
+  assert.match(sql, /report_id = \$2/);
+  assert.match(sql, /metadata->>'reportId' = \$2/);
+  assert.match(sql, /subject_key = \$3/);
+  assert.match(sql, /metadata->>'closureState'/);
+  assert.match(sql, /NOT \(metadata->>'closureState' = ANY/);
+  assert.equal(params[0], 12);
+  assert.equal(params[1], 'RPT-test');
+  assert.equal(params[2], 'subject-key');
+  assert.ok(Array.isArray(params[3]));
+  assert.ok(params[3].includes('direct_provider_required'));
+  assert.ok(params[3].includes('market_validation_pending'));
+});
+
+test('loadDbBackfillTasks without reportId still excludes terminal closure states', async () => {
+  const client = recordingClient([]);
+  await loadDbBackfillTasks(client, { limit: 25 });
+  assert.equal(client.captured.length, 1);
+  const { sql, params } = client.captured[0];
+  assert.doesNotMatch(sql, /report_id = \$/);
+  assert.match(sql, /metadata->>'closureState'/);
+  assert.equal(params[0], 25);
+  assert.ok(Array.isArray(params[1]));
+  assert.ok(params[1].includes('direct_provider_required'));
+});
+
+test('loadTasksFromDbIfNeeded refuses to load global tasks when scope is set and no artifact present', async () => {
+  const client = recordingClient([{ id: 'leaked', subject_key: 'other', query: 'q', metadata: {} }]);
+  const cyclePlan = { tasks: [], artifact: null, state: { routes: {} }, reportId: 'RPT-scoped' };
+  const result = await loadTasksFromDbIfNeeded(client, cyclePlan, { reportDir: '/tmp/x' });
+  assert.equal(result.tasks.length, 0);
+  assert.equal(result.strictScopeNoTasks, true);
+  assert.equal(client.captured.length, 0);
+});
+
+test('loadTasksFromDbIfNeeded falls back to global DB load only in unscoped mode', async () => {
+  const client = recordingClient([{ id: 1, subject_key: 'other', query: 'q', task_type: 'source_query', metadata: {} }]);
+  const cyclePlan = { tasks: [], artifact: null, state: { routes: {} } };
+  const result = await loadTasksFromDbIfNeeded(client, cyclePlan, { limit: 5 });
+  assert.equal(client.captured.length, 1);
+  assert.equal(result.tasks.length, 1);
+  assert.equal(result.strictScopeNoTasks, undefined);
+});
+
+test('buildEvidenceBackfillCyclePlan writes state into per-report shard when no explicit state path is provided', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'lattice-evidence-cycle-'));
+  try {
+    const bundle = {
+      reportId: 'RPT-shard-test',
+      reportType: 'theme_report',
+      subject: { subjectId: 'ai-ml', subjectType: 'theme', displayName: 'AI / Machine Learning' },
+      metadata: { deepResearchPack: { evidenceClassMatrix: [] } },
+      symbols: [],
+    };
+    await writeFile(path.join(dir, 'bundle.json'), `${JSON.stringify(bundle, null, 2)}\n`, 'utf8');
+    await writeFile(path.join(dir, 'source-query-drafts.json'), '[]\n', 'utf8');
+    const plan = await buildEvidenceBackfillCyclePlan({
+      reportDir: dir,
+      providers: ['sec'],
+      limit: 10,
+    });
+    assert.ok(plan.statePath);
+    assert.match(plan.statePath, /evidence-contract-backfill-cycle-state-shards/);
+    assert.match(plan.statePath, /\.json$/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('buildEvidenceBackfillCyclePlan honors user-provided --state-path', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'lattice-evidence-cycle-'));
+  try {
+    const bundle = {
+      reportId: 'RPT-explicit-state',
+      reportType: 'theme_report',
+      subject: { subjectId: 'ai-ml', subjectType: 'theme', displayName: 'AI / Machine Learning' },
+      metadata: { deepResearchPack: { evidenceClassMatrix: [] } },
+      symbols: [],
+    };
+    await writeFile(path.join(dir, 'bundle.json'), `${JSON.stringify(bundle, null, 2)}\n`, 'utf8');
+    await writeFile(path.join(dir, 'source-query-drafts.json'), '[]\n', 'utf8');
+    const explicitStatePath = path.join(dir, 'custom-state.json');
+    const plan = await buildEvidenceBackfillCyclePlan({
+      reportDir: dir,
+      providers: ['sec'],
+      limit: 10,
+      statePath: explicitStatePath,
+      userStatePathProvided: true,
+    });
+    assert.equal(plan.statePath, explicitStatePath);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

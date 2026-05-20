@@ -20,6 +20,7 @@ import {
 } from './evidence-provider-router.mjs';
 import { evaluateEvidenceClassAcceptance } from './evidence-class-playbooks.mjs';
 import { collectorCapability } from './collector-capability-matrix.mjs';
+import { recordOperatorSeedEvidenceOutcome } from './operator-research-seeds.mjs';
 
 function compact(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -70,6 +71,14 @@ function normalizeText(value) {
 
 function lowerRaw(value) {
   return String(value || '').toLowerCase();
+}
+
+function operatorSeedIdsFromOptions(options = {}) {
+  return uniqueStrings(options.operatorSeedIds || options.operatorSeedId || []);
+}
+
+function operatorSeedFilterEnabled(options = {}) {
+  return Boolean(options.operatorSeedCreatedOnly) || operatorSeedIdsFromOptions(options).length > 0;
 }
 
 export function sourceQueryApprovalBlocker(approval = {}) {
@@ -569,6 +578,28 @@ function negativeControlFinding(text = '') {
   return 'checked_no_direct';
 }
 
+function negativeControlFindingCounts(bundles = []) {
+  const counts = {};
+  for (const bundle of bundles || []) {
+    if (bundle.desiredEvidenceClass !== 'negative_control') continue;
+    if (bundle.evidenceUse !== 'negative_control_candidate') continue;
+    const finding = bundle.negativeControlFinding || 'checked_no_direct';
+    counts[finding] = (counts[finding] || 0) + 1;
+  }
+  return counts;
+}
+
+function negativeControlClosureForBundles(bundles = [], evidenceClass = '') {
+  if (String(evidenceClass || '') !== 'negative_control') return null;
+  const candidateCounts = negativeControlFindingCounts(bundles);
+  if ((candidateCounts.invalidator || 0) > 0) return 'invalidator';
+  if ((candidateCounts.supported_constraint || 0) > 0) return 'supported_constraint';
+  if ((candidateCounts.checked_no_direct || 0) > 0) return 'checked_no_direct';
+  const inspectedNegativeBundles = (bundles || [])
+    .filter((bundle) => bundle.desiredEvidenceClass === 'negative_control' && bundle.persistable);
+  return inspectedNegativeBundles.length ? 'checked_no_direct' : 'unchecked';
+}
+
 function closureReasonForEvidenceUse(evidenceUse = '') {
   return ({
     promotion_candidate: 'promotion_collected',
@@ -991,12 +1022,14 @@ function scoreAllSourceQueryBundles(bundles = [], approval = {}, policy = loadRe
 }
 
 function sourceQueryTierCounts(bundles = []) {
+  const negativeCounts = negativeControlFindingCounts(bundles);
   return {
     persistedBundleCount: bundles.filter((bundle) => bundle.persistable).length,
     promotionBundleCount: bundles.filter((bundle) => bundle.promotionEligible).length,
     contextBundleCount: bundles.filter((bundle) => bundle.evidenceUse === 'supporting_context').length,
     negativeControlCount: bundles.filter((bundle) => bundle.evidenceUse === 'negative_control_candidate').length,
     noiseCount: bundles.filter((bundle) => bundle.evidenceUse === 'weak_noise').length,
+    negativeControlFindingCounts: negativeCounts,
   };
 }
 
@@ -1313,6 +1346,8 @@ export async function quarantineInvalidSourceQueryApprovals(queryable, options =
   const statuses = options.statuses || ['pending', 'approved', 'needs-fix'];
   const reportId = compact(options.reportId);
   const reportCreatedOnly = Boolean(options.reportCreatedOnly);
+  const operatorOnly = operatorSeedFilterEnabled(options);
+  const operatorSeedIds = operatorSeedIdsFromOptions(options);
   const { rows } = await queryable.query(
     `SELECT id, payload, status, created_at
        FROM approval_queue
@@ -1331,9 +1366,16 @@ export async function quarantineInvalidSourceQueryApprovals(queryable, options =
           OR payload->>'source' = 'report-deep-research-pack'
           OR payload->>'collectionKind' = 'universal_evidence_contract'
         )
+        AND (
+          $5::boolean IS NOT TRUE
+          OR payload->>'createdBy' = 'operator-mechanism-seed'
+          OR payload->>'source' = 'operator-mechanism-seed'
+          OR payload->>'collectionKind' = 'operator_mechanism_seed'
+        )
+        AND (cardinality($6::text[]) = 0 OR payload->>'operatorSeedId' = ANY($6::text[]))
       ORDER BY created_at ASC
       LIMIT $1`,
-    [limit, statuses, reportId || null, reportCreatedOnly],
+    [limit, statuses, reportId || null, reportCreatedOnly, operatorOnly, operatorSeedIds],
   );
   const rejected = [];
   for (const row of rows) {
@@ -1417,6 +1459,8 @@ async function updateSourceQueryOutcomeMetadata(queryable, approval, outcome = {
       persisted: Number(outcome.persistedBundleCount || 0),
       context: Number(outcome.contextBundleCount || 0),
       negativeControl: Number(outcome.negativeControlCount || 0),
+      negativeControlClosure: outcome.negativeControlClosure || null,
+      negativeControlFindingCounts: outcome.negativeControlFindingCounts || {},
       noise: Number(outcome.noiseCount || 0),
       updatedAt: new Date().toISOString(),
     },
@@ -1453,12 +1497,59 @@ async function updateSourceQueryOutcomeMetadata(queryable, approval, outcome = {
   }
 }
 
+async function updateOperatorSeedEvidenceOutcomeForApproval(queryable, approval, outcome = {}) {
+  const payload = approval?.payload || {};
+  const seedId = compact(payload.operatorSeedId);
+  if (!seedId) return null;
+  const evidenceClass = desiredEvidenceClassFromPayload(payload);
+  return recordOperatorSeedEvidenceOutcome(queryable, {
+    seedId,
+    approvalId: approval.id,
+    evidenceClass,
+    query: payload.query || '',
+    status: outcome.status || '',
+    failureCategory: outcome.failureCategory || '',
+    collectedCount: outcome.collectedCount || 0,
+    externalCollectedCount: outcome.externalCollectedCount || 0,
+    acceptedBundleCount: outcome.acceptedBundleCount || 0,
+    persistedBundleCount: outcome.persistedBundleCount || 0,
+    promotionBundleCount: outcome.promotionBundleCount || 0,
+    contextBundleCount: outcome.contextBundleCount || 0,
+    negativeControlCount: outcome.negativeControlCount || 0,
+    negativeControlFinding: outcome.negativeControlFinding || outcome.negativeControlClosure || null,
+    negativeControlClosure: outcome.negativeControlClosure || null,
+    negativeControlFindingCounts: outcome.negativeControlFindingCounts || {},
+    noiseCount: outcome.noiseCount || 0,
+    sourceQueryFailure: {
+      category: outcome.failureCategory || null,
+      collected: Number(outcome.collectedCount || 0),
+      external: Number(outcome.externalCollectedCount || 0),
+      accepted: Number(outcome.acceptedBundleCount || 0),
+      persisted: Number(outcome.persistedBundleCount || 0),
+      context: Number(outcome.contextBundleCount || 0),
+      negativeControl: Number(outcome.negativeControlCount || 0),
+      noise: Number(outcome.noiseCount || 0),
+    },
+    metadata: {
+      collectionKind: payload.collectionKind || null,
+      createdBy: payload.createdBy || payload.source || null,
+      providerRoutePlan: payload.providerRoutePlan || null,
+      promotionEligible: Boolean(payload.promotionEligible),
+      evidenceUse: payload.evidenceUse || null,
+      negativeControlClosure: outcome.negativeControlClosure || null,
+      negativeControlFindingCounts: outcome.negativeControlFindingCounts || {},
+    },
+  }).catch((error) => ({ ok: false, seedId, error: String(error?.message || error) }));
+}
+
 export async function approvePendingSourceQueries(queryable, options = {}) {
   const limit = Math.max(1, Number(options.limit || 25));
   const reviewer = options.reviewer || 'codex-current-request';
   const reportId = compact(options.reportId);
   const approvalIds = uniqueStrings(options.approvalIds || []);
   const reportCreatedOnly = Boolean(options.reportCreatedOnly);
+  const operatorOnly = operatorSeedFilterEnabled(options);
+  const operatorSeedIds = operatorSeedIdsFromOptions(options);
   const { rows } = await queryable.query(
     `UPDATE approval_queue
         SET status = 'approved',
@@ -1477,13 +1568,20 @@ export async function approvePendingSourceQueries(queryable, options = {}) {
            )
            AND (cardinality($5::bigint[]) = 0 OR id = ANY($5::bigint[]))
            AND (
-             $6::boolean IS NOT TRUE
+             $8::boolean IS NOT TRUE
              OR payload ? 'reportId'
              OR payload ? 'latestReportId'
              OR payload ? 'reportBackfillTaskId'
              OR payload->>'source' = 'report-deep-research-pack'
              OR payload->>'collectionKind' = 'universal_evidence_contract'
            )
+           AND (
+             $6::boolean IS NOT TRUE
+             OR payload->>'createdBy' = 'operator-mechanism-seed'
+             OR payload->>'source' = 'operator-mechanism-seed'
+             OR payload->>'collectionKind' = 'operator_mechanism_seed'
+           )
+           AND (cardinality($7::text[]) = 0 OR payload->>'operatorSeedId' = ANY($7::text[]))
          ORDER BY created_at ASC
          LIMIT $1
       )
@@ -1494,6 +1592,8 @@ export async function approvePendingSourceQueries(queryable, options = {}) {
       options.reason || 'Approved for current S-tier Research OS convergence run.',
       reportId || null,
       approvalIds.filter((id) => /^\d+$/.test(id)).map((id) => Number(id)),
+      operatorOnly,
+      operatorSeedIds,
       reportCreatedOnly,
     ],
   );
@@ -1505,6 +1605,8 @@ export async function previewPendingSourceQueries(queryable, options = {}) {
   const reportId = compact(options.reportId);
   const approvalIds = uniqueStrings(options.approvalIds || []);
   const reportCreatedOnly = Boolean(options.reportCreatedOnly);
+  const operatorOnly = operatorSeedFilterEnabled(options);
+  const operatorSeedIds = operatorSeedIdsFromOptions(options);
   const { rows } = await queryable.query(
     `SELECT id
        FROM approval_queue
@@ -1517,16 +1619,30 @@ export async function previewPendingSourceQueries(queryable, options = {}) {
         )
         AND (cardinality($3::bigint[]) = 0 OR id = ANY($3::bigint[]))
         AND (
-          $4::boolean IS NOT TRUE
+          $6::boolean IS NOT TRUE
           OR payload ? 'reportId'
           OR payload ? 'latestReportId'
           OR payload ? 'reportBackfillTaskId'
           OR payload->>'source' = 'report-deep-research-pack'
           OR payload->>'collectionKind' = 'universal_evidence_contract'
         )
+        AND (
+          $4::boolean IS NOT TRUE
+          OR payload->>'createdBy' = 'operator-mechanism-seed'
+          OR payload->>'source' = 'operator-mechanism-seed'
+          OR payload->>'collectionKind' = 'operator_mechanism_seed'
+        )
+        AND (cardinality($5::text[]) = 0 OR payload->>'operatorSeedId' = ANY($5::text[]))
       ORDER BY created_at ASC
       LIMIT $1`,
-    [limit, reportId || null, approvalIds.filter((id) => /^\d+$/.test(id)).map((id) => Number(id)), reportCreatedOnly],
+    [
+      limit,
+      reportId || null,
+      approvalIds.filter((id) => /^\d+$/.test(id)).map((id) => Number(id)),
+      operatorOnly,
+      operatorSeedIds,
+      reportCreatedOnly,
+    ],
   );
   return { approvedCount: rows.length, approvalIds: rows.map((row) => String(row.id)), dryRun: true };
 }
@@ -1539,6 +1655,8 @@ export async function loadApprovedSourceQueryApprovals(queryable, options = {}) 
   const reportId = compact(options.reportId);
   const approvalIds = uniqueStrings(options.approvalIds || []);
   const reportCreatedOnly = Boolean(options.reportCreatedOnly);
+  const operatorOnly = operatorSeedFilterEnabled(options);
+  const operatorSeedIds = operatorSeedIdsFromOptions(options);
   const { rows } = await queryable.query(
     `SELECT id, payload, reasoning, status, created_at
        FROM approval_queue
@@ -1551,13 +1669,20 @@ export async function loadApprovedSourceQueryApprovals(queryable, options = {}) 
         )
         AND (cardinality($4::bigint[]) = 0 OR id = ANY($4::bigint[]))
         AND (
-          $6::boolean IS NOT TRUE
+          $8::boolean IS NOT TRUE
           OR payload ? 'reportId'
           OR payload ? 'latestReportId'
           OR payload ? 'reportBackfillTaskId'
           OR payload->>'source' = 'report-deep-research-pack'
           OR payload->>'collectionKind' = 'universal_evidence_contract'
         )
+        AND (
+          $6::boolean IS NOT TRUE
+          OR payload->>'createdBy' = 'operator-mechanism-seed'
+          OR payload->>'source' = 'operator-mechanism-seed'
+          OR payload->>'collectionKind' = 'operator_mechanism_seed'
+        )
+        AND (cardinality($7::text[]) = 0 OR payload->>'operatorSeedId' = ANY($7::text[]))
         AND (
           status <> 'needs-fix'
           OR $5::boolean
@@ -1571,6 +1696,8 @@ export async function loadApprovedSourceQueryApprovals(queryable, options = {}) 
       reportId || null,
       approvalIds.filter((id) => /^\d+$/.test(id)).map((id) => Number(id)),
       Boolean(options.reopenExhausted),
+      operatorOnly,
+      operatorSeedIds,
       reportCreatedOnly,
     ],
   );
@@ -1586,13 +1713,21 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
   await ensureAutomationSchema(queryable);
   const invalidBlocker = sourceQueryApprovalBlocker(approval);
   if (invalidBlocker) {
-    if (!options.dryRun) await rejectInvalidSourceQueryApproval(queryable, approval, invalidBlocker);
+    let operatorSeedOutcome = null;
+    if (!options.dryRun) {
+      await rejectInvalidSourceQueryApproval(queryable, approval, invalidBlocker);
+      operatorSeedOutcome = await updateOperatorSeedEvidenceOutcomeForApproval(queryable, approval, {
+        status: 'rejected',
+        failureCategory: invalidBlocker,
+      });
+    }
     return {
       ok: true,
       skipped: true,
       approvalId: String(approval.id),
       status: 'rejected',
       reason: invalidBlocker,
+      operatorSeedOutcome,
     };
   }
   const approvalStatus = String(approval.status || 'approved');
@@ -1645,8 +1780,13 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
     }
   }
   if (approvalStatus === 'needs-fix' && repair.exhausted) {
+    let operatorSeedOutcome = null;
     if (!options.dryRun && activeApproval.payload?.repair?.exhausted !== true) {
       await markSourceQueryRetryExhausted(queryable, approval.id, repair);
+      operatorSeedOutcome = await updateOperatorSeedEvidenceOutcomeForApproval(queryable, activeApproval, {
+        status: 'needs-fix',
+        failureCategory: 'retry-exhausted',
+      });
     }
     return {
       ok: true,
@@ -1655,6 +1795,7 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
       status: 'needs-fix',
       reason: 'retry attempts exhausted',
       suggestedQueries: repair.suggestedQueries,
+      operatorSeedOutcome,
     };
   }
   const questionPayload = buildSourceQueryQuestionPayload(activeApproval);
@@ -1697,6 +1838,10 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
         reportSubjectKey: activeApproval.payload?.subjectKey || null,
         reportSubjectDisplay: payloadSubjectDisplay(activeApproval.payload) || null,
         collectionKind: activeApproval.payload?.collectionKind || null,
+        createdBy: activeApproval.payload?.createdBy || activeApproval.payload?.source || null,
+        operatorSeedId: activeApproval.payload?.operatorSeedId || null,
+        operatorSeedTitle: activeApproval.payload?.seedTitle || null,
+        operatorSeedStatus: activeApproval.payload?.seedStatus || null,
         adjacentCandidateKey: activeApproval.payload?.adjacentCandidateKey || null,
         adjacentLane: activeApproval.payload?.adjacentLane || null,
         adjacentStatus: activeApproval.payload?.adjacentStatus || null,
@@ -1710,6 +1855,7 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
         evidenceUse: bundle.evidenceUse || null,
         issuerUniverse: activeApproval.payload?.issuerUniverse || activeApproval.payload?.issuerHints || [],
         negativeControlFinding: bundle.negativeControlFinding || null,
+        negativeControlClosure: bundle.desiredEvidenceClass === 'negative_control' ? (bundle.negativeControlFinding || null) : null,
         relevanceTier: bundle.relevanceTier || null,
         providerRoutePlan: activeApproval.payload?.providerRoutePlan || providerRoutePlanFromPayload(activeApproval.payload, initialCandidate),
         factsExtracted: bundle.factsExtracted || [],
@@ -1727,6 +1873,8 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
     }));
   promotionBundles = persistedBundles.filter((bundle) => bundle.promotionEligible);
   const tierCounts = sourceQueryTierCounts(persistedBundles);
+  const desiredEvidenceClass = desiredEvidenceClassFromPayload(activeApproval.payload || {});
+  const negativeControlClosure = negativeControlClosureForBundles(persistedBundles, desiredEvidenceClass);
   if (options.dryRun) {
     return {
       ok: true,
@@ -1737,6 +1885,7 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
       externalCollectedCount: externalResult.bundles.length,
       externalError: externalResult.error,
       acceptedBundleCount: promotionBundles.length,
+      negativeControlClosure,
       ...tierCounts,
       repair,
     };
@@ -1767,10 +1916,21 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
     externalError: externalResult.error,
   });
   await updateSourceQueryOutcomeMetadata(queryable, activeApproval, {
+    status,
     failureCategory,
     collectedCount: collected.bundles.length,
     externalCollectedCount: externalResult.bundles.length,
     acceptedBundleCount: promotionBundles.length,
+    negativeControlClosure,
+    ...tierCounts,
+  });
+  const operatorSeedOutcome = await updateOperatorSeedEvidenceOutcomeForApproval(queryable, activeApproval, {
+    status,
+    failureCategory,
+    collectedCount: collected.bundles.length,
+    externalCollectedCount: externalResult.bundles.length,
+    acceptedBundleCount: promotionBundles.length,
+    negativeControlClosure,
     ...tierCounts,
   });
   if (status === 'needs-fix') {
@@ -1807,8 +1967,10 @@ export async function executeSourceQueryApproval(queryable, approval, options = 
     externalCollectedCount: externalResult.bundles.length,
     externalError: externalResult.error,
     acceptedBundleCount: promotionBundles.length,
+    negativeControlClosure,
     ...tierCounts,
     failureCategory,
+    operatorSeedOutcome,
     repair,
     ...edgeResult,
   };
@@ -1822,6 +1984,8 @@ export async function executeApprovedSourceQueries(queryable, options = {}) {
     limit: Math.max(100, Number(options.limit || 25) * 10),
     reportId: options.reportId,
     reportCreatedOnly: options.reportCreatedOnly,
+    operatorSeedCreatedOnly: options.operatorSeedCreatedOnly,
+    operatorSeedIds: options.operatorSeedIds,
   });
   const approved = options.approvePending
     ? await (options.dryRun ? previewPendingSourceQueries : approvePendingSourceQueries)(queryable, {
@@ -1831,6 +1995,8 @@ export async function executeApprovedSourceQueries(queryable, options = {}) {
       reportId: options.reportId,
       approvalIds: options.approvalIds,
       reportCreatedOnly: options.reportCreatedOnly,
+      operatorSeedCreatedOnly: options.operatorSeedCreatedOnly,
+      operatorSeedIds: options.operatorSeedIds,
     })
     : { approvedCount: 0, approvalIds: [] };
   const approvals = await loadApprovedSourceQueryApprovals(queryable, options);
@@ -1866,6 +2032,7 @@ export async function executeApprovedSourceQueries(queryable, options = {}) {
     negativeControlCount: results.reduce((sum, item) => sum + Number(item.negativeControlCount || 0), 0),
     noiseCount: results.reduce((sum, item) => sum + Number(item.noiseCount || 0), 0),
     edgeEvidenceInserted: results.reduce((sum, item) => sum + Number(item.edgeEvidenceCount || 0), 0),
+    operatorSeedOutcomeCount: results.filter((item) => item.operatorSeedOutcome?.ok).length,
     results,
   };
 }

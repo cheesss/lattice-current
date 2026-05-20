@@ -121,6 +121,10 @@ export function ensureAuditDrawer() {
 }
 
 export function openAuditDrawer(title, payload) {
+  openAuditDrawerHtml(title, `<pre>${escapeHtml(JSON.stringify(payload || {}, null, 2))}</pre>`);
+}
+
+export function openAuditDrawerHtml(title, html) {
   const drawer = ensureAuditDrawer();
   const backdrop = document.getElementById('modern-audit-backdrop');
   if (!drawer) return;
@@ -128,7 +132,7 @@ export function openAuditDrawer(title, payload) {
   const bodyEl = document.getElementById('modern-audit-body');
   if (titleEl) titleEl.textContent = title || 'Audit details';
   if (bodyEl) {
-    bodyEl.innerHTML = `<pre>${escapeHtml(JSON.stringify(payload || {}, null, 2))}</pre>`;
+    bodyEl.innerHTML = html || '';
   }
   backdrop?.classList.add('active');
   drawer.classList.add('active');

@@ -220,3 +220,44 @@ export async function loadFor(subject, opts = {}) {
     errors,
   };
 }
+
+export async function loadValuationSnapshot(symbol, opts = {}) {
+  const apiKey = resolveEnvKey('FMP_API_KEY');
+  if (!apiKey) return { status: 'no_key', symbol };
+  if (!symbol) return { status: 'no_symbol' };
+  const base = 'https://financialmodelingprep.com/stable';
+  const ratios = await safeFetchJson(`${base}/ratios-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`);
+  const metrics = await safeFetchJson(`${base}/key-metrics-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`);
+  const peers = opts.includePeers === false
+    ? { ok: true, json: [] }
+    : await safeFetchJson(`${base}/stock-peers?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`);
+  const errors = [];
+  for (const [name, result] of Object.entries({ ratios, metrics, peers })) {
+    if (!result.ok) {
+      errors.push(adapterError(`${name}_failed`, result, { endpoint: name }));
+    }
+  }
+  const ratiosRow = Array.isArray(ratios.json) ? ratios.json[0] : ratios.json;
+  const metricsRow = Array.isArray(metrics.json) ? metrics.json[0] : metrics.json;
+  const peerSymbols = Array.isArray(peers.json) ? peers.json.map((row) => row.peers || row.peer || row).flat() : [];
+  const peerList = Array.from(new Set(peerSymbols.map((value) => String(value || '').toUpperCase()).filter(Boolean))).slice(0, 8);
+  const peTtm = Number(ratiosRow?.peRatioTTM ?? metricsRow?.peRatioTTM);
+  const evEbitdaTtm = Number(ratiosRow?.enterpriseValueOverEBITDATTM ?? metricsRow?.enterpriseValueOverEBITDATTM);
+  const priceToBookTtm = Number(ratiosRow?.priceBookValueRatioTTM ?? metricsRow?.priceBookValueRatioTTM);
+  let peVsPeerMedian = null;
+  if (opts.peerMedianPE && Number.isFinite(peTtm) && Number.isFinite(opts.peerMedianPE) && opts.peerMedianPE > 0) {
+    peVsPeerMedian = peTtm / opts.peerMedianPE;
+  }
+  return {
+    status: errors.length === 0 ? 'ok' : 'partial',
+    symbol,
+    peTtm: Number.isFinite(peTtm) ? peTtm : null,
+    evEbitdaTtm: Number.isFinite(evEbitdaTtm) ? evEbitdaTtm : null,
+    priceToBookTtm: Number.isFinite(priceToBookTtm) ? priceToBookTtm : null,
+    peVsPeerMedian,
+    peers: peerList,
+    rawForwardEpsGrowth: Number.isFinite(Number(metricsRow?.epsGrowthTTM)) ? Number(metricsRow.epsGrowthTTM) : null,
+    forwardEpsGrowth: Number.isFinite(Number(metricsRow?.epsGrowthTTM)) ? Number(metricsRow.epsGrowthTTM) : null,
+    errors,
+  };
+}
