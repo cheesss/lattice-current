@@ -2152,7 +2152,7 @@ class BacktestHubWindow {
   }
 
   private normalizeRenderedUi(): void {
-    this.root.innerHTML = this.root.innerHTML.split(' 쨌 ').join(' · ');
+    this.root.innerHTML = this.root.innerHTML.split(' \uCA0C ').join(' · ');
 
     const primaryButton = this.root.querySelector<HTMLButtonElement>('.backtest-hub-primary-btn');
     if (primaryButton?.dataset.action === 'start-scheduler') {

@@ -1,0 +1,85 @@
+{
+  "id": "openclaw-lattice-control-plane",
+  "name": "Lattice Control Plane",
+  "description": "OpenClaw control-plane tools for local Lattice operator surfaces, source repair status, guarded review actions, and observability.",
+  "commandAliases": [
+    {
+      "name": "lattice-source-status",
+      "kind": "runtime-slash"
+    }
+  ],
+  "contracts": {
+    "tools": [
+      "lattice.get_health",
+      "lattice.get_source_repair_status",
+      "lattice.get_kpi_summary",
+      "lattice.get_nowcast_status",
+      "lattice.get_hot_events",
+      "lattice.get_meta_model_health",
+      "lattice.explain_event",
+      "lattice.get_source_diversity_audit",
+      "lattice.get_theme_impact",
+      "lattice.bulk_simulate_approvals",
+      "lattice.get_theme_brief",
+      "lattice.get_approval_queue",
+      "lattice.get_discovery_triage",
+      "lattice.get_data_freshness_audit",
+      "lattice.get_live_status",
+      "lattice.get_runtime_observability",
+      "lattice.get_automation_ops_snapshot",
+      "lattice.simulate_approval",
+      "lattice.review_approval",
+      "lattice.review_discovery_topic"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "latticeApiBaseUrl": {
+        "type": "string",
+        "title": "Lattice API Base URL",
+        "description": "Local Lattice API base URL for operator reads and guarded review actions.",
+        "default": "http://127.0.0.1:46200"
+      },
+      "latticeUiBaseUrl": {
+        "type": "string",
+        "title": "Lattice UI Base URL",
+        "description": "Dashboard base URL used for operator deep links.",
+        "default": "http://127.0.0.1:4173"
+      },
+      "defaultTheme": {
+        "type": "string",
+        "title": "Default Theme",
+        "description": "Fallback theme for theme brief lookups when one is not provided.",
+        "default": "materials-science"
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "title": "Request Timeout (ms)",
+        "description": "HTTP timeout for local API calls.",
+        "minimum": 1000,
+        "maximum": 60000,
+        "default": 10000
+      },
+      "sidecarBaseUrl": {
+        "type": "string",
+        "title": "Sidecar Base URL",
+        "description": "Optional local sidecar base URL for observability endpoints.",
+        "default": "http://127.0.0.1:46123"
+      },
+      "sidecarAuthMode": {
+        "type": "string",
+        "title": "Sidecar Auth Mode",
+        "description": "Use none for the current local anonymous sidecar, or bearer when sidecarToken is required.",
+        "enum": ["none", "bearer"],
+        "default": "none"
+      },
+      "sidecarToken": {
+        "type": "string",
+        "title": "Sidecar Bearer Token",
+        "description": "Optional bearer token for sidecar endpoints."
+      }
+    }
+  }
+}

@@ -1,12 +1,24 @@
-/** GET /api/signal-correlation — 90-day rolling signal correlation matrix */
+/** GET /api/signal-correlation - 90-day rolling signal correlation matrix. */
+function requirePgPassword() {
+  const password = process.env.PG_PASSWORD || process.env.PGPASSWORD || process.env.INTEL_PG_PASSWORD;
+  if (!password) {
+    throw new Error('Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, or INTEL_PG_PASSWORD.');
+  }
+  return password;
+}
+
 export default async function handler(req, res) {
+  let pool;
   try {
     const pg = await import('pg');
-    const pool = new pg.default.Pool({
-      host: process.env.PG_HOST || '192.168.0.2', port: Number(process.env.PG_PORT || 5433),
+    pool = new pg.default.Pool({
+      host: process.env.PG_HOST || '192.168.0.2',
+      port: Number(process.env.PG_PORT || 5433),
       user: process.env.PG_USER || 'postgres',
-      password: process.env.PG_PASSWORD || process.env.PGPASSWORD || process.env.INTEL_PG_PASSWORD || 'lattice1234',
-      database: process.env.PG_DATABASE || 'lattice', max: 2, idleTimeoutMillis: 10000,
+      password: requirePgPassword(),
+      database: process.env.PG_DATABASE || 'lattice',
+      max: 2,
+      idleTimeoutMillis: 10000,
     });
     const signals = ['vix', 'yieldSpread', 'oilPrice', 'dollarIndex', 'hy_credit_spread', 'marketStress'];
     const result = await pool.query(`
@@ -19,9 +31,7 @@ export default async function handler(req, res) {
         AND a.signal_name <= b.signal_name
       GROUP BY a.signal_name, b.signal_name
     `, [signals]);
-    await pool.end();
 
-    // Mirror the matrix
     const full = [];
     for (const r of result.rows) {
       full.push(r);
@@ -31,5 +41,9 @@ export default async function handler(req, res) {
     }
     res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200');
     return res.status(200).json(full);
-  } catch (err) { return res.status(500).json({ error: String(err?.message || err) }); }
+  } catch (err) {
+    return res.status(500).json({ error: String(err?.message || err) });
+  } finally {
+    if (pool) await pool.end();
+  }
 }

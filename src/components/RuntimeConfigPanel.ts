@@ -221,7 +221,7 @@ export class RuntimeConfigPanel extends Panel {
           </button>
         </section>
       `;
-      this.content.innerHTML = this.content.innerHTML.split(' 쨌 ').join(' · ');
+      this.content.innerHTML = this.content.innerHTML.split(' \uCA0C ').join(' · ');
       this.attachListeners();
       return;
     }
@@ -235,7 +235,7 @@ export class RuntimeConfigPanel extends Panel {
       </div>
     `;
 
-    this.content.innerHTML = this.content.innerHTML.split(' 쨌 ').join(' · ');
+    this.content.innerHTML = this.content.innerHTML.split(' \uCA0C ').join(' · ');
     this.attachListeners();
   }
 

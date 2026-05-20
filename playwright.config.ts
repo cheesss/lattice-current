@@ -32,9 +32,9 @@ export default defineConfig({
   ],
   snapshotPathTemplate: '{testDir}/{testFileName}-snapshots/{arg}{ext}',
   webServer: {
-    command: 'node scripts/run-with-env.mjs VITE_E2E=1 -- npm run dev -- --host 127.0.0.1 --port 4173',
+    command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173',
     url: 'http://127.0.0.1:4173/tests/map-harness.html',
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
 });

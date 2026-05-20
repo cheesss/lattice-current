@@ -28,7 +28,7 @@ test('buildDiscoveryTriagePayload maps triage rows and summary', async () => {
           research_momentum: 0.9,
           novelty: 0.55,
           source_quality_score: 0.88,
-          keywords: ['quantum computing', 'qubit'],
+          keywords: ['quantum computing', 'qubit', 'dogs', 'views', '2026', 'reuters'],
           updated_at: '2026-04-08T00:00:00.000Z',
           last_review_decision: 'watch',
           last_review_reason: 'Needs one more cycle',
@@ -54,6 +54,7 @@ test('buildDiscoveryTriagePayload maps triage rows and summary', async () => {
   assert.equal(payload.items.length, 1);
   assert.equal(payload.items[0].normalizedTheme, 'quantum-computing');
   assert.equal(payload.items[0].lastReview.decision, 'watch');
+  assert.deepEqual(payload.items[0].keywords, ['quantum computing', 'qubit']);
   assert.ok(payload.items[0].structuralScore > 0);
 });
 
@@ -173,8 +174,12 @@ test('applyDiscoveryTriageDecision preserves explicit parent/category hints when
 });
 
 test('buildStructuralAlertsPayload returns mapped alert rows', async () => {
-  const safeQuery = async (sql) => {
+  let alertSql = '';
+  let alertValues = [];
+  const safeQuery = async (sql, values = []) => {
     if (/FROM theme_structural_alerts/.test(sql)) {
+      alertSql = sql;
+      alertValues = values;
       return {
         rows: [{
           alert_key: 'tsa-1',
@@ -195,7 +200,7 @@ test('buildStructuralAlertsPayload returns mapped alert rows', async () => {
           first_seen_at: '2026-04-08T00:00:00.000Z',
           last_seen_at: '2026-04-08T00:00:00.000Z',
           updated_at: '2026-04-08T00:00:00.000Z',
-          metadata: { acceleration: 22.1 },
+          metadata: { acceleration: 22.1, sourceDiversity: 0.82, articleCount: 24 },
         }],
       };
     }
@@ -207,4 +212,11 @@ test('buildStructuralAlertsPayload returns mapped alert rows', async () => {
   assert.equal(payload.items.length, 1);
   assert.equal(payload.items[0].severity, 'high');
   assert.equal(payload.items[0].theme, 'quantum-computing');
+  assert.match(alertSql, /sourceDiversity/);
+  assert.match(alertSql, /articleCount/);
+  assert.equal(alertValues[3], 0.15);
+  assert.equal(alertValues[4], 10);
+  assert.equal(alertValues[5], 10);
+  assert.equal(alertValues[6], 10);
+  assert.equal(alertValues[7], 10);
 });

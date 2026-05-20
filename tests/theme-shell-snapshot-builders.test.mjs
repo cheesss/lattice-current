@@ -46,6 +46,22 @@ describe('theme shell snapshot builders', () => {
   });
 
   it('builds compact snapshots from existing cache files and persistent envelopes', async () => {
+    const RealDate = Date;
+    global.Date = class extends RealDate {
+      constructor(...args) {
+        return args.length ? new RealDate(...args) : new RealDate('2026-04-09T02:00:00.000Z');
+      }
+      static now() {
+        return new RealDate('2026-04-09T02:00:00.000Z').valueOf();
+      }
+      static parse(value) {
+        return RealDate.parse(value);
+      }
+      static UTC(...args) {
+        return RealDate.UTC(...args);
+      }
+    };
+    try {
     await writeJson(path.join(root, 'event-dashboard-cache', 'live-status.json'), {
       temperatures: [
         { theme: 'ai-ml', temperature: 'HOT', intensity: 0.82 },
@@ -396,9 +412,28 @@ describe('theme shell snapshot builders', () => {
     assert.equal(payload.transmission.topRelations[0].relationType, 'country');
     assert.equal(payload.sourceOps.approvedCount, 2);
     assert.equal(payload.sourceOps.profileCount, 2);
+    } finally {
+      global.Date = RealDate;
+    }
   });
 
   it('falls back to safeQuery when cache files are missing', async () => {
+    const RealDate = Date;
+    global.Date = class extends RealDate {
+      constructor(...args) {
+        return args.length ? new RealDate(...args) : new RealDate('2026-04-09T02:00:00.000Z');
+      }
+      static now() {
+        return new RealDate('2026-04-09T02:00:00.000Z').valueOf();
+      }
+      static parse(value) {
+        return RealDate.parse(value);
+      }
+      static UTC(...args) {
+        return RealDate.UTC(...args);
+      }
+    };
+    try {
     const safeQuery = async (sql) => {
       const query = String(sql);
       if (query.includes('FROM signal_history')) {
@@ -489,6 +524,51 @@ describe('theme shell snapshot builders', () => {
     assert.equal(investment.strongestPairs[0].theme, 'semiconductor');
     assert.equal(investment.experimentRegistry, null);
     assert.equal(investment.signalRuntime, null);
+    } finally {
+      global.Date = RealDate;
+    }
+  });
+
+  it('forwards the requested period into structural alert-backed risk snapshots', async () => {
+    let observedPeriod = null;
+    const risk = await buildCompactRiskSnapshot({
+      dataRoot: root,
+      safeQuery: async (sql) => {
+        const query = String(sql);
+        if (query.includes('FROM signal_history')) {
+          return {
+            rows: [
+              { signal_name: 'vix', ts: '2026-04-09T01:00:00.000Z', value: 17.4 },
+            ],
+          };
+        }
+        if (query.includes('FROM pending_outcomes')) {
+          return { rows: [{ count: 0 }] };
+        }
+        if (query.includes('FROM event_hawkes_intensity')) {
+          return { rows: [] };
+        }
+        if (query.includes('FROM articles')) {
+          return { rows: [{ count: 4 }] };
+        }
+        if (query.includes('FROM auto_article_themes')) {
+          return { rows: [] };
+        }
+        return { rows: [] };
+      },
+      period: 'quarter',
+      buildStructuralAlerts: async (_safeQuery, params) => {
+        observedPeriod = params.get('period');
+        return {
+          items: [
+            { id: 'alert-1', theme: 'conflict', severity: 'high', headline: 'Quarterly structural alert', alertScore: 54 },
+          ],
+        };
+      },
+    });
+
+    assert.equal(observedPeriod, 'quarter');
+    assert.equal(risk.summary.alertCount, 1);
   });
 
   it('falls back to json validation artifacts when replay cache is missing', async () => {
@@ -596,5 +676,123 @@ describe('theme shell snapshot builders', () => {
     assert.deepEqual(geoPressure.topCountries, []);
     assert.deepEqual(transmission.strongestEdges, []);
     assert.deepEqual(sourceOps.recentEvents, []);
+  });
+
+  it('uses one transmission freshness decision for top-level and nested source metadata', async () => {
+    await writeJson(persistentPath(root, 'event-market-transmission:v1'), {
+      key: 'event-market-transmission:v1',
+      data: {
+        snapshot: {
+          generatedAt: '2026-04-09T00:30:00.000Z',
+          regime: {
+            label: 'Inflation Shock',
+            confidence: 72,
+          },
+          edges: [
+            {
+              id: 'edge-1',
+              eventTitle: 'Shipping corridor reprices crude',
+              eventSource: 'Reuters',
+              marketSymbol: 'CL=F',
+              relationType: 'country',
+              strength: 77,
+            },
+          ],
+        },
+      },
+      updatedAt: Date.parse('2026-04-09T00:30:00.000Z'),
+      ttlMs: 3600000,
+      expiresAt: Date.now() + 3600000,
+    });
+
+    const RealDate = Date;
+    global.Date = class extends RealDate {
+      constructor(...args) {
+        return args.length ? new RealDate(...args) : new RealDate('2026-04-12T01:00:00.000Z');
+      }
+      static now() {
+        return new RealDate('2026-04-12T01:00:00.000Z').valueOf();
+      }
+      static parse(value) {
+        return RealDate.parse(value);
+      }
+      static UTC(...args) {
+        return RealDate.UTC(...args);
+      }
+    };
+
+    try {
+      const transmission = await buildCompactTransmissionSnapshot({ dataRoot: root });
+      const geoPressure = await buildCompactGeoPressureSnapshot({
+        dataRoot: root,
+        riskSnapshot: {
+          score: 40,
+          hottestThemes: [],
+          meta: { stale: false, sources: [] },
+        },
+      });
+
+      assert.equal(transmission.fresh, false);
+      assert.equal(transmission.meta.stale, true);
+      assert.equal(transmission.meta.sources[0].stale, true);
+      assert.equal(geoPressure.transmissionFresh, false);
+      assert.equal(geoPressure.meta.stale, true);
+      assert.equal(geoPressure.meta.sources[0].stale, true);
+    } finally {
+      global.Date = RealDate;
+    }
+  });
+
+  it('dedupes repeated transmission headlines and dampens country pressure fan-out', async () => {
+    await writeJson(path.join(root, 'event-dashboard-cache', 'live-status.json'), {
+      temperatures: [{ theme: 'conflict', temperature: 'HOT', intensity: 0.81 }],
+      signals: [{ channel: 'vix', label: 'VIX', value: 22.4, updatedAt: '2026-04-15T00:00:00.000Z' }],
+      pending: 2,
+      todayArticles: 5,
+      meta: { updatedAt: '2026-04-15T00:05:00.000Z', stale: false },
+    });
+
+    await writeJson(persistentPath(root, 'event-market-transmission:v1'), {
+      key: 'event-market-transmission:v1',
+      data: {
+        snapshot: {
+          generatedAt: '2026-04-15T00:10:00.000Z',
+          regime: {
+            id: 'inflation-shock',
+            label: 'Inflation Shock',
+            confidence: 88,
+            notes: [],
+          },
+          edges: [
+            { id: 'a::cl', eventTitle: 'Hormuz shipping disruption', eventSource: 'CNBC', eventUrl: 'https://x/a', marketSymbol: 'CL=F', marketName: 'Crude Oil', relationType: 'commodity', strength: 100, reason: 'Iran shipping shock', keywords: ['iran', 'oil'] },
+            { id: 'a::uso', eventTitle: 'Hormuz shipping disruption', eventSource: 'CNBC', eventUrl: 'https://x/b', marketSymbol: 'USO', marketName: 'Oil ETF', relationType: 'commodity', strength: 96, reason: 'Iran shipping shock', keywords: ['iran', 'oil'] },
+            { id: 'a::xle', eventTitle: 'Hormuz shipping disruption', eventSource: 'CNBC', eventUrl: 'https://x/c', marketSymbol: 'XLE', marketName: 'Energy ETF', relationType: 'commodity', strength: 95, reason: 'Iran shipping shock', keywords: ['iran', 'energy'] },
+            { id: 'b::cl', eventTitle: 'Lebanon strikes pressure ceasefire', eventSource: 'Reuters', eventUrl: 'https://x/d', marketSymbol: 'CL=F', marketName: 'Crude Oil', relationType: 'commodity', strength: 82, reason: 'Israel risk shock', keywords: ['israel', 'oil'] },
+          ],
+          summaryLines: [],
+        },
+      },
+      updatedAt: Date.parse('2026-04-15T00:10:00.000Z'),
+      ttlMs: 3600000,
+      expiresAt: Date.now() + 3600000,
+    });
+
+    const transmission = await buildCompactTransmissionSnapshot({ dataRoot: root });
+    const geo = await buildCompactGeoPressureSnapshot({
+      dataRoot: root,
+      riskSnapshot: {
+        score: 55,
+        hottestThemes: [],
+        meta: { stale: false, sources: [] },
+      },
+    });
+
+    assert.equal(transmission.strongestEdges.length, 2);
+    assert.equal(new Set(transmission.strongestEdges.map((item) => item.headline)).size, 2);
+    assert.equal(transmission.uniqueEventCount, 2);
+    assert.equal(geo.topCountries[0].label, 'Iran');
+    assert.equal(geo.topCountries[0].uniqueEventCount, 1);
+    assert.equal(geo.topCountries[0].pressureScore <= 100, true);
+    assert.equal(geo.topCountries[0].totalStrength, 100);
   });
 });

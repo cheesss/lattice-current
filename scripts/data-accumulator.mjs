@@ -20,11 +20,11 @@ import { loadEnvFile } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
 
-const CYCLE_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
-const GDELT_RATE_LIMIT_MS = 6000;
-const YAHOO_BATCH_SIZE = 10;
-const SIDECAR_PORT = 46123;
-const MAX_BACKFILL_DAYS = 365;
+const CYCLE_INTERVAL_MS = Number(process.env.DATA_ACCUMULATOR_CYCLE_MS) || 2 * 60 * 60 * 1000; // 2h default
+const GDELT_RATE_LIMIT_MS = Number(process.env.GDELT_RATE_LIMIT_MS) || 6000;
+const YAHOO_BATCH_SIZE = Number(process.env.YAHOO_BATCH_SIZE) || 30; // raised from 10 — at 5 syms/2h the warm store fell 24+ days behind
+const SIDECAR_PORT = Number(process.env.SIDECAR_PORT) || 46123;
+const MAX_BACKFILL_DAYS = Number(process.env.MAX_BACKFILL_DAYS) || 365;
 
 const runOnce = process.argv.includes('--once');
 const backfillAll = process.argv.includes('--backfill-all');

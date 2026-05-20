@@ -147,8 +147,9 @@ async function main() {
       INTEL_PG_HOST: 'localhost', INTEL_PG_PORT: '15433',
       NAS_PG_HOST: 'localhost', NAS_PG_PORT: '15433',
     },
-    shell: true,
+    shell: process.platform === 'win32' && command.endsWith('.cmd'),
     cwd: process.cwd(),
+    windowsHide: true,
   });
 
   child.stdin.write(prompt);

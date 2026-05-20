@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Comparison · Lattice Current</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/dashboard/shared/tokens.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(circle at top left,rgba(22,199,132,.08),transparent 30%),radial-gradient(circle at top right,rgba(59,130,246,.06),transparent 26%),linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 50%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:13px;line-height:1.55;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:1200px;margin:0 auto;padding:32px 24px 64px}
+header{margin-bottom:36px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+h1{font-size:30px;line-height:1.15;font-weight:600;color:var(--text-loud);margin-bottom:10px}
+.tagline{color:var(--muted);font-size:14px;max-width:760px}
+.hero-lift{margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.hero-card{padding:18px 20px;border:1px solid var(--border-base);border-radius:14px;background:rgba(28,32,40,.5)}
+.hero-card-label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.hero-card-value{font-size:24px;font-weight:600;color:var(--accent)}
+.hero-card-value.negative{color:var(--red-critical)}
+.hero-card-foot{font-size:11px;color:var(--muted);margin-top:4px}
+.section{margin-top:36px}
+.section-title{font-size:16px;font-weight:600;margin-bottom:14px;color:var(--text-loud)}
+.section-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+table.cmp{width:100%;border-collapse:collapse;font-size:12.5px}
+table.cmp th,table.cmp td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border-dim)}
+table.cmp th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;background:transparent}
+table.cmp td.num{text-align:right;font-family:var(--font-mono);color:var(--text-loud)}
+table.cmp tr.baseline{background:rgba(255,255,255,.02);color:var(--muted)}
+table.cmp tr.baseline td.num{color:var(--muted)}
+table.cmp tr.best td.num.brier-metric{color:var(--signal-green);font-weight:600}
+.method{padding:18px 20px;border:1px solid var(--border-base);border-radius:14px;background:rgba(28,32,40,.4)}
+.method dt{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-top:10px;margin-bottom:4px}
+.method dt:first-child{margin-top:0}
+.method dd{font-size:12.5px;color:var(--text-base);margin-bottom:6px}
+footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--border-dim);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.error{padding:24px;border:1px solid var(--red-critical);border-radius:12px;background:rgba(64,12,12,.4);color:var(--text-loud)}
+.skeleton{padding:32px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="eyebrow">Lattice Current — Model Evidence</div>
+    <h1>Why this model wins (when it does)</h1>
+    <p class="tagline">An honest side-by-side of every meta-model version we've shipped, against the baseline a coin-flipping picker would achieve. The promotion gate is worst-fold ECE ≤ 0.10 and worst-fold Brier ≤ 0.25 (CLAUDE.md §10).</p>
+    <div id="lift-grid" class="hero-lift"><div class="skeleton">Loading model evaluation...</div></div>
+  </header>
+
+  <section class="section">
+    <div class="section-title">Versions on the bench</div>
+    <div class="section-sub">Sorted by Brier score (lower = better calibrated probability). The naive-random-top20 row is a synthetic baseline, not a deployed model.</div>
+    <div id="models-table"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-title">Methodology</div>
+    <div class="method" id="method-block"></div>
+  </section>
+
+  <footer>
+    <div>Generated <span id="generated-at">—</span></div>
+    <div>
+      <a href="/event-dashboard.html">← Dashboard</a>
+      &nbsp;·&nbsp;
+      <a href="/api/model-comparison">Raw JSON</a>
+      &nbsp;·&nbsp;
+      <a href="/license.html">License</a>
+      &nbsp;·&nbsp;
+      <a href="/data-sources.html">Data sources</a>
+    </div>
+  </footer>
+</div>
+
+<script type="module">
+const fmt = (v, digits = 3) => {
+  if (v == null || !Number.isFinite(Number(v))) return '—';
+  return Number(v).toFixed(digits);
+};
+const fmtPct = (v) => {
+  if (v == null || !Number.isFinite(Number(v))) return '—';
+  return (Number(v) >= 0 ? '+' : '') + Number(v).toFixed(1) + '%';
+};
+
+async function load() {
+  const res = await fetch('/api/model-comparison', { cache: 'no-store' });
+  if (!res.ok) {
+    document.querySelector('main, .container').insertAdjacentHTML(
+      'beforeend',
+      '<div class="error">Failed to load /api/model-comparison (HTTP ' + res.status + '). Make sure the dashboard API is running.</div>',
+    );
+    return;
+  }
+  const data = await res.json();
+  document.getElementById('generated-at').textContent = data.generatedAt
+    ? new Date(data.generatedAt).toLocaleString()
+    : '(unknown)';
+
+  // Lift hero.
+  const liftGrid = document.getElementById('lift-grid');
+  if (!data.lift) {
+    liftGrid.innerHTML = '<div class="skeleton">No model_eval rows yet — train and eval at least one version to populate this view.</div>';
+  } else {
+    const cards = [
+      { label: 'Active model', value: data.lift.activeModel || '—', foot: 'Best Brier among shipped versions' },
+      { label: 'Brier improvement', value: fmtPct(data.lift.brierImprovement), foot: 'vs random-top-20', sign: true },
+      { label: 'Top-20 precision lift', value: fmtPct(data.lift.top20Lift), foot: 'vs 0.20 random base', sign: true },
+      { label: 'Hit-rate lift', value: fmtPct(data.lift.hitRateLift), foot: 'vs 50/50 base', sign: true },
+    ];
+    liftGrid.innerHTML = cards.map((c) => {
+      const negCls = c.sign && /^-/.test(String(c.value)) ? ' negative' : '';
+      return `<div class="hero-card"><div class="hero-card-label">${c.label}</div><div class="hero-card-value${negCls}">${c.value}</div><div class="hero-card-foot">${c.foot}</div></div>`;
+    }).join('');
+  }
+
+  // Models table.
+  const models = data.models || [];
+  const best = models.find((m) => !m.isBaseline);
+  const tbl = document.createElement('table');
+  tbl.className = 'cmp';
+  tbl.innerHTML = `
+    <thead>
+      <tr>
+        <th>Model version</th>
+        <th class="num">Brier (mean / worst)</th>
+        <th class="num">ECE (mean / worst)</th>
+        <th class="num">Top-20 prec.</th>
+        <th class="num">Hit rate</th>
+        <th class="num">Deflated Sharpe</th>
+        <th class="num">Samples</th>
+      </tr>
+    </thead>
+    <tbody>${models.map((m) => {
+      const isBest = !m.isBaseline && best && m.modelVersion === best.modelVersion;
+      const cls = m.isBaseline ? 'baseline' : (isBest ? 'best' : '');
+      return `<tr class="${cls}">
+        <td><strong>${m.modelVersion}</strong>${m.description ? '<br><span style="font-size:10.5px;color:var(--muted)">' + m.description + '</span>' : ''}</td>
+        <td class="num brier-metric">${fmt(m.brier?.mean)} / ${fmt(m.brier?.worst)}</td>
+        <td class="num">${fmt(m.ece?.mean)} / ${fmt(m.ece?.worst)}</td>
+        <td class="num">${fmt(m.top20Precision?.mean, 3)}</td>
+        <td class="num">${fmt(m.alphaHitRate?.mean, 3)}</td>
+        <td class="num">${fmt(m.deflatedSharpe?.mean, 2)}</td>
+        <td class="num">${m.nSamples ? m.nSamples.toLocaleString() : '—'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  `;
+  const container = document.getElementById('models-table');
+  container.innerHTML = '';
+  container.appendChild(tbl);
+
+  // Methodology.
+  const m = data.methodology || {};
+  document.getElementById('method-block').innerHTML = `
+    <dl>
+      <dt>Promotion gate</dt><dd>${m.promotionGate || '—'}</dd>
+      <dt>Walk-forward</dt><dd>${m.walkForward || '—'}</dd>
+      <dt>Baseline</dt><dd>${m.baselineNote || '—'}</dd>
+    </dl>
+  `;
+}
+
+load().catch((err) => {
+  console.error('model comparison load failed', err);
+});
+</script>
+</body>
+</html>

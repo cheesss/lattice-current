@@ -1,5 +1,7 @@
 # Backtest System Deep Dive
 
+> **Status**: reference (durable architecture explainer for the replay + NAS storage path; backtest is a secondary validation surface on the current branch)
+
 작성일: 2026-04-01
 대상 저장소: `lattice-current-fix`
 

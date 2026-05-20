@@ -26,7 +26,7 @@ repo with minimal token usage.
 
 - Replay, walk-forward, backtest hub
   - read [src/services/historical-intelligence.md](C:\Users\chohj\Documents\Playground\lattice-current-fix\src\services\historical-intelligence.md)
-  - then read [docs/BACKTEST_SIGNAL_ENGINE_ROADMAP_2026-03-31.md](C:\Users\chohj\Documents\Playground\lattice-current-fix\docs\BACKTEST_SIGNAL_ENGINE_ROADMAP_2026-03-31.md)
+  - then read [docs/BACKTEST_SYSTEM_DEEP_DIVE_2026-04-01.md](C:\Users\chohj\Documents\Playground\lattice-current-fix\docs\BACKTEST_SYSTEM_DEEP_DIVE_2026-04-01.md)
 - Investment ideas, current brief, ranking
   - read [src/services/investment-intelligence.md](C:\Users\chohj\Documents\Playground\lattice-current-fix\src\services\investment-intelligence.md)
 - Local API routes, replay-now, scheduler-now, runtime secrets

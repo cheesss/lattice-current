@@ -1,0 +1,327 @@
+{
+  "_description": "Domain to (publisher_group, market_relevance) mapping. Used by RSS ingestion and article backfill to collapse multilingual duplicates and tier feeds by financial signal value.",
+  "_relevance_rules": {
+    "high": "Primary financial/market/macro sources. Included in eventIntensity nowcast.",
+    "medium": "Gov/regulatory/tech/policy. Included with weight 0.5 in eventIntensity.",
+    "low": "General news, regional, inspiring, startup discovery. EXCLUDED from eventIntensity nowcast; kept for discovery only."
+  },
+  "groups": {
+    "euronews": {
+      "domains": ["euronews.com", "fr.euronews.com", "de.euronews.com", "it.euronews.com", "es.euronews.com", "pt.euronews.com", "ru.euronews.com"],
+      "relevance": "medium"
+    },
+    "france24": {
+      "domains": ["france24.com"],
+      "relevance": "medium"
+    },
+    "dw": {
+      "domains": ["dw.com", "rss.dw.com"],
+      "relevance": "medium"
+    },
+    "le-monde": {
+      "domains": ["lemonde.fr"],
+      "relevance": "medium"
+    },
+    "bbc": {
+      "domains": ["bbc.com", "bbc.co.uk", "feeds.bbci.co.uk"],
+      "relevance": "medium"
+    },
+    "guardian": {
+      "domains": ["theguardian.com"],
+      "relevance": "medium"
+    },
+    "npr": {
+      "domains": ["npr.org", "feeds.npr.org"],
+      "relevance": "low"
+    },
+    "al-jazeera": {
+      "domains": ["aljazeera.com", "aljazeera.net"],
+      "relevance": "medium"
+    },
+    "cnn": {
+      "domains": ["cnn.com", "rss.cnn.com"],
+      "relevance": "medium"
+    },
+    "cnbc": {
+      "domains": ["cnbc.com"],
+      "relevance": "high"
+    },
+    "marketwatch": {
+      "domains": ["marketwatch.com", "feeds.marketwatch.com"],
+      "relevance": "high"
+    },
+    "ft": {
+      "domains": ["ft.com"],
+      "relevance": "high"
+    },
+    "reuters": {
+      "domains": ["reuters.com", "reutersagency.com", "feeds.reuters.com"],
+      "relevance": "high"
+    },
+    "axios": {
+      "domains": ["axios.com", "api.axios.com"],
+      "relevance": "medium"
+    },
+    "politico": {
+      "domains": ["politico.com", "rss.politico.com"],
+      "relevance": "medium"
+    },
+    "nikkei-asia": {
+      "domains": ["asia.nikkei.com"],
+      "relevance": "high"
+    },
+    "diplomat": {
+      "domains": ["thediplomat.com"],
+      "relevance": "medium"
+    },
+    "foreign-policy": {
+      "domains": ["foreignpolicy.com"],
+      "relevance": "medium"
+    },
+    "foreign-affairs": {
+      "domains": ["foreignaffairs.com"],
+      "relevance": "medium"
+    },
+    "defense-one": {
+      "domains": ["defenseone.com"],
+      "relevance": "medium"
+    },
+    "breaking-defense": {
+      "domains": ["breakingdefense.com"],
+      "relevance": "medium"
+    },
+    "defense-news": {
+      "domains": ["defensenews.com"],
+      "relevance": "medium"
+    },
+    "military-times": {
+      "domains": ["militarytimes.com"],
+      "relevance": "medium"
+    },
+    "usni": {
+      "domains": ["news.usni.org"],
+      "relevance": "medium"
+    },
+    "seeking-alpha": {
+      "domains": ["seekingalpha.com"],
+      "relevance": "high"
+    },
+    "crunchbase": {
+      "domains": ["news.crunchbase.com"],
+      "relevance": "medium"
+    },
+    "bellingcat": {
+      "domains": ["bellingcat.com"],
+      "relevance": "medium"
+    },
+    "the-drive": {
+      "domains": ["thedrive.com"],
+      "relevance": "low"
+    },
+    "krebs-on-security": {
+      "domains": ["krebsonsecurity.com"],
+      "relevance": "medium"
+    },
+    "schneier": {
+      "domains": ["schneier.com"],
+      "relevance": "medium"
+    },
+    "dark-reading": {
+      "domains": ["darkreading.com"],
+      "relevance": "medium"
+    },
+    "ransomware-live": {
+      "domains": ["ransomware.live"],
+      "relevance": "medium"
+    },
+    "ars-technica": {
+      "domains": ["arstechnica.com", "feeds.arstechnica.com"],
+      "relevance": "low"
+    },
+    "verge": {
+      "domains": ["theverge.com"],
+      "relevance": "low"
+    },
+    "techcrunch": {
+      "domains": ["techcrunch.com"],
+      "relevance": "low"
+    },
+    "tech-review": {
+      "domains": ["technologyreview.com"],
+      "relevance": "low"
+    },
+    "venturebeat": {
+      "domains": ["venturebeat.com"],
+      "relevance": "low"
+    },
+    "zdnet": {
+      "domains": ["zdnet.com"],
+      "relevance": "low"
+    },
+    "techmeme": {
+      "domains": ["techmeme.com"],
+      "relevance": "low"
+    },
+    "anandtech": {
+      "domains": ["anandtech.com"],
+      "relevance": "low"
+    },
+    "toms-hardware": {
+      "domains": ["tomshardware.com"],
+      "relevance": "low"
+    },
+    "semianalysis": {
+      "domains": ["semianalysis.com"],
+      "relevance": "medium"
+    },
+    "engadget": {
+      "domains": ["engadget.com"],
+      "relevance": "low"
+    },
+    "hackernews": {
+      "domains": ["hnrss.org", "ycombinator.com", "lobste.rs"],
+      "relevance": "low"
+    },
+    "openai": {
+      "domains": ["openai.com"],
+      "relevance": "medium"
+    },
+    "huggingface": {
+      "domains": ["huggingface.co"],
+      "relevance": "low"
+    },
+    "arxiv": {
+      "domains": ["arxiv.org", "rss.arxiv.org", "export.arxiv.org"],
+      "relevance": "low"
+    },
+    "yahoo-finance": {
+      "domains": ["finance.yahoo.com"],
+      "relevance": "high"
+    },
+    "fed-gov": {
+      "domains": ["federalreserve.gov"],
+      "relevance": "high"
+    },
+    "treasury-gov": {
+      "domains": ["home.treasury.gov"],
+      "relevance": "high"
+    },
+    "sec-gov": {
+      "domains": ["sec.gov"],
+      "relevance": "high"
+    },
+    "whitehouse": {
+      "domains": ["whitehouse.gov"],
+      "relevance": "medium"
+    },
+    "state-gov": {
+      "domains": ["state.gov"],
+      "relevance": "medium"
+    },
+    "defense-gov": {
+      "domains": ["defense.gov"],
+      "relevance": "medium"
+    },
+    "justice-gov": {
+      "domains": ["justice.gov"],
+      "relevance": "medium"
+    },
+    "cdc-gov": {
+      "domains": ["tools.cdc.gov"],
+      "relevance": "low"
+    },
+    "fema-gov": {
+      "domains": ["fema.gov"],
+      "relevance": "low"
+    },
+    "dhs-gov": {
+      "domains": ["dhs.gov"],
+      "relevance": "medium"
+    },
+    "uk-gov": {
+      "domains": ["gov.uk"],
+      "relevance": "medium"
+    },
+    "cfr": {
+      "domains": ["cfr.org"],
+      "relevance": "medium"
+    },
+    "csis": {
+      "domains": ["csis.org"],
+      "relevance": "medium"
+    },
+    "brookings": {
+      "domains": ["brookings.edu"],
+      "relevance": "medium"
+    },
+    "atlantic-council": {
+      "domains": ["atlanticcouncil.org"],
+      "relevance": "medium"
+    },
+    "oryx": {
+      "domains": ["oryxspioenkop.com"],
+      "relevance": "medium"
+    },
+    "layoffs-fyi": {
+      "domains": ["layoffs.fyi"],
+      "relevance": "low"
+    },
+    "task-and-purpose": {
+      "domains": ["taskandpurpose.com"],
+      "relevance": "low"
+    },
+    "google-news": {
+      "domains": ["news.google.com"],
+      "relevance": "medium"
+    },
+    "rsshub": {
+      "domains": ["rsshub.app"],
+      "relevance": "low"
+    },
+    "saastr": {
+      "domains": ["saastr.com"],
+      "relevance": "low"
+    },
+    "product-hunt": {
+      "domains": ["producthunt.com"],
+      "relevance": "low"
+    },
+    "info-q": {
+      "domains": ["feed.infoq.com"],
+      "relevance": "low"
+    },
+    "new-stack": {
+      "domains": ["thenewstack.io"],
+      "relevance": "low"
+    },
+    "devops-com": {
+      "domains": ["devops.com"],
+      "relevance": "low"
+    },
+    "dev-to": {
+      "domains": ["dev.to"],
+      "relevance": "low"
+    },
+    "changelog": {
+      "domains": ["changelog.com"],
+      "relevance": "low"
+    },
+    "github-blog": {
+      "domains": ["github.blog", "githubnext.com"],
+      "relevance": "low"
+    }
+  },
+  "wire_patterns": [
+    { "name": "ap", "domain_contains": "apnews.com" },
+    { "name": "ap", "title_prefix": "By Associated Press" },
+    { "name": "ap", "body_lead": "(AP) -" },
+    { "name": "ap", "body_lead": "(AP) —" },
+    { "name": "reuters", "domain_contains": "reuters.com" },
+    { "name": "reuters", "title_prefix": "Reuters -" },
+    { "name": "reuters", "body_lead": "(Reuters) -" },
+    { "name": "reuters", "body_lead": "(Reuters) —" },
+    { "name": "bloomberg", "domain_contains": "bloomberg.com" },
+    { "name": "bloomberg", "body_lead": "(Bloomberg) --" },
+    { "name": "afp", "body_lead": "(AFP) -" }
+  ]
+}

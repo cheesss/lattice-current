@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { XMLParser } from 'fast-xml-parser';
@@ -114,6 +114,10 @@ function dedupeArticles(items) {
 const GDELT_MIN_INTERVAL_MS = Math.max(7000, optionalInt(process.env.GDELT_MIN_INTERVAL_MS, 8000));
 const GDELT_MAX_ATTEMPTS = Math.max(1, optionalInt(process.env.GDELT_MAX_ATTEMPTS, 3));
 const GDELT_RATE_LIMIT_JITTER_MS = Math.max(250, optionalInt(process.env.GDELT_RATE_LIMIT_JITTER_MS, 1250));
+const GDELT_RATE_LIMIT_STATE_PATH = path.resolve(
+  String(process.env.GDELT_RATE_LIMIT_STATE_PATH || '').trim() || 'data/automation/gdelt-doc-rate-limit.json',
+);
+const GDELT_RATE_LIMIT_LOCK_DIR = `${GDELT_RATE_LIMIT_STATE_PATH}.lock`;
 let lastGdeltDocRequestAt = 0;
 
 function isGdeltRateLimitError(error) {
@@ -121,10 +125,51 @@ function isGdeltRateLimitError(error) {
 }
 
 async function waitForGdeltWindow() {
-  const elapsed = Date.now() - lastGdeltDocRequestAt;
-  const waitMs = Math.max(0, GDELT_MIN_INTERVAL_MS - elapsed);
-  if (waitMs > 0) {
-    await sleep(waitMs);
+  await mkdir(path.dirname(GDELT_RATE_LIMIT_STATE_PATH), { recursive: true });
+  const lockStartedAt = Date.now();
+  while (true) {
+    try {
+      await mkdir(GDELT_RATE_LIMIT_LOCK_DIR);
+      break;
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      try {
+        const lockStat = await stat(GDELT_RATE_LIMIT_LOCK_DIR);
+        if (Date.now() - lockStat.mtimeMs > 60_000) {
+          await rm(GDELT_RATE_LIMIT_LOCK_DIR, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        // The lock disappeared between attempts.
+      }
+      if (Date.now() - lockStartedAt > 90_000) {
+        throw new Error('GDELT rate-limit lease timeout');
+      }
+      await sleep(250);
+    }
+  }
+
+  try {
+    let sharedLastRequestAt = 0;
+    try {
+      const state = JSON.parse(await readFile(GDELT_RATE_LIMIT_STATE_PATH, 'utf8'));
+      sharedLastRequestAt = Date.parse(String(state?.lastRequestAt || '')) || 0;
+    } catch {
+      sharedLastRequestAt = 0;
+    }
+    const lastRequestAt = Math.max(lastGdeltDocRequestAt, sharedLastRequestAt);
+    const elapsed = Date.now() - lastRequestAt;
+    const waitMs = Math.max(0, GDELT_MIN_INTERVAL_MS - elapsed);
+    if (waitMs > 0) {
+      await sleep(waitMs);
+    }
+    lastGdeltDocRequestAt = Date.now();
+    await writeFile(GDELT_RATE_LIMIT_STATE_PATH, JSON.stringify({
+      lastRequestAt: new Date(lastGdeltDocRequestAt).toISOString(),
+      pid: process.pid,
+    }, null, 2), 'utf8');
+  } finally {
+    await rm(GDELT_RATE_LIMIT_LOCK_DIR, { recursive: true, force: true });
   }
 }
 
@@ -132,7 +177,6 @@ async function fetchGdeltJson(url) {
   let lastError = null;
   for (let attempt = 1; attempt <= GDELT_MAX_ATTEMPTS; attempt += 1) {
     await waitForGdeltWindow();
-    lastGdeltDocRequestAt = Date.now();
     try {
       return await fetchJson(url);
     } catch (error) {
@@ -415,7 +459,7 @@ async function fetchGdeltDoc(args) {
       if (window.end) params.set('enddatetime', String(window.end));
       if (args.sort) params.set('sort', String(args.sort));
       try {
-        const data = await fetchGdeltJson(`http://api.gdeltproject.org/api/v2/doc/doc?${params}`);
+        const data = await fetchGdeltWithFallback(wrappedQuery, params);
         const rows = Array.isArray(data?.articles) ? data.articles : [];
         articles.push(...rows);
       } catch (error) {

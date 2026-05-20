@@ -67,7 +67,7 @@ import { archiveHistoricalReplayRun } from '../historical-archive';
 import { getPersistentCache, setPersistentCache } from '../persistent-cache';
 import { measureResourceOperation } from '../resource-telemetry';
 
-// ───────────────────��────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // Internal utility functions
 // ────────────────────────────────────────────────────────────────
 
@@ -1678,7 +1678,7 @@ function buildThemeRegimeMetrics(
     .sort((a, b) => b.sampleSize - a.sampleSize || b.confirmationScore - a.confirmationScore);
 }
 
-// ────────────────────────────────���──────────────────────��────────
+// ---------------------------------------------------------------------------
 // Main executeReplay function
 // ────────────────────────────────────────────────────────────────
 

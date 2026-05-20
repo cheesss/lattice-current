@@ -14,11 +14,11 @@ GDELT, Guardian, NYT 등 뉴스를 수집하고, 클러스터링/신뢰도 평�
 | `docs/NAS_BACKTEST_STORAGE_PLAN_2026-04-01.md` | NAS 데이터 저장 아키텍처, 테이블 스키마 |
 | `docs/AGENT_QUICKSTART.md` | 에이전트 온보딩 가이드 |
 | `docs/TEST_OPERATIONS_RUNBOOK.md` | 테스트 및 검증 절차 |
-| `docs/GDELT_GUARDIAN_INGEST_AND_TRAINING_PLAN_2026-04-01.md` | GDELT vs Guardian 데이터 특성 차이, 설계 철학 |
 
 ## 현재 상태 요약
 
 ### 완료된 것
+
 - NAS PostgreSQL(192.168.0.76:5433)에 5년치 데이터 통합 완료 (Guardian 57k, NYT 3.3k, GDELT 집계 1.38M, Yahoo 80k, FRED 6.3k)
 - 60,353건 기사 임베딩 생성 (Ollama nomic-embed-text)
 - 618,402건 아웃컴 레이블링 완료

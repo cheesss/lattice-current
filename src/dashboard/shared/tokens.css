@@ -1,0 +1,213 @@
+/*
+ * Lattice dashboard design tokens (G2 dashboard split — first CSS slice).
+ *
+ * This file is the canonical source of truth for the design system: the
+ * background palette, semantic colors (signal/amber/red/blue), text scale,
+ * fonts, and the `--bg`/`--surface`/`--accent` aliases used across the
+ * inline event-dashboard.html style block AND any new per-surface modules.
+ *
+ * Loaded via <link rel="stylesheet"> in event-dashboard.html BEFORE the
+ * inline <style> block. The inline block currently still defines the same
+ * tokens for backward compatibility — that duplicate will be removed when
+ * PR 1 of the full dashboard split lands. Until then, both define the same
+ * values so cascade order has no visible effect.
+ *
+ * If you change a token here, also update the inline <style> :root block
+ * until the duplicate is removed. (Or leave the duplicate stale: cascade
+ * order means the inline block wins, so the duplicate doesn't matter for
+ * runtime — only for future-extracted files that import this directly.)
+ */
+
+:root {
+  /* Background palette */
+  --bg-void: #07080a;
+  --bg-base: #0d0f13;
+  --bg-surface: #13161d;
+  --bg-elevated: #1c2028;
+  --bg-overlay: rgba(13, 15, 19, .92);
+
+  /* Borders */
+  --border-dim: rgba(255, 255, 255, .04);
+  --border-base: rgba(255, 255, 255, .08);
+  --border-focus: rgba(255, 255, 255, .18);
+
+  /* Semantic colors — match plan §1 lane colors so per-surface files can
+     reuse without re-defining */
+  --signal-green: #16c784;
+  --amber-risk: #f59e0b;
+  --red-critical: #ef4444;
+  --blue-info: #3b82f6;
+  --graphite: #4b5563;
+
+  /* Text scale — opacities tuned for WCAG AA on small text against bg-void.
+     Previous: .95 / .75 / .45 / .25. The .45 muted at 9-11px failed AA
+     contrast; bumped to .60 / .42 to keep the visual hierarchy while
+     keeping body text legible without straining at typical viewing
+     distances. */
+  --text-loud: rgba(255, 255, 255, .96);
+  --text-base: rgba(255, 255, 255, .80);
+  --text-soft: rgba(255, 255, 255, .60);
+  --text-muted: rgba(255, 255, 255, .42);
+
+  /* Type scale — semantic sizes. Use these instead of inline font-size:9px etc.
+     Caps (uppercase labels) and body have separate rails because uppercase
+     text needs more letter-spacing and a higher floor for legibility. */
+  --fs-caps-xs:   10.5px;     /* uppercase eyebrow / kicker / pillar label */
+  --fs-caps-sm:   11.5px;     /* uppercase section title */
+  --fs-2xs:       11px;       /* shortcut chips, micro-meta */
+  --fs-xs:        12px;       /* metadata, badges, deltas */
+  --fs-sm:        13px;       /* compact body */
+  --fs-md:        14px;       /* default body */
+  --fs-lg:        16px;       /* card titles */
+  --fs-xl:        20px;       /* hero numbers */
+  --fs-2xl:       26px;       /* surface hero */
+  --fs-3xl:       32px;       /* page hero */
+
+  /* Line heights — default 1.5 for body, 1.3 for compact rows, 1.65 for prose */
+  --lh-tight:    1.2;
+  --lh-snug:     1.35;
+  --lh-default:  1.5;
+  --lh-relaxed:  1.6;
+
+  /* Letter spacing — uppercase labels need .08-.14em depending on size */
+  --ls-caps-tight:  .06em;
+  --ls-caps:        .1em;
+  --ls-caps-loose:  .14em;
+
+  /* Font weights — Geist supports 300-700 */
+  --fw-light:    300;
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semi:     600;
+  --fw-bold:     700;
+
+  /* Fonts */
+  --font-sans: 'Geist', Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Aliases used pervasively in the inline style block.
+     Kept here so per-surface CSS files can reference them too. */
+  --bg: var(--bg-void);
+  --surface: var(--bg-surface);
+  --surface2: var(--bg-elevated);
+  --border: var(--border-base);
+  --text: var(--text-loud);
+  --muted: var(--text-soft);
+
+  /* Accent palette */
+  --accent: #d8f99d;
+  --accent2: var(--signal-green);
+  --amber: var(--amber-risk);
+  --red: var(--red-critical);
+  --teal: #67d1c5;
+  --blue: var(--blue-info);
+
+  /* ============================================================
+     V3 — FANCY pro-tool palette (Linear / Palantir / Vercel tone)
+     Source: research pass 1+2 + "fancy" upgrade pass.
+     Indigo-tinted dark base, vivid Linear-saturation lanes,
+     cyan signature accent, violet secondary, glows on accents.
+     ============================================================ */
+
+  /* Lane (categorical) — Tailwind 400-tier saturation, Linear feel */
+  --v3-lane-validated: #34d399; /* emerald-400 — vivid */
+  --v3-lane-pending:   #fbbf24; /* amber-400 */
+  --v3-lane-watch:     #60a5fa; /* blue-400 */
+  --v3-lane-noise:     #64748b; /* slate-500, kept dim */
+
+  /* Direction (Bloomberg-semantic, deuteranopia-safe + amped).
+     amber here is NEUTRAL data text only. Up = sky, down = rose. */
+  --v3-dir-up:      #38bdf8; /* sky-400 */
+  --v3-dir-down:    #f43f5e; /* rose-500, hot */
+  --v3-dir-neutral: #fbbf24;
+
+  /* Severity — rosy critical for glow */
+  --v3-sev-critical: #fb7185; /* rose-400 */
+  --v3-sev-warning:  #fbbf24;
+  --v3-sev-info:     #38bdf8;
+  --v3-sev-ok:       #34d399;
+
+  /* Background depth (5 steps, indigo-tinted near-black).
+     Cooler than slate, warmer than pure black, hint of premium. */
+  --v3-bg-950: #08081a;
+  --v3-bg-900: #0d0f1f;
+  --v3-bg-850: #15182b;
+  --v3-bg-800: #1f2238;
+  --v3-bg-750: #2a2e47;
+
+  /* Borders — indigo-tinted instead of slate (subtle premium tint) */
+  --v3-border-hairline: rgba(165, 180, 252, 0.08);
+  --v3-border-soft:     rgba(165, 180, 252, 0.16);
+  --v3-border-strong:   rgba(165, 180, 252, 0.32);
+  --v3-border-focus:    var(--v3-accent);
+
+  /* Text — luminosity scale (cooler tint) */
+  --v3-text-loud:  #f1f5f9;
+  --v3-text-base:  #cbd5e1;
+  --v3-text-soft:  #94a3b8;
+  --v3-text-muted: #64748b;
+
+  /* Evidence ladder — luminosity → mint-cyan top (matrix tone) */
+  --v3-ev-e0: #475569;
+  --v3-ev-e1: #64748b;
+  --v3-ev-e2: #94a3b8;
+  --v3-ev-e3: #34d399;
+  --v3-ev-e4: #00f5d4; /* mint-cyan, high-conviction */
+
+  /* Signature accents — Palantir cyan + Linear violet + pink */
+  --v3-accent:       #22d3ee; /* cyan-400, primary signature */
+  --v3-accent-glow:  rgba(34, 211, 238, 0.35);
+  --v3-accent-2:     #a78bfa; /* violet-400, secondary */
+  --v3-accent-2-glow: rgba(167, 139, 250, 0.35);
+  --v3-accent-3:     #f472b6; /* pink-400, special-event */
+
+  /* Glows — for selected, validated, critical, focus */
+  --v3-glow-validated: 0 0 20px rgba(52, 211, 153, 0.30);
+  --v3-glow-critical:  0 0 20px rgba(251, 113, 133, 0.35);
+  --v3-glow-accent:    0 0 16px var(--v3-accent-glow);
+  --v3-glow-accent-2:  0 0 16px var(--v3-accent-2-glow);
+  --v3-glow-soft:      0 0 10px rgba(255, 255, 255, 0.06);
+
+  /* Gradients — subtle tile depth */
+  --v3-grad-tile:        linear-gradient(135deg, rgba(34, 211, 238, 0.04), transparent 60%);
+  --v3-grad-validated:   linear-gradient(135deg, rgba(52, 211, 153, 0.08), transparent 60%);
+  --v3-grad-critical:    linear-gradient(135deg, rgba(251, 113, 133, 0.10), transparent 60%);
+  --v3-grad-violet:      linear-gradient(135deg, rgba(167, 139, 250, 0.08), transparent 60%);
+  --v3-grad-aurora:      linear-gradient(135deg, rgba(34, 211, 238, 0.10), rgba(167, 139, 250, 0.08) 50%, rgba(244, 114, 182, 0.06) 100%);
+
+  /* Frosted glass — for ticker / cheatsheet / palette */
+  --v3-glass-bg:   rgba(13, 15, 31, 0.70);
+  --v3-glass-blur: blur(20px) saturate(180%);
+
+  /* Radius — 3-tier only */
+  --v3-radius-sm: 8px;
+  --v3-radius-md: 12px;
+  --v3-radius-lg: 16px;
+
+  /* Spacing — 4px base */
+  --v3-space-1: 4px;
+  --v3-space-2: 8px;
+  --v3-space-3: 12px;
+  --v3-space-4: 16px;
+  --v3-space-6: 24px;
+  --v3-space-8: 32px;
+
+  /* Freshness pill (Smashing 3-state) */
+  --v3-freshness-live:   var(--v3-sev-ok);
+  --v3-freshness-stale:  var(--v3-sev-warning);
+  --v3-freshness-paused: var(--v3-text-muted);
+
+  /* Motion — Linear-style restraint */
+  --v3-motion-fast:   100ms;
+  --v3-motion-base:   200ms;
+  --v3-motion-slow:   300ms;
+  --v3-ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --v3-ease-in:      cubic-bezier(0.7, 0, 0.84, 0);
+  --v3-ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Numbers — every numeric cell tabular, slashed-zero, mono. */
+.v3-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+}

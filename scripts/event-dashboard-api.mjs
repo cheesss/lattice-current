@@ -18,8 +18,50 @@ import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.m
 import { createLogger } from './_shared/structured-logger.mjs';
 import { computeCalibrationDiagnostic } from './_shared/calibration-diagnostic.mjs';
 import { computeDataQualityMetrics } from './_shared/data-quality-check.mjs';
+import { buildFreshnessAudit } from './audit-data-freshness.mjs';
+import { buildNowcastStatusPayload } from './_shared/nowcast-status-builder.mjs';
+import {
+  HOT_EVENTS_MIN_PROMOTION_CONTROLS,
+  buildHotEventsPayload,
+  buildTrendingThemesPayload,
+  buildMetaModelHealthPayload,
+  buildExplainEventPayload,
+  buildSourceDiversityAuditPayload,
+  buildThemeImpactPayload,
+} from './_shared/event-intelligence-builder.mjs';
+import {
+  buildEventTimelinePayload,
+  buildEventNarrativePayload,
+  buildSimilarEventsPayload,
+  buildRegimeScenarioPayload,
+  buildCurrentRegimeBriefPayload,
+  buildAssetDossierPayload,
+  buildWeeklyDigestPayload,
+  buildCorrelationBreaksPayload,
+} from './_shared/ai-analysis-builder.mjs';
 import { getBudgetStatus } from './_shared/automation-budget.mjs';
 import { getRecentAutomationActions } from './_shared/automation-audit.mjs';
+import {
+  ensureInboxAuditSchema,
+  recordInboxAction,
+  recentInboxActions,
+  newRequestId,
+  hashRequestBody,
+} from './_shared/inbox-audit.mjs';
+import {
+  setWatchlistState,
+  getWatchlistEntry,
+  removeWatchlistEntry,
+  listWatchlist,
+  VALID_WATCHLIST_STATES,
+  VALID_WATCHLIST_ITEM_TYPES,
+} from './_shared/user-watchlist.mjs';
+import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs.mjs';
+import { isDemoMode, blockIfDemoMode, loadDemoSnapshot } from './_shared/demo-mode.mjs';
+import { buildModelComparisonPayload } from './_shared/model-comparison.mjs';
+import { makeRouteHandler } from './_shared/route-helper.mjs';
+import { memoize } from './_shared/memoize-payload.mjs';
+import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import {
   getPendingApprovals,
@@ -53,14 +95,108 @@ import {
   buildStructuralAlertsPayload,
   dismissStructuralAlert,
 } from './_shared/trend-workbench.mjs';
+import {
+  mapThemeToTaxonomy,
+  rankThemesForText,
+} from './_shared/theme-taxonomy.mjs';
 import { isLowSignalAddRssProposal } from './_shared/rss-proposal-quality.mjs';
+import { isLowValueGoogleNewsSourceName } from './_shared/google-news-source-policy.mjs';
+import {
+  MAP_LENS_FILTER_TERMS,
+  MAP_LENS_ANCHORS,
+  TRANSMISSION_TARGETS,
+  normalizeLensFilter,
+  normalizeLensText,
+  matchesLensFilter,
+  inferMapLensAnchor,
+} from './_shared/dashboard-map-lens.mjs';
+import {
+  CACHE_DIR,
+  readJsonCache,
+  writeJsonCache,
+  hasRenderableData,
+  toCacheToken,
+  buildCacheKey,
+  hasDynamicSinceParams,
+  buildSinceToken,
+} from './_shared/dashboard-cache.mjs';
+import {
+  sanitizeTopicText,
+  splitTopicTerms,
+  buildTopicArticleProfile,
+  buildTopicRecentArticleScore,
+} from './_shared/dashboard-topic-scoring.mjs';
+import {
+  SIGNAL_LABELS,
+  KPI_SIGNAL_CHANNELS,
+  SIGNAL_STALE_THRESHOLD_HOURS,
+  DATA_TIMESTAMP_KEYS,
+  MODE_STALE_THRESHOLD_HOURS,
+  ALLOWED_RESPONSE_MODES,
+  OBSERVED_MODES,
+  ESTIMATED_MODES,
+  toIsoTimestamp,
+  collectPayloadTimestamps,
+  latestInternalTimestamp,
+  firstTimestamp,
+  inferResponseMode,
+  deriveValueOrigin,
+  signalAgeHours,
+  classifySignalQuality,
+  deriveResponseMeta,
+  withMeta,
+} from './_shared/dashboard-signal-quality.mjs';
+import { fuseNowcastsIntoLookup } from './_shared/dashboard-nowcast-fusion.mjs';
+
+// Re-exported for test consumers
+// (tests/event-dashboard-topic-article-matching.test.mjs,
+//  tests/event-dashboard-freshness-contract.test.mjs,
+//  tests/nowcast-fusion.test.mjs).
+export { buildTopicArticleProfile, buildTopicRecentArticleScore };
+export { classifySignalQuality, withMeta, deriveResponseMeta };
+export { fuseNowcastsIntoLookup };
+export {
+  inferArticleDashboardTheme,
+  normalizeDashboardThemeKey,
+  sanitizeArticleDisplaySource,
+  shouldRenderTodayEvent,
+};
 
 loadOptionalEnvFile();
 
 const { Pool } = pg;
 const PORT = Number(process.env.DASHBOARD_PORT || 46200);
-const CACHE_DIR = path.resolve('data', 'event-dashboard-cache');
+const EVIDENCE_GRADE_WINDOW_DAYS = 365;
+const AUDIT_DIR = path.resolve('data', 'audits');
+const DATA_FRESHNESS_AUDIT_TTL_MS = Number(process.env.DATA_FRESHNESS_AUDIT_TTL_MS || 5 * 60 * 1000);
+const SERVER_CACHE_FALLBACK_TTL_MS = Number(process.env.DASHBOARD_CACHE_FALLBACK_TTL_MS || 60 * 60 * 1000);
+const HOT_THEME_HAWKES_MAX_AGE_HOURS = Number(process.env.HOT_THEME_HAWKES_MAX_AGE_HOURS || 72);
+const ARTICLE_LIVE_MAX_AGE_HOURS = Number(process.env.ARTICLE_LIVE_MAX_AGE_HOURS || 24);
+const SIDECAR_BASE_URL = String(
+  process.env.LATTICE_SIDECAR_BASE_URL
+  || process.env.LOCAL_API_BASE_URL
+  || (process.env.LOCAL_API_PORT ? `http://127.0.0.1:${process.env.LOCAL_API_PORT}` : 'http://127.0.0.1:46123'),
+).replace(/\/+$/, '');
+const SIDECAR_PROXY_TIMEOUT_MS = Number(process.env.SIDECAR_PROXY_TIMEOUT_MS || 10_000);
+const OPAQUE_DISCOVERY_THEME_PATTERN = /^dt-[a-z0-9]+$/i;
 const logger = createLogger('event-dashboard-api');
+
+// Lightweight Array coercion helper used by the emerging-tech topic detail
+// fallback path. Pulled inline because the existing copies live in builders
+// that aren't imported here, and a runtime ReferenceError was crashing
+// /api/emerging-tech/:topicId with HTTP 500 ("asArray is not defined").
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+  if (typeof value === 'object') return Object.values(value);
+  return [];
+}
 let pool = null;
 let poolConfig = null;
 let poolConfigError = null;
@@ -68,7 +204,12 @@ let poolConfigError = null;
 function getPgConfig() {
   if (!poolConfig && !poolConfigError) {
     try {
-      poolConfig = { ...resolveNasPgConfig(), max: 6 };
+      poolConfig = {
+        ...resolveNasPgConfig(),
+        max: Number(process.env.EVENT_DASHBOARD_PG_POOL_MAX || 20),
+        idleTimeoutMillis: Number(process.env.EVENT_DASHBOARD_PG_IDLE_MS || 30_000),
+        connectionTimeoutMillis: Number(process.env.EVENT_DASHBOARD_PG_CONNECT_MS || 10_000),
+      };
     } catch (error) {
       poolConfigError = error;
     }
@@ -92,17 +233,6 @@ export async function closeEventDashboardResources() {
   pool = null;
   await current.end();
 }
-
-const SIGNAL_LABELS = {
-  vix: 'VIX',
-  yieldSpread: 'Yield Spread',
-  hy_credit_spread: 'HY Credit',
-  dollarIndex: 'Dollar',
-  oilPrice: 'Oil',
-  marketStress: 'Market Stress',
-  transmissionStrength: 'Transmission',
-  eventIntensity: 'Event Intensity',
-};
 
 function buildJsonResponse(data, status = 200) {
   return {
@@ -144,42 +274,160 @@ async function safeQuery(text, values = []) {
   }
 }
 
-async function readJsonCache(name) {
-  const filePath = path.join(CACHE_DIR, `${name}.json`);
-  if (!existsSync(filePath)) return null;
-  try {
-    return JSON.parse(await readFile(filePath, 'utf8'));
-  } catch {
-    return null;
+// R3 — In-process micro-cache (10s TTL) for heavy builders that get called
+// from multiple aggregator endpoints (now-do, health-summary) plus their
+// dedicated routes within the same dashboard refresh tick. Pool is closed
+// over so the cache key is computed from non-pool args only.
+const memoOpsStatusPayload = memoize(
+  'ops-status',
+  () => buildOpsStatusPayload(getPool()),
+);
+const memoHotEventsPayload = memoize(
+  'hot-events',
+  (opts) => buildHotEventsPayload(getPool(), opts),
+);
+const memoTrendingThemesPayload = memoize(
+  'trending-themes',
+  (opts) => buildTrendingThemesPayload(getPool(), opts),
+);
+const memoProductQualityPayload = memoize(
+  'product-quality',
+  () => buildProductQualityPayload({
+    pool: getPool(),
+    safeQuery,
+    buildBrief: buildThemeBriefPayload,
+  }),
+);
+
+async function loadLatestSignalsWithQuality() {
+  // signal_history may or may not have value_origin/writer_id columns depending
+  // on whether scripts/migrations/add-signal-history-origin.mjs has been run.
+  // Use COALESCE-to-default via a detection step so the API keeps working
+  // on pre-migration databases.
+  const columnsR = await safeQuery(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'signal_history'
+  `);
+  const availableColumns = new Set(columnsR.rows.map((row) => String(row.column_name)));
+  const originExpr = availableColumns.has('value_origin')
+    ? 'value_origin'
+    : `'observed'::text AS value_origin`;
+  const writerExpr = availableColumns.has('writer_id')
+    ? 'writer_id'
+    : 'NULL::text AS writer_id';
+  const selectList = ['signal_name', 'ts', 'value', originExpr, writerExpr].join(', ');
+
+  const [latestSignalsR, signalSamplesR] = await Promise.all([
+    safeQuery(`
+      SELECT DISTINCT ON (signal_name) ${selectList}
+      FROM signal_history
+      ORDER BY signal_name, ts DESC
+    `),
+    safeQuery(`
+      WITH ranked AS (
+        SELECT
+          signal_name,
+          ts,
+          value,
+          ROW_NUMBER() OVER (PARTITION BY signal_name ORDER BY ts DESC) AS rn
+        FROM signal_history
+      )
+      SELECT signal_name, ts, value
+      FROM ranked
+      WHERE rn <= 12
+      ORDER BY signal_name, ts DESC
+    `),
+  ]);
+  const samplesBySignal = new Map();
+  for (const row of signalSamplesR.rows) {
+    const key = String(row.signal_name || '');
+    if (!samplesBySignal.has(key)) samplesBySignal.set(key, []);
+    samplesBySignal.get(key).push(row);
   }
-}
-
-async function writeJsonCache(name, payload) {
-  await mkdir(CACHE_DIR, { recursive: true });
-  await writeFile(path.join(CACHE_DIR, `${name}.json`), JSON.stringify(payload, null, 2));
-}
-
-function withMeta(payload, extra = {}) {
+  const rows = latestSignalsR.rows.map((row) => {
+    const signalName = String(row.signal_name || '');
+    return {
+      signal_name: signalName,
+      ts: row.ts,
+      value: Number(row.value || 0),
+      value_origin: row.value_origin || 'observed',
+      writer_id: row.writer_id || null,
+      quality: classifySignalQuality(signalName, row, samplesBySignal.get(signalName) || []),
+    };
+  });
+  const qualityBySignal = Object.fromEntries(rows.map((row) => [row.signal_name, row.quality]));
+  const originBySignal = Object.fromEntries(rows.map((row) => [row.signal_name, {
+    valueOrigin: row.value_origin,
+    writerId: row.writer_id,
+  }]));
+  const criticalRows = rows.filter((row) => KPI_SIGNAL_CHANNELS.has(row.signal_name));
+  const degradedRows = criticalRows.filter((row) => row.quality.status !== 'observed');
+  const mirroredRows = degradedRows.filter((row) => row.quality.status === 'mirrored');
+  const staleRows = degradedRows.filter((row) => row.quality.status === 'stale');
+  const mode = mirroredRows.length > 0 ? 'delayed' : 'live';
+  const stale = staleRows.length > 0 || mirroredRows.length > 0;
+  const staleReason = mirroredRows.length > 0
+    ? `${mirroredRows.map((row) => SIGNAL_LABELS[row.signal_name] || row.signal_name).join(', ')} signal history appears mirrored`
+    : staleRows.length > 0
+      ? `${staleRows.map((row) => SIGNAL_LABELS[row.signal_name] || row.signal_name).join(', ')} signal history is stale`
+      : null;
   return {
-    ...payload,
-    meta: {
-      updatedAt: new Date().toISOString(),
-      stale: false,
-      ...payload.meta,
-      ...extra,
-    },
+    rows,
+    qualityBySignal,
+    originBySignal,
+    mode,
+    stale,
+    staleReason,
   };
 }
 
-function hasRenderableData(payload) {
-  if (!payload || typeof payload !== 'object') return false;
-  return Object.values(payload).some((value) => {
-    if (Array.isArray(value)) return value.length > 0;
-    if (value && typeof value === 'object') return Object.keys(value).length > 0;
-    if (typeof value === 'number') return value > 0;
-    return false;
-  });
+async function detectLiveQuoteFeed() {
+  const tableCheck = await safeQuery(`SELECT to_regclass('market_quotes') AS table_name`);
+  const configured = Boolean(tableCheck.rows?.[0]?.table_name);
+  if (!configured) {
+    return {
+      configured: false,
+      status: 'unavailable',
+      table: 'market_quotes',
+      reason: 'market_quotes table not found; KPI strip is using signal_history, not a live quote feed',
+    };
+  }
+  const quote = await safeQuery(`
+    SELECT symbol, provider, observed_at, fetched_at, last_price
+    FROM market_quotes
+    WHERE symbol = '^VIX'
+    ORDER BY fetched_at DESC
+    LIMIT 1
+  `);
+  const latest = quote.rows?.[0] || null;
+  if (!latest) {
+    return {
+      configured: true,
+      status: 'empty',
+      table: 'market_quotes',
+      reason: 'market_quotes exists but has no ^VIX rows',
+    };
+  }
+  const fetchedAt = toIsoTimestamp(latest.fetched_at);
+  const observedAt = toIsoTimestamp(latest.observed_at);
+  const fetchedAgeHours = signalAgeHours(fetchedAt);
+  const observedAgeHours = signalAgeHours(observedAt);
+  const stale = fetchedAgeHours == null || fetchedAgeHours > 4 || observedAgeHours == null || observedAgeHours > 36;
+  return {
+    configured: true,
+    status: stale ? 'stale' : 'configured',
+    table: 'market_quotes',
+    symbol: String(latest.symbol || '^VIX'),
+    provider: String(latest.provider || 'unknown'),
+    fetchedAt,
+    observedAt,
+    lastPrice: Number(latest.last_price),
+    fetchedAgeHours: Number.isFinite(fetchedAgeHours) ? Math.round(fetchedAgeHours * 10) / 10 : null,
+    observedAgeHours: Number.isFinite(observedAgeHours) ? Math.round(observedAgeHours * 10) / 10 : null,
+    reason: stale ? 'market_quotes ^VIX row is stale or missing observed time' : null,
+  };
 }
+
 
 async function resolveWithCache(cacheKey, buildPayload) {
   try {
@@ -193,46 +441,25 @@ async function resolveWithCache(cacheKey, buildPayload) {
     return buildJsonResponse(enriched);
   } catch (error) {
     const cached = await readJsonCache(cacheKey);
-    if (cached) {
+    if (cached && canUseServerCacheFallback(cacheKey, cached)) {
       logger.metric('api.cache_hit', 1, { cacheKey });
       return buildJsonResponse(withMeta(cached, {
+        cacheHit: true,
+        mode: 'cache',
         stale: true,
         cacheReason: String(error?.message || error || 'cache fallback'),
       }));
     }
+    if (cached) {
+      logger.warn('server cache fallback rejected because cache is stale', {
+        cacheKey,
+        generatedAt: cacheGeneratedAt(cached),
+        reason: String(error?.message || error || 'cache fallback'),
+      });
+    }
     logger.metric('api.cache_miss', 1, { cacheKey });
     throw error;
   }
-}
-
-function toCacheToken(value) {
-  const normalized = String(value ?? 'all')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return normalized || 'all';
-}
-
-function buildCacheKey(prefix, ...parts) {
-  return [prefix, ...parts.map((part) => toCacheToken(part))].join('--');
-}
-
-function hasDynamicSinceParams(params) {
-  if (!params || typeof params.keys !== 'function') return false;
-  if (params.has('since')) return true;
-  return Array.from(params.keys()).some((key) => String(key || '').startsWith('since_'));
-}
-
-function buildSinceToken(params, keyPrefix = 'since') {
-  const parts = [];
-  for (const [key, value] of params.entries()) {
-    if (key === keyPrefix || key.startsWith(`${keyPrefix}_`)) {
-      parts.push(`${key}:${value}`);
-    }
-  }
-  parts.sort();
-  return parts.length > 0 ? parts.join('|') : 'none';
 }
 
 async function readJsonBody(req) {
@@ -246,6 +473,52 @@ async function readJsonBody(req) {
   return JSON.parse(text);
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = SIDECAR_PROXY_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = { raw: text };
+    }
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function buildSidecarProxyPayload(endpoint) {
+  try {
+    const result = await fetchJsonWithTimeout(`${SIDECAR_BASE_URL}${endpoint}`);
+    return {
+      ok: result.ok,
+      status: result.status,
+      sidecarBaseUrl: SIDECAR_BASE_URL,
+      endpoint,
+      payload: result.payload,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 503,
+      sidecarBaseUrl: SIDECAR_BASE_URL,
+      endpoint,
+      error: String(error?.message || error),
+    };
+  }
+}
+
 function normalizeTemperatureValue(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -254,6 +527,49 @@ function normalizeTemperatureValue(value) {
 function clamp(value, minimum, maximum) {
   if (!Number.isFinite(value)) return minimum;
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function timestampMs(value) {
+  const iso = toIsoTimestamp(value);
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function latestIsoTimestampFrom(...values) {
+  const max = values
+    .flat()
+    .map(timestampMs)
+    .filter((value) => Number.isFinite(value))
+    .reduce((current, value) => Math.max(current, value), 0);
+  return max > 0 ? new Date(max).toISOString() : null;
+}
+
+function ageHoursFrom(value, now = new Date()) {
+  const ms = timestampMs(value);
+  if (!ms) return null;
+  return Math.max(0, (now.getTime() - ms) / 36e5);
+}
+
+function isFreshWithinHours(value, maxAgeHours, now = new Date()) {
+  const age = ageHoursFrom(value, now);
+  return age != null && age <= maxAgeHours;
+}
+
+function cacheGeneratedAt(payload) {
+  return toIsoTimestamp(payload?.meta?.generatedAt || payload?.generatedAt || payload?.meta?.updatedAt || payload?.updatedAt);
+}
+
+function canUseServerCacheFallback(cacheKey, payload, now = new Date()) {
+  const generatedAt = cacheGeneratedAt(payload);
+  if (!generatedAt) return false;
+  const ageMs = now.getTime() - Date.parse(generatedAt);
+  if (!Number.isFinite(ageMs) || ageMs < 0) return false;
+  const key = String(cacheKey || '');
+  const ttlMs = key === 'today' || key === 'live-status'
+    ? Math.min(SERVER_CACHE_FALLBACK_TTL_MS, 15 * 60 * 1000)
+    : SERVER_CACHE_FALLBACK_TTL_MS;
+  return ageMs <= ttlMs;
 }
 
 function normalizeSignalQueueTitle(value) {
@@ -270,6 +586,68 @@ function classifyTemperature(intensity) {
   return 'COLD';
 }
 
+function isOpaqueDiscoveryTheme(value) {
+  return OPAQUE_DISCOVERY_THEME_PATTERN.test(String(value || '').trim());
+}
+
+function normalizeDashboardThemeKey(value) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === 'unknown' || isOpaqueDiscoveryTheme(raw)) return null;
+  const canonical = mapThemeToTaxonomy(raw);
+  return canonical && canonical !== 'unknown' ? canonical : null;
+}
+
+function inferArticleDashboardTheme(row) {
+  const explicit = normalizeDashboardThemeKey(row?.raw_theme)
+    || normalizeDashboardThemeKey(row?.auto_theme)
+    || normalizeDashboardThemeKey(row?.theme_key)
+    || normalizeDashboardThemeKey(row?.theme)
+    || normalizeDashboardThemeKey(row?.legacy_theme);
+  if (explicit) return explicit;
+
+  const ranked = rankThemesForText(
+    [row?.title, row?.summary, row?.source].filter(Boolean).join(' '),
+    { includeParents: false, limit: 1 },
+  );
+  const best = ranked[0];
+  return best && Number(best.score || 0) >= 0.8 ? best.theme : null;
+}
+
+function decodeDashboardHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+      const codePoint = Number.parseInt(hex, 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _;
+    })
+    .replace(/&#(\d+);/g, (_, decimal) => {
+      const codePoint = Number.parseInt(decimal, 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _;
+    })
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function sanitizeArticleDisplaySource(source, title = '') {
+  const rawSource = decodeDashboardHtmlEntities(source).trim();
+  const rawTitle = decodeDashboardHtmlEntities(title).trim();
+  const cleanedSource = rawSource
+    .replace(/\s+source(?:\s+\d{8})?$/i, '')
+    .replace(/^codex\s+(?:e2e|retest)\s+/i, '')
+    .trim();
+  if (!cleanedSource.toLowerCase().startsWith('google news:')) return cleanedSource;
+
+  const titleParts = rawTitle.split(/\s[-–—]\s/).map((part) => part.trim()).filter(Boolean);
+  const publisher = titleParts.length > 1 ? titleParts.at(-1) : null;
+  return publisher || 'Google News';
+}
+
+function shouldRenderTodayEvent(event) {
+  return Boolean(String(event?.title || '').trim() && normalizeDashboardThemeKey(event?.theme));
+}
+
 function mapExpectedReactions(rows) {
   return rows.slice(0, 5).map((row) => {
     const magnitude = Number(row.avg_return ?? row.avgReturn ?? 0);
@@ -279,69 +657,6 @@ function mapExpectedReactions(rows) {
       magnitude: Math.abs(magnitude),
     };
   });
-}
-
-const MAP_LENS_FILTER_TERMS = {
-  all: [],
-  conflict: ['conflict', 'war', 'defense', 'military', 'drone', 'sanction', 'security', 'iran', 'israel', 'ukraine', 'russia'],
-  macro: ['macro', 'macroeconomics', 'fiscal', 'inflation', 'rates', 'liquidity', 'yield', 'monetary', 'budget', 'trade'],
-  tech: ['technology', 'technology-general', 'ai', 'cloud', 'robotics', 'semiconductor', 'cyber', 'quantum', 'science'],
-  energy: ['energy', 'oil', 'gas', 'lng', 'clean-energy', 'renewable', 'power', 'electricity', 'grid'],
-  climate: ['climate', 'wildfire', 'water', 'agriculture', 'weather', 'heat', 'resilience', 'environment'],
-};
-
-const MAP_LENS_ANCHORS = [
-  { id: 'iran', lat: 35.6892, lon: 51.389, terms: ['iran', 'tehran', 'persian gulf', 'hormuz'], filters: ['conflict', 'energy'] },
-  { id: 'israel', lat: 31.7683, lon: 35.2137, terms: ['israel', 'gaza', 'tel aviv', 'jerusalem'], filters: ['conflict', 'energy'] },
-  { id: 'ukraine', lat: 50.4501, lon: 30.5234, terms: ['ukraine', 'kyiv', 'kiev', 'donbas', 'crimea'], filters: ['conflict', 'energy'] },
-  { id: 'russia', lat: 55.7558, lon: 37.6173, terms: ['russia', 'moscow', 'kremlin'], filters: ['conflict', 'energy'] },
-  { id: 'taiwan', lat: 25.033, lon: 121.5654, terms: ['taiwan', 'tsmc', 'strait', 'taipei'], filters: ['tech', 'conflict'] },
-  { id: 'seoul', lat: 37.5665, lon: 126.978, terms: ['korea', 'seoul', 'semiconductor', 'memory chip'], filters: ['tech'] },
-  { id: 'tokyo', lat: 35.6762, lon: 139.6503, terms: ['japan', 'tokyo'], filters: ['tech', 'macro'] },
-  { id: 'silicon-valley', lat: 37.3875, lon: -122.0575, terms: ['ai', 'cloud', 'data center', 'nvidia', 'silicon valley'], filters: ['tech'] },
-  { id: 'london', lat: 51.5072, lon: -0.1276, terms: ['uk', 'britain', 'london', 'budget', 'gilts'], filters: ['macro'] },
-  { id: 'washington', lat: 38.9072, lon: -77.0369, terms: ['us', 'federal reserve', 'treasury', 'washington', 'congress'], filters: ['macro', 'tech'] },
-  { id: 'dubai', lat: 25.2048, lon: 55.2708, terms: ['shipping', 'suez', 'red sea', 'middle east', 'energy', 'oil'], filters: ['energy', 'conflict'] },
-  { id: 'singapore', lat: 1.3521, lon: 103.8198, terms: ['shipping', 'strait', 'container', 'freight', 'logistics'], filters: ['energy', 'macro', 'tech'] },
-  { id: 'santiago', lat: -33.4489, lon: -70.6693, terms: ['lithium', 'copper', 'critical minerals'], filters: ['energy', 'climate', 'tech'] },
-  { id: 'amazon', lat: -3.4653, lon: -62.2159, terms: ['climate', 'wildfire', 'amazon', 'deforestation'], filters: ['climate'] },
-  { id: 'australia', lat: -35.2809, lon: 149.13, terms: ['weather', 'wildfire', 'heat', 'water stress'], filters: ['climate', 'energy'] },
-];
-
-const TRANSMISSION_TARGETS = {
-  commodity: { lat: 25.2048, lon: 55.2708, label: 'Commodity markets' },
-  equity: { lat: 40.7128, lon: -74.006, label: 'Equity markets' },
-  currency: { lat: 51.5072, lon: -0.1276, label: 'FX markets' },
-  rates: { lat: 38.8951, lon: -77.0364, label: 'Rates markets' },
-  country: { lat: 48.8566, lon: 2.3522, label: 'Country exposure' },
-  'supply-chain': { lat: 1.3521, lon: 103.8198, label: 'Supply-chain hubs' },
-};
-
-function normalizeLensFilter(value) {
-  const normalized = String(value || 'all').trim().toLowerCase();
-  return Object.hasOwn(MAP_LENS_FILTER_TERMS, normalized) ? normalized : 'all';
-}
-
-function normalizeLensText(...values) {
-  return values
-    .map((value) => String(value || '').trim().toLowerCase())
-    .filter(Boolean)
-    .join(' ');
-}
-
-function matchesLensFilter(filter, text) {
-  if (filter === 'all') return true;
-  return MAP_LENS_FILTER_TERMS[filter].some((term) => text.includes(term));
-}
-
-function inferMapLensAnchor(title, theme, filter = 'all') {
-  const text = normalizeLensText(title, theme);
-  const direct = MAP_LENS_ANCHORS.find((anchor) => anchor.terms.some((term) => text.includes(term)));
-  if (direct) return direct;
-  if (filter !== 'all') {
-    return MAP_LENS_ANCHORS.find((anchor) => anchor.filters.includes(filter)) || null;
-  }
-  return MAP_LENS_ANCHORS[0] || null;
 }
 
 function periodToDays(period) {
@@ -382,6 +697,15 @@ async function buildMapLensOverlayPayload(params) {
       LIMIT 180
     `, [days]),
     safeQuery(`
+      WITH article_quality AS (
+        SELECT aem.canonical_event_id,
+               COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+               COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+          FROM article_event_map aem
+          JOIN articles a ON a.id = aem.article_id
+         GROUP BY aem.canonical_event_id
+      )
       SELECT
         ce.id AS canonical_event_id,
         ce.theme,
@@ -391,10 +715,19 @@ async function buildMapLensOverlayPayload(params) {
         eu.horizon,
         eu.uplift,
         eu.t_stat,
+        eu.n_controls,
         eu.evidence_grade
       FROM event_uplift eu
       JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+      LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.id
       WHERE eu.evidence_grade = 'E2'
+        AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+        AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+        AND NOT (
+          COALESCE(aq.known_market_relevance_articles, 0) > 0
+          AND COALESCE(aq.market_relevant_articles, 0) = 0
+          AND COALESCE(aq.low_relevance_articles, 0) > 0
+        )
         AND ce.event_date >= CURRENT_DATE - ($1 * INTERVAL '1 day')
       ORDER BY ABS(COALESCE(eu.uplift, 0)) DESC, ABS(COALESCE(eu.t_stat, 0)) DESC, ce.event_date DESC
       LIMIT 80
@@ -495,14 +828,12 @@ async function buildMapLensOverlayPayload(params) {
 }
 
 async function buildLiveStatus() {
-  const [signalsR, tempsR, pendingR, articlesR, recentThemesR] = await Promise.all([
+  const now = new Date();
+  const [signalState, quoteFeed, tempsR, pendingR, articlesR, recentThemesR] = await Promise.all([
+    loadLatestSignalsWithQuality(),
+    detectLiveQuoteFeed(),
     safeQuery(`
-      SELECT DISTINCT ON (signal_name) signal_name, ts, value
-      FROM signal_history
-      ORDER BY signal_name, ts DESC
-    `),
-    safeQuery(`
-      SELECT DISTINCT ON (theme) theme, normalized_temperature
+      SELECT DISTINCT ON (theme) theme, normalized_temperature, event_date, updated_at
       FROM event_hawkes_intensity
       ORDER BY theme, event_date DESC
     `),
@@ -512,57 +843,155 @@ async function buildLiveStatus() {
       WHERE status IN ('pending', 'waiting')
     `),
     safeQuery(`
-      SELECT COUNT(*)::int AS count
+      SELECT COUNT(*)::int AS count, MAX(published_at) AS latest_published_at
       FROM articles
       WHERE published_at >= NOW() - INTERVAL '24 hours'
     `),
     safeQuery(`
-      SELECT auto_theme AS theme, COUNT(*)::int AS count
-      FROM auto_article_themes t
-      JOIN articles a ON a.id = t.article_id
-      WHERE a.published_at >= NOW() - INTERVAL '7 days'
-      GROUP BY auto_theme
+      WITH recent_theme_rows AS (
+        SELECT
+          CASE
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'tech' THEN 'technology-general'
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'economy' THEN 'macroeconomics'
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'politics' THEN 'geopolitics'
+            WHEN COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), '')) = 'energy' THEN 'clean-energy'
+            ELSE COALESCE(NULLIF(TRIM(t.theme_key), ''), NULLIF(TRIM(t.auto_theme), ''))
+          END AS theme,
+          a.published_at
+        FROM auto_article_themes t
+        JOIN articles a ON a.id = t.article_id
+        WHERE a.published_at >= NOW() - INTERVAL '7 days'
+      )
+      SELECT theme, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at
+      FROM recent_theme_rows
+      WHERE theme IS NOT NULL
+        AND theme <> ''
+        AND theme !~* '^dt-[a-z0-9]+$'
+        AND theme <> 'unknown'
+      GROUP BY theme
       ORDER BY count DESC
       LIMIT 8
     `),
   ]);
 
-  const temperatures = (tempsR.rows.length > 0 ? tempsR.rows : recentThemesR.rows).map((row) => {
-    const intensity = normalizeTemperatureValue(
-      row.normalized_temperature ?? Math.min(1, Number(row.count || 0) / 20),
-    );
-    return {
-      theme: String(row.theme || 'unknown'),
-      temperature: classifyTemperature(intensity),
-      intensity,
-    };
-  });
+  const freshHawkesRows = tempsR.rows.filter((row) => (
+    isFreshWithinHours(row.event_date, HOT_THEME_HAWKES_MAX_AGE_HOURS, now)
+    || isFreshWithinHours(row.updated_at, HOT_THEME_HAWKES_MAX_AGE_HOURS, now)
+  ));
+  const temperatureRows = freshHawkesRows.length > 0 ? freshHawkesRows : recentThemesR.rows;
+  const temperatureSource = freshHawkesRows.length > 0 ? 'event_hawkes_intensity' : 'recent_article_themes';
+  const maxRecentThemeCount = Math.max(...recentThemesR.rows.map((row) => Number(row.count || 0)), 1);
+  const temperatures = temperatureRows
+    .filter((row) => !isOpaqueDiscoveryTheme(row.theme))
+    .map((row) => {
+      const intensity = normalizeTemperatureValue(
+        row.normalized_temperature ?? Math.min(1, Number(row.count || 0) / maxRecentThemeCount),
+      );
+      return {
+        theme: String(row.theme || 'unknown'),
+        temperature: classifyTemperature(intensity),
+        intensity,
+        updatedAt: row.updated_at || row.latest_published_at || row.event_date || null,
+        source: temperatureSource,
+      };
+    });
 
-  const signals = signalsR.rows.map((row) => {
+  const signals = signalState.rows.map((row) => {
     const channel = String(row.signal_name || '');
     return {
       channel,
       value: Number(row.value || 0),
       label: SIGNAL_LABELS[channel] || channel,
       updatedAt: row.ts,
+      quality: row.quality,
     };
   });
+  const articleCount24h = Number(articlesR.rows[0]?.count || 0);
+  const latestArticlePublishedAt = toIsoTimestamp(articlesR.rows[0]?.latest_published_at);
+  const articleAgeHours = latestArticlePublishedAt ? ageHoursFrom(latestArticlePublishedAt, now) : null;
+  const articlesStale = !latestArticlePublishedAt || Number(articleAgeHours) > ARTICLE_LIVE_MAX_AGE_HOURS;
+  const latestSignalAt = latestIsoTimestampFrom(signals.map((row) => row.updatedAt));
+  const latestTemperatureAt = latestIsoTimestampFrom(temperatures.map((row) => row.updatedAt));
+  const dataUpdatedAt = latestIsoTimestampFrom(latestArticlePublishedAt, latestSignalAt, latestTemperatureAt);
 
   return {
     temperatures,
     signals,
+    signalQuality: signalState.qualityBySignal,
     pending: Number(pendingR.rows[0]?.count || 0),
-    todayArticles: Number(articlesR.rows[0]?.count || 0),
+    todayArticles: articleCount24h,
+    articleFreshness: {
+      latestPublishedAt: latestArticlePublishedAt,
+      ageHours: Number.isFinite(articleAgeHours) ? Math.round(articleAgeHours * 10) / 10 : null,
+      stale: articlesStale,
+      count24h: articleCount24h,
+      maxAgeHours: ARTICLE_LIVE_MAX_AGE_HOURS,
+    },
+    temperatureSource,
+    temperatureFreshness: {
+      source: temperatureSource,
+      fallbackUsed: freshHawkesRows.length === 0 && tempsR.rows.length > 0,
+      reason: freshHawkesRows.length === 0 && tempsR.rows.length > 0
+        ? 'event_hawkes_intensity is stale; using recent article themes'
+        : null,
+    },
+    meta: {
+      mode: signalState.mode,
+      dataUpdatedAt,
+      latestInternalUpdatedAt: dataUpdatedAt,
+      stale: signalState.stale || quoteFeed.status !== 'configured' || articlesStale,
+      staleReason: [
+        signalState.staleReason,
+        quoteFeed.status === 'configured' ? null : quoteFeed.reason,
+        articlesStale ? `article age ${articleAgeHours == null ? 'unknown' : Math.round(articleAgeHours)}h exceeds ${ARTICLE_LIVE_MAX_AGE_HOURS}h threshold` : null,
+      ].filter(Boolean).join('; ') || null,
+      quoteFeed,
+    },
   };
 }
 
+/**
+ * Pure: merge nowcast rows into the observed lookup/originMap so that KPI
+ * payloads show estimated values when observed is missing or non-observed.
+ * Extracted for testability (buildSignalSummary wires the pg calls).
+ *
+ * @param {{lookup: Record<string, unknown>, originMap: Record<string, any>,
+ *          nowcasts: Record<string, any>}} args
+ * @returns {{lookup: Record<string, unknown>, originMap: Record<string, any>,
+ *            nowcastSummary: Record<string, any>, anyEstimated: boolean}}
+ */
+async function loadLatestNowcastsForSignals(signalNames) {
+  if (!Array.isArray(signalNames) || !signalNames.length) return {};
+  // estimated_signal_nowcasts may not exist yet (Phase 1 migration pending)
+  const tableCheck = await safeQuery(`SELECT to_regclass('estimated_signal_nowcasts') AS t`);
+  if (!tableCheck.rows?.[0]?.t) return {};
+  // Also ensure model_registry exists — we filter fused nowcasts to only
+  // models whose promotion_state ∈ ('shadow','active'). Without that gate
+  // a gate-failing candidate model would silently leak to the dashboard.
+  const registryCheck = await safeQuery(`SELECT to_regclass('model_registry') AS t`);
+  if (!registryCheck.rows?.[0]?.t) return {};
+  const { rows } = await safeQuery(`
+    SELECT DISTINCT ON (est.signal_name)
+      est.signal_name, est.target_ts, est.estimated_value, est.estimate_method,
+      est.estimate_confidence, est.interval_low, est.interval_high,
+      est.feature_vintage_at, est.derived_from_sources, est.last_observed_at, est.created_at,
+      est.model_version, mr.promotion_state
+    FROM estimated_signal_nowcasts est
+    JOIN model_registry mr
+      ON mr.target_signal = est.signal_name
+     AND mr.model_version = est.model_version
+    WHERE est.signal_name = ANY($1)
+      AND est.last_observed_at IS NULL
+      AND mr.promotion_state IN ('shadow','active')
+    ORDER BY est.signal_name, est.created_at DESC
+  `, [signalNames]);
+  return Object.fromEntries(rows.map((row) => [String(row.signal_name), row]));
+}
+
 async function buildSignalSummary() {
-  const [latestSignalsR, vixHistoryR] = await Promise.all([
-    safeQuery(`
-      SELECT DISTINCT ON (signal_name) signal_name, ts, value
-      FROM signal_history
-      ORDER BY signal_name, ts DESC
-    `),
+  const [signalState, quoteFeed, vixHistoryR] = await Promise.all([
+    loadLatestSignalsWithQuality(),
+    detectLiveQuoteFeed(),
     safeQuery(`
       SELECT ts, value
       FROM signal_history
@@ -573,13 +1002,26 @@ async function buildSignalSummary() {
     `),
   ]);
 
-  const rows = latestSignalsR.rows.map((row) => ({
-    signal_name: String(row.signal_name || ''),
-    ts: row.ts,
-    value: Number(row.value || 0),
-  }));
+  const rows = signalState.rows;
   const lookup = Object.fromEntries(rows.map((row) => [row.signal_name, row.value]));
-  const vix = Number(lookup.vix);
+  const originMap = signalState.originBySignal || {};
+
+  // Fuse in nowcasts for signals where the observed value is missing or
+  // non-observed (proxy/composite). Never overwrite observed values.
+  const nowcastCandidates = new Set();
+  for (const key of ['vix', 'yieldSpread', 'hy_credit_spread', 'treasury10y', 'ig_credit_spread', 'oilPrice', 'dollarIndex', 'marketStress', 'transmissionStrength']) {
+    const origin = originMap[key]?.valueOrigin;
+    if (origin !== 'observed') nowcastCandidates.add(key);
+    if (lookup[key] == null || !Number.isFinite(Number(lookup[key]))) nowcastCandidates.add(key);
+  }
+  const nowcasts = await loadLatestNowcastsForSignals(Array.from(nowcastCandidates));
+  const fused = fuseNowcastsIntoLookup({ lookup, originMap, nowcasts });
+  const fusedLookup = fused.lookup;
+  const fusedOriginMap = fused.originMap;
+  const nowcastSummary = fused.nowcastSummary;
+  const anyEstimated = fused.anyEstimated;
+
+  const vix = Number(fusedLookup.vix);
   const riskGauge = Number.isFinite(vix)
     ? Number(clamp(45 + (vix - 20) * 2, 4, 100).toFixed(1))
     : null;
@@ -587,17 +1029,28 @@ async function buildSignalSummary() {
     ? (vix > 25 ? 'risk-off' : vix < 18 ? 'risk-on' : 'balanced')
     : null;
 
+  const responseMode = anyEstimated ? 'nowcast' : signalState.mode;
+
   return {
     vix: Number.isFinite(vix) ? vix : null,
-    yieldSpread: Number.isFinite(Number(lookup.yieldSpread)) ? Number(lookup.yieldSpread) : null,
-    oilPrice: Number.isFinite(Number(lookup.oilPrice)) ? Number(lookup.oilPrice) : null,
-    dollarIndex: Number.isFinite(Number(lookup.dollarIndex)) ? Number(lookup.dollarIndex) : null,
-    hyCreditSpread: Number.isFinite(Number(lookup.hy_credit_spread)) ? Number(lookup.hy_credit_spread) : null,
-    marketStress: Number.isFinite(Number(lookup.marketStress)) ? Number(lookup.marketStress) : null,
+    yieldSpread: Number.isFinite(Number(fusedLookup.yieldSpread)) ? Number(fusedLookup.yieldSpread) : null,
+    oilPrice: Number.isFinite(Number(fusedLookup.oilPrice)) ? Number(fusedLookup.oilPrice) : null,
+    dollarIndex: Number.isFinite(Number(fusedLookup.dollarIndex)) ? Number(fusedLookup.dollarIndex) : null,
+    hyCreditSpread: Number.isFinite(Number(fusedLookup.hy_credit_spread)) ? Number(fusedLookup.hy_credit_spread) : null,
+    marketStress: Number.isFinite(Number(fusedLookup.marketStress)) ? Number(fusedLookup.marketStress) : null,
     riskGauge,
     riskState,
     vixHistory: vixHistoryR.rows.map((row) => Number(row.value || 0)).filter((value) => Number.isFinite(value)),
     rows,
+    signalQuality: signalState.qualityBySignal,
+    signalOrigin: fusedOriginMap,
+    nowcasts: nowcastSummary,
+    meta: {
+      mode: responseMode,
+      stale: signalState.stale || quoteFeed.status !== 'configured',
+      staleReason: [signalState.staleReason, quoteFeed.status === 'configured' ? null : quoteFeed.reason].filter(Boolean).join('; ') || null,
+      quoteFeed,
+    },
   };
 }
 
@@ -660,25 +1113,7 @@ async function buildHeatmap() {
   return { themes, symbols, cells };
 }
 
-async function buildTodayEvents() {
-  const recent24h = await safeQuery(`
-    SELECT id, title, source, published_at
-    FROM articles
-    WHERE published_at >= NOW() - INTERVAL '24 hours'
-    ORDER BY published_at DESC
-    LIMIT 40
-  `);
-
-  const articleRows = recent24h.rows.length > 0
-    ? recent24h.rows
-    : (await safeQuery(`
-      SELECT id, title, source, published_at
-      FROM articles
-      WHERE published_at >= NOW() - INTERVAL '7 days'
-      ORDER BY published_at DESC
-      LIMIT 40
-    `)).rows;
-
+async function materializeTodayEvents(articleRows, window) {
   if (!articleRows.length) {
     return { events: [], meta: { window: 'collecting' } };
   }
@@ -686,7 +1121,11 @@ async function buildTodayEvents() {
   const articleIds = articleRows.map((row) => Number(row.id)).filter(Number.isFinite);
   const themesR = articleIds.length > 0
     ? await safeQuery(`
-      SELECT article_id, auto_theme
+      SELECT
+        article_id,
+        auto_theme,
+        theme_key,
+        COALESCE(NULLIF(TRIM(theme_key), ''), NULLIF(TRIM(auto_theme), '')) AS raw_theme
       FROM auto_article_themes
       WHERE article_id = ANY($1::int[])
     `, [articleIds])
@@ -694,10 +1133,19 @@ async function buildTodayEvents() {
 
   const themeByArticle = new Map();
   for (const row of themesR.rows) {
-    themeByArticle.set(Number(row.article_id), String(row.auto_theme || 'unknown'));
+    const articleId = Number(row.article_id);
+    if (!Number.isFinite(articleId) || themeByArticle.has(articleId)) continue;
+    const theme = inferArticleDashboardTheme(row);
+    if (theme) themeByArticle.set(articleId, theme);
+  }
+  for (const row of articleRows) {
+    const articleId = Number(row.id);
+    if (!Number.isFinite(articleId) || themeByArticle.has(articleId)) continue;
+    const theme = inferArticleDashboardTheme(row);
+    if (theme) themeByArticle.set(articleId, theme);
   }
 
-  const distinctThemes = Array.from(new Set(themesR.rows.map((row) => String(row.auto_theme || 'unknown')).filter(Boolean)));
+  const distinctThemes = Array.from(new Set([...themeByArticle.values()].filter(Boolean)));
   const sensitivityR = distinctThemes.length > 0
     ? await safeQuery(`
       SELECT theme, symbol, avg_return
@@ -715,21 +1163,51 @@ async function buildTodayEvents() {
     reactionsByTheme.set(theme, bucket);
   }
 
-  return {
-    events: articleRows.map((row) => {
-      const theme = themeByArticle.get(Number(row.id)) || 'unknown';
+  const events = articleRows
+    .map((row) => {
+      const theme = themeByArticle.get(Number(row.id)) || null;
       return {
-        title: String(row.title || ''),
-        source: String(row.source || ''),
+        title: decodeDashboardHtmlEntities(row.title || ''),
+        source: sanitizeArticleDisplaySource(row.source, row.title),
         publishedAt: row.published_at,
         theme,
         expectedReactions: mapExpectedReactions(reactionsByTheme.get(theme) || []),
       };
-    }),
+    })
+    .filter(shouldRenderTodayEvent)
+    .slice(0, 40);
+
+  return {
+    events,
     meta: {
-      window: recent24h.rows.length > 0 ? '24h' : '7d-fallback',
+      window,
+      dataUpdatedAt: latestIsoTimestampFrom((events.length > 0 ? events : articleRows).map((row) => row.publishedAt || row.published_at)),
     },
   };
+}
+
+async function buildTodayEvents() {
+  const recent24h = await safeQuery(`
+    SELECT id, title, summary, source, published_at, theme, legacy_theme
+    FROM articles
+    WHERE published_at >= NOW() - INTERVAL '24 hours'
+    ORDER BY published_at DESC
+    LIMIT 240
+  `);
+
+  if (recent24h.rows.length > 0) {
+    const today = await materializeTodayEvents(recent24h.rows, '24h');
+    if (today.events.length > 0) return today;
+  }
+
+  const fallbackRows = (await safeQuery(`
+      SELECT id, title, summary, source, published_at, theme, legacy_theme
+      FROM articles
+      WHERE published_at >= NOW() - INTERVAL '7 days'
+      ORDER BY published_at DESC
+      LIMIT 500
+    `)).rows;
+  return materializeTodayEvents(fallbackRows, '7d-fallback');
 }
 
 async function buildStrategies(params) {
@@ -737,7 +1215,12 @@ async function buildStrategies(params) {
   const symbol = String(params.get('symbol') || '').trim().toUpperCase();
 
   const primary = await safeQuery(`
-    SELECT name, sharpe_ratio, expected_return, max_drawdown, theme
+    SELECT
+      CONCAT(theme, ' / ', symbol, COALESCE(' ' || direction, '')) AS name,
+      sharpe_ratio,
+      COALESCE(avg_pnl_pct, total_return_pct, 0) AS expected_return,
+      COALESCE(max_drawdown_pct, 0) AS max_drawdown,
+      theme
     FROM whatif_simulations
     WHERE ($1 = '' OR theme = $1) AND ($2 = '' OR symbol = $2)
     ORDER BY sharpe_ratio DESC
@@ -875,6 +1358,456 @@ async function buildDataQuality() {
   return computeDataQualityMetrics(getPool());
 }
 
+// ── /api/ops/status (S-Level Phase 7 minimal) ─────────────────────────────
+// Single-pane operator health: services, freshness, model, recent issues.
+// Designed to be the canonical "is the system healthy" endpoint.
+
+const OPS_DAEMON_STATE_PATH = path.resolve('data', 'daemon-state.json');
+const OPS_ACCUMULATOR_STATE_PATH = path.resolve('data', 'historical', 'accumulator-state.json');
+const OPS_ALERTS_PATH = path.resolve('data', 'alerts.json');
+const OPS_META_MODEL_URL = process.env.META_MODEL_URL || 'http://127.0.0.1:8100';
+const OPS_DAEMON_FRESH_MS = 30 * 60 * 1000;       // 2x the 15-minute daemon tick
+const OPS_ACCUMULATOR_FRESH_MS = 90 * 60 * 1000;  // accumulator cycles include slow network backfills
+const OPS_HTTP_PROBE_TIMEOUT_MS = 1500;
+const OPS_RECENT_ISSUE_LIMIT = 10;
+
+async function probeFileService(stateFilePath, freshThresholdMs) {
+  try {
+    const { stat: statFn } = await import('node:fs/promises');
+    const s = await statFn(stateFilePath);
+    const ageMs = Date.now() - s.mtimeMs;
+    return {
+      status: ageMs <= freshThresholdMs ? 'ok' : 'stale',
+      lastTickAt: new Date(s.mtimeMs).toISOString(),
+      ageMs,
+      ageMinutes: Math.round(ageMs / 60_000),
+    };
+  } catch {
+    return { status: 'missing', lastTickAt: null, ageMs: null, ageMinutes: null };
+  }
+}
+
+async function probeMetaModelService() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPS_HTTP_PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${OPS_META_MODEL_URL}/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    return {
+      status: res.ok ? 'ok' : 'unhealthy',
+      http: res.status,
+      url: OPS_META_MODEL_URL,
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    const reason = err?.name === 'AbortError' ? 'timeout' : String(err?.message || err);
+    return { status: 'unreachable', http: null, url: OPS_META_MODEL_URL, reason };
+  }
+}
+
+async function loadRecentOpsAlerts(limit = OPS_RECENT_ISSUE_LIMIT) {
+  try {
+    const raw = await readFile(OPS_ALERTS_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry) => {
+        const message = typeof entry?.message === 'string' ? entry.message : '';
+        // Legacy read-only /api/calibration calls used to emit this as a
+        // meta-model critical alert even though it measured sensitivity-matrix
+        // calibration. Keep the raw log on disk, but do not surface it as an
+        // active ops issue.
+        return !(entry?.context?.type === 'model_drift' && message.startsWith('Meta-model calibration drift:'));
+      })
+      .slice(-limit)
+      .reverse()
+      .map((entry) => ({
+        timestamp: entry?.timestamp ?? null,
+        severity: entry?.severity ?? 'info',
+        message: typeof entry?.message === 'string' ? entry.message.slice(0, 240) : '',
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness }) {
+  // Critical conditions: master daemon stale/missing, meta-model unreachable, model failed.
+  if (daemon.status !== 'ok') return 'critical';
+  if (metaModel.status === 'unreachable' || modelLevel === 'critical') return 'critical';
+  // Warning conditions: accumulator stale, calibration warning, feature lag, meta-model unhealthy.
+  if (accumulator.status !== 'ok') return 'warning';
+  if (modelLevel === 'warning') return 'warning';
+  if (metaModel.status === 'unhealthy') return 'warning';
+  if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) return 'warning';
+  if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) return 'warning';
+  return 'ok';
+}
+
+async function buildOpsStatusPayload(pool) {
+  const generatedAt = new Date().toISOString();
+
+  // Run independent probes in parallel.
+  const [daemon, accumulator, metaModel, recentIssues, modelHealth] = await Promise.all([
+    probeFileService(OPS_DAEMON_STATE_PATH, OPS_DAEMON_FRESH_MS),
+    probeFileService(OPS_ACCUMULATOR_STATE_PATH, OPS_ACCUMULATOR_FRESH_MS),
+    probeMetaModelService(),
+    loadRecentOpsAlerts(),
+    buildMetaModelHealthPayload(pool).catch((err) => ({
+      ok: false,
+      error: String(err?.message || err),
+      summary: {
+        level: 'critical',
+        pipelineFreshness: null,
+        latestEval: null,
+        activeModel: null,
+        symbolCoverage: null,
+      },
+    })),
+  ]);
+
+  // buildMetaModelHealthPayload nests freshness/eval/activeModel/symbolCoverage
+  // inside `.summary` (see scripts/_shared/event-intelligence-builder.mjs return shape).
+  const modelSummary = modelHealth?.summary || {};
+  const pipelineFreshness = modelSummary.pipelineFreshness || null;
+  const symbolCoverage = modelSummary.symbolCoverage || null;
+  const latestEval = modelSummary.latestEval || null;
+  const activeModelName =
+    modelSummary.activeModel?.modelVersion ||
+    modelSummary.activeModel?.modelId ||
+    modelSummary.activeModel?.model_version ||
+    latestEval?.modelVersion ||
+    latestEval?.model_version ||
+    null;
+  const modelLevel = modelSummary.level || 'unknown';
+  const modelHealthStatus = modelSummary.healthStatus || modelLevel;
+
+  const freshness = pipelineFreshness
+    ? {
+      latestArticleDateKey: pipelineFreshness.latestArticleDateKey ?? null,
+      latestFeatureArticleDateKey: pipelineFreshness.latestFeatureArticleDateKey ?? null,
+      latestPredictedArticleDateKey: pipelineFreshness.latestPredictedArticleDateKey ?? null,
+      featureLagDays: pipelineFreshness.featureLagDays ?? null,
+      featureLagHours: pipelineFreshness.featureLagHours ?? null,
+      featureStaleEventCount: pipelineFreshness.featureStaleEventCount ?? 0,
+      // S-Tier §A4: copy predictionStaleCount through so the actionableInstructions
+      // builder can fire its threshold checks. The field is set by
+      // buildMetaModelHealthPayload when model_predictions table exists.
+      predictionStaleCount: pipelineFreshness.predictionStaleCount ?? 0,
+      articles24h: pipelineFreshness.articles24h ?? 0,
+      events24h: pipelineFreshness.events24h ?? 0,
+    }
+    : null;
+
+  const summaryLevel = rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness });
+  const summaryNotes = [];
+  if (daemon.status !== 'ok') summaryNotes.push(`master-daemon ${daemon.status} (${daemon.ageMinutes ?? '?'} min)`);
+  if (accumulator.status !== 'ok') summaryNotes.push(`data-accumulator ${accumulator.status}`);
+  if (metaModel.status !== 'ok') summaryNotes.push(`meta-model server ${metaModel.status}`);
+  if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) {
+    summaryNotes.push(`event_features lag ${freshness.featureLagDays.toFixed(0)}d`);
+  }
+  if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
+    summaryNotes.push(`${freshness.featureStaleEventCount} stale feature rows`);
+  }
+  if (modelLevel === 'warning') {
+    summaryNotes.push(modelSummary.notes?.[0] || 'model health warning');
+  } else if (modelHealthStatus === 'watch') {
+    summaryNotes.push(modelSummary.notes?.[0] || 'model watch: calibrated but monitor next validation fold');
+  }
+
+  // S-Tier §A4: actionable instructions. Each item is a concrete operator
+  // command paired with the condition that triggered it, so a human (or a
+  // dashboard) can immediately do the right thing without parsing every
+  // sub-field. The master-daemon's existing 2h meta-model-infer task is the
+  // self-heal path; these instructions cover the case where the daemon is
+  // behind or the threshold has been crossed since the last tick.
+  const actionableInstructions = [];
+  if (daemon.status !== 'ok') {
+    actionableInstructions.push({
+      severity: 'critical',
+      condition: `master-daemon is ${daemon.status} (${daemon.ageMinutes ?? '?'} min since last tick)`,
+      action: 'Restart the master daemon: `npm run daemon` (or check the systemd/PM2 supervisor).',
+    });
+  }
+  if (metaModel.status === 'unreachable') {
+    actionableInstructions.push({
+      severity: 'critical',
+      condition: 'meta-model-server is unreachable',
+      action: 'Restart: `python scripts/meta-model-server.py` and verify it binds 8100.',
+    });
+  }
+  if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `${freshness.featureStaleEventCount} stale event_features rows`,
+      action: 'Run repair task once: `node scripts/master-daemon.mjs --task repair-stale-features --once`',
+    });
+  }
+  if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `event_features lag ${freshness.featureLagDays.toFixed(0)} day(s) behind latest article date`,
+      action: 'Trigger event-engine: `node scripts/incremental-event-engine-fast.mjs --skip-controls`',
+    });
+  }
+  // Stale prediction surfacing — the value also lives on /api/hot-events
+  // modelTrust, but we duplicate here so /api/ops/status alone can drive
+  // the operator's day.
+  const stalePredictionCount = Number(freshness?.predictionStaleCount ?? 0);
+  if (stalePredictionCount >= 1000) {
+    actionableInstructions.push({
+      severity: 'critical',
+      condition: `${stalePredictionCount} stale model_predictions (≥ 1000) — model-driven ranking is currently disabled in /api/hot-events`,
+      action: 'Run: `node --import tsx scripts/meta-model-infer.mjs` to refresh predictions, or wait up to 2h for the master-daemon meta-model-infer cron.',
+    });
+  } else if (stalePredictionCount >= 200) {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `${stalePredictionCount} stale model_predictions (≥ 200)`,
+      action: 'Predictions will refresh on the next master-daemon meta-model-infer cycle. To force now: `node --import tsx scripts/meta-model-infer.mjs`',
+    });
+  }
+  if (modelHealthStatus === 'calibration-warning') {
+    actionableInstructions.push({
+      severity: 'warning',
+      condition: `model calibration drifting (worst-split ECE ${(latestEval?.worstEce ?? 0).toFixed(3)})`,
+      action: 'Re-calibrate: `python scripts/calibrate-meta-model.py --apply` and inspect data/meta-*.calibration.json.',
+    });
+  }
+
+  return {
+    ok: true,
+    generatedAt,
+    summary: {
+      level: summaryLevel,
+      notes: summaryNotes,
+    },
+    services: {
+      api: { status: 'ok', port: Number(process.env.PORT || 46200) },
+      masterDaemon: daemon,
+      dataAccumulator: accumulator,
+      metaModel,
+    },
+    freshness,
+    model: {
+      activeModel: activeModelName,
+      healthStatus: modelHealthStatus,
+      worstSplitECE: latestEval?.worstEce ?? null,
+      worstSplitBrier: latestEval?.worstBrierScore ?? null,
+      aggregateBrier: latestEval?.brierScore ?? null,
+      aggregateECE: latestEval?.ece ?? null,
+      effectiveBrier: modelSummary.effectiveMetrics?.brier ?? latestEval?.brierScore ?? null,
+      effectiveECE: modelSummary.effectiveMetrics?.ece ?? latestEval?.ece ?? null,
+      calibrated: Boolean(modelSummary.effectiveMetrics?.calibrated),
+      calibration: modelSummary.calibration ?? null,
+      promotionGates: Array.isArray(modelSummary.promotionGates) ? modelSummary.promotionGates : [],
+      recommendedActions: Array.isArray(modelSummary.recommendedActions) ? modelSummary.recommendedActions : [],
+      level: modelLevel,
+    },
+    symbolCoverage: symbolCoverage
+      ? {
+        themeCount: symbolCoverage.themeCount ?? 0,
+        coveredThemeCount: symbolCoverage.coveredThemeCount ?? 0,
+        coveragePct: symbolCoverage.coveragePct ?? 0,
+        missingThemes: Array.isArray(symbolCoverage.missingThemes) ? symbolCoverage.missingThemes : [],
+      }
+      : null,
+    actionableInstructions,
+    recentIssues,
+  };
+}
+
+function auditDateToken(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+function normalizeFreshnessAuditPayload(payload, auditPath, extra = {}) {
+  return {
+    ok: true,
+    auditPath: auditPath ? path.relative(process.cwd(), auditPath).replace(/\\/g, '/') : null,
+    generatedAt: payload.generatedAt || null,
+    summary: payload.summary || null,
+    findings: Array.isArray(payload.findings) ? payload.findings : [],
+    nas: payload.nas || null,
+    backfill: payload.backfill || null,
+    cache: {
+      checkedFiles: payload.cache?.checkedFiles || 0,
+      issues: Array.isArray(payload.cache?.issues) ? payload.cache.issues.slice(0, 20) : [],
+    },
+    ...extra,
+  };
+}
+
+async function readLatestDataFreshnessAuditArtifact() {
+  if (!existsSync(AUDIT_DIR)) {
+    return {
+      ok: false,
+      error: 'No data freshness audit directory found',
+      auditPath: null,
+      summary: null,
+      findings: [],
+    };
+  }
+  const files = (await readdir(AUDIT_DIR))
+    .filter((name) => /^data-freshness-\d{4}-\d{2}-\d{2}\.json$/.test(name))
+    .sort()
+    .reverse();
+  if (!files.length) {
+    return {
+      ok: false,
+      error: 'No data freshness audit artifact found',
+      auditPath: null,
+      summary: null,
+      findings: [],
+    };
+  }
+  const file = files[0];
+  const auditPath = path.join(AUDIT_DIR, file);
+  const payload = JSON.parse(await readFile(auditPath, 'utf8'));
+  return normalizeFreshnessAuditPayload(payload, auditPath, { source: 'artifact' });
+}
+
+async function writeDataFreshnessAuditArtifact(payload, now = new Date()) {
+  await mkdir(AUDIT_DIR, { recursive: true });
+  const auditPath = path.join(AUDIT_DIR, `data-freshness-${auditDateToken(now)}.json`);
+  await writeFile(auditPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return auditPath;
+}
+
+async function loadLatestDataFreshnessAudit(options = {}) {
+  const forceRefresh = Boolean(options.forceRefresh);
+  const existing = await readLatestDataFreshnessAuditArtifact();
+  const existingAgeMs = existing.ok && existing.generatedAt
+    ? Date.now() - Date.parse(existing.generatedAt)
+    : Number.POSITIVE_INFINITY;
+  if (!forceRefresh && existing.ok && Number.isFinite(existingAgeMs) && existingAgeMs >= 0 && existingAgeMs <= DATA_FRESHNESS_AUDIT_TTL_MS) {
+    return existing;
+  }
+
+  const now = new Date();
+  try {
+    const audit = await buildFreshnessAudit({ cwd: process.cwd(), now, envFile: '.env.local' });
+    const auditPath = await writeDataFreshnessAuditArtifact(audit, now);
+    return normalizeFreshnessAuditPayload(audit, auditPath, { source: 'live-refresh' });
+  } catch (error) {
+    if (existing.ok) {
+      return {
+        ...existing,
+        stale: true,
+        refreshError: String(error?.message || error),
+      };
+    }
+    return {
+      ok: false,
+      error: String(error?.message || error),
+      auditPath: null,
+      summary: null,
+      findings: [],
+    };
+  }
+}
+
+async function readLatestSourceRepairAuditArtifact() {
+  if (!existsSync(AUDIT_DIR)) {
+    return {
+      ok: false,
+      error: 'No source repair audit directory found',
+      auditPath: null,
+      audit: null,
+    };
+  }
+  const files = (await readdir(AUDIT_DIR))
+    .filter((name) => /^source-repair-closed-loop-.*\.json$/.test(name))
+    .sort()
+    .reverse();
+  if (!files.length) {
+    return {
+      ok: false,
+      error: 'No source repair audit artifact found',
+      auditPath: null,
+      audit: null,
+    };
+  }
+  const auditPath = path.join(AUDIT_DIR, files[0]);
+  const audit = JSON.parse(await readFile(auditPath, 'utf8'));
+  return {
+    ok: audit?.ok !== false,
+    auditPath: path.relative(process.cwd(), auditPath).replace(/\\/g, '/'),
+    generatedAt: audit.finishedAt || audit.generatedAt || audit.startedAt || null,
+    audit,
+  };
+}
+
+function summarizeApprovalCounts(approvals = []) {
+  const counts = {
+    total: approvals.length,
+    pending: 0,
+    needsFix: 0,
+    rejected: 0,
+    executed: 0,
+    sourceNeedsFix: 0,
+  };
+  for (const item of approvals) {
+    const status = String(item?.status || 'unknown');
+    if (status === 'pending') counts.pending += 1;
+    if (status === 'needs-fix') counts.needsFix += 1;
+    if (status === 'rejected') counts.rejected += 1;
+    if (status === 'executed') counts.executed += 1;
+    if (status === 'needs-fix' && String(item?.action_type || item?.actionType || '') === 'add-rss') {
+      counts.sourceNeedsFix += 1;
+    }
+  }
+  return counts;
+}
+
+async function buildSourceRepairStatusPayload() {
+  const [audit, approvalQueue, freshness] = await Promise.all([
+    readLatestSourceRepairAuditArtifact(),
+    buildApprovalQueuePayload().catch(() => ({ approvals: [] })),
+    loadLatestDataFreshnessAudit({ forceRefresh: false }).catch((error) => ({ ok: false, error: String(error?.message || error) })),
+  ]);
+  const approvals = Array.isArray(approvalQueue.approvals) ? approvalQueue.approvals : [];
+  const historical = audit.audit?.historical && typeof audit.audit.historical === 'object' ? audit.audit.historical : {};
+  const countedSuccesses = Number(audit.audit?.countedSuccesses ?? historical.eventMappedSources ?? 0);
+  const targetSuccesses = Number(audit.audit?.targetSuccesses ?? 20);
+  const sourceRepairSummary = {
+    countedSuccesses,
+    targetSuccesses,
+    targetMet: countedSuccesses >= targetSuccesses,
+    thisRunSuccesses: Number(audit.audit?.pipelineSuccesses ?? audit.audit?.successes?.length ?? 0),
+    registeredSources: Number(historical.seededSources ?? 0),
+    themedSources: Number(historical.themedSources ?? 0),
+    eventMappedSources: Number(historical.eventMappedSources ?? 0),
+    codexRepairActiveSources: Number(historical.codexRepairActiveSources ?? 0),
+    codexRepairEventMappedSources: Number(historical.codexRepairEventMappedSources ?? 0),
+    fullHeuristic: Boolean(audit.audit?.inputs?.fullHeuristic),
+    catalogBootstrap: Boolean(audit.audit?.inputs?.catalogBootstrap),
+    codeRepairEnabled: Boolean(audit.audit?.inputs?.enableCodeRepair),
+  };
+  return {
+    ok: Boolean(audit.ok && sourceRepairSummary.targetMet),
+    generatedAt: new Date().toISOString(),
+    auditPath: audit.auditPath,
+    sourceRepair: sourceRepairSummary,
+    approval: summarizeApprovalCounts(approvals),
+    freshness: {
+      ok: freshness.ok !== false,
+      articleCount24h: freshness.summary?.articleCount24h ?? null,
+      articleCount72h: freshness.summary?.articleCount72h ?? null,
+      latestPublishedAt: freshness.nas?.articles?.latestPublishedAt ?? null,
+      findings: freshness.summary?.findings ?? null,
+      cacheIssues: freshness.summary?.cacheIssues ?? null,
+    },
+    audit: audit.audit,
+  };
+}
+
 async function buildCodexQuality() {
   let persistedMetrics = {
     totalCalls: 0,
@@ -897,6 +1830,17 @@ async function buildCodexQuality() {
     }
   } catch {
     // best-effort metrics hydration
+  }
+
+  let promptMetrics = { prompts: {}, history: [] };
+  try {
+    const promptMetricsPath = path.resolve('data', 'codex-prompt-metrics.json');
+    if (existsSync(promptMetricsPath)) {
+      const parsed = JSON.parse(await readFile(promptMetricsPath, 'utf8'));
+      if (parsed && typeof parsed === 'object') promptMetrics = parsed;
+    }
+  } catch {
+    // best-effort prompt wrapper metrics hydration
   }
 
   const auditDirs = [
@@ -940,6 +1884,12 @@ async function buildCodexQuality() {
   const avgConfidence = Number(persistedMetrics.avgConfidence || 0) > 0
     ? Number(persistedMetrics.avgConfidence)
     : auditAvgConfidence;
+  const promptEntries = Object.values(promptMetrics.prompts || {}).filter((entry) => entry && typeof entry === 'object');
+  const wrapperTotalCalls = promptEntries.reduce((sum, entry) => sum + Number(entry.totalCalls || 0), 0);
+  const wrapperParseSuccess = promptEntries.reduce((sum, entry) => sum + Number(entry.parseSuccessCount || 0), 0);
+  const wrapperParseFail = promptEntries.reduce((sum, entry) => sum + Number(entry.parseFailCount || 0), 0);
+  const promptHistory = Array.isArray(promptMetrics.history) ? promptMetrics.history : [];
+  const latestPrompt = promptHistory[0] || null;
 
   return {
     totalCalls,
@@ -952,6 +1902,18 @@ async function buildCodexQuality() {
     lastWarnings: Array.isArray(persistedMetrics.lastWarnings) ? persistedMetrics.lastWarnings : [],
     recentAuditEntries: auditEntries.length,
     recentValidationWarnings: auditValidationWarnings.slice(-10),
+    jsonWrapper: {
+      totalCalls: wrapperTotalCalls,
+      parseSuccess: wrapperParseSuccess,
+      parseFail: wrapperParseFail,
+      parseSuccessRate: wrapperTotalCalls > 0 ? Number((wrapperParseSuccess / wrapperTotalCalls).toFixed(4)) : 0,
+      latestLabel: latestPrompt?.label || null,
+      latestModel: latestPrompt?.model || null,
+      latestFailureKind: latestPrompt?.failureKind || null,
+      latestAttempts: Number(latestPrompt?.attempts || 0),
+      latestParsed: latestPrompt ? Boolean(latestPrompt.parsed) : null,
+      latestAt: latestPrompt?.at || null,
+    },
   };
 }
 
@@ -1011,38 +1973,38 @@ async function buildEmergingTechDetail(topicId) {
   `, [topicId]);
   const topic = topicResponse.rows[0];
   if (!topic) {
-    return { topic: null, report: null, symbols: [], articles: [] };
+    return { topic: null, report: null, symbols: [], articles: [], latestLinkedArticles: [], articleMeta: null };
   }
 
-  // Build keyword filter for fallback article search
-  const topicKeywords = Array.isArray(topic.keywords) ? topic.keywords.filter(k => k && k.length > 3) : [];
-  const keywordIlike = topicKeywords.slice(0, 5).map((_, i) => `a.title ILIKE $${i + 2}`).join(' OR ');
+  const articleProfile = buildTopicArticleProfile(topic);
+  const allQueryTerms = [...articleProfile.strong, ...articleProfile.support, ...(articleProfile.geoContext || []), ...(articleProfile.focusTerms || [])];
+  const candidateTermCount = Math.min(allQueryTerms.length, 16);
+  const candidateWhere = allQueryTerms
+    .slice(0, candidateTermCount)
+    .map((_, index) => `(a.title ILIKE $${index + 1} OR COALESCE(a.summary, '') ILIKE $${index + 1})`)
+    .join(' OR ');
+  const excludeArxiv = String(topic.parent_theme || '') === 'geopolitics' || String(topic.category || '') === 'geopolitics';
 
-  const [articlesResponse, reportResponse, symbolsResponse] = await Promise.all([
-    // Two-source article query: junction table + keyword fallback, deduplicated, newest first
+  const [linkedArticlesResponse, candidateArticlesResponse, reportResponse, symbolsResponse] = await Promise.all([
     safeQuery(`
-        WITH linked AS (
-          SELECT a.id, a.title, a.source, a.published_at, a.url, 'linked' AS match_type
-          FROM discovery_topic_articles dta
-          JOIN articles a ON a.id = dta.article_id
-          WHERE dta.topic_id = $1
-        ),
-        keyword_recent AS (
-          SELECT a.id, a.title, a.source, a.published_at, a.url, 'keyword' AS match_type
-          FROM articles a
-          WHERE (${keywordIlike || 'FALSE'})
-            AND a.published_at >= NOW() - INTERVAL '90 days'
-            AND a.id NOT IN (SELECT id FROM linked)
-        ),
-        combined AS (
-          SELECT * FROM linked
-          UNION ALL
-          SELECT * FROM keyword_recent
-        )
-        SELECT DISTINCT ON (id) id, title, source, published_at, url, match_type
-        FROM combined
-        ORDER BY id, published_at DESC
-      `, [topicId, ...topicKeywords.slice(0, 5).map(k => `%${k}%`)]),
+      SELECT a.id, a.title, a.summary, a.source, a.published_at, a.url, a.theme, a.legacy_theme
+      FROM discovery_topic_articles dta
+      JOIN articles a ON a.id = dta.article_id
+      WHERE dta.topic_id = $1
+      ORDER BY a.published_at DESC
+      LIMIT 300
+    `, [topicId]),
+    safeQuery(`
+      SELECT a.id, a.title, a.summary, a.source, a.published_at, a.url, a.theme, a.legacy_theme
+      FROM articles a
+      WHERE a.published_at >= NOW() - INTERVAL '90 days'
+        ${excludeArxiv ? "AND COALESCE(a.source, '') NOT ILIKE 'arxiv%'" : ''}
+        AND (${candidateWhere || 'FALSE'})
+      ORDER BY a.published_at DESC
+      LIMIT 300
+    `, allQueryTerms.slice(0, candidateTermCount).map((term) => `%${term}%`).length
+      ? allQueryTerms.slice(0, candidateTermCount).map((term) => `%${term}%`)
+      : []),
     safeQuery(`
       SELECT *
       FROM tech_reports
@@ -1058,6 +2020,116 @@ async function buildEmergingTechDetail(topicId) {
       LIMIT 12
     `, [topicId, String(topic.parent_theme || 'emerging-tech')]),
   ]);
+
+  const linkedArticles = linkedArticlesResponse.rows
+    .filter((row) => !isLowValueGoogleNewsSourceName(row.source))
+    .map((row) => ({
+    id: Number(row.id || 0),
+    title: String(row.title || ''),
+    source: String(row.source || ''),
+    publishedAt: row.published_at,
+    url: String(row.url || ''),
+    summary: String(row.summary || ''),
+    theme: String(row.theme || ''),
+    legacyTheme: String(row.legacy_theme || ''),
+    matchType: 'linked',
+  }));
+
+  const linkedById = new Map(linkedArticles.map((article) => [article.id, article]));
+  const recentCandidates = [];
+  for (const row of candidateArticlesResponse.rows) {
+    if (isLowValueGoogleNewsSourceName(row.source)) continue;
+    const candidate = {
+      id: Number(row.id || 0),
+      title: String(row.title || ''),
+      source: String(row.source || ''),
+      publishedAt: row.published_at,
+      url: String(row.url || ''),
+      summary: String(row.summary || ''),
+      theme: String(row.theme || ''),
+      legacyTheme: String(row.legacy_theme || ''),
+      matchType: linkedById.has(Number(row.id || 0)) ? 'linked' : 'derived',
+    };
+    const scoring = buildTopicRecentArticleScore({
+      title: candidate.title,
+      summary: candidate.summary,
+      source: candidate.source,
+      theme: candidate.theme,
+      legacy_theme: candidate.legacyTheme,
+      published_at: candidate.publishedAt,
+    }, topicId, topic.parent_theme, articleProfile);
+    const isLinked = linkedById.has(candidate.id);
+    if (!isLinked && scoring.strongHitCount < 1 && scoring.focusHitCount < 1) continue;
+    if (excludeArxiv && (scoring.geoHitCount < 1 || scoring.focusHitCount < 1)) continue;
+    if (scoring.score < (isLinked ? 4 : 8)) continue;
+    recentCandidates.push({
+      ...candidate,
+      score: scoring.score,
+      matchedStrong: scoring.matchedStrong,
+      matchedSupport: scoring.matchedSupport,
+      matchedGeo: scoring.matchedGeo,
+      matchedFocus: scoring.matchedFocus,
+    });
+  }
+
+  for (const article of linkedArticles) {
+    const publishedAt = article.publishedAt ? new Date(article.publishedAt).getTime() : 0;
+    if (!(publishedAt > 0) || (Date.now() - publishedAt) > 90 * 24 * 36e5) continue;
+    const scoring = buildTopicRecentArticleScore({
+      title: article.title,
+      summary: article.summary,
+      source: article.source,
+      theme: article.theme,
+      legacy_theme: article.legacyTheme,
+      published_at: article.publishedAt,
+    }, topicId, topic.parent_theme, articleProfile);
+    if (excludeArxiv && (scoring.geoHitCount < 1 || scoring.focusHitCount < 1)) continue;
+    if (scoring.score < 4) continue;
+    recentCandidates.push({
+      ...article,
+      score: scoring.score,
+      matchedStrong: scoring.matchedStrong,
+      matchedSupport: scoring.matchedSupport,
+      matchedGeo: scoring.matchedGeo,
+      matchedFocus: scoring.matchedFocus,
+    });
+  }
+
+  const dedupedRecentArticles = [];
+  const seenRecentIds = new Set();
+  for (const article of recentCandidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return new Date(b.publishedAt) - new Date(a.publishedAt);
+  })) {
+    if (seenRecentIds.has(article.id)) continue;
+    seenRecentIds.add(article.id);
+    dedupedRecentArticles.push(article);
+    if (dedupedRecentArticles.length >= 20) break;
+  }
+
+  const latestLinkedArticles = linkedArticles
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+    .slice(0, 20);
+
+  const latestLinkedPublishedAt = latestLinkedArticles[0]?.publishedAt || null;
+  const derivedRecentCount = dedupedRecentArticles.filter((article) => article.matchType === 'derived').length;
+  const linkedRecentCount = dedupedRecentArticles.filter((article) => article.matchType === 'linked').length;
+  const effectiveReport = reportResponse.rows[0]
+    ? {
+        ...reportResponse.rows[0],
+        top_articles: dedupedRecentArticles.length
+          ? dedupedRecentArticles.slice(0, 10).map((article) => ({
+              id: article.id,
+              title: article.title,
+              source: article.source,
+              published_at: article.publishedAt,
+              url: article.url,
+              match_type: article.matchType,
+            }))
+          : asArray(reportResponse.rows[0].top_articles)
+            .filter((article) => !isLowValueGoogleNewsSourceName(article?.source)),
+      }
+    : null;
 
   return {
     topic: {
@@ -1082,24 +2154,42 @@ async function buildEmergingTechDetail(topicId) {
       codexMetadata: topic.codex_metadata || {},
       updatedAt: topic.updated_at,
     },
-    report: reportResponse.rows[0] || null,
+    report: effectiveReport,
     symbols: symbolsResponse.rows.map((row) => ({
       symbol: String(row.symbol || ''),
       avgReturn: Number(row.avg_return || 0),
       hitRate: Number(row.hit_rate || 0),
       sampleSize: Number(row.sample_size || 0),
     })),
-    articles: articlesResponse.rows
-      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
-      .slice(0, 20)
-      .map((row) => ({
-        id: Number(row.id || 0),
-        title: String(row.title || ''),
-        source: String(row.source || ''),
-        publishedAt: row.published_at,
-        url: String(row.url || ''),
-        matchType: String(row.match_type || 'linked'),
-      })),
+    articles: dedupedRecentArticles.map((article) => ({
+      id: article.id,
+      title: article.title,
+      source: article.source,
+      publishedAt: article.publishedAt,
+      url: article.url,
+      matchType: article.matchType,
+      matchedStrong: article.matchedStrong,
+      matchedSupport: article.matchedSupport,
+      matchedGeo: article.matchedGeo,
+      matchedFocus: article.matchedFocus,
+    })),
+    latestLinkedArticles: latestLinkedArticles.map((article) => ({
+      id: article.id,
+      title: article.title,
+      source: article.source,
+      publishedAt: article.publishedAt,
+      url: article.url,
+      matchType: article.matchType,
+    })),
+    articleMeta: {
+      windowDays: 90,
+      recentCount: dedupedRecentArticles.length,
+      linkedRecentCount,
+      derivedRecentCount,
+      latestLinkedPublishedAt,
+      usingFallback: derivedRecentCount > 0,
+      status: dedupedRecentArticles.length > 0 ? 'recent-available' : 'linked-only',
+    },
   };
 }
 
@@ -1236,9 +2326,10 @@ async function buildAutomationLogPayload() {
   }
 }
 
-async function buildApprovalQueuePayload() {
+async function buildApprovalQueuePayload(options = {}) {
+  const includeFinal = Boolean(options?.includeFinal);
   try {
-    const approvals = await getPendingApprovals(getPool(), 200);
+    const approvals = await getPendingApprovals(getPool(), 200, { includeFinal });
     return { approvals };
   } catch {
     return { approvals: [] };
@@ -1290,16 +2381,33 @@ function classifyMacroVerdict({ vix, marketStress, hyCredit, transmission }) {
   return 'watch';
 }
 
-async function buildProposalInboxPayload() {
-  const [proposalRows, approvalPayload] = await Promise.all([
-    safeQuery(`
+/**
+ * Build proposal-inbox payload.
+ *
+ * Default (S-Level §Phase 2): actionable items only — excludes 'executed'
+ * and 'dead' states. Pass { includeFinal: true } to include them. The
+ * inbox surface in the dashboard must NEVER pass includeFinal=true; only
+ * a future history view should.
+ */
+async function buildProposalInboxPayload(options = {}) {
+  const includeFinal = Boolean(options?.includeFinal);
+  const proposalSql = includeFinal
+    ? `
+      SELECT id, proposal_type, payload, status, result, reasoning, source, created_at, executed_at
+      FROM codex_proposals
+      ORDER BY created_at DESC
+      LIMIT 40
+    `
+    : `
       SELECT id, proposal_type, payload, status, result, reasoning, source, created_at, executed_at
       FROM codex_proposals
       WHERE status NOT IN ('executed', 'dead')
       ORDER BY created_at DESC
       LIMIT 40
-    `),
-    buildApprovalQueuePayload(),
+    `;
+  const [proposalRows, approvalPayload] = await Promise.all([
+    safeQuery(proposalSql),
+    buildApprovalQueuePayload({ includeFinal }),
   ]);
 
   const proposals = proposalRows.rows.map((row) => ({
@@ -1339,20 +2447,62 @@ async function reviewCodexProposal(proposalId, body = {}) {
   if (!decision) {
     return buildJsonResponse({ error: 'decision must be accept or reject' }, 400);
   }
+  const requestId = newRequestId();
+  const bodyHash = hashRequestBody(body);
+  const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
+
+  // Capture prev state before mutation so audit log records the transition
+  // accurately even if the review function returns the post-state only.
+  let prevState = null;
+  try {
+    const { rows } = await getPool().query(
+      `SELECT status FROM codex_proposals WHERE id = $1 LIMIT 1`,
+      [Number(proposalId)],
+    );
+    prevState = rows[0]?.status ?? null;
+  } catch {
+    // Non-fatal — audit will record null prev_state.
+  }
+
   try {
     const reviewed = await reviewCodexProposalById(getPool(), proposalId, decision, {
-      reviewer: String(body.reviewer || 'theme-dashboard').slice(0, 120),
+      reviewer,
       reason: String(body.reason || ''),
       dryRun: body.dryRun === true,
     });
     const proposal = reviewed?.proposal || {};
+    const nextState = String(reviewed.status || proposal.status || 'pending');
+
+    // Audit. Best-effort: failure to write must not break the user action.
+    if (!body.dryRun) {
+      try {
+        await recordInboxAction(getPool(), {
+          itemType: 'proposal',
+          itemId: String(proposalId),
+          prevState,
+          nextState,
+          decision,
+          reviewer,
+          requestId,
+          bodyHash,
+          note: body.reason ? String(body.reason) : null,
+        });
+      } catch (auditErr) {
+        logger.warn('inbox audit write failed', {
+          itemType: 'proposal',
+          itemId: String(proposalId),
+          error: String(auditErr?.message || auditErr),
+        });
+      }
+    }
+
     return buildJsonResponse({
       proposal: {
         id: Number(proposal.id || proposalId),
         proposal_type: String(proposal.proposal_type || proposal.proposalType || 'proposal'),
         proposalType: String(proposal.proposal_type || proposal.proposalType || 'proposal'),
         payload: proposal.payload || {},
-        status: String(reviewed.status || proposal.status || 'pending'),
+        status: nextState,
         result: reviewed.result ?? proposal.result ?? null,
         created_at: proposal.created_at || proposal.createdAt || null,
         createdAt: proposal.created_at || proposal.createdAt || null,
@@ -1360,11 +2510,12 @@ async function reviewCodexProposal(proposalId, body = {}) {
         executedAt: proposal.executed_at || proposal.executedAt || null,
         alreadyFinal: Boolean(reviewed.alreadyFinal),
       },
+      audit: { requestId },
     });
   } catch (error) {
     const message = String(error?.message || error || 'proposal review failed');
     const status = /not found/i.test(message) ? 404 : 500;
-    return buildJsonResponse({ error: message }, status);
+    return buildJsonResponse({ error: message, audit: { requestId } }, status);
   }
 }
 
@@ -1373,18 +2524,45 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
   if (!decision) {
     return buildJsonResponse({ error: 'decision must be accept or reject' }, 400);
   }
+  const requestId = newRequestId();
+  const bodyHash = hashRequestBody(body);
   const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
   const approval = await loadApprovalById(getPool(), queueId);
   if (!approval) {
-    return buildJsonResponse({ error: 'approval queue item not found' }, 404);
+    return buildJsonResponse({ error: 'approval queue item not found', audit: { requestId } }, 404);
   }
 
-  const currentStatus = String(approval.status || '').trim().toLowerCase();
-  if (['approved', 'rejected', 'executed'].includes(currentStatus)) {
+  const prevState = String(approval.status || 'pending').toLowerCase();
+
+  // Best-effort audit helper used by every return path below.
+  const writeAudit = async (nextState, note) => {
+    try {
+      await recordInboxAction(getPool(), {
+        itemType: 'approval',
+        itemId: String(queueId),
+        prevState,
+        nextState,
+        decision,
+        reviewer,
+        requestId,
+        bodyHash,
+        note: note || (body.reason ? String(body.reason) : null),
+      });
+    } catch (auditErr) {
+      logger.warn('inbox audit write failed', {
+        itemType: 'approval',
+        itemId: String(queueId),
+        error: String(auditErr?.message || auditErr),
+      });
+    }
+  };
+
+  if (['approved', 'rejected', 'executed'].includes(prevState)) {
     return buildJsonResponse({
       approval,
       execution: null,
       alreadyFinal: true,
+      audit: { requestId },
     });
   }
 
@@ -1394,10 +2572,12 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       reviewer,
       note: body.reason ? String(body.reason) : 'Rejected in proposal inbox',
     });
+    await writeAudit('rejected');
     return buildJsonResponse({
       approval: reviewed,
       execution: null,
       alreadyFinal: false,
+      audit: { requestId },
     });
   }
 
@@ -1414,6 +2594,36 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       humanApproved: true,
     });
 
+    if (body.dryRun === true) {
+      // No state change → no audit row (dry-runs are intentionally not audited
+      // as taken actions; they'd flood the log without representing a decision).
+      return buildJsonResponse({
+        approval,
+        execution,
+        dryRun: true,
+        alreadyFinal: false,
+        audit: { requestId, dryRun: true },
+      });
+    }
+
+    if (execution?.skipped === true) {
+      const skipNote = `skipped: ${execution.reason || execution.summary || 'execution skipped without registration'}`;
+      const reviewed = await markApprovalReviewed(getPool(), queueId, {
+        decision: 'needs-fix',
+        reviewer,
+        note: skipNote,
+      });
+      await writeAudit('needs-fix', skipNote);
+      return buildJsonResponse({
+        approval: reviewed,
+        execution,
+        alreadyFinal: false,
+        skipped: true,
+        needsFix: true,
+        audit: { requestId },
+      });
+    }
+
     const note = execution?.summary
       || execution?.reason
       || `Executed ${String(approval.action_type || 'approval action')}`;
@@ -1422,24 +2632,28 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
       reviewer,
       note,
     });
+    await writeAudit('executed', note);
     return buildJsonResponse({
       approval: reviewed,
       execution,
       alreadyFinal: false,
+      audit: { requestId },
     });
   } catch (error) {
     const message = String(error?.message || error || 'approval execution failed');
     return buildJsonResponse({
       error: message,
       approval,
+      audit: { requestId },
     }, /not found/i.test(message) ? 404 : 500);
   }
 }
 
-async function buildRiskSnapshot() {
+async function buildRiskSnapshot(params = new URLSearchParams()) {
   return buildCompactRiskSnapshot({
     safeQuery,
     buildStructuralAlerts: buildStructuralAlertsPayload,
+    period: resolveDashboardPeriod(params),
   });
 }
 
@@ -1455,10 +2669,16 @@ async function buildValidationSnapshot() {
   return buildCompactValidationSnapshot();
 }
 
-async function buildThemeShellSnapshots() {
+function resolveDashboardPeriod(params, fallback = 'quarter') {
+  const value = String(params?.get?.('period') || fallback).trim().toLowerCase();
+  return ['week', 'month', 'quarter', 'year'].includes(value) ? value : fallback;
+}
+
+async function buildThemeShellSnapshots(params = new URLSearchParams()) {
   return buildThemeShellSnapshotPayloads({
     safeQuery,
     buildStructuralAlerts: buildStructuralAlertsPayload,
+    period: resolveDashboardPeriod(params),
   });
 }
 
@@ -1466,27 +2686,592 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
   const { pathname, segments, params } = parseUrl(rawUrl);
   const method = String(requestMeta.method || 'GET').toUpperCase();
   const body = requestMeta.body && typeof requestMeta.body === 'object' ? requestMeta.body : {};
+  // Standard try/catch wrapper for routes that follow the
+  // "build → return JSON" pattern. Reduces ~5 lines of boilerplate per
+  // route. Routes that need custom error handling can still use raw
+  // try/catch (kept for ops/status, hot-events, etc. that have 503-level logic).
+  const handle = makeRouteHandler(logger, buildJsonResponse);
   try {
+    // S-Tier C3: demo-mode write block. POST/PUT/DELETE/PATCH return 403
+    // when LATTICE_DEMO_MODE=1 so the public sandbox stays read-only.
+    // GET routes pass through.
+    const demoBlock = blockIfDemoMode(method);
+    if (demoBlock) {
+      return buildJsonResponse(demoBlock.body, demoBlock.status);
+    }
+
+    // ── /api/demo/snapshot (S-Tier C3) ──
+    // Returns the static snapshot (built by build-public-demo-snapshot.mjs)
+    // when one is available. Used by the sandbox dashboard to render real
+    // events without needing the live NAS DB.
+    if (segments[0] === 'api' && segments[1] === 'demo' && segments[2] === 'snapshot') {
+      try {
+        const snap = await loadDemoSnapshot();
+        if (!snap) {
+          return buildJsonResponse({
+            ok: false,
+            error: 'No demo snapshot found. Run scripts/build-public-demo-snapshot.mjs to generate one.',
+            demoMode: isDemoMode(),
+          }, 404);
+        }
+        return buildJsonResponse({
+          ok: true,
+          demoMode: isDemoMode(),
+          generatedAt: snap.generatedAt,
+          counts: snap.counts,
+          windowMonths: snap.windowMonths,
+          attribution: snap.attribution,
+          // The full themes/events/articles arrays are large — stream them
+          // separately via /api/demo/snapshot/<section> if needed.
+          // For now we ship the metadata + small theme list.
+          themes: snap.themes,
+        });
+      } catch (err) {
+        logger.warn('demo/snapshot route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+    if (segments[0] === 'api' && segments[1] === 'demo' && segments[2] === 'snapshot' && segments[3]) {
+      // /api/demo/snapshot/<section> — events|articles|uplift|predictions
+      try {
+        const snap = await loadDemoSnapshot();
+        if (!snap) return buildJsonResponse({ ok: false, error: 'no snapshot' }, 404);
+        const section = segments[3];
+        const limit = Math.max(1, Math.min(2000, Number(params.get('limit')) || 100));
+        const offset = Math.max(0, Number(params.get('offset')) || 0);
+        const sectionMap = {
+          events: snap.canonicalEvents,
+          articles: snap.articles,
+          uplift: snap.eventUplift,
+          predictions: snap.modelPredictions,
+        };
+        const rows = sectionMap[section];
+        if (!Array.isArray(rows)) {
+          return buildJsonResponse({ ok: false, error: `unknown section: ${section}` }, 404);
+        }
+        return buildJsonResponse({
+          ok: true,
+          section,
+          total: rows.length,
+          offset,
+          limit,
+          rows: rows.slice(offset, offset + limit),
+        });
+      } catch (err) {
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     // ── /api/health ──
     if (segments[0] === 'api' && segments[1] === 'health') {
       const payload = await buildHealth();
       return buildJsonResponse(payload, payload.status === 'critical' ? 503 : 200);
     }
 
+    // ── /api/product-quality (S-Tier §7) ──
+    // Five product-quality metrics (theme_relevance_precision,
+    // brief_completeness, evidence_coverage, noise_suppression_rate,
+    // actionability_score) plus their S-tier targets, rolled up into a
+    // single summary.level (ok/warning/unknown). The endpoint is
+    // intentionally separate from /api/ops/status — that one watches
+    // technical health (services, freshness, model state); this one
+    // watches whether the product is delivering useful information.
+    if (segments[0] === 'api' && segments[1] === 'product-quality') {
+      try {
+        const payload = await memoProductQualityPayload();
+        const httpStatus = payload.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, httpStatus);
+      } catch (err) {
+        logger.warn('product-quality route failed', { error: String(err?.message || err) });
+        return buildJsonResponse(
+          { ok: false, error: String(err?.message || err), generatedAt: new Date().toISOString() },
+          500,
+        );
+      }
+    }
+
+    // ── /api/user-prefs (S-Tier C1) ──
+    // GET /api/user-prefs[?user=]   — read prefs (defaults if absent)
+    // POST /api/user-prefs          — partial merge update
+    // DELETE /api/user-prefs        — reset to defaults
+    if (segments[0] === 'api' && segments[1] === 'user-prefs') {
+      try {
+        const userId = String(body.userId || params.get('user') || 'default').slice(0, 120);
+        if (method === 'GET') {
+          const prefs = await getUserPrefs(userId);
+          return buildJsonResponse({ ok: true, userId, prefs });
+        }
+        if (method === 'POST') {
+          const prefs = await setUserPrefs(userId, body || {});
+          return buildJsonResponse({ ok: true, userId, prefs });
+        }
+        if (method === 'DELETE') {
+          const prefs = await resetUserPrefs(userId);
+          return buildJsonResponse({ ok: true, userId, prefs, reset: true });
+        }
+        return buildJsonResponse({ error: 'unsupported method on user-prefs' }, 405);
+      } catch (err) {
+        logger.warn('user-prefs route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/model-comparison (S-Tier B1) ──
+    if (segments[0] === 'api' && segments[1] === 'model-comparison') {
+      return handle('model-comparison', () => buildModelComparisonPayload(getPool()));
+    }
+
+    // ── /api/dashboard/health-summary (S-Tier A4) ──
+    // Single envelope combining ops/status, product-quality, and the
+    // hot-events.modelTrust / themeFraming signal so the dashboard can
+    // render one unified system-health view instead of stitching four
+    // separate endpoints together.
+    if (segments[0] === 'api' && segments[1] === 'dashboard' && segments[2] === 'health-summary') {
+      try {
+        const [opsPayload, productPayload, hotPayload] = await Promise.all([
+          memoOpsStatusPayload().catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
+          memoProductQualityPayload()
+            .catch((err) => ({ ok: false, error: String(err?.message || err), summary: { level: 'unknown' } })),
+          memoHotEventsPayload({ limit: 1, lookbackDays: 7 })
+            .catch(() => ({ modelTrust: null, themeFraming: null, laneCounts: null })),
+        ]);
+
+        const dataLevel = (() => {
+          const fresh = opsPayload?.freshness;
+          if (!fresh) return 'unknown';
+          if ((fresh.featureStaleEventCount ?? 0) > 0) return 'warning';
+          if ((fresh.featureLagDays ?? 0) >= 1) return 'warning';
+          return 'ok';
+        })();
+        const pipelineLevel = (() => {
+          const services = opsPayload?.services || {};
+          if (services.masterDaemon?.status !== 'ok') return 'critical';
+          if (services.dataAccumulator?.status !== 'ok') return 'warning';
+          return 'ok';
+        })();
+        const modelLevel = (() => {
+          const trust = hotPayload?.modelTrust;
+          if (trust?.level === 'disabled') return 'critical';
+          if (trust?.level === 'stale') return 'warning';
+          if (opsPayload?.model?.healthStatus === 'calibration-warning') return 'warning';
+          return 'ok';
+        })();
+        const productLevel = productPayload?.summary?.level || 'unknown';
+
+        const overall = (() => {
+          const levels = [dataLevel, pipelineLevel, modelLevel, productLevel];
+          if (levels.includes('critical')) return 'critical';
+          if (levels.includes('warning')) return 'warning';
+          if (levels.every((l) => l === 'ok')) return 'ok';
+          return 'unknown';
+        })();
+
+        return buildJsonResponse({
+          ok: true,
+          generatedAt: new Date().toISOString(),
+          overall,
+          pillars: {
+            data: {
+              level: dataLevel,
+              latestArticleDateKey: opsPayload?.freshness?.latestArticleDateKey ?? null,
+              featureLagDays: opsPayload?.freshness?.featureLagDays ?? null,
+              featureStaleEventCount: opsPayload?.freshness?.featureStaleEventCount ?? 0,
+              articles24h: opsPayload?.freshness?.articles24h ?? 0,
+            },
+            pipeline: {
+              level: pipelineLevel,
+              masterDaemon: opsPayload?.services?.masterDaemon?.status ?? 'unknown',
+              dataAccumulator: opsPayload?.services?.dataAccumulator?.status ?? 'unknown',
+              metaModel: opsPayload?.services?.metaModel?.status ?? 'unknown',
+              api: opsPayload?.services?.api?.status ?? 'unknown',
+            },
+            model: {
+              level: modelLevel,
+              activeModel: opsPayload?.model?.activeModel ?? null,
+              calibration: opsPayload?.model?.healthStatus ?? 'unknown',
+              modelTrust: hotPayload?.modelTrust?.level ?? 'unknown',
+              stalePredictionCount: hotPayload?.modelTrust?.stalePredictionCount ?? null,
+              worstSplitECE: opsPayload?.model?.worstSplitECE ?? null,
+            },
+            product: {
+              level: productLevel,
+              themeRelevancePrecision: productPayload?.metrics?.theme_relevance_precision ?? null,
+              briefCompleteness: productPayload?.metrics?.brief_completeness ?? null,
+              evidenceCoverage: productPayload?.metrics?.evidence_coverage ?? null,
+              actionabilityScore: productPayload?.metrics?.actionability_score ?? null,
+              noiseSuppressionRate: productPayload?.metrics?.noise_suppression_rate ?? null,
+            },
+          },
+          actionables: opsPayload?.actionableInstructions ?? [],
+          laneCounts: hotPayload?.laneCounts ?? null,
+          themeFraming: hotPayload?.themeFraming ?? null,
+        }, overall === 'critical' ? 503 : 200);
+      } catch (err) {
+        logger.warn('dashboard/health-summary route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/dashboard/now-do (S-Tier A3) ──
+    // Single prescriptive recommendation — "the one thing the operator
+    // should do right now". Priority queue:
+    //   1. ops critical → run-instruction
+    //   2. validated > 0 → "open inbox"
+    //   3. pending > 0 → "inspect blockers"
+    //   4. noise_only → "watch trending themes"
+    //   5. otherwise → "system idle"
+    if (segments[0] === 'api' && segments[1] === 'dashboard' && segments[2] === 'now-do') {
+      try {
+        const [opsPayload, hotPayload, trendingPayload] = await Promise.all([
+          memoOpsStatusPayload().catch(() => null),
+          memoHotEventsPayload({ limit: 5, lookbackDays: 7 }).catch(() => null),
+          memoTrendingThemesPayload({ windowDays: 7, limit: 1 }).catch(() => null),
+        ]);
+
+        const counts = hotPayload?.laneCounts || { validated: 0, pending: 0, watch: 0, noise: 0 };
+        const criticalActionable = (opsPayload?.actionableInstructions || []).find(
+          (a) => a.severity === 'critical',
+        );
+        const topTrending = trendingPayload?.themes?.[0] || null;
+
+        let recommendation;
+        if (criticalActionable) {
+          recommendation = {
+            priority: 'critical',
+            icon: '⚠',
+            label: criticalActionable.condition,
+            action: criticalActionable.action,
+            target: '/api/ops/status',
+          };
+        } else if (counts.validated > 0) {
+          recommendation = {
+            priority: 'primary',
+            icon: '✓',
+            label: `${counts.validated} validated signal${counts.validated === 1 ? '' : 's'} ready for review`,
+            action: 'Open Decision Inbox to triage',
+            target: '#inbox',
+          };
+        } else if (counts.pending > 0) {
+          recommendation = {
+            priority: 'primary',
+            icon: '○',
+            label: `${counts.pending} pending validation — blocked on controls or t-stat`,
+            action: 'Inspect blockers; promote manually if structural',
+            target: '#inbox?lane=pending',
+          };
+        } else if (topTrending) {
+          recommendation = {
+            priority: 'secondary',
+            icon: '✦',
+            label: `No validated signals yet. Top trending: ${topTrending.theme} (${topTrending.articlesNow} articles${topTrending.articlesChangePct != null ? `, ${topTrending.articlesChangePct >= 0 ? '+' : ''}${topTrending.articlesChangePct}%` : ''})`,
+            action: 'Open theme brief',
+            target: `/api/theme-brief/${encodeURIComponent(topTrending.theme)}`,
+          };
+        } else {
+          recommendation = {
+            priority: 'idle',
+            icon: '·',
+            label: 'System idle. Articles ingested but no actionable theme yet.',
+            action: 'Wait for next pipeline tick or check ops/status',
+            target: '/api/ops/status',
+          };
+        }
+
+        return buildJsonResponse({
+          ok: true,
+          generatedAt: new Date().toISOString(),
+          recommendation,
+          counts,
+        });
+      } catch (err) {
+        logger.warn('dashboard/now-do route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/ops/status (Phase 7 minimal) ──
+    if (segments[0] === 'api' && segments[1] === 'ops' && segments[2] === 'status') {
+      try {
+        const payload = await memoOpsStatusPayload();
+        const httpStatus = payload.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, httpStatus);
+      } catch (err) {
+        logger.warn('ops/status route failed', { error: String(err?.message || err) });
+        return buildJsonResponse(
+          { ok: false, error: String(err?.message || err), generatedAt: new Date().toISOString() },
+          500,
+        );
+      }
+    }
+
     if (segments[0] === 'api' && segments[1] === 'calibration') {
-      return buildJsonResponse(await computeCalibrationDiagnostic(getPool(), { alertFn: sendAlert }));
+      const emitAlert = params.get('emit_alert') === '1' || params.get('alert') === '1';
+      try {
+        return buildJsonResponse(await computeCalibrationDiagnostic(getPool(), emitAlert ? { alertFn: sendAlert } : {}));
+      } catch (err) {
+        const message = String(err?.message || err || 'calibration unavailable');
+        logger.warn('calibration diagnostic unavailable; returning degraded fallback', { error: message });
+        return buildJsonResponse({
+          ece: 0,
+          brierScore: 0,
+          buckets: Array.from({ length: 5 }, (_, index) => {
+            const start = index * 20;
+            return { range: `${start}-${start + 20}%`, predicted: 0, actual: 0, count: 0 };
+          }),
+          sampleSize: 0,
+          status: 'degraded',
+          source: 'fallback',
+          warning: 'calibration unavailable',
+          error: message,
+        });
+      }
     }
 
     if (segments[0] === 'api' && segments[1] === 'kpi-summary') {
-      return buildJsonResponse(await buildSignalSummary());
+      return buildJsonResponse(withMeta(await buildSignalSummary()));
     }
 
     if (segments[0] === 'api' && segments[1] === 'signals' && segments.length === 2) {
-      return buildJsonResponse(await buildSignalSummary());
+      return buildJsonResponse(withMeta(await buildSignalSummary()));
     }
 
     if (segments[0] === 'api' && segments[1] === 'data-quality') {
       return buildJsonResponse(await buildDataQuality());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'data-freshness-audit') {
+      return buildJsonResponse(await loadLatestDataFreshnessAudit({ forceRefresh: params.get('refresh') === '1' }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'source-repair-status') {
+      return buildJsonResponse(await buildSourceRepairStatusPayload());
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'nowcast-status') {
+      try {
+        const payload = await buildNowcastStatusPayload(getPool());
+        const status = payload?.summary?.level === 'critical' ? 503 : 200;
+        return buildJsonResponse(payload, status);
+      } catch (err) {
+        logger.warn('nowcast-status route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'hot-events') {
+      try {
+        // S-Tier §2: clients may request a subset of lanes for theme pages
+        // or noise-suppressed home views. lane=all returns everything.
+        const laneParam = params.get('lane');
+        const themeParam = params.get('theme');
+        const payload = await memoHotEventsPayload({
+          limit: Number(params.get('limit') || 10),
+          lookbackDays: Number(params.get('lookback') || 7),
+          laneFilter: laneParam ? laneParam.split(/[,\s]+/) : null,
+          themeFilter: themeParam || null,
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('hot-events route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/themes/trending (S-Tier N7) ──
+    // Article-volume change ranking as a fallback when event_uplift /
+    // evidence-grade pipeline is catching up. Always-on signal that
+    // works regardless of validated lane state.
+    //   ?window=7   — comparison window in days (now vs prior, max 30)
+    //   ?limit=12   — max themes returned (max 50)
+    //   ?min=2      — minimum article_count per included event
+    if (segments[0] === 'api' && segments[1] === 'themes' && segments[2] === 'trending') {
+      return handle('themes/trending', () => memoTrendingThemesPayload({
+        windowDays: Number(params.get('window') || 7),
+        limit: Number(params.get('limit') || 12),
+        minArticleCount: Number(params.get('min') || 2),
+      }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'meta-model-health') {
+      return handle('meta-model-health', async () => {
+        const payload = await buildMetaModelHealthPayload(getPool());
+        return { payload, statusCode: payload?.summary?.level === 'critical' ? 503 : 200 };
+      });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'explain-event' && segments[2]) {
+      return handle('explain-event', async () => {
+        const payload = await buildExplainEventPayload(getPool(), { eventId: segments[2] });
+        return { payload, statusCode: payload.ok ? 200 : 404 };
+      });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-symbols-bulk') {
+      try {
+        const themesRaw = String(params.get('themes') || '').trim();
+        if (!themesRaw) return buildJsonResponse({ ok: true, themes: {} });
+        const themes = themesRaw.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 20);
+        if (!themes.length) return buildJsonResponse({ ok: true, themes: {} });
+        const limit = Math.min(5, Math.max(1, Number(params.get('limit') || 3)));
+        const { rows } = await getPool().query(
+          `
+          SELECT theme, symbol, quality_score, correlation, reaction_count, directional_edge,
+                 avg_abs_reaction, outcome_hit_rate, outcome_avg_return,
+                 ROW_NUMBER() OVER (PARTITION BY LOWER(theme) ORDER BY COALESCE(quality_score, 0) DESC NULLS LAST, reaction_count DESC) AS rn
+            FROM auto_theme_symbols
+           WHERE LOWER(theme) = ANY($1::text[])
+          `,
+          [themes],
+        );
+        const byTheme = {};
+        for (const r of rows) {
+          if (Number(r.rn) > limit) continue;
+          const key = String(r.theme).toLowerCase();
+          if (!byTheme[key]) byTheme[key] = [];
+          byTheme[key].push({
+            symbol: r.symbol,
+            qualityScore: r.quality_score == null ? null : Number(r.quality_score),
+            correlation: r.correlation == null ? null : Number(r.correlation),
+            reactionCount: Number(r.reaction_count ?? 0),
+            directionalEdge: r.directional_edge == null ? null : Number(r.directional_edge),
+            avgAbsReaction: r.avg_abs_reaction == null ? null : Number(r.avg_abs_reaction),
+            outcomeHitRate: r.outcome_hit_rate == null ? null : Number(r.outcome_hit_rate),
+            outcomeAvgReturn: r.outcome_avg_return == null ? null : Number(r.outcome_avg_return),
+          });
+        }
+        return buildJsonResponse({ ok: true, themes: byTheme });
+      } catch (err) {
+        logger.warn('theme-symbols-bulk route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'event-timeline') {
+      try {
+        const payload = await buildEventTimelinePayload(getPool(), {
+          days: Number(params.get('days') || 90),
+          theme: params.get('theme') || null,
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('event-timeline failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'event-narrative' && segments[2]) {
+      try {
+        const payload = await buildEventNarrativePayload(getPool(), {
+          eventId: segments[2],
+          forceRefresh: params.get('refresh') === '1',
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('event-narrative failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'similar-events' && segments[2]) {
+      try {
+        const payload = await buildSimilarEventsPayload(getPool(), {
+          eventId: segments[2],
+          limit: Number(params.get('limit') || 6),
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('similar-events failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'regime-scenario') {
+      try {
+        const payload = await buildRegimeScenarioPayload(getPool(), {
+          vix: params.get('vix') ? Number(params.get('vix')) : null,
+          yieldSpread: params.get('yieldSpread') ? Number(params.get('yieldSpread')) : null,
+          oilPrice: params.get('oilPrice') ? Number(params.get('oilPrice')) : null,
+        });
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('regime-scenario failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'current-regime-brief') {
+      try {
+        const payload = await buildCurrentRegimeBriefPayload(getPool(), {
+          useCodex: params.get('codex') === '1',
+          forceRefresh: params.get('refresh') === '1',
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 500);
+      } catch (err) {
+        logger.warn('current-regime-brief failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'asset-dossier' && segments[2]) {
+      try {
+        const payload = await buildAssetDossierPayload(getPool(), { symbol: segments[2] });
+        return buildJsonResponse(payload, payload.ok ? 200 : 400);
+      } catch (err) {
+        logger.warn('asset-dossier failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'weekly-digest') {
+      try {
+        const payload = await buildWeeklyDigestPayload(getPool(), {
+          forceRefresh: params.get('refresh') === '1',
+        });
+        return buildJsonResponse(payload, payload.ok ? 200 : 500);
+      } catch (err) {
+        logger.warn('weekly-digest failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'correlation-breaks') {
+      try {
+        const payload = await buildCorrelationBreaksPayload(getPool());
+        return buildJsonResponse(payload);
+      } catch (err) {
+        logger.warn('correlation-breaks failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'theme-impact' && segments[2]) {
+      return handle('theme-impact', async () => {
+        const payload = await buildThemeImpactPayload(getPool(), {
+          theme: segments[2],
+          horizon: params.get('horizon') || null,
+          symbolLimit: Number(params.get('limit') || 12),
+        });
+        return { payload, statusCode: payload.ok ? 200 : 400 };
+      });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'source-diversity-audit') {
+      return handle('source-diversity-audit', async () => {
+        const payload = await buildSourceDiversityAuditPayload(getPool(), {
+          windowHours: Number(params.get('window') || 24),
+        });
+        return { payload, statusCode: payload?.level === 'critical' ? 503 : 200 };
+      });
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'runtime-observability') {
+      const payload = await buildSidecarProxyPayload('/api/local-runtime-observability');
+      return buildJsonResponse(payload, payload.ok ? 200 : 503);
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'automation-ops-snapshot') {
+      const payload = await buildSidecarProxyPayload('/api/local-automation-ops-snapshot');
+      return buildJsonResponse(payload, payload.ok ? 200 : 503);
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-quality') {
@@ -1502,7 +3287,8 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'proposal-inbox') {
-      return buildJsonResponse(await buildProposalInboxPayload());
+      const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
+      return buildJsonResponse(await buildProposalInboxPayload({ includeFinal }));
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-proposals' && segments[2] && segments[3] === 'review' && method === 'POST') {
@@ -1514,11 +3300,54 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'approval-queue') {
-      return buildJsonResponse(await buildApprovalQueuePayload());
+      const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
+      return buildJsonResponse(await buildApprovalQueuePayload({ includeFinal }));
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'runtime-issues' && !segments[2] && method === 'POST') {
+      try {
+        const { captureRuntimeIssue, classifyIssue } = await import('./_shared/runtime-issue-writer.mjs');
+        const classification = String(body.classification || '').trim() || classifyIssue(body.surface, body.action, body.responseStatus, body.errorMessage);
+        const result = captureRuntimeIssue({ ...body, classification });
+        return buildJsonResponse({ ok: true, id: result.id, path: result.path });
+      } catch (err) {
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) });
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'runtime-issues' && !segments[2] && method === 'GET') {
+      try {
+        const { readdirSync, readFileSync, existsSync } = await import('node:fs');
+        const issuesDir = path.resolve('data', 'runtime-issues');
+        if (!existsSync(issuesDir)) return buildJsonResponse({ issues: [], total: 0 });
+        const files = [];
+        for (const dateDir of readdirSync(issuesDir).sort().reverse()) {
+          const full = path.join(issuesDir, dateDir);
+          try {
+            for (const f of readdirSync(full).filter(n => n.endsWith('.json') && !n.startsWith('investigation-')).sort().reverse()) {
+              files.push(path.join(full, f));
+              if (files.length >= 50) break;
+            }
+          } catch {}
+          if (files.length >= 50) break;
+        }
+        const issues = files.map(fp => {
+          try {
+            const issue = JSON.parse(readFileSync(fp, 'utf8'));
+            if (issue.responseBody && String(issue.responseBody).length > 500) {
+              issue.responseBody = String(issue.responseBody).slice(0, 500) + '…';
+            }
+            return issue;
+          } catch { return null; }
+        }).filter(Boolean);
+        return buildJsonResponse({ issues, total: issues.length });
+      } catch (err) {
+        return buildJsonResponse({ issues: [], total: 0, error: String(err?.message || err) });
+      }
     }
 
     if (segments[0] === 'api' && segments[1] === 'risk-snapshot') {
-      return buildJsonResponse(await buildRiskSnapshot());
+      return buildJsonResponse(await buildRiskSnapshot(params));
     }
 
     if (segments[0] === 'api' && segments[1] === 'macro-snapshot') {
@@ -1534,7 +3363,7 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'theme-shell-snapshots') {
-      return buildJsonResponse(await buildThemeShellSnapshots());
+      return buildJsonResponse(await buildThemeShellSnapshots(params));
     }
 
     if (segments[0] === 'api' && segments[1] === 'emerging-tech' && segments.length === 2) {
@@ -1581,10 +3410,72 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     if (segments[0] === 'api' && segments[1] === 'theme-brief' && segments[2]) {
       const theme = decodeURIComponent(segments[2] || '');
-      if (hasDynamicSinceParams(params)) {
-        return buildJsonResponse(withMeta(await buildThemeBriefPayload(theme, safeQuery, params), {
+      const wantNarrative = params.get('narrative') === 'llm';
+      // S-Tier D1: optional LLM narrative — augments briefStructure with
+      // Codex-generated specific lines. Falls back gracefully on Codex
+      // failure or daily budget exhaustion.
+      const enhanceWithNarrative = async (briefPayload) => {
+        if (!wantNarrative || !briefPayload) return briefPayload;
+        try {
+          const { buildThemeNarrativePayload } = await import('./_shared/ai-analysis-builder.mjs');
+          const period = params.get('period') || 'quarter';
+          const narrativeResult = await buildThemeNarrativePayload(getPool(), {
+            theme,
+            period,
+            briefPayload,
+            forceRefresh: params.get('refresh') === '1',
+          });
+          if (narrativeResult?.ok && narrativeResult.narrative && !narrativeResult.exhausted) {
+            // Merge: replace each section's templated content with LLM lines
+            // ONLY when the LLM produced non-empty content for that section.
+            // Original templated content stays as fallback for empty sections.
+            const merged = { ...(briefPayload.briefStructure || {}) };
+            const n = narrativeResult.narrative;
+            for (const key of ['whatChanged', 'whyMatters', 'caveats', 'monitor']) {
+              if (Array.isArray(n[key]) && n[key].length > 0) merged[key] = n[key];
+            }
+            // Evidence is structured (items/classes) — only replace items.
+            if (Array.isArray(n.evidence) && n.evidence.length > 0) {
+              merged.evidence = {
+                items: n.evidence,
+                classes: briefPayload.briefStructure?.evidence?.classes || [],
+              };
+            }
+            // Related — narrative provides flat list; we put under entities.
+            if (Array.isArray(n.related) && n.related.length > 0) {
+              merged.related = {
+                ...(briefPayload.briefStructure?.related || {}),
+                entities: n.related,
+              };
+            }
+            return {
+              ...briefPayload,
+              briefStructure: merged,
+              narrativeSource: narrativeResult.cached ? 'cache' : 'llm-fresh',
+              narrativeGeneratedAt: narrativeResult.generatedAt,
+            };
+          }
+          // Budget exhausted or LLM failed — keep original templated brief +
+          // surface the reason so the dashboard can show a banner.
+          return {
+            ...briefPayload,
+            narrativeSource: narrativeResult?.exhausted ? 'budget-exhausted' : 'llm-failed',
+            narrativeError: narrativeResult?.error || narrativeResult?.reason || null,
+          };
+        } catch (err) {
+          logger.warn('theme-brief narrative augmentation failed', { error: String(err?.message || err) });
+          return { ...briefPayload, narrativeSource: 'llm-failed', narrativeError: String(err?.message || err) };
+        }
+      };
+
+      if (hasDynamicSinceParams(params) || wantNarrative) {
+        // narrative=llm bypasses cache so the user gets the latest LLM output
+        // (or the LLM cache layer handles it via theme_narrative_cache).
+        const base = await buildThemeBriefPayload(theme, safeQuery, params);
+        const enriched = await enhanceWithNarrative(base);
+        return buildJsonResponse(withMeta(enriched, {
           cacheable: false,
-          cacheReason: 'dynamic-since',
+          cacheReason: wantNarrative ? 'llm-narrative' : 'dynamic-since',
         }));
       }
       return await resolveWithCache(
@@ -1647,11 +3538,204 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     if (segments[0] === 'api' && segments[1] === 'discovery-triage') {
       if (method === 'POST' && segments[2] === 'review') {
-        return buildJsonResponse(withMeta(await applyDiscoveryTriageDecision({ query: safeQuery }, body), {
+        const requestId = newRequestId();
+        const bodyHash = hashRequestBody(body);
+        const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
+        const topicId = body.topicId || body.topic_id || body.id;
+        // Capture pre-decision promotion_state for accurate audit transition.
+        let prevState = null;
+        if (topicId) {
+          try {
+            const { rows } = await getPool().query(
+              `SELECT promotion_state FROM discovery_topics WHERE id = $1 LIMIT 1`,
+              [String(topicId)],
+            );
+            prevState = rows[0]?.promotion_state ?? null;
+          } catch {
+            // Non-fatal — audit will record null prev_state.
+          }
+        }
+        const result = await applyDiscoveryTriageDecision({ query: safeQuery }, body);
+        const nextState = result?.topic?.promotion_state
+          ?? result?.promotion_state
+          ?? body.decision
+          ?? null;
+        if (topicId) {
+          try {
+            await recordInboxAction(getPool(), {
+              itemType: 'discovery',
+              itemId: String(topicId),
+              prevState,
+              nextState: nextState ? String(nextState) : null,
+              decision: String(body.decision || '').slice(0, 64) || null,
+              reviewer,
+              requestId,
+              bodyHash,
+              note: body.reason ? String(body.reason) : null,
+            });
+          } catch (auditErr) {
+            logger.warn('inbox audit write failed', {
+              itemType: 'discovery',
+              itemId: String(topicId),
+              error: String(auditErr?.message || auditErr),
+            });
+          }
+        }
+        return buildJsonResponse(withMeta({ ...result, audit: { requestId } }, {
           cacheable: false,
         }));
       }
       return buildJsonResponse(await buildDiscoveryTriagePayload(safeQuery, params));
+    }
+
+    // ── /api/inbox/audit (S-Level §Phase 2) ──
+    // Recent operator decisions across all 4 inbox item types. Useful for
+    // history views, dispute resolution, and verifying that an action was
+    // actually written through.
+    //
+    // Optional filters:
+    //   ?type=discovery|approval|proposal|e2_signal
+    //   ?id=<item id>
+    //   ?limit=<int, max 500, default 100>
+    if (segments[0] === 'api' && segments[1] === 'inbox' && segments[2] === 'audit') {
+      try {
+        const rows = await recentInboxActions(getPool(), {
+          itemType: params.get('type'),
+          itemId: params.get('id'),
+          limit: Number(params.get('limit') || 100),
+        });
+        return buildJsonResponse({ ok: true, count: rows.length, entries: rows });
+      } catch (err) {
+        logger.warn('inbox/audit route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    // ── /api/watchlist (S-Tier §4) ──
+    // Persist user follow / mute / dismiss / snooze state for items that
+    // have no DB-side review queue (e2_signal type, themes, symbols).
+    //
+    //   GET    /api/watchlist[?type=&state=]           list user entries
+    //   GET    /api/watchlist/<type>/<id>              query single entry
+    //   POST   /api/watchlist                          upsert {itemType,itemId,state,snoozeUntil?,note?}
+    //   DELETE /api/watchlist/<type>/<id>              remove entry
+    //
+    // userId comes from body.userId or query.user; defaults to 'default' until
+    // auth lands. Each successful mutation also writes an inbox-audit row with
+    // item_type='e2_signal' (or whatever VALID_WATCHLIST_ITEM_TYPES says).
+    if (segments[0] === 'api' && segments[1] === 'watchlist') {
+      try {
+        const userId = String(body.userId || params.get('user') || 'default').slice(0, 120);
+        const reviewer = String(body.reviewer || 'dashboard-ui').slice(0, 160);
+
+        // GET /api/watchlist (no extra segments) — list mode
+        if (method === 'GET' && !segments[2]) {
+          const rows = await listWatchlist(getPool(), {
+            userId,
+            itemType: params.get('type'),
+            state: params.get('state'),
+            active: params.get('include_expired') !== '1',
+            limit: Number(params.get('limit') || 200),
+          });
+          return buildJsonResponse({ ok: true, count: rows.length, entries: rows });
+        }
+
+        // GET /api/watchlist/<type>/<id> — single lookup
+        if (method === 'GET' && segments[2] && segments[3]) {
+          const row = await getWatchlistEntry(getPool(), {
+            userId,
+            itemType: segments[2],
+            itemId: decodeURIComponent(segments[3]),
+          });
+          return buildJsonResponse({ ok: true, entry: row });
+        }
+
+        // POST /api/watchlist — upsert
+        if (method === 'POST' && !segments[2]) {
+          const requestId = newRequestId();
+          const bodyHash = hashRequestBody(body);
+          const itemType = String(body.itemType || body.item_type || '').toLowerCase();
+          const itemId = String(body.itemId || body.item_id || '').trim();
+          const nextState = body.state ? String(body.state).toLowerCase() : null;
+          const snoozeUntil = body.snoozeUntil || body.snooze_until || null;
+          if (!VALID_WATCHLIST_ITEM_TYPES.has(itemType)) {
+            return buildJsonResponse({
+              error: `invalid itemType — expected one of ${[...VALID_WATCHLIST_ITEM_TYPES].join(', ')}`,
+              audit: { requestId },
+            }, 400);
+          }
+          if (nextState && !VALID_WATCHLIST_STATES.has(nextState)) {
+            return buildJsonResponse({
+              error: `invalid state — expected one of ${[...VALID_WATCHLIST_STATES].join(', ')}`,
+              audit: { requestId },
+            }, 400);
+          }
+          // Capture prev state for the audit transition.
+          const prevRow = await getWatchlistEntry(getPool(), { userId, itemType, itemId });
+          const prevState = prevRow?.state ?? null;
+
+          const result = await setWatchlistState(getPool(), {
+            userId,
+            itemType,
+            itemId,
+            state: nextState,
+            snoozeUntil,
+            note: body.note ? String(body.note) : null,
+          });
+
+          // Audit. Best-effort: failure must not break the user action.
+          try {
+            await recordInboxAction(getPool(), {
+              itemType: VALID_WATCHLIST_ITEM_TYPES.has(itemType) && itemType !== 'e2_signal' ? 'e2_signal' : itemType,
+              itemId,
+              prevState,
+              nextState,
+              decision: nextState,
+              reviewer,
+              requestId,
+              bodyHash,
+              note: body.note ? String(body.note) : null,
+            });
+          } catch (auditErr) {
+            logger.warn('watchlist audit write failed', {
+              itemType,
+              itemId,
+              error: String(auditErr?.message || auditErr),
+            });
+          }
+
+          return buildJsonResponse({ ok: true, entry: result, audit: { requestId } });
+        }
+
+        // DELETE /api/watchlist/<type>/<id>
+        if (method === 'DELETE' && segments[2] && segments[3]) {
+          const requestId = newRequestId();
+          const itemType = String(segments[2]).toLowerCase();
+          const itemId = decodeURIComponent(segments[3]);
+          const prevRow = await getWatchlistEntry(getPool(), { userId, itemType, itemId });
+          const result = await removeWatchlistEntry(getPool(), { userId, itemType, itemId });
+          try {
+            await recordInboxAction(getPool(), {
+              itemType: itemType === 'e2_signal' ? 'e2_signal' : 'e2_signal',
+              itemId,
+              prevState: prevRow?.state ?? null,
+              nextState: null,
+              decision: 'remove',
+              reviewer,
+              requestId,
+              bodyHash: null,
+            });
+          } catch (auditErr) {
+            logger.warn('watchlist audit (delete) write failed', { error: String(auditErr?.message || auditErr) });
+          }
+          return buildJsonResponse({ ok: true, removed: result.removed, audit: { requestId } });
+        }
+
+        return buildJsonResponse({ error: 'unsupported watchlist route' }, 405);
+      } catch (err) {
+        logger.warn('watchlist route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
     }
 
     if (segments[0] === 'api' && segments[1] === 'followed-theme-briefing') {
@@ -1825,23 +3909,40 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         'Biotech/Gene': ['biotech', 'CRISPR', 'mRNA'],
         Renewable: ['solar', 'renewable', 'hydrogen'],
       };
-      const results = [];
-      for (const [name, kws] of Object.entries(topics)) {
-        const cond = kws.map((_, i) => `title ILIKE $${i + 1}`).join(' OR ');
-        const r = await safeQuery(
-          `SELECT DATE_TRUNC('month', published_at)::date AS month, COUNT(*) AS n
-           FROM articles WHERE ${cond}
-           GROUP BY month ORDER BY month`,
-          kws.map((k) => `%${k}%`),
-        );
-        const counts = r.rows.map((row) => ({ month: row.month, n: Number(row.n) }));
+      const pairs = Object.entries(topics).flatMap(([name, keywords]) => keywords.map((keyword) => [name, keyword]));
+      const valuesSql = pairs.map((_, index) => `($${index * 2 + 1}::text, $${index * 2 + 2}::text)`).join(', ');
+      const r = await safeQuery(
+        `
+        WITH topic_keywords(topic, keyword) AS (VALUES ${valuesSql}),
+        monthly AS (
+          SELECT tk.topic AS name,
+                 DATE_TRUNC('month', a.published_at)::date AS month,
+                 COUNT(DISTINCT a.id)::int AS n
+            FROM articles a
+            JOIN topic_keywords tk ON a.title ILIKE ('%' || tk.keyword || '%')
+           WHERE a.published_at >= CURRENT_DATE - INTERVAL '5 years'
+           GROUP BY tk.topic, DATE_TRUNC('month', a.published_at)::date
+        )
+        SELECT name, month, n
+          FROM monthly
+         ORDER BY name, month
+        `,
+        pairs.flat(),
+      );
+      const byTopic = new Map(Object.keys(topics).map((name) => [name, []]));
+      for (const row of r.rows) {
+        const bucket = byTopic.get(row.name) || [];
+        bucket.push({ month: row.month, n: Number(row.n) });
+        byTopic.set(row.name, bucket);
+      }
+      const results = Array.from(byTopic.entries()).map(([name, counts]) => {
         const recent = counts.slice(-3);
         const prev = counts.slice(-6, -3);
         const recentAvg = recent.length ? recent.reduce((sum, row) => sum + row.n, 0) / recent.length : 0;
         const prevAvg = prev.length ? prev.reduce((sum, row) => sum + row.n, 0) / prev.length : 0;
         const momentum = prevAvg > 0 ? ((recentAvg - prevAvg) / prevAvg) * 100 : 0;
-        results.push({ name, momentum, recentAvg, total: counts.reduce((sum, row) => sum + row.n, 0), timeline: counts });
-      }
+        return { name, momentum, recentAvg, total: counts.reduce((sum, row) => sum + row.n, 0), timeline: counts };
+      });
       return buildJsonResponse(results);
     }
 
@@ -1882,20 +3983,36 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'pending') {
+      const limit = Math.max(1, Math.min(200, Number(params.get('limit')) || 50));
       const r = await safeQuery(`
-        SELECT
-          article_id AS "articleId",
-          theme,
-          symbol,
-          entry_price AS "entryPrice",
-          published_at AS "publishedAt",
-          target_date AS "targetDate",
-          GREATEST(0, (target_date::date - CURRENT_DATE)::int) AS "daysRemaining"
-        FROM pending_outcomes
-        WHERE status IN ('pending', 'waiting')
-        ORDER BY target_date ASC
+        WITH ranked AS (
+          SELECT
+            article_id AS "articleId",
+            theme,
+            symbol,
+            entry_price AS "entryPrice",
+            published_at AS "publishedAt",
+            target_date AS "targetDate",
+            GREATEST(0, (target_date::date - CURRENT_DATE)::int) AS "daysRemaining",
+            ROW_NUMBER() OVER (
+              PARTITION BY COALESCE(symbol, ''), COALESCE(theme, '')
+              ORDER BY target_date ASC, published_at DESC NULLS LAST
+            ) AS rn
+          FROM pending_outcomes
+          WHERE status IN ('pending', 'waiting')
+        )
+        SELECT "articleId", theme, symbol, "entryPrice", "publishedAt", "targetDate", "daysRemaining"
+          FROM ranked
+         WHERE rn = 1
+         ORDER BY "targetDate" ASC
+        LIMIT $1
+      `, [limit]);
+      const countRes = await safeQuery(`
+        SELECT COUNT(DISTINCT (COALESCE(symbol, ''), COALESCE(theme, '')))::int AS total
+          FROM pending_outcomes
+         WHERE status IN ('pending', 'waiting')
       `);
-      return buildJsonResponse({ items: r.rows });
+      return buildJsonResponse({ items: r.rows, total: Number(countRes.rows[0]?.total || r.rows.length), limit });
     }
 
     if (segments[0] === 'api' && segments[1] === 'codex-latest') {
@@ -1908,12 +4025,15 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       } catch {
         discoveries = null;
       }
-      const proposals = await safeQuery(`
-        SELECT *
-        FROM codex_proposals
-        ORDER BY created_at DESC
-        LIMIT 20
-      `);
+      // S-Level §Phase 2: actionable items by default. Final proposals
+      // (executed/dead) are omitted unless the caller opts in. Use this
+      // route as a status overview, not as the inbox source-of-truth.
+      const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
+      const proposals = await safeQuery(
+        includeFinal
+          ? `SELECT * FROM codex_proposals ORDER BY created_at DESC LIMIT 20`
+          : `SELECT * FROM codex_proposals WHERE status NOT IN ('executed', 'dead') ORDER BY created_at DESC LIMIT 20`,
+      );
       return buildJsonResponse({ discoveries, proposals: proposals.rows });
     }
 
@@ -1939,65 +4059,149 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
 
     // ── /api/event-uplift-grades ──
     if (segments[0] === 'api' && segments[1] === 'event-uplift-grades') {
-      const r = await safeQuery(`
-        WITH ranked_uplift AS (
-          SELECT
-            eu.canonical_event_id,
-            eu.evidence_grade,
-            eu.uplift,
-            eu.t_stat,
-            ce.theme,
-            ce.representative_title AS title,
-            lo.symbol,
-            lo.forward_return_pct,
-            lo.abnormal_return,
-            ROW_NUMBER() OVER (
-              PARTITION BY eu.canonical_event_id
-              ORDER BY ABS(COALESCE(lo.abnormal_return, eu.uplift, 0)) DESC,
-                       ABS(COALESCE(eu.uplift, 0)) DESC,
-                       ABS(COALESCE(eu.t_stat, 0)) DESC
-            ) AS event_rank
-          FROM event_uplift eu
-          JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+      const summaryRes = await safeQuery(`
+        WITH uplift_candidates AS (
+          SELECT eu.*
+            FROM event_uplift eu
+            JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+           WHERE eu.evidence_grade IS NOT NULL
+             AND ce.event_date >= CURRENT_DATE - INTERVAL '${EVIDENCE_GRADE_WINDOW_DAYS} days'
+        ),
+        candidate_event_ids AS (
+          SELECT DISTINCT canonical_event_id AS id
+            FROM uplift_candidates
+        ),
+        article_quality AS (
+          SELECT aem.canonical_event_id,
+                 COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+            FROM article_event_map aem
+            JOIN candidate_event_ids cei ON cei.id = aem.canonical_event_id
+            JOIN articles a ON a.id = aem.article_id
+           GROUP BY aem.canonical_event_id
+        ),
+        gated AS (
+          SELECT eu.evidence_grade AS raw_evidence_grade,
+            CASE
+              WHEN eu.evidence_grade IN ('E2','E3','E4')
+               AND (
+                 ABS(COALESCE(eu.t_stat, 0)) < 2
+                 OR COALESCE(eu.n_controls, 0) < ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+                 OR (
+                   COALESCE(aq.known_market_relevance_articles, 0) > 0
+                   AND COALESCE(aq.market_relevant_articles, 0) = 0
+                   AND COALESCE(aq.low_relevance_articles, 0) > 0
+                 )
+               ) THEN NULL
+              ELSE eu.evidence_grade
+            END AS evidence_grade,
+            eu.uplift
+          FROM uplift_candidates eu
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = eu.canonical_event_id
+        )
+        SELECT evidence_grade,
+               COUNT(*)::int AS count,
+               AVG(COALESCE(uplift, 0)) AS avg_uplift,
+               COUNT(*) FILTER (WHERE raw_evidence_grade IS NOT NULL AND evidence_grade IS NULL)::int AS quarantined
+          FROM gated
+         GROUP BY evidence_grade
+         ORDER BY evidence_grade DESC NULLS LAST
+      `);
+
+      const liveSignalWindowDays = 30;
+      const signalsRes = await safeQuery(`
+        WITH candidate_events AS (
+          SELECT eu.canonical_event_id,
+                 eu.evidence_grade,
+                 eu.uplift,
+                 eu.t_stat,
+                 eu.n_controls,
+                 ce.theme,
+                 ce.representative_title AS title,
+                 ce.event_date AS updated_at
+            FROM event_uplift eu
+            JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+           WHERE eu.evidence_grade = 'E2'
+             AND ce.event_date >= CURRENT_DATE - INTERVAL '${liveSignalWindowDays} days'
+             AND ABS(COALESCE(eu.t_stat, 0)) >= 2
+             AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
+        ),
+        article_quality AS (
+          SELECT aem.canonical_event_id,
+                 COUNT(*) FILTER (WHERE a.market_relevance IS NOT NULL)::int AS known_market_relevance_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance IN ('high', 'medium'))::int AS market_relevant_articles,
+                 COUNT(*) FILTER (WHERE a.market_relevance = 'low')::int AS low_relevance_articles
+            FROM article_event_map aem
+            JOIN candidate_events ce ON ce.canonical_event_id = aem.canonical_event_id
+            JOIN articles a ON a.id = aem.article_id
+           GROUP BY aem.canonical_event_id
+        )
+        SELECT ce.canonical_event_id,
+               ce.evidence_grade,
+               ce.uplift,
+               ce.t_stat,
+               ce.n_controls,
+               ce.theme,
+               ce.title,
+               ce.updated_at,
+               lo.symbol,
+               lo.forward_return_pct,
+               lo.abnormal_return,
+               art.sources
+          FROM candidate_events ce
+          LEFT JOIN article_quality aq ON aq.canonical_event_id = ce.canonical_event_id
           LEFT JOIN LATERAL (
             SELECT lo2.symbol, lo2.forward_return_pct, lo2.abnormal_return
-            FROM labeled_outcomes lo2
-            WHERE lo2.canonical_event_id = eu.canonical_event_id
-              AND lo2.symbol != 'SPY'
-              AND lo2.abnormal_return IS NOT NULL
-            ORDER BY ABS(lo2.abnormal_return) DESC
-            LIMIT 1
+              FROM labeled_outcomes lo2
+             WHERE lo2.canonical_event_id = ce.canonical_event_id
+               AND lo2.symbol != 'SPY'
+               AND lo2.abnormal_return IS NOT NULL
+             ORDER BY ABS(lo2.abnormal_return) DESC
+             LIMIT 1
           ) lo ON true
-          WHERE eu.evidence_grade IS NOT NULL
-        )
-        SELECT canonical_event_id, evidence_grade, uplift, t_stat, theme, title, symbol, forward_return_pct, abnormal_return
-        FROM ranked_uplift
-        WHERE event_rank = 1
-        ORDER BY evidence_grade DESC, ABS(uplift) DESC
-        LIMIT 50000
+          LEFT JOIN LATERAL (
+            SELECT json_agg(
+              json_build_object(
+                'title', sub.title,
+                'url', sub.url,
+                'source', sub.source,
+                'publishedAt', sub.published_at
+              ) ORDER BY sub.published_at DESC
+            ) AS sources
+            FROM (
+              SELECT a.title, a.url, a.source, a.published_at
+                FROM article_event_map aem
+                JOIN articles a ON a.id = aem.article_id
+               WHERE aem.canonical_event_id = ce.canonical_event_id
+                 AND a.title IS NOT NULL
+               ORDER BY a.published_at DESC
+               LIMIT 3
+            ) sub
+          ) art ON true
+         WHERE NOT (
+           COALESCE(aq.known_market_relevance_articles, 0) > 0
+           AND COALESCE(aq.market_relevant_articles, 0) = 0
+           AND COALESCE(aq.low_relevance_articles, 0) > 0
+         )
+         ORDER BY ABS(COALESCE(ce.uplift, 0)) * 0.6 + ABS(COALESCE(ce.t_stat, 0)) * 0.4 DESC
+         LIMIT 100
       `);
-      // Separate: summary for chart + top signals for queue
-      const grades = r.rows;
-      const summary = {};
-      for (const row of grades) {
-        const g = row.evidence_grade;
-        if (!summary[g]) summary[g] = { grade: g, count: 0, totalUplift: 0 };
-        summary[g].count++;
-        summary[g].totalUplift += Number(row.uplift || 0);
-      }
-      for (const s of Object.values(summary)) {
-        s.avgUplift = s.count > 0 ? Number((s.totalUplift / s.count).toFixed(4)) : 0;
-      }
+      const summaryRows = summaryRes.rows || [];
+      const rawRows = summaryRows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+      const quarantinedCount = summaryRows.reduce((sum, row) => sum + Number(row.quarantined || 0), 0);
+      const summary = summaryRows
+        .filter((row) => row.evidence_grade)
+        .map((row) => ({
+          grade: row.evidence_grade,
+          count: Number(row.count || 0),
+          totalUplift: Number(row.avg_uplift || 0) * Number(row.count || 0),
+          avgUplift: Number(Number(row.avg_uplift || 0).toFixed(4)),
+        }));
       const symbolCounts = new Map();
       const seenTitles = new Set();
       const actionableSignals = [];
-      for (const row of grades
-        .filter((item) => String(item.evidence_grade || '').toUpperCase() === 'E2')
-        .sort((a, b) => {
-          const aScore = Math.abs(Number(a.uplift || 0)) * 0.6 + Math.abs(Number(a.t_stat || 0)) * 0.4;
-          const bScore = Math.abs(Number(b.uplift || 0)) * 0.6 + Math.abs(Number(b.t_stat || 0)) * 0.4;
-          return bScore - aScore;
-        })) {
+      for (const row of signalsRes.rows || []) {
         const titleKey = normalizeSignalQueueTitle(row.title);
         const symbolKey = String(row.symbol || 'unknown').toUpperCase();
         if (titleKey && seenTitles.has(titleKey)) continue;
@@ -2007,12 +4211,17 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         actionableSignals.push(row);
         if (actionableSignals.length >= 20) break;
       }
-      const fallbackSignals = actionableSignals.length
-        ? actionableSignals
-        : grades.filter((item) => String(item.evidence_grade || '').toUpperCase() === 'E2').slice(0, 20);
       return buildJsonResponse({
-        grades: Object.values(summary),
-        signals: fallbackSignals,
+        grades: summary,
+        signals: actionableSignals,
+        meta: {
+          liveSignalWindowDays,
+          minPromotionControls: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
+          evidenceGradeWindowDays: EVIDENCE_GRADE_WINDOW_DAYS,
+          rawRows,
+          promotedRows: summary.reduce((sum, row) => sum + Number(row.count || 0), 0),
+          quarantinedRows: quarantinedCount,
+        },
       });
     }
 
@@ -2091,12 +4300,20 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     if (segments[0] === 'api' && segments[1] === 'regime-timeline') {
       const days = Math.max(1, Math.min(3650, Number(params.get('days')) || 365));
       const r = await safeQuery(`
-        WITH daily_regime AS (
-          SELECT DATE(ts) as d, value as vix,
-            CASE WHEN value > 25 THEN 'risk-off'
-                 WHEN value < 18 THEN 'risk-on'
+        WITH daily_vix AS (
+          SELECT DISTINCT ON (DATE(ts))
+                 DATE(ts) AS d,
+                 value AS vix
+            FROM signal_history
+           WHERE signal_name='vix' AND ts >= NOW() - ($1 || ' days')::interval
+           ORDER BY DATE(ts), ts DESC
+        ),
+        daily_regime AS (
+          SELECT d, vix,
+            CASE WHEN vix > 25 THEN 'risk-off'
+                 WHEN vix < 18 THEN 'risk-on'
                  ELSE 'balanced' END AS regime
-          FROM signal_history WHERE signal_name='vix' AND ts >= NOW() - ($1 || ' days')::interval
+          FROM daily_vix
         )
         SELECT d, regime, vix FROM daily_regime ORDER BY d
       `, [String(days)]);

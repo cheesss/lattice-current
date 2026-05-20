@@ -35,6 +35,13 @@ export function checkKillSwitch() {
 }
 
 function getLimit(scope, action) {
+  const envAction = String(action || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .toUpperCase();
+  const envKey = `AUTOMATION_BUDGET_${String(scope || '').toUpperCase()}_${envAction}`;
+  const envValue = Number(process.env[envKey]);
+  if (Number.isFinite(envValue) && envValue >= 0) return envValue;
   const table = AUTOMATION_BUDGETS?.[scope];
   if (!table) return null;
   const value = table[action];

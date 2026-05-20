@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>License · Lattice Current</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/dashboard/shared/tokens.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 50%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:13px;line-height:1.65;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:780px;margin:0 auto;padding:36px 24px 64px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+h1{font-size:28px;line-height:1.15;font-weight:600;color:var(--text-loud);margin-bottom:18px}
+h2{font-size:16px;font-weight:600;color:var(--text-loud);margin:26px 0 8px}
+p{color:var(--text-base);margin-bottom:10px}
+ul{padding-left:20px;color:var(--text-base);margin-bottom:14px}
+li{margin-bottom:5px}
+.callout{padding:14px 18px;border:1px solid var(--border-base);border-radius:12px;background:rgba(28,32,40,.5);margin:18px 0;color:var(--text-loud);font-size:12.5px}
+footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--border-dim);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+code{font-family:'JetBrains Mono',Consolas,monospace;background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="eyebrow">Lattice Current — Terms</div>
+  <h1>License</h1>
+
+  <p>Lattice Current is published under <strong>GNU AGPL v3.0</strong>. The full text is at <a href="https://www.gnu.org/licenses/agpl-3.0.txt" target="_blank" rel="noopener">https://www.gnu.org/licenses/agpl-3.0.txt</a> and shipped in the repo at <code>LICENSE</code>.</p>
+
+  <h2>What AGPL v3.0 means in practice</h2>
+  <ul>
+    <li><strong>You may use, copy, modify, and redistribute</strong> the source — including in commercial products — provided you keep the AGPL notice and disclose changes.</li>
+    <li><strong>If you run a modified version as a network service</strong>, you must offer the source of your modifications to users of that service. This is the "A" in AGPL.</li>
+    <li><strong>No warranty.</strong> The code is provided as-is. See §15 of the license.</li>
+    <li><strong>Patent grant.</strong> Contributors grant a patent license for their contributions (§11).</li>
+  </ul>
+
+  <h2>What's in the source vs what's not</h2>
+  <p>The repository contains: dashboard code, API server, scripts, machine-learning training and inference logic, schema migrations, and configuration.</p>
+  <p>The repository does NOT contain: production data (articles, predictions, evidence rows), trained model weights for proprietary versions, or third-party data licensed from external providers.</p>
+
+  <div class="callout">
+    <strong>Not financial advice.</strong> Lattice Current generates statistical signals from public news and market data for research and decision-support. Nothing it produces is investment advice, an offer, or a solicitation. Use at your own risk; consult a licensed advisor for investment decisions.
+  </div>
+
+  <h2>Third-party data and code</h2>
+  <p>The dashboard ingests and links to content from third-party publishers (news, market data, research, code). Their licenses apply independently. See <a href="/data-sources.html">/data-sources.html</a> for the full attribution list.</p>
+
+  <h2>Reporting issues</h2>
+  <p>Code bugs and security issues: file an issue or contact the maintainer. License and patent concerns should reach the maintainer directly before public discussion.</p>
+
+  <footer>
+    <div>Last revised 2026-05-01</div>
+    <div>
+      <a href="/event-dashboard.html">← Dashboard</a>
+      &nbsp;·&nbsp;
+      <a href="/data-sources.html">Data sources</a>
+      &nbsp;·&nbsp;
+      <a href="/terms.html">Terms of use</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

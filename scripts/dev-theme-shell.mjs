@@ -29,6 +29,24 @@ const RESET = '\x1b[0m';
 const CYAN = '\x1b[36m';
 const YELLOW = '\x1b[33m';
 const GREEN = '\x1b[32m';
+const MAGENTA = '\x1b[35m';
+
+const metaModelScript = path.join(projectRoot, 'scripts', 'meta-model-server.py');
+function findPythonBin() {
+  const candidates = [
+    process.env.PYTHON_BIN,
+    'C:/Users/chohj/miniconda3/python.exe',
+    'python3',
+    'python',
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try {
+      if (path.isAbsolute(c) && fs.existsSync(c)) return c;
+      if (!path.isAbsolute(c)) return c; // shell will resolve via PATH
+    } catch {}
+  }
+  return null;
+}
 
 function prefix(color, tag) {
   return (data) => {
@@ -125,15 +143,33 @@ if (!fs.existsSync(viteEntry)) {
 acquireDevStackLock();
 process.on('exit', () => releaseDevStackLock());
 
-console.log(`${GREEN}[theme-shell]${RESET} Starting event dashboard API + Vite dev server...`);
+console.log(`${GREEN}[theme-shell]${RESET} Starting event dashboard API + Vite dev server${fs.existsSync(metaModelScript) ? ' + meta-model GPU inference' : ''}...`);
 console.log(`${GREEN}[theme-shell]${RESET} Press Ctrl+C to stop all services.\n`);
 
 const api = spawnHidden(process.execPath, [apiScript]);
 wireLogging(api, CYAN, 'theme-api');
 
+// Spawn meta-model-server (FastAPI on :8100). Non-fatal if Python missing —
+// dashboard works without it, just `Conviction vs Realized Alpha` plot stays
+// empty and `model_predictions` doesn't fill. Historically this was only
+// spawned by `dev-full.mjs`; users running plain `npm run dev` were silently
+// missing it for weeks. Including it here closes that operational gap.
+let metaModel = null;
+const pythonBin = findPythonBin();
+if (pythonBin && fs.existsSync(metaModelScript)) {
+  metaModel = spawnHidden(pythonBin, [metaModelScript], { PYTHONIOENCODING: 'utf-8' });
+  wireLogging(metaModel, MAGENTA, 'meta-model');
+  metaModel.on('close', (code) => {
+    console.log(`${MAGENTA}[meta-model]${RESET} exited with code ${code} (inference unavailable until restart)`);
+  });
+} else {
+  console.log(`${MAGENTA}[meta-model]${RESET} skipping (python or meta-model-server.py missing)`);
+}
+
 const cleanup = (vite) => {
   vite?.kill();
   api.kill();
+  metaModel?.kill();
 };
 
 setTimeout(() => {

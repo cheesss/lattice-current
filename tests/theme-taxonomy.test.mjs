@@ -9,6 +9,7 @@ import {
   isLegacyThemeKey,
   listChildThemes,
   listTrendTrackerThemes,
+  rankThemesForText,
   resolveThemeTaxonomy,
 } from '../scripts/_shared/theme-taxonomy.mjs';
 
@@ -99,4 +100,23 @@ test('generic bucket themes require stronger evidence before they are surfaced a
   });
 
   assert.equal(genericDiscovery.canonicalTheme, null);
+});
+
+test('keyword ranking uses token boundaries to avoid substring false positives', () => {
+  const ranked = rankThemesForText('Ransomware attack disrupts critical infrastructure provider', {
+    includeParents: false,
+    limit: 3,
+  });
+  assert.equal(ranked[0]?.theme, 'cybersecurity');
+  assert.equal(ranked.some((item) => item.theme === 'conflict' && item.matchedKeywords.includes('war')), false);
+});
+
+test('article classifier recognizes common AI and space headline terms', () => {
+  assert.equal(classifyArticleAgainstTaxonomy({
+    title: 'ChatGPT new Images 2.0 model is surprisingly good at generating text',
+  }).theme, 'ai-ml');
+  assert.equal(classifyArticleAgainstTaxonomy({
+    title: 'NASA invests in small businesses innovating for Space and Earth',
+    source: 'NASA News Releases',
+  }).theme, 'space');
 });

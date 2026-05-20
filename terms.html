@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Use · Lattice Current</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/dashboard/shared/tokens.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 50%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:13px;line-height:1.65;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:780px;margin:0 auto;padding:36px 24px 64px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+h1{font-size:28px;line-height:1.15;font-weight:600;color:var(--text-loud);margin-bottom:18px}
+h2{font-size:16px;font-weight:600;color:var(--text-loud);margin:26px 0 8px}
+p,li{color:var(--text-base);margin-bottom:8px}
+ul{padding-left:20px;margin-bottom:14px}
+.callout{padding:14px 18px;border:1px solid var(--amber-risk);border-radius:12px;background:linear-gradient(180deg,rgba(64,42,12,.42),rgba(28,32,40,.5));margin:18px 0;color:var(--text-loud);font-size:12.5px}
+.callout.danger{border-color:var(--red-critical);background:linear-gradient(180deg,rgba(64,12,12,.42),rgba(28,32,40,.5))}
+footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--border-dim);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="eyebrow">Lattice Current — Terms of Use</div>
+  <h1>Terms of use</h1>
+
+  <div class="callout danger">
+    <strong>Not investment advice.</strong> Lattice Current produces statistical signals for research and decision support. It is NOT investment, legal, tax, or accounting advice. Nothing it produces is an offer or solicitation to buy or sell any security, instrument, or fund.
+  </div>
+
+  <h2>Use cases this is appropriate for</h2>
+  <ul>
+    <li>Surfacing event-driven coverage and statistical reaction patterns in public market data.</li>
+    <li>Comparing observed news intensity to baseline rates per theme.</li>
+    <li>Flagging mismatches between coverage volume and matched-control returns.</li>
+    <li>Internal research workflows that require an evidence-graded view of theme momentum.</li>
+  </ul>
+
+  <h2>Use cases this is NOT appropriate for</h2>
+  <ul>
+    <li>Automated trading without human review.</li>
+    <li>Investment recommendations to retail clients.</li>
+    <li>Compliance / regulatory filings (the underlying data is not warranted).</li>
+    <li>Real-time decisions where second-by-second latency matters (data refresh is delayed by source minimums and cache TTLs).</li>
+  </ul>
+
+  <div class="callout">
+    <strong>No warranty.</strong> Per AGPL v3.0 §15, the software is provided "as-is", without warranty of any kind. The signals can be wrong. Models can drift. Sources can fail. Always verify critical conclusions against original sources.
+  </div>
+
+  <h2>Data accuracy</h2>
+  <p>The system aggregates third-party data. We do our best to flag staleness (modelTrust, freshness pillars, calibration warnings) but cannot guarantee end-to-end correctness. Specifically:</p>
+  <ul>
+    <li>Article sources can publish corrections after we ingest.</li>
+    <li>Evidence grades depend on matched-control sufficiency that varies by theme.</li>
+    <li>Model predictions can become stale — see the modelTrust banner before acting.</li>
+  </ul>
+
+  <h2>Acceptable use</h2>
+  <p>You agree not to:</p>
+  <ul>
+    <li>Use the system to harass, defame, or coordinate market manipulation.</li>
+    <li>Re-publish underlying third-party data in ways that violate the source's license.</li>
+    <li>Misrepresent system output as advice from a registered investment professional.</li>
+  </ul>
+
+  <h2>Demo / sandbox environments</h2>
+  <p>Public demo deployments (LATTICE_DEMO_MODE=1) are read-only. The data is a sanitized historical slice and does not reflect real-time conditions. Do not act on demo data.</p>
+
+  <h2>Liability</h2>
+  <p>To the maximum extent allowed by law, the maintainers and contributors are not liable for damages arising from use or inability to use the software. See AGPL v3.0 §16.</p>
+
+  <h2>Changes</h2>
+  <p>These terms may be updated as the product matures. Material changes will be reflected in the "Last revised" date below.</p>
+
+  <footer>
+    <div>Last revised 2026-05-01</div>
+    <div>
+      <a href="/event-dashboard.html">← Dashboard</a>
+      &nbsp;·&nbsp;
+      <a href="/license.html">License</a>
+      &nbsp;·&nbsp;
+      <a href="/data-sources.html">Data sources</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

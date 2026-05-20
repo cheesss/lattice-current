@@ -26,6 +26,7 @@ test('master daemon includes circuit breaker and pending outcome resolution', ()
   assert.match(source, /openalex-theme-evidence/);
   assert.match(source, /github-theme-evidence/);
   assert.match(source, /generate-structural-alerts/);
+  assert.match(source, /refresh-event-market-transmission/);
   assert.match(source, /generate-codex-theme-proposals/);
   assert.match(source, /generate-weekly-digest/);
   assert.match(source, /auto-curate/);
@@ -36,6 +37,8 @@ test('master daemon includes circuit breaker and pending outcome resolution', ()
   assert.match(source, /createLogger/);
   assert.match(source, /task\.duration_ms/);
   assert.match(source, /backfill-new-sources\.mjs --source fred/);
+  assert.match(source, /const periods = \['week', 'month', 'quarter', 'year'\]/);
+  assert.match(source, /refresh-event-market-transmission\.mjs --days 14 --limit 180/);
   assert.match(source, /DASHBOARD_HEALTH_TIMEOUT_MS/);
   assert.match(source, /DUCKDB_SYNC_TIMEOUT_MS/);
   assert.match(source, /listRunningNodeProcesses/);

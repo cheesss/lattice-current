@@ -21,6 +21,7 @@ const { parser: createJsonParser } = streamJsonPackage as { parser: () => NodeJS
 const { pick } = pickPackage as { pick: (options: { filter: string }) => NodeJS.ReadWriteStream };
 const { streamArray } = streamArrayPackage as { streamArray: () => NodeJS.ReadWriteStream };
 const DUCKDB_LOCK_TTL_MINUTES = 45;
+const DUCKDB_MALFORMED_LOCK_GRACE_MS = 30_000;
 const IMPORT_FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
 type DuckDbConnection = {
@@ -212,6 +213,15 @@ async function acquireDuckDbPathLock(
       existing = null;
     }
 
+    const malformedLockLooksStale = !existing && await (async () => {
+      try {
+        const lockStat = await stat(lockPath);
+        return Date.now() - lockStat.mtimeMs > DUCKDB_MALFORMED_LOCK_GRACE_MS;
+      } catch {
+        return false;
+      }
+    })();
+
     const pidLooksDead = (() => {
       if (!existing?.pid || existing.pid === process.pid) return false;
       try {
@@ -222,7 +232,7 @@ async function acquireDuckDbPathLock(
       }
     })();
 
-    if ((existing?.expiresAt && asTs(existing.expiresAt) < Date.now()) || pidLooksDead) {
+    if ((existing?.expiresAt && asTs(existing.expiresAt) < Date.now()) || pidLooksDead || malformedLockLooksStale) {
       await rm(lockPath, { force: true });
       if (!(await tryCreate())) return null;
     } else {
@@ -234,6 +244,11 @@ async function acquireDuckDbPathLock(
     await rm(lockPath, { force: true });
   };
 }
+
+export const __historicalStreamWorkerTestUtils = {
+  acquireDuckDbPathLock,
+  getDuckDbLockPath,
+};
 
 export interface HistoricalReplayFrameArchiveRow extends MaterializedFrameRow {
   payload: HistoricalReplayFrame;

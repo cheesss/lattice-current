@@ -83,9 +83,12 @@ async function backfillFRED(client, fromDate) {
         if (isNaN(value) || obs.value === '.') continue;
 
         await client.query(`
-          INSERT INTO signal_history (signal_name, ts, value)
-          VALUES ($1, $2::date, $3)
-          ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
+          INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
+          VALUES ($1, $2::date, $3, 'observed', 'backfill-new-sources-fred')
+          ON CONFLICT (signal_name, ts) DO UPDATE
+            SET value = EXCLUDED.value,
+                value_origin = EXCLUDED.value_origin,
+                writer_id = EXCLUDED.writer_id
         `, [series.signal, obs.date, value]);
         inserted++;
       }
@@ -168,9 +171,12 @@ async function populateSignalHistoryFromTables(client, fromDate) {
         const value = parseFloat(row.value);
         if (isNaN(value)) continue;
         await client.query(`
-          INSERT INTO signal_history (signal_name, ts, value)
-          VALUES ($1, $2::date, $3)
-          ON CONFLICT (signal_name, ts) DO UPDATE SET value = EXCLUDED.value
+          INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
+          VALUES ($1, $2::date, $3, 'observed', 'backfill-new-sources-tables')
+          ON CONFLICT (signal_name, ts) DO UPDATE
+            SET value = EXCLUDED.value,
+                value_origin = EXCLUDED.value_origin,
+                writer_id = EXCLUDED.writer_id
         `, [t.name, row.date, value]);
         inserted++;
       }

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Lattice Current | Signal Intelligence Showcase</title>
+  <style>
+    :root {
+      --bg:#050608; --panel:rgba(18,22,31,.76); --panel2:rgba(28,34,47,.84);
+      --line:rgba(255,255,255,.11); --line2:rgba(255,255,255,.2);
+      --text:rgba(248,250,252,.96); --soft:rgba(225,231,240,.74); --muted:rgba(188,199,214,.52);
+      --green:#18d59d; --amber:#f5b84b; --blue:#67a8ff; --red:#ff5c7a; --violet:#b69cff;
+      --mx:50%; --my:16%;
+      font-family:"Aptos","Segoe UI Variable","Segoe UI",Inter,system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+    }
+    *{box-sizing:border-box} html{background:var(--bg);scroll-behavior:smooth}
+    body{margin:0;min-height:100vh;overflow-x:hidden;color:var(--text);background:
+      radial-gradient(circle at var(--mx) var(--my),rgba(103,168,255,.19),transparent 24rem),
+      radial-gradient(circle at 18% 12%,rgba(24,213,157,.18),transparent 34rem),
+      radial-gradient(circle at 88% 8%,rgba(182,156,255,.16),transparent 31rem),
+      linear-gradient(180deg,#07080b,#0b0e13 44%,#050608)}
+    body:before{position:fixed;inset:0;z-index:-2;pointer-events:none;content:"";opacity:.42;background-image:
+      linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:72px 72px;
+      mask-image:linear-gradient(to bottom,#000,transparent 86%)}
+    a{color:inherit;text-decoration:none} button{font:inherit} h1,h2,h3,p{margin:0}
+    .page{width:min(1180px,calc(100% - 32px));margin:0 auto}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 0;backdrop-filter:blur(18px)}
+    .nav:before{position:absolute;inset:0 50%;z-index:-1;width:100vw;margin-left:-50vw;content:"";background:linear-gradient(180deg,rgba(5,6,8,.86),rgba(5,6,8,.42));border-bottom:1px solid rgba(255,255,255,.055)}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:760;letter-spacing:-.03em}.mark{position:relative;width:38px;height:38px;border-radius:13px;border:1px solid rgba(255,255,255,.42);background:radial-gradient(circle at 30% 26%,#f7fffb 0 8%,transparent 9%),linear-gradient(135deg,var(--green),#8be7ff);box-shadow:0 0 34px rgba(24,213,157,.36)}
+    .mark:after{position:absolute;inset:8px;content:"";border:1px solid rgba(5,17,13,.55);border-radius:9px;transform:rotate(45deg)}
+    .nav-links{display:flex;gap:8px;color:var(--muted);font-size:13px}.nav-links a{padding:9px 12px;border:1px solid transparent;border-radius:999px}.nav-links a:hover,.nav-links a:focus-visible{color:var(--text);background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.09);outline:0}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(340px,.92fr);gap:34px;min-height:760px;padding:86px 0 62px;align-items:center}
+    .eyebrow{display:inline-flex;align-items:center;gap:10px;width:max-content;padding:8px 12px;color:#d5ffef;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;background:rgba(24,213,157,.095);border:1px solid rgba(24,213,157,.24);border-radius:999px;box-shadow:0 0 64px rgba(24,213,157,.2)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(24,213,157,.45);animation:pulse 2.8s ease-out infinite}
+    h1{max-width:900px;margin-top:26px;font-size:clamp(56px,9vw,112px);line-height:.89;letter-spacing:-.084em}.grad{display:block;color:transparent;background:linear-gradient(105deg,#fff 5%,#b9fff0 34%,#7bb7ff 66%,#fff2cc 96%);background-clip:text;-webkit-background-clip:text;text-shadow:0 0 80px rgba(103,168,255,.28)}
+    .copy{max-width:680px;margin-top:28px;color:var(--soft);font-size:clamp(18px,2vw,22px);line-height:1.55;letter-spacing:-.02em}
+    .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);font-size:14px;font-weight:750;transition:.18s ease}.btn:hover,.btn:focus-visible{transform:translateY(-1px);background:rgba(255,255,255,.1);border-color:var(--line2);outline:0}.btn.primary{color:#04110d;background:linear-gradient(135deg,#cffff0,var(--green));border-color:rgba(183,255,231,.72);box-shadow:0 18px 58px rgba(24,213,157,.28)}
+    .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:640px;margin-top:34px}.metric{padding:17px;border-radius:20px;background:rgba(255,255,255,.052);border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}.metric b{display:block;font-size:27px;letter-spacing:-.045em;font-variant-numeric:tabular-nums}.metric span{display:block;margin-top:7px;color:var(--muted);font-size:12px;line-height:1.35}
+    .panel{position:relative;min-height:520px;padding:22px;overflow:hidden;border-radius:34px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(145deg,rgba(255,255,255,.12),transparent 26%),linear-gradient(180deg,rgba(18,22,31,.88),rgba(10,13,18,.76));box-shadow:0 24px 100px rgba(0,0,0,.38)}
+    .panel:before{position:absolute;inset:-40% -20% auto;height:320px;content:"";background:radial-gradient(circle,rgba(24,213,157,.3),transparent 62%);filter:blur(10px);animation:drift 12s ease-in-out infinite alternate}.panel:after{position:absolute;inset:0;z-index:-1;content:"";background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:38px 38px;mask-image:radial-gradient(circle at center,#000,transparent 76%)}
+    .frame{position:relative;display:grid;min-height:476px;grid-template-rows:auto 1fr auto;gap:18px}.top,.impact-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.top{color:var(--muted);font-size:12px}
+    .chip,.grade{display:inline-flex;align-items:center;gap:7px;width:max-content;padding:6px 9px;border-radius:999px;border:1px solid var(--line);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.chip{color:#d5ffef;background:rgba(24,213,157,.12);border-color:rgba(24,213,157,.28)}.grade.e2{color:#dfffee;background:rgba(24,213,157,.18);border-color:rgba(24,213,157,.28)}.grade.warn{color:#ffe9bb;background:rgba(245,184,75,.18);border-color:rgba(245,184,75,.28)}
+    .node-field{position:relative;display:grid;place-items:center;min-height:292px}.orbit{position:absolute;width:270px;height:270px;border:1px solid rgba(255,255,255,.12);border-radius:50%;animation:rotate 18s linear infinite}.orbit:nth-child(2){width:206px;height:206px;border-color:rgba(103,168,255,.2);animation:rotate 12s linear infinite reverse}.orbit:nth-child(3){width:134px;height:134px;border-color:rgba(245,184,75,.18);animation-duration:9s}.orbit:before{position:absolute;top:-5px;left:50%;width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 28px rgba(24,213,157,.75);content:""}
+    .core{position:relative;display:grid;place-items:center;width:138px;height:138px;text-align:center;border-radius:42px;border:1px solid rgba(184,255,234,.45);background:radial-gradient(circle at 28% 26%,rgba(255,255,255,.3),transparent 23%),linear-gradient(145deg,rgba(24,213,157,.28),rgba(103,168,255,.18));box-shadow:0 0 88px rgba(24,213,157,.26)}.core strong{display:block;font-size:40px;letter-spacing:-.08em}.core span{color:rgba(226,255,246,.74);font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+    .impact{display:grid;gap:11px;padding:15px;border-radius:19px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.058);color:var(--soft);font-size:13px}.bar{position:relative;width:130px;height:7px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.08)}.bar:before{position:absolute;inset:0;width:var(--w,60%);content:"";border-radius:inherit;background:linear-gradient(90deg,var(--green),var(--blue))}
+    section{padding:78px 0}.section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:26px}.kicker{margin-bottom:10px;color:var(--green);font-size:12px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}h2{max-width:760px;font-size:clamp(34px,5vw,58px);line-height:1;letter-spacing:-.06em}.section-copy{max-width:400px;color:var(--muted);font-size:15px;line-height:1.6}
+    .flow,.report-shell,.op-card{overflow:hidden;border-radius:34px;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.09),transparent 28%),var(--panel);box-shadow:0 24px 100px rgba(0,0,0,.38)}.flow{padding:clamp(20px,5vw,44px)}.beam{position:relative;min-height:330px;padding:24px 0}.beam svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}.beam-line{fill:none;stroke:url(#beamGradient);stroke-width:3;stroke-linecap:round;stroke-dasharray:14 18;filter:drop-shadow(0 0 18px rgba(24,213,157,.38));animation:beam 2.8s linear infinite}.beam-glow{fill:none;stroke:rgba(103,168,255,.09);stroke-width:22;stroke-linecap:round}
+    .flow-node{position:absolute;width:min(210px,38vw);padding:15px;border-radius:19px;border:1px solid rgba(255,255,255,.12);background:rgba(9,12,17,.82);box-shadow:0 18px 52px rgba(0,0,0,.26);backdrop-filter:blur(14px)}.flow-node strong{display:block;margin-bottom:6px;font-size:15px}.flow-node span{color:var(--muted);font-size:12px;line-height:1.45}.flow-node:nth-of-type(1){top:18px;left:1%}.flow-node:nth-of-type(2){top:116px;left:22%}.flow-node:nth-of-type(3){top:36px;left:45%}.flow-node:nth-of-type(4){top:168px;left:60%}.flow-node:nth-of-type(5){top:60px;right:1%}
+    .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{position:relative;min-height:250px;padding:22px;overflow:hidden;border-radius:28px;border:1px solid var(--line);background:linear-gradient(145deg,rgba(255,255,255,.09),transparent 25%),var(--panel);box-shadow:0 18px 70px rgba(0,0,0,.26)}.card.large{grid-column:span 2;grid-row:span 2;min-height:516px}.card.wide{grid-column:span 2}.card h3{margin-bottom:8px;font-size:19px;letter-spacing:-.04em}.card p{max-width:360px;color:var(--muted);font-size:13px;line-height:1.55}
+    .mini-map{position:absolute;inset:96px 20px 22px;overflow:hidden;border-radius:24px;border:1px solid var(--line);background:radial-gradient(circle at 61% 44%,rgba(255,92,122,.2),transparent 12%),radial-gradient(circle at 50% 55%,rgba(245,184,75,.2),transparent 14%),linear-gradient(145deg,rgba(103,168,255,.1),rgba(24,213,157,.08)),#081019}.mini-map:before{position:absolute;inset:0;content:"";background:linear-gradient(28deg,transparent 0 44%,rgba(255,255,255,.06) 45% 46%,transparent 47% 100%),linear-gradient(143deg,transparent 0 54%,rgba(255,255,255,.05) 55% 56%,transparent 57% 100%)}.arc{position:absolute;width:180px;height:86px;border-top:2px solid rgba(24,213,157,.72);border-radius:50%;filter:drop-shadow(0 0 12px rgba(24,213,157,.55));transform:rotate(-16deg);animation:arc 3.4s ease-in-out infinite}.arc.a{top:38%;left:17%}.arc.b{top:52%;right:10%;width:126px;transform:rotate(22deg);animation-delay:.9s}.point{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 7px rgba(245,184,75,.1),0 0 24px rgba(245,184,75,.8)}.point.a{top:37%;left:23%}.point.b{top:56%;right:22%;background:var(--red)}.point.c{top:29%;right:34%;background:var(--green)}
+    .list{display:grid;gap:10px;margin-top:22px}.row,.evidence,.scenario-card{padding:12px;border-radius:15px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.045);color:var(--soft);font-size:12px}.row{display:flex;justify-content:space-between;gap:12px}.row.active{color:#dfffee;background:rgba(24,213,157,.1);border-color:rgba(24,213,157,.24)}.mono{font-family:"Cascadia Mono","SFMono-Regular",Consolas,ui-monospace,monospace;font-variant-numeric:tabular-nums}
+    .report-shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:720px}.report-nav{padding:28px;background:rgba(255,255,255,.035);border-right:1px solid rgba(255,255,255,.09)}.report-nav h3{margin-bottom:18px;font-size:17px}.report-nav a{display:block;padding:10px 0;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,.055)}.report{padding:clamp(26px,5vw,52px)}.report-header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding-bottom:28px;border-bottom:1px solid rgba(255,255,255,.1)}.report-title h2{margin-top:10px;font-size:clamp(34px,5vw,64px)}.report-meta{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;min-width:240px}
+    .report-section{display:grid;grid-template-columns:170px minmax(0,1fr);gap:24px;padding:30px 0;border-bottom:1px solid rgba(255,255,255,.08)}.report-section h3{color:var(--green);font-size:12px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}.report-section p{color:var(--soft);font-size:17px;line-height:1.65;letter-spacing:-.015em}.cite{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;margin:0 2px;border:0;border-radius:999px;color:#07110e;background:var(--green);font-size:12px;font-weight:850;vertical-align:middle;cursor:pointer}.evidence strong,.scenario-card strong{display:block;margin-bottom:7px;color:var(--text);font-size:14px}.evidence span,.scenario-card span{color:var(--muted);font-size:12px}.scenario{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+    .operating{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.op-card{padding:24px}.op-card h3{margin-bottom:10px;font-size:20px}.op-card p{color:var(--muted);font-size:14px;line-height:1.6}.footer{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:34px 0 56px;color:var(--muted);font-size:13px;border-top:1px solid rgba(255,255,255,.08)}
+    .reveal{opacity:1;transform:none;transition:700ms cubic-bezier(.2,.8,.2,1)}.motion-ready .reveal{opacity:0;transform:translateY(18px)}.motion-ready .reveal.visible{opacity:1;transform:none}.tip{position:fixed;z-index:40;max-width:320px;padding:12px 13px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(8,10,14,.94);box-shadow:0 16px 42px rgba(0,0,0,.38);color:var(--soft);font-size:12px;line-height:1.45;pointer-events:none;opacity:0;transform:translateY(8px);transition:.14s ease}.tip.visible{opacity:1;transform:none}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(24,213,157,.42)}70%{box-shadow:0 0 0 10px rgba(24,213,157,0)}100%{box-shadow:0 0 0 0 rgba(24,213,157,0)}}@keyframes drift{from{transform:translateX(-8%) rotate(0)}to{transform:translateX(12%) rotate(8deg)}}@keyframes rotate{to{transform:rotate(360deg)}}@keyframes beam{to{stroke-dashoffset:-64}}@keyframes arc{0%,100%{opacity:.44}50%{opacity:1}}
+    @media (max-width:980px){.hero{grid-template-columns:1fr;min-height:auto;padding-top:58px}.section-head,.report-header,.footer{align-items:flex-start;flex-direction:column}.bento,.operating{grid-template-columns:repeat(2,1fr)}.card.large,.card.wide{grid-column:span 2}.report-shell{grid-template-columns:1fr}.report-nav{display:none}}
+    @media (max-width:720px){.page{width:min(100% - 22px,1180px)}.nav{align-items:flex-start;flex-direction:column}.nav-links{width:100%;justify-content:flex-start;overflow-x:auto;padding-bottom:4px}h1{font-size:clamp(46px,16vw,76px)}.metrics,.scenario,.operating,.bento{grid-template-columns:1fr}.card.large,.card.wide{grid-column:auto}.card.large{min-height:440px}.beam{display:grid;min-height:auto;gap:12px}.beam svg{display:none}.flow-node{position:relative;top:auto!important;right:auto!important;left:auto!important;width:100%}.report-section{grid-template-columns:1fr;gap:12px}.report{padding:22px}}
+    @media (prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.reveal{opacity:1;transform:none}}
+  </style>
+</head>
+<body>
+  <div class="tip" id="citation-tip" role="status" aria-live="polite"></div>
+  <header class="page nav" aria-label="Showcase navigation">
+    <a class="brand" href="showcase.html" aria-label="Lattice Current showcase home"><span class="mark" aria-hidden="true"></span><span>Lattice Current</span></a>
+    <nav class="nav-links"><a href="#flow">Signal Flow</a><a href="#platform">Platform</a><a href="#report">Demo Report</a><a href="event-dashboard.html">Open Cockpit</a></nav>
+  </header>
+  <main>
+    <section class="page hero">
+      <div class="reveal">
+        <div class="eyebrow"><span class="dot" aria-hidden="true"></span>Validated Signal Intelligence</div>
+        <h1>Market signals with <span class="grad">proof, not noise.</span></h1>
+        <p class="copy">Lattice Current turns live events, geospatial pressure, model validation, and analyst review into one evidence-first workflow for asset-market decisions.</p>
+        <div class="actions"><a class="btn primary" href="event-dashboard.html">Open operator cockpit</a><a class="btn" href="#report">View proof report</a></div>
+        <div class="metrics" aria-label="Platform metrics">
+          <div class="metric"><b class="mono" data-count="424813">0</b><span>event-market observations replayed</span></div>
+          <div class="metric"><b class="mono" data-count="975">0</b><span>E2 matched-control signals</span></div>
+          <div class="metric"><b class="mono" data-count="36">0</b><span>validation runs tracked</span></div>
+        </div>
+      </div>
+      <aside class="panel reveal" aria-label="Live proof preview">
+        <div class="frame">
+          <div class="top"><span class="chip"><span class="dot" aria-hidden="true"></span>Proof engine live</span><span class="mono">ECE 0.12 · p95 840ms</span></div>
+          <div class="node-field" aria-hidden="true"><div class="orbit"></div><div class="orbit"></div><div class="orbit"></div><div class="core"><div><strong>E2</strong><span>uplift validated</span></div></div></div>
+          <div class="impact"><div class="impact-row"><span>Conflict pressure → Energy basket</span><strong class="mono">+2.3%</strong></div><div class="impact-row"><span>Matched-control uplift</span><span class="bar" style="--w:72%"></span></div><div class="impact-row"><span>Freshness</span><strong class="mono">18m</strong></div></div>
+        </div>
+      </aside>
+    </section>
+    <section class="page" id="flow">
+      <div class="section-head reveal"><div><div class="kicker">Signal Flow</div><h2>From event stream to decision-grade proof.</h2></div><p class="section-copy">The showcase compresses the operating loop into one cinematic system map: intake, normalization, counterfactual validation, signal grading, and review.</p></div>
+      <div class="flow reveal"><div class="beam">
+        <svg viewBox="0 0 1000 330" aria-hidden="true"><defs><linearGradient id="beamGradient" x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stop-color="#18d59d"></stop><stop offset="48%" stop-color="#67a8ff"></stop><stop offset="100%" stop-color="#f5b84b"></stop></linearGradient></defs><path class="beam-glow" d="M72 84 C230 210 318 226 444 110 S652 72 744 212 S884 220 938 82"></path><path class="beam-line" d="M72 84 C230 210 318 226 444 110 S652 72 744 212 S884 220 938 82"></path></svg>
+        <div class="flow-node"><strong>Live events</strong><span>News, filings, macro prints, geo pressure, and source health are normalized into a shared event fabric.</span></div><div class="flow-node"><strong>Theme intelligence</strong><span>Clusters become durable themes with freshness, lineage, and contradiction checks.</span></div><div class="flow-node"><strong>Counterfactual replay</strong><span>Events are tested against matched-control days instead of headline sentiment.</span></div><div class="flow-node"><strong>E2 signal queue</strong><span>Validated signals move into a decision inbox with human review.</span></div><div class="flow-node"><strong>Asset impact</strong><span>Operator actions link back to proof, citations, assumptions, and replay outcomes.</span></div>
+      </div></div>
+    </section>
+    <section class="page" id="platform">
+      <div class="section-head reveal"><div><div class="kicker">Premium Cockpit</div><h2>Designed like a decision instrument, not a card dump.</h2></div><p class="section-copy">The operating product stays restrained. Motion is reserved for state changes, while evidence, freshness, and next actions take visual priority.</p></div>
+      <div class="bento">
+        <article class="card large reveal"><h3>Geo pressure lens</h3><p>Country pressure, corridor risk, and transmission arcs are presented as a focused map instrument with layer budgets.</p><div class="mini-map" aria-hidden="true"><div class="arc a"></div><div class="arc b"></div><div class="point a"></div><div class="point b"></div><div class="point c"></div></div></article>
+        <article class="card reveal"><h3>Evidence ladder</h3><p>Each signal shows what level of proof has been reached before an analyst acts.</p><div class="list"><div class="row"><span>E0 Noise</span><span>42k</span></div><div class="row"><span>E1 Positive alpha</span><span>6.4k</span></div><div class="row active"><span>E2 Uplift proven</span><span>975</span></div></div></article>
+        <article class="card reveal"><h3>Review inbox</h3><p>Proposals, source additions, and signal approvals are routed through a single action surface.</p><div class="list"><div class="row"><span>Accept source</span><strong>pending</strong></div><div class="row"><span>Simulate signal</span><strong>dry-run</strong></div><div class="row"><span>Suppress topic</span><strong>queued</strong></div></div></article>
+        <article class="card wide reveal"><h3>Replay-backed validation</h3><p>Every important claim keeps its path back to replay runs, counterfactual assumptions, and calibration status.</p><div class="list"><div class="row"><span>Matched controls</span><strong class="mono">N=12,480</strong></div><div class="row"><span>Forward window</span><strong class="mono">2w</strong></div><div class="row"><span>Drift guard</span><strong class="mono">fresh</strong></div></div></article>
+        <article class="card wide reveal"><h3>Source-grounded research</h3><p>Theme briefs read like analyst dossiers: claims, citations, source freshness, invalidation triggers, and watch-next prompts.</p><div class="list"><div class="row"><span>Inline citation</span><strong>[1][2][3]</strong></div><div class="row"><span>Freshness</span><strong>18m</strong></div></div></article>
+      </div>
+    </section>
+    <section class="page" id="report">
+      <div class="section-head reveal"><div><div class="kicker">Demo Report</div><h2>An Evidence.dev-style proof narrative.</h2></div><p class="section-copy">This report format turns model output into a readable chain of claims, evidence, assumptions, and next actions.</p></div>
+      <div class="report-shell reveal">
+        <aside class="report-nav" aria-label="Report sections"><h3>Conflict escalation → Energy signal</h3><a href="#changed">What changed</a><a href="#matters">Why it matters</a><a href="#evidence">Evidence</a><a href="#counterfactual">Counterfactual</a><a href="#signals">Signals triggered</a></aside>
+        <article class="report">
+          <header class="report-header"><div class="report-title"><div class="kicker">2026-04-15 Demo Brief</div><h2>Conflict pressure is crossing into energy-market validation.</h2></div><div class="report-meta"><span class="grade e2">E2 uplift</span><span class="grade warn">watch 48h</span><span class="grade">fresh 18m</span></div></header>
+          <section class="report-section" id="changed"><h3>What changed</h3><div><p>A cluster of corridor-risk articles and country pressure updates moved from monitoring to validation after replay matched the event pattern with prior energy-basket reactions <button class="cite" type="button" data-citation="Demo source · 2026-04-15 09:32 UTC · corridor risk article used for citation styling.">1</button> <button class="cite" type="button" data-citation="Macro-linked evidence sample · source freshness checked within 18 minutes.">2</button>.</p></div></section>
+          <section class="report-section" id="matters"><h3>Why it matters</h3><div><p>The signal is no longer a headline spike. Matched-control replay shows a positive two-week forward spread versus non-event days, while the invalidation path remains explicit.</p><div class="scenario"><div class="scenario-card"><strong>Uplift</strong><span class="mono">+2.3% versus controls</span></div><div class="scenario-card"><strong>t-stat</strong><span class="mono">2.41</span></div><div class="scenario-card"><strong>Coverage</strong><span class="mono">12,480 observations</span></div></div></div></section>
+          <section class="report-section" id="evidence"><h3>Evidence</h3><div><p>The proof chain is visible: source item, time window, matched-control cohort, signal grade, and analyst action are carried together.</p><div class="list"><div class="evidence"><strong>[1] Corridor pressure article cluster</strong><span>fresh · 18m · geopolitical corridor risk · source quality 0.74</span></div><div class="evidence"><strong>[2] Macro and commodity confirmation</strong><span>fresh · 42m · energy basket sensitivity · replay linked</span></div><div class="evidence"><strong>[3] Matched-control replay run</strong><span>E2 · uplift positive · drift guard passed</span></div></div></div></section>
+          <section class="report-section" id="counterfactual"><h3>Counterfactual</h3><div><p>If corridor pressure reverses within 48 hours or the energy basket fails to hold its matched-control spread, the signal should be downgraded from E2 to watchlist.</p></div></section>
+          <section class="report-section" id="signals"><h3>Signals triggered</h3><div class="list"><div class="evidence"><strong>XLE LONG · E2 · confidence 68%</strong><span>Action: simulate before accept · reason: conflict pressure crossing into commodity-sensitive assets</span></div><div class="evidence"><strong>DBC LONG · E1 watch · confidence 59%</strong><span>Action: keep in queue · reason: directional confirmation without enough control strength</span></div></div></section>
+        </article>
+      </div>
+    </section>
+    <section class="page"><div class="section-head reveal"><div><div class="kicker">Operating Principle</div><h2>Keep the cockpit restrained. Make the proof cinematic.</h2></div></div><div class="operating"><article class="op-card reveal"><h3>Showcase surface</h3><p>Use cinematic motion, spotlight effects, bento storytelling, and animated beams to explain the product to a first-time viewer.</p></article><article class="op-card reveal"><h3>Operator cockpit</h3><p>Keep motion limited to state changes. Prioritize stale warnings, evidence grade, source freshness, and review actions.</p></article><article class="op-card reveal"><h3>Research brief</h3><p>Turn each claim into a traceable dossier with citations, replay assumptions, invalidation triggers, and watch-next prompts.</p></article></div></section>
+  </main>
+  <footer class="page footer"><span>Lattice Current · Signal Intelligence Showcase</span><a class="btn" href="event-dashboard.html">Enter cockpit</a></footer>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduced) root.classList.add("motion-ready");
+      if (!reduced) window.addEventListener("pointermove", (event) => {
+        root.style.setProperty("--mx", `${(event.clientX / innerWidth) * 100}%`);
+        root.style.setProperty("--my", `${(event.clientY / innerHeight) * 100}%`);
+      }, { passive: true });
+      const reveal = document.querySelectorAll(".reveal");
+      if ("IntersectionObserver" in window && !reduced) {
+        const io = new IntersectionObserver((entries) => entries.forEach((entry) => {
+          if (entry.isIntersecting) { entry.target.classList.add("visible"); io.unobserve(entry.target); }
+        }), { threshold: .14 });
+        reveal.forEach((el) => io.observe(el));
+      } else reveal.forEach((el) => el.classList.add("visible"));
+      const animate = (el) => {
+        const target = Number(el.dataset.count || 0);
+        const start = performance.now();
+        const duration = reduced ? 1 : 1200;
+        const step = (now) => {
+          const progress = Math.min((now - start) / duration, 1);
+          el.textContent = new Intl.NumberFormat("en-US").format(Math.round(target * (1 - Math.pow(1 - progress, 3))));
+          if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+      const counters = document.querySelectorAll("[data-count]");
+      if ("IntersectionObserver" in window) {
+        const cio = new IntersectionObserver((entries) => entries.forEach((entry) => {
+          if (entry.isIntersecting) { animate(entry.target); cio.unobserve(entry.target); }
+        }), { threshold: .8 });
+        counters.forEach((el) => cio.observe(el));
+      } else counters.forEach(animate);
+      const tip = document.getElementById("citation-tip");
+      document.querySelectorAll(".cite").forEach((button) => {
+        const show = () => {
+          const rect = button.getBoundingClientRect();
+          tip.textContent = button.dataset.citation || "Source detail unavailable.";
+          tip.style.left = `${Math.max(Math.min(rect.left, innerWidth - 340), 12)}px`;
+          tip.style.top = `${Math.min(rect.bottom + 12, innerHeight - 120)}px`;
+          tip.classList.add("visible");
+        };
+        button.addEventListener("mouseenter", show);
+        button.addEventListener("focus", show);
+        button.addEventListener("mouseleave", () => tip.classList.remove("visible"));
+        button.addEventListener("blur", () => tip.classList.remove("visible"));
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # NAS Backtest Storage Plan
 
+> **Status**: shipped / reference (NAS is system-of-record; DuckDB is the local execution cache; plan still anchors the storage policy)
+
 ## Goal
 
 Make NAS the system of record for backtest datasets and replay outputs, while keeping local DuckDB as an execution cache.

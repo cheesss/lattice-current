@@ -29,7 +29,7 @@ const PG_CONFIG = {
   host: process.env.PG_HOST || '192.168.0.2',
   port: Number(process.env.PG_PORT || 5433),
   user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD || process.env.PGPASSWORD || 'lattice1234',
+  password: process.env.PG_PASSWORD || process.env.PGPASSWORD || process.env.INTEL_PG_PASSWORD || process.env.NAS_PG_PASSWORD || (() => { throw new Error('Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, INTEL_PG_PASSWORD, or NAS_PG_PASSWORD.'); })(),
   database: process.env.PG_DATABASE || 'lattice',
   max: 4,
 };
@@ -220,6 +220,8 @@ async function main() {
     console.log(`  ${marketAdj.rowCount} rows updated (article-based SPY join)`);
 
     // Method 2: date-based join from market_returns table (broader coverage)
+    // NOTE: PostgreSQL UPDATE ... FROM cannot correlate the target alias (lo) inside
+    // a JOIN ON condition. Move mr.horizon = lo.horizon to WHERE (2026-04-23 fix).
     const dateAdj = await pool.query(`
       UPDATE labeled_outcomes lo
       SET market_return = mr.forward_return_pct,
@@ -227,8 +229,8 @@ async function main() {
       FROM articles a
       JOIN market_returns mr ON mr.trade_date = DATE(a.published_at)
         AND mr.symbol = 'SPY'
-        AND mr.horizon = lo.horizon
       WHERE a.id = lo.article_id
+        AND mr.horizon = lo.horizon
         AND lo.symbol != 'SPY'
         AND lo.forward_return_pct IS NOT NULL
         AND lo.abnormal_return IS NULL
@@ -362,18 +364,50 @@ async function main() {
       return Math.round((ei - eiPrev) / Math.max(eiPrev, 0.01) * 1e4) / 1e4;
     }
 
-    let featureCount = 0;
+    // Collect features first, then bulk-INSERT via UNNEST — one round-trip
+    // instead of N per-event round-trips.
+    const regimeMultMap = { crisis: 2.0, 'risk-off': 1.5, balanced: 1.0, 'risk-on': 0.8, 'risk-on-strong': 0.6 };
+    const featureRows = [];
     for (const event of newEvents.rows) {
       const d = event.event_date.toISOString().slice(0, 10);
       const sig = dailySignals.get(d) || {};
       const vix = sig.vix ?? null;
       const regime = vix != null ? classifyRegime(vix, sig.hy_credit_spread, null, null) : 'balanced';
-      const regimeMultMap = { crisis: 2.0, 'risk-off': 1.5, balanced: 1.0, 'risk-on': 0.8, 'risk-on-strong': 0.6 };
-
       const ei = sig.eventIntensity ?? 0;
       const { vixZscore, vixMomentum } = computeVixFeatures(d, vix);
       const hawkesMom = computeHawkesMomentum(d, ei);
+      featureRows.push({
+        canonical_event_id: event.id,
+        source_count: event.source_count,
+        source_diversity: event.source_diversity,
+        article_count: event.article_count,
+        hawkes_intensity: ei,
+        hawkes_momentum: hawkesMom,
+        hmm_regime: regime,
+        vix_value: vix,
+        vix_zscore: vixZscore,
+        vix_momentum: vixMomentum,
+        yield_spread: sig.yieldSpread ?? null,
+        oil_price: sig.oilPrice ?? null,
+        dollar_index: sig.dollarIndex ?? null,
+        credit_spread_hy: sig.hy_credit_spread ?? null,
+        market_stress: sig.marketStress ?? null,
+        transmission_strength: sig.transmissionStrength ?? null,
+        event_intensity: sig.eventIntensity ?? null,
+        regime_label: regime,
+        regime_multiplier: regimeMultMap[regime] || 1.0,
+        risk_gauge: vix != null ? clamp(45 + (vix - 20) * 2, 4, 100) : 45,
+        graph_signal_score: clamp(event.source_count * 12 + event.source_diversity * 40, 0, 100),
+        nmi_score: clamp((sig.transmissionStrength ?? 0) * 0.6 + (sig.marketStress ?? 0) * 0.4, 0, 1),
+        narrative_alignment: clamp(40 + event.source_count * 8, 0, 100),
+        truth_discovery_score: clamp(event.source_diversity * 0.7 + 0.3, 0.3, 1),
+        legacy_conviction: clamp(Math.round(24 + event.source_count * 7 + (sig.eventIntensity ?? 0) * 14), 20, 98),
+        legacy_fpr: clamp(Math.round(82 - event.source_count * 6 - (sig.eventIntensity ?? 0) * 12), 6, 78),
+      });
+    }
 
+    let featureCount = 0;
+    if (featureRows.length) {
       await pool.query(`
         INSERT INTO event_features (
           canonical_event_id, source_count, source_diversity, article_count,
@@ -384,32 +418,47 @@ async function main() {
           regime_label, regime_multiplier, risk_gauge,
           graph_signal_score, nmi_score, narrative_alignment,
           truth_discovery_score, legacy_conviction, legacy_fpr
-        ) VALUES (
-          $1, $2, $3, $4,
-          $5, $6, $7,
-          $8, $9, $10,
-          $11, $12, $13, $14,
-          $15, $16, $17,
-          $18, $19, $20,
-          $21, $22, $23,
-          $24, $25, $26
-        ) ON CONFLICT (canonical_event_id) DO NOTHING
+        )
+        SELECT * FROM UNNEST(
+          $1::bigint[],  $2::int[],              $3::double precision[], $4::int[],
+          $5::double precision[], $6::double precision[], $7::text[],
+          $8::double precision[], $9::double precision[], $10::double precision[],
+          $11::double precision[], $12::double precision[], $13::double precision[], $14::double precision[],
+          $15::double precision[], $16::double precision[], $17::double precision[],
+          $18::text[], $19::double precision[], $20::double precision[],
+          $21::double precision[], $22::double precision[], $23::double precision[],
+          $24::double precision[], $25::double precision[], $26::double precision[]
+        )
+        ON CONFLICT (canonical_event_id) DO NOTHING
       `, [
-        event.id, event.source_count, event.source_diversity, event.article_count,
-        ei, hawkesMom, regime,
-        vix, vixZscore, vixMomentum,
-        sig.yieldSpread ?? null, sig.oilPrice ?? null, sig.dollarIndex ?? null, sig.hy_credit_spread ?? null,
-        sig.marketStress ?? null, sig.transmissionStrength ?? null, sig.eventIntensity ?? null,
-        regime, regimeMultMap[regime] || 1.0, vix != null ? clamp(45 + (vix - 20) * 2, 4, 100) : 45,
-        // proxy values for runtime-only features
-        clamp(event.source_count * 12 + event.source_diversity * 40, 0, 100),
-        clamp((sig.transmissionStrength ?? 0) * 0.6 + (sig.marketStress ?? 0) * 0.4, 0, 1),
-        clamp(40 + event.source_count * 8, 0, 100),
-        clamp(event.source_diversity * 0.7 + 0.3, 0.3, 1),
-        clamp(Math.round(24 + event.source_count * 7 + (sig.eventIntensity ?? 0) * 14), 20, 98),
-        clamp(Math.round(82 - event.source_count * 6 - (sig.eventIntensity ?? 0) * 12), 6, 78),
+        featureRows.map((r) => r.canonical_event_id),
+        featureRows.map((r) => r.source_count),
+        featureRows.map((r) => r.source_diversity),
+        featureRows.map((r) => r.article_count),
+        featureRows.map((r) => r.hawkes_intensity),
+        featureRows.map((r) => r.hawkes_momentum),
+        featureRows.map((r) => r.hmm_regime),
+        featureRows.map((r) => r.vix_value),
+        featureRows.map((r) => r.vix_zscore),
+        featureRows.map((r) => r.vix_momentum),
+        featureRows.map((r) => r.yield_spread),
+        featureRows.map((r) => r.oil_price),
+        featureRows.map((r) => r.dollar_index),
+        featureRows.map((r) => r.credit_spread_hy),
+        featureRows.map((r) => r.market_stress),
+        featureRows.map((r) => r.transmission_strength),
+        featureRows.map((r) => r.event_intensity),
+        featureRows.map((r) => r.regime_label),
+        featureRows.map((r) => r.regime_multiplier),
+        featureRows.map((r) => r.risk_gauge),
+        featureRows.map((r) => r.graph_signal_score),
+        featureRows.map((r) => r.nmi_score),
+        featureRows.map((r) => r.narrative_alignment),
+        featureRows.map((r) => r.truth_discovery_score),
+        featureRows.map((r) => r.legacy_conviction),
+        featureRows.map((r) => r.legacy_fpr),
       ]);
-      featureCount++;
+      featureCount = featureRows.length;
     }
     console.log(`  ${featureCount} new event features inserted`);
   }

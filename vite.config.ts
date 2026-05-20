@@ -771,6 +771,11 @@ export default defineConfig({
         settings: resolve(__dirname, 'settings.html'),
         liveChannels: resolve(__dirname, 'live-channels.html'),
         backtestHub: resolve(__dirname, 'backtest-hub.html'),
+        // S-Tier B1+E1: standalone investor / external pages.
+        modelComparison: resolve(__dirname, 'model-comparison.html'),
+        license: resolve(__dirname, 'license.html'),
+        dataSources: resolve(__dirname, 'data-sources.html'),
+        terms: resolve(__dirname, 'terms.html'),
       },
       output: {
         manualChunks(id) {
@@ -834,6 +839,9 @@ export default defineConfig({
     },
   },
   server: {
+    // host '0.0.0.0' binds both IPv4 and IPv6 — without this, vite defaults to ::1 only,
+    // causing IPv4 'localhost' or '127.0.0.1' connections to take 21s due to OS fallback.
+    host: '0.0.0.0',
     port: 3000,
     open: !isE2E,
     hmr: isE2E ? false : undefined,

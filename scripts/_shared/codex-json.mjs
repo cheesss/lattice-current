@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 
 const CODEX_PROMPT_METRICS_PATH = path.resolve('data', 'codex-prompt-metrics.json');
 
-function getSafeEnv() {
+export function getSafeEnv(overrides = {}) {
   const keys = [
     'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP',
     'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
@@ -17,10 +17,14 @@ function getSafeEnv() {
   for (const key of keys) {
     if (process.env[key]) env[key] = process.env[key];
   }
+  for (const [key, value] of Object.entries(overrides || {})) {
+    if (value == null) delete env[key];
+    else env[key] = String(value);
+  }
   return env;
 }
 
-async function resolveCodexCommand() {
+export async function resolveCodexCommand() {
   if (process.env.CODEX_BIN?.trim() && existsSync(process.env.CODEX_BIN.trim())) {
     return process.env.CODEX_BIN.trim();
   }
@@ -58,11 +62,52 @@ function parseCodexJsonOutput(stdout) {
       if (parsed?.type === 'item.completed' && parsed?.item?.type === 'agent_message' && typeof parsed.item.text === 'string') {
         lastAgentMessage = parsed.item.text.trim();
       }
+      if (parsed?.type === 'message' && typeof parsed.message === 'string') {
+        lastAgentMessage = parsed.message.trim();
+      }
+      if (parsed?.type === 'response.completed' && typeof parsed.response?.output_text === 'string') {
+        lastAgentMessage = parsed.response.output_text.trim();
+      }
     } catch {
       // ignore
     }
   }
   return lastAgentMessage;
+}
+
+function parseBalancedJsonObject(text) {
+  const source = String(text || '');
+  for (let start = 0; start < source.length; start += 1) {
+    if (source[start] !== '{') continue;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < source.length; i += 1) {
+      const ch = source[i];
+      if (inString) {
+        if (escape) escape = false;
+        else if (ch === '\\') escape = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === '{') {
+        depth += 1;
+      } else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            const parsed = JSON.parse(source.slice(start, i + 1));
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+  return null;
 }
 
 export function parseJsonObject(rawText) {
@@ -78,9 +123,12 @@ export function parseJsonObject(rawText) {
         const parsed = JSON.parse(fenced[1].trim());
         return parsed && typeof parsed === 'object' ? parsed : null;
       } catch {
-        return null;
+        const repaired = parseBalancedJsonObject(fenced[1]);
+        if (repaired) return repaired;
       }
     }
+    const balanced = parseBalancedJsonObject(text);
+    if (balanced) return balanced;
     const firstBrace = text.indexOf('{');
     const lastBrace = text.lastIndexOf('}');
     if (firstBrace >= 0 && lastBrace > firstBrace) {
@@ -124,6 +172,9 @@ async function recordPromptMetric(meta, result, durationMs) {
     avgDurationMs: 0,
     lastDurationMs: 0,
     lastCode: null,
+    lastModel: null,
+    lastFailureKind: null,
+    lastAttemptCount: 0,
     lastSuccessAt: null,
     lastFailureAt: null,
     lastError: '',
@@ -138,6 +189,9 @@ async function recordPromptMetric(meta, result, durationMs) {
   promptEntry.lastDurationMs = durationMs;
   promptEntry.avgDurationMs = Number((((promptEntry.avgDurationMs * (promptEntry.totalCalls - 1)) + durationMs) / promptEntry.totalCalls).toFixed(2));
   promptEntry.lastCode = result.code;
+  promptEntry.lastModel = result.model || null;
+  promptEntry.lastFailureKind = result.failureKind || null;
+  promptEntry.lastAttemptCount = Number(result.attempts?.length || 1);
   if (result.code === 0 && result.parsed) {
     promptEntry.lastSuccessAt = new Date().toISOString();
     promptEntry.lastError = '';
@@ -153,6 +207,9 @@ async function recordPromptMetric(meta, result, durationMs) {
     code: result.code,
     parsed: Boolean(result.parsed),
     durationMs,
+    model: result.model || null,
+    failureKind: result.failureKind || null,
+    attempts: Number(result.attempts?.length || 1),
     stderr: String(result.stderr || result.message || '').slice(0, 240),
   });
   metrics.prompts = prompts;
@@ -160,7 +217,7 @@ async function recordPromptMetric(meta, result, durationMs) {
   await persistPromptMetrics(metrics);
 }
 
-export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) {
+async function runCodexJsonPromptLegacy(prompt, timeoutMs = 95_000, meta = {}) {
   const command = await resolveCodexCommand();
   const args = ['exec'];
   if (process.env.CODEX_MODEL?.trim()) {
@@ -179,6 +236,11 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) 
     });
     let stdout = '';
     let stderr = '';
+    let oversized = false;
+    // Cap accumulated output to keep heap bounded if Codex returns a runaway
+    // response. 20MB is well above any legitimate completion (~50KB typical)
+    // but small enough to prevent OOM during silent infinite-loop replies.
+    const MAX_OUTPUT_BYTES = Number(process.env.CODEX_MAX_OUTPUT_BYTES) || 20 * 1024 * 1024;
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
     }, timeoutMs);
@@ -186,10 +248,22 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) 
     child.stdin?.write(String(prompt || ''));
     child.stdin?.end();
     child.stdout?.on('data', (chunk) => {
+      if (oversized) return;
       stdout += String(chunk);
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        oversized = true;
+        stdout += `\n[truncated at ${MAX_OUTPUT_BYTES} bytes — likely runaway response]\n`;
+        try { child.kill('SIGTERM'); } catch {}
+      }
     });
     child.stderr?.on('data', (chunk) => {
+      if (oversized) return;
       stderr += String(chunk);
+      if (stderr.length > MAX_OUTPUT_BYTES) {
+        oversized = true;
+        stderr += '\n[truncated]\n';
+        try { child.kill('SIGTERM'); } catch {}
+      }
     });
     child.on('close', (code) => {
       clearTimeout(timer);
@@ -219,4 +293,210 @@ export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) 
       resolve(result);
     });
   });
+}
+
+function uniqueStrings(items) {
+  const out = [];
+  const seen = new Set();
+  for (const item of items) {
+    const value = String(item || '').trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function resolveJsonModels() {
+  const configured = String(process.env.CODEX_JSON_MODEL || '').trim();
+  const inherited = String(process.env.CODEX_MODEL || '').trim();
+  const fallbackModels = String(process.env.CODEX_JSON_FALLBACK_MODELS || 'gpt-5.4,gpt-5.4-mini')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  // Codex CLI 0.116.0 rejects gpt-5.5. This wrapper powers dashboard
+  // synthesis, so prefer a compatible model unless CODEX_JSON_MODEL explicitly
+  // asks for something else.
+  const primary = configured || (/^gpt-5\.5\b/i.test(inherited) ? 'gpt-5.4' : inherited) || 'gpt-5.4';
+  return uniqueStrings([primary, ...fallbackModels, inherited].filter((model) => (
+    !/^gpt-5\.5\b/i.test(model) || configured === model
+  )));
+}
+
+function buildCodexArgs(model) {
+  const args = ['exec'];
+  if (model) args.push('--model', model);
+  args.push('--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--full-auto');
+  return args;
+}
+
+function classifyCodexFailure(result) {
+  if (result.parsed) return null;
+  const combined = `${result.stdout || ''}\n${result.stderr || ''}\n${result.message || ''}`.toLowerCase();
+  if (combined.includes('requires a newer version of codex')) return 'incompatible_model';
+  if (combined.includes('invalid_request_error')) return 'invalid_request';
+  if (combined.includes('timed out') || combined.includes('timeout')) return 'timeout';
+  if (result.code !== 0) return 'execution_error';
+  return 'parse_error';
+}
+
+function buildRetryPrompt(prompt, previousMessage) {
+  return `${String(prompt || '').trim()}
+
+The previous response was not valid JSON for this dashboard parser.
+Return ONLY one valid JSON object.
+Do not use markdown fences.
+Do not include commentary before or after JSON.
+If a value is unknown, use null or an empty array.
+
+Previous invalid response excerpt:
+${String(previousMessage || '').slice(0, 1200)}`;
+}
+
+function summarizeAttempt(result) {
+  return {
+    model: result.model || null,
+    code: Number(result.code ?? 1),
+    parsed: Boolean(result.parsed),
+    failureKind: result.failureKind || null,
+    durationMs: Number(result.durationMs || 0),
+    message: String(result.message || '').slice(0, 600),
+    stderr: String(result.stderr || '').slice(0, 600),
+  };
+}
+
+async function runCodexJsonAttempt({ command, args, prompt, timeoutMs, model, attemptIndex }) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const shell = process.platform === 'win32' && !/\.exe$/i.test(command);
+    const child = spawn(command, args, {
+      cwd: process.cwd(),
+      env: getSafeEnv({ CODEX_MODEL: model || undefined }),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+      shell,
+    });
+    let stdout = '';
+    let stderr = '';
+    let oversized = false;
+    let timedOut = false;
+    const MAX_OUTPUT_BYTES = Number(process.env.CODEX_MAX_OUTPUT_BYTES) || 20 * 1024 * 1024;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { child.kill('SIGTERM'); } catch {}
+    }, timeoutMs);
+
+    child.stdin?.write(String(prompt || ''));
+    child.stdin?.end();
+    child.stdout?.on('data', (chunk) => {
+      if (oversized) return;
+      stdout += String(chunk);
+      if (stdout.length > MAX_OUTPUT_BYTES) {
+        oversized = true;
+        stdout += `\n[truncated at ${MAX_OUTPUT_BYTES} bytes - likely runaway response]\n`;
+        try { child.kill('SIGTERM'); } catch {}
+      }
+    });
+    child.stderr?.on('data', (chunk) => {
+      if (oversized) return;
+      stderr += String(chunk);
+      if (stderr.length > MAX_OUTPUT_BYTES) {
+        oversized = true;
+        stderr += '\n[truncated]\n';
+        try { child.kill('SIGTERM'); } catch {}
+      }
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const message = parseCodexJsonOutput(stdout) || stdout;
+      const result = {
+        code: timedOut ? 124 : Number(code ?? 1),
+        stdout,
+        stderr: timedOut ? `${stderr}\nTimed out after ${timeoutMs}ms`.trim() : stderr,
+        message,
+        parsed: parseJsonObject(message) || parseJsonObject(stdout),
+        model,
+        attemptIndex,
+        durationMs: Date.now() - startedAt,
+      };
+      result.failureKind = classifyCodexFailure(result);
+      resolve(result);
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      const result = {
+        code: 1,
+        stdout,
+        stderr: `${stderr}\n${error.message}`.trim(),
+        message: '',
+        parsed: null,
+        model,
+        attemptIndex,
+        durationMs: Date.now() - startedAt,
+      };
+      result.failureKind = classifyCodexFailure(result);
+      resolve(result);
+    });
+  });
+}
+
+export async function runCodexJsonPrompt(prompt, timeoutMs = 95_000, meta = {}) {
+  const command = await resolveCodexCommand();
+  const startedAt = Date.now();
+  const maxParseRetries = Math.max(0, Math.min(3, Number(process.env.CODEX_JSON_PARSE_RETRIES ?? 1)));
+  const models = resolveJsonModels();
+  const attempts = [];
+
+  for (const model of models) {
+    const first = await runCodexJsonAttempt({
+      command,
+      args: buildCodexArgs(model),
+      prompt,
+      timeoutMs,
+      model,
+      attemptIndex: attempts.length + 1,
+    });
+    attempts.push(summarizeAttempt(first));
+    if (first.parsed) {
+      const final = { ...first, attempts };
+      await recordPromptMetric(meta, final, Date.now() - startedAt).catch(() => {});
+      return final;
+    }
+    if (first.failureKind === 'incompatible_model') continue;
+    if (first.failureKind === 'timeout') break;
+    if (first.failureKind === 'parse_error') {
+      for (let retry = 0; retry < maxParseRetries; retry += 1) {
+        const retryResult = await runCodexJsonAttempt({
+          command,
+          args: buildCodexArgs(model),
+          prompt: buildRetryPrompt(prompt, first.message || first.stdout),
+          timeoutMs,
+          model,
+          attemptIndex: attempts.length + 1,
+        });
+        attempts.push(summarizeAttempt(retryResult));
+        if (retryResult.parsed) {
+          const final = { ...retryResult, attempts };
+          await recordPromptMetric(meta, final, Date.now() - startedAt).catch(() => {});
+          return final;
+        }
+        if (retryResult.failureKind !== 'parse_error') break;
+      }
+    }
+    if (first.failureKind !== 'execution_error' && first.failureKind !== 'invalid_request') break;
+  }
+
+  const last = attempts[attempts.length - 1] || {};
+  const final = {
+    code: Number(last.code ?? 1),
+    stdout: '',
+    stderr: String(last.stderr || last.message || 'codex json prompt failed'),
+    message: String(last.message || ''),
+    parsed: null,
+    model: last.model || models[0] || null,
+    failureKind: last.failureKind || 'unknown',
+    attempts,
+  };
+  await recordPromptMetric(meta, final, Date.now() - startedAt).catch(() => {});
+  return final;
 }
