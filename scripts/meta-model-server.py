@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -32,6 +33,95 @@ try:
     import uvicorn
 except ImportError:
     print("pip install fastapi uvicorn"); sys.exit(1)
+
+
+def load_optional_env_file(path: str = ".env.local") -> None:
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key and key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
+
+
+def resolve_nas_pg_config() -> dict:
+    load_optional_env_file()
+    password = (
+        os.environ.get("PG_PASSWORD")
+        or os.environ.get("NAS_PG_PASSWORD")
+        or os.environ.get("INTEL_PG_PASSWORD")
+    )
+    if not password:
+        raise RuntimeError("missing PostgreSQL password")
+    return {
+        "host": os.environ.get("PG_HOST") or os.environ.get("NAS_PG_HOST") or "192.168.0.76",
+        "port": int(os.environ.get("PG_PORT") or os.environ.get("NAS_PG_PORT") or "5433"),
+        "dbname": (
+            os.environ.get("PG_DATABASE")
+            or os.environ.get("PG_DB")
+            or os.environ.get("NAS_PG_DATABASE")
+            or "lattice"
+        ),
+        "user": os.environ.get("PG_USER") or os.environ.get("NAS_PG_USER") or "postgres",
+        "password": password,
+    }
+
+
+def load_active_model_version() -> str | None:
+    try:
+        import psycopg2
+    except ImportError:
+        return None
+    try:
+        cfg = resolve_nas_pg_config()
+        conn = psycopg2.connect(**cfg)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT model_version
+              FROM model_registry
+             WHERE promotion_state IN ('active', 'shadow')
+             ORDER BY promoted_at DESC NULLS LAST, created_at DESC
+             LIMIT 1
+            """
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return row[0] if row else None
+    except Exception as exc:
+        print(f"Could not resolve active model from model_registry: {exc}")
+        return None
+
+
+def resolve_model_path(explicit_model: str | None) -> str:
+    if explicit_model:
+        return explicit_model
+
+    env_model_path = os.environ.get("META_MODEL_PATH")
+    if env_model_path:
+        return env_model_path
+
+    data_dir = Path("data")
+    env_model_version = os.environ.get("META_MODEL_VERSION")
+    active_model_version = env_model_version or load_active_model_version()
+    if active_model_version:
+        active_path = data_dir / f"{active_model_version}.pt"
+        if active_path.exists():
+            print(f"Resolved active meta-model from registry/env: {active_model_version}")
+            return str(active_path)
+        print(f"Active meta-model file not found: {active_path}; falling back to latest artifact")
+
+    pt_files = sorted(data_dir.glob("meta-v1-*.pt"))
+    if not pt_files:
+        print("No model file found in data/. Train first: python scripts/train-meta-model.py")
+        sys.exit(1)
+    return str(pt_files[-1])
 
 # ---------------------------------------------------------------------------
 # Model definition (must match train-meta-model.py)
@@ -237,16 +327,7 @@ def main():
     parser.add_argument("--model", default=None, help="Path to .pt model file")
     args = parser.parse_args()
 
-    # Find latest model
-    if args.model:
-        model_path = args.model
-    else:
-        data_dir = Path("data")
-        pt_files = sorted(data_dir.glob("meta-v1-*.pt"))
-        if not pt_files:
-            print("No model file found in data/. Train first: python scripts/train-meta-model.py")
-            sys.exit(1)
-        model_path = str(pt_files[-1])
+    model_path = resolve_model_path(args.model)
 
     app = create_app(model_path)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

@@ -21,6 +21,30 @@ export const DEFAULT_MARKET_QUOTE_SYMBOLS = getAllRequiredSymbols();
 
 const SIGNAL_MAPPINGS = new Map(Object.entries(getSignalMappings()));
 
+function mergeSymbols(...groups) {
+  const set = new Set();
+  for (const group of groups) {
+    for (const symbol of Array.isArray(group) ? group : []) {
+      const clean = String(symbol || '').trim();
+      if (clean) set.add(clean);
+    }
+  }
+  return Array.from(set).sort();
+}
+
+async function loadAutoThemeSymbols(pool, limit = 160) {
+  const cappedLimit = Math.max(0, Math.min(500, Number(limit) || 0));
+  if (cappedLimit <= 0) return [];
+  const { rows } = await pool.query(`
+    SELECT DISTINCT symbol
+      FROM auto_theme_symbols
+     WHERE symbol IS NOT NULL AND symbol <> ''
+     ORDER BY symbol
+     LIMIT $1
+  `, [cappedLimit]);
+  return rows.map((row) => row.symbol);
+}
+
 function parseArgs(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i += 1) {
@@ -156,29 +180,35 @@ export async function writeMarketQuotes(pool, quotes, { updateSignalHistory = tr
 
 export async function refreshMarketQuotesToNas(options = {}) {
   loadOptionalEnvFile(options.envFile || '.env.local');
-  const symbols = Array.isArray(options.symbols) && options.symbols.length
-    ? options.symbols
-    : DEFAULT_MARKET_QUOTE_SYMBOLS;
-  const fetched = await fetchMarketQuotes(symbols, options);
-  if (!fetched.quotes.length) {
-    return {
-      ok: false,
-      written: [],
-      errors: fetched.errors,
-      error: 'no market quotes fetched',
-    };
-  }
-  if (options.dryRun) {
-    return {
-      ok: true,
-      dryRun: true,
-      written: [],
-      quotes: fetched.quotes,
-      errors: fetched.errors,
-    };
-  }
   const pool = new Pool({ ...resolveNasPgConfig(), max: 2 });
   try {
+    const autoSymbols = options.includeAutoThemeSymbols
+      ? await loadAutoThemeSymbols(pool, options.autoThemeSymbolLimit ?? 160)
+      : [];
+    const symbols = mergeSymbols(
+      Array.isArray(options.symbols) && options.symbols.length
+        ? options.symbols
+        : DEFAULT_MARKET_QUOTE_SYMBOLS,
+      autoSymbols,
+    );
+    const fetched = await fetchMarketQuotes(symbols, options);
+    if (!fetched.quotes.length) {
+      return {
+        ok: false,
+        written: [],
+        errors: fetched.errors,
+        error: 'no market quotes fetched',
+      };
+    }
+    if (options.dryRun) {
+      return {
+        ok: true,
+        dryRun: true,
+        written: [],
+        quotes: fetched.quotes,
+        errors: fetched.errors,
+      };
+    }
     const written = await writeMarketQuotes(pool, fetched.quotes, {
       updateSignalHistory: options.updateSignalHistory !== false,
     });
@@ -200,6 +230,8 @@ async function main() {
   const result = await refreshMarketQuotesToNas({
     symbols,
     dryRun: Boolean(args['dry-run']),
+    includeAutoThemeSymbols: Boolean(args['include-auto-theme-symbols']),
+    autoThemeSymbolLimit: args['auto-theme-symbol-limit'] ? Number(args['auto-theme-symbol-limit']) : undefined,
     updateSignalHistory: args['skip-signal-history'] ? false : true,
     delayMs: args['delay-ms'] ? Number(args['delay-ms']) : undefined,
   });

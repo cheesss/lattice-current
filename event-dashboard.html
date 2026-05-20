@@ -2243,6 +2243,34 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
     </div>
     <div id="cross-theme-connectors" class="loading" data-skeleton="list">No new cross-theme links since last refresh. New non-obvious connections between themes will surface here.</div>
   </section>
+
+  <section class="section-block ux-section-primary tint-cold" id="deep-research-report-section">
+    <div class="section-heading">
+      <div><div class="section-kicker">Deep Research</div><div class="section-title">Generate Report <span class="badge">DB-first</span></div></div>
+      <div class="section-meta">Turns the selected theme into a readable report: thesis, evidence ledger, causal chain, historical analogs, scenarios, caveats, and source/backfill tasks.</div>
+    </div>
+    <div class="grid2">
+      <div class="info-note">
+        <div class="brief-section-title">Primary action</div>
+        <div class="brief-copy">Generates one report for the current theme. It uses the database first; if the DB is unavailable, it tries the deterministic offline bundle and labels the result clearly.</div>
+        <div class="theme-actions" style="margin-top:10px">
+          <button class="btn" onclick="generateDeepThemeReport()">Generate deep report</button>
+          <button class="btn" onclick="openReportRegistry()">Open latest / registry</button>
+        </div>
+        <div id="deep-report-status" class="meta-line" style="margin-top:8px" aria-live="polite">Select or keep a theme, then generate. The report opens automatically when ready.</div>
+      </div>
+      <div class="info-note">
+        <div class="brief-section-title">Quality status</div>
+        <div class="brief-copy">Every run returns a visible quality label. Weak evidence is not hidden: stale sources, hypothesis-only causal edges, missing analogs, and DB gaps become caveats or backfill tasks.</div>
+        <div class="pill-row" style="margin-top:10px">
+          <span class="tag tag-neutral">claim ledger</span>
+          <span class="tag tag-neutral">causal map</span>
+          <span class="tag tag-neutral">scenario tests</span>
+          <span class="tag tag-neutral">source gaps</span>
+        </div>
+      </div>
+    </div>
+  </section>
   </div>
 
   <details class="home-reference-drawer" id="home-reference-drawer">
@@ -2329,6 +2357,15 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
         <div class="card-title">Theme Brief <span class="badge" id="theme-brief-badge">No theme selected</span></div>
         <div class="info-note inline-help" id="theme-brief-help">This is the detailed panel. Any <strong>Open full brief</strong> action updates this card and scrolls you back here.</div>
         <div id="theme-brief" class="loading" data-skeleton="card">select a theme from the trend surfaces</div>
+        <div class="info-note" id="deep-report-card" style="margin-top:12px">
+          <div class="brief-section-title">Report shortcut</div>
+          <div class="meta-line" style="margin-top:6px">Same Deep Research generator as above, placed here so the selected Theme Brief can become a report without leaving the brief.</div>
+          <div class="theme-actions" style="margin-top:10px">
+            <button class="btn" onclick="generateDeepThemeReport()">Generate for selected theme</button>
+            <button class="btn" onclick="openReportRegistry()">Open latest / registry</button>
+          </div>
+          <div id="deep-report-status-workspace" class="meta-line" style="margin-top:8px" aria-live="polite">Mirrors the main report status. Pick a theme first if none is selected.</div>
+        </div>
       </div>
     </div>
       <div class="card" style="margin-top:12px">
@@ -2528,6 +2565,8 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
         <div class="mini-grid">
           <div class="subcard"><div class="subcard-title">Top Topics</div><div id="emerging-tech-topics" class="loading">Loading emerging topics...</div></div>
           <div class="subcard"><div class="subcard-title">Latest Reports</div><div id="emerging-tech-reports" class="loading">Loading reports...</div></div>
+          <div class="subcard"><div class="subcard-title">Report Backfill</div><div id="report-backfill-closure" class="loading">Loading backfill closure...</div></div>
+          <div class="subcard"><div class="subcard-title">Adjacent Themes</div><div id="adjacent-theme-candidates" class="loading">Loading adjacent candidates...</div></div>
           <div class="subcard"><div class="subcard-title">Weekly Digest</div><div id="emerging-tech-digest" class="loading">Loading digest...</div></div>
         </div>
       </div>
@@ -2815,6 +2854,8 @@ try{
 }catch{}
 let selectedEmergingTopicId='';
 let selectedEmergingReportId='';
+let selectedReportBackfillStatus='';
+let selectedAdjacentThemeStatus='';
 let lastStatusSnapshot=null;
 let lastTrendRows=[];
 let lastDigestItems=[];
@@ -3443,6 +3484,115 @@ async function openThemeBrief(theme){
   emitEmbeddedContext();
   scrollThemeBriefIntoView();
 }
+let activeReportApiBase='';
+function reportApiCandidates(){
+  const host=window.location.hostname||'localhost';
+  const candidates=[API];
+  if(host==='localhost'||host==='127.0.0.1'||window.location.protocol==='file:'){
+    candidates.push(`http://${host}:${SIGNAL_API_PORT}/api`);
+    candidates.push(`http://127.0.0.1:${SIGNAL_API_PORT}/api`);
+    candidates.push(`http://localhost:${SIGNAL_API_PORT}/api`);
+  }
+  return Array.from(new Set(candidates.map(normalizeApiBase).filter(Boolean)));
+}
+function openReportRegistry(){
+  const base=activeReportApiBase||reportApiCandidates()[0]||API;
+  window.open(`${base}/reports/index`, '_blank', 'noopener');
+}
+function setDeepReportStatus(html){
+  ['deep-report-status','deep-report-status-workspace'].forEach((id)=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=html;
+  });
+}
+function getDeepReportQualityLabel(data,degraded){
+  const quality=data?.validation?.quality||{};
+  if(quality.publishable===false)return'not publishable';
+  if(String(data?.validation?.status||'').toLowerCase()==='warning')return'warning';
+  return String(quality.grade||data?.validation?.status||(degraded?'offline fallback':'ready')).replace(/_/g,' ');
+}
+function getDeepReportQualityClass(data,degraded){
+  const status=String(data?.validation?.status||'').toLowerCase();
+  const grade=String(data?.validation?.quality?.grade||'').toLowerCase();
+  if(data?.validation?.quality?.publishable===false)return'tag-declining';
+  if(data?.ok===false||data?.httpOk===false||status.includes('blocked')||status.includes('fail')||grade==='f')return'tag-declining';
+  if(degraded||status.includes('warn')||status.includes('caveat'))return'tag-nascent';
+  return'tag-growing';
+}
+async function requestDeepReport(payload){
+  let lastError=null;
+  for(const base of reportApiCandidates()){
+    try{
+      const response=await fetch(`${base}/reports/generate`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload||{}),
+      });
+      const contentType=response.headers.get('content-type')||'';
+      const data=contentType.includes('application/json')
+        ? await response.json().catch(()=>({}))
+        : {error:(await response.text().catch(()=>''))?.slice(0,160)||`Non-JSON response (${response.status})`};
+      if(data?.reportId){
+        activeReportApiBase=base;
+        return {...data,httpOk:response.ok,apiBase:base};
+      }
+      lastError=new Error(data?.error||`Report generation failed (${response.status}) via ${base}`);
+    }catch(error){
+      lastError=error instanceof Error?error:new Error(String(error));
+    }
+  }
+  throw lastError||new Error('Report generation failed');
+}
+async function generateDeepThemeReport(){
+  ensureCurrentTheme();
+  const theme=normalizeTheme(state.currentTheme||getDirectThemeFromUrl());
+  if(!theme||theme==='unknown'){
+    setDeepReportStatus('<span class="tag tag-neutral">needs theme</span> Select a theme, then generate.');
+    return;
+  }
+  const period=getCurrentPeriod();
+  const display=humanizeTheme(theme);
+  setDeepReportStatus(`<span class="tag tag-neutral">running</span> Generating DB-backed report for ${escapeHtml(display)}...`);
+  const basePayload={
+    db:true,
+    depth:'deep',
+    reportType:'theme_report',
+    theme,
+    subject:{subjectType:'theme',subjectId:theme,displayName:display,metadata:{theme}},
+    period,
+    provider:'deterministic',
+  };
+  let data;
+  let degraded=false;
+  try{
+    data=await requestDeepReport(basePayload);
+  }catch(error){
+    degraded=true;
+    setDeepReportStatus('<span class="tag tag-nascent">DB unavailable</span> Trying deterministic offline fallback...');
+    try{
+      data=await requestDeepReport({...basePayload,db:false,source:'offline-fallback',sample:false});
+    }catch(fallbackError){
+      const message=fallbackError instanceof Error?fallbackError.message:String(fallbackError);
+      setDeepReportStatus(`<span class="tag tag-declining">failed</span> Could not generate. Check the report API, then retry. <span class="meta-line">${escapeHtml(message)}</span>`);
+      return;
+    }
+  }
+  const reportId=String(data.reportId||'');
+  const reportApiBase=data.apiBase||activeReportApiBase||API;
+  const reportHref=`${reportApiBase}/reports/${encodeURIComponent(reportId)}/html`;
+  const grade=getDeepReportQualityLabel(data,degraded);
+  const tagClass=getDeepReportQualityClass(data,degraded);
+  const publishable=data?.validation?.quality?.publishable!==false&&data?.validation?.status==='passed'&&data?.ok!==false&&data?.httpOk!==false;
+  const reasons=(data?.validation?.quality?.publishabilityReasons||[]).slice(0,2).join('; ');
+  const mode=publishable
+    ? (degraded?'Offline fallback report generated':'DB-backed report generated')
+    : 'Generated for review; caveats or data gaps prevent publishable status';
+  const reasonHtml=reasons?` <span class="meta-line">${escapeHtml(reasons)}</span>`:'';
+  setDeepReportStatus(`<span class="tag ${tagClass}">${escapeHtml(grade)}</span> ${mode}${reasonHtml} &middot; <a href="${escapeHtml(reportHref)}" target="_blank" rel="noreferrer">Open report</a> &middot; <a href="${escapeHtml(reportApiBase)}/reports/index" target="_blank" rel="noreferrer">Registry</a>`);
+  if(publishable){
+    try{ window.open(reportHref,'_blank','noopener'); }catch{}
+  }
+}
 async function persistThemeWatchlistState(theme,stateValue){
   const normalized=normalizeTheme(theme);
   if(!normalized||normalized==='unknown')return;
@@ -3671,6 +3821,7 @@ function getCommandItems(){
   });
   if(state.currentTheme){
     items.push({id:'theme-open-brief',kind:'theme',title:`Open brief: ${humanizeTheme(state.currentTheme)}`,desc:'Jump to the current Theme Brief card and refresh its evidence context.',shortcut:'',run:()=>openThemeBrief(state.currentTheme)});
+    items.push({id:'theme-generate-deep-report',kind:'theme',title:`Generate deep report: ${humanizeTheme(state.currentTheme)}`,desc:'Create a DB-first report with evidence ledger, causal chain, historical analogs, scenarios, caveats, and source/backfill tasks.',shortcut:'',run:()=>{ switchSurface('home'); generateDeepThemeReport(); }});
   }
   return items;
 }
@@ -5357,7 +5508,7 @@ function buildInboxActions(item) {
       ? `<button class="inbox-btn inbox-btn-accept" data-inbox-action="retry" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('retry','${escapeHtml(item.id)}')" title="Re-run validation and execute only if the source passes current gates">Retry check <span class="inbox-arrow">→</span> <span class="inbox-dest">Re-validate</span> <span class="inbox-shortcut">A</span></button>`
       : `<button class="inbox-btn inbox-btn-accept" data-inbox-action="accept" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('accept','${escapeHtml(item.id)}')" title="Run the approval action against production">Accept <span class="inbox-arrow">→</span> <span class="inbox-dest">Run</span> <span class="inbox-shortcut">A</span></button>`;
     const repairHint = probeState.blocked
-      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)} Retry check re-runs the same server-side gates before any execution.</span>`
+      ? `<span class="meta-line" style="align-self:center">${escapeHtml(probeState.reason)} Retry Check re-runs the same server-side gates before any execution.</span>`
       : '';
     return `
       <button class="inbox-btn inbox-btn-snooze" data-inbox-action="simulate" data-inbox-item-id="${escapeHtml(item.id)}" data-inbox-item-type="approval" onclick="inboxAction('simulate','${escapeHtml(item.id)}')" title="Dry-run: show what Accept would do, no state change">Simulate <span class="inbox-dest">(dry-run)</span> <span class="inbox-shortcut">S</span></button>
@@ -7343,7 +7494,7 @@ async function refreshAll(){
     decisionInboxReady,
     loadStatus(),loadAutomationBudget(),loadAutomationLog(),loadSystemHealth(),loadDataQuality(),loadCodexQuality(),loadModelHealth(),loadDataFreshnessAudit(),
     loadCuratedItems(),loadTrendPyramid(),loadThemeEvolution(),loadCategoryTrends(),loadQuarterlyInsights(),loadStructuralAlerts(),loadDiscoveryTriage(),loadTrackedTargets(),loadCrossThemeConnectors(),
-    loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadWeeklyDigest(),
+    loadToday(),loadTrends(),loadEmergingTechTopics(),loadEmergingTechReports(),loadReportBackfillClosure(),loadAdjacentThemeCandidates(),loadWeeklyDigest(),
     loadWhatif(),loadAnomalies(),loadCodex(),loadProposalInbox(),loadPending(),loadRegime(),loadHeatmap(),loadSignalTimeline(),loadCorrelation(),loadRegimeTimeline(),loadThemeShellSnapshots(),loadE2SignalQueue(),
     refreshTrustStrip(),refreshHotEventsRows(),refreshSinceStrip(),refreshThemeSpectrum(),
     refreshAiTimeline(),refreshCorrelationBreaks(),refreshAssetDossier(),refreshCurrentRegimeBrief(false),
@@ -8138,6 +8289,72 @@ async function loadEmergingTechReports(){
   });
   el.innerHTML=html;
   if(!selectedEmergingReportId&&reports[0]?.id)await openReportDetail(reports[0].id,{skipListRefresh:true,skipRecovery:true});
+}
+function setReportBackfillFilter(status){
+  selectedReportBackfillStatus=String(status||'');
+  loadReportBackfillClosure();
+}
+async function loadReportBackfillClosure(){
+  const el=document.getElementById('report-backfill-closure');
+  if(!el)return;
+  const statusQuery=selectedReportBackfillStatus?`&status=${encodeURIComponent(selectedReportBackfillStatus)}`:'';
+  const {data,cached,cachedAt}=await f(`${API}/reports/backfill-closure?limit=8${statusQuery}`,'report-backfill-closure');
+  const reports=Array.isArray(data?.reports)?data.reports:[];
+  const filters=[
+    ['', 'all'],
+    ['pending','pending'],
+    ['running','running'],
+    ['blocked','blocked'],
+    ['review-ready','review'],
+    ['rejected','rejected'],
+  ];
+  let html=`<div class="pill-row" style="margin-bottom:8px">${filters.map(([value,label])=>`<button class="chip ${selectedReportBackfillStatus===value?'active':''}" onclick="setReportBackfillFilter('${escapeHtml(value)}')">${escapeHtml(label)}</button>`).join('')}</div>`;
+  if(cached)html+=`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`;
+  if(!reports.length){
+    el.innerHTML=html+'<div class="meta-line">No report closure rows for this filter.</div>';
+    return;
+  }
+  reports.forEach((report)=>{
+    const status=String(report.status||'blocked');
+    const tagClass=status==='review-ready'?'tag-growing':status==='rejected'?'tag-cooling':status==='running'?'tag-emerging':'tag-neutral';
+    const open=Array.isArray(report.openClasses)?report.openClasses:[];
+    const onclick=report.reportId?` onclick='openReportDetail(${JSON.stringify(String(report.reportId))})'`:'';
+    html+=`<div class="interactive-row"${onclick}><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(report.subject||report.reportId||'report')}</strong><span class="tag ${tagClass}">${escapeHtml(status)}</span></div><div class="meta-line" style="margin-top:4px">${escapeHtml(report.reportType||'report')} | ${escapeHtml(report.evidenceStateLabel||report.evidenceState||'More evidence needed')}</div><div class="meta-line">Market ${escapeHtml(report.marketTier||'missing')} | negative ${escapeHtml(report.negativeControlStatus||'unchecked')} | open ${fmtWhole(open.length)}</div><div class="meta-line">pending ${fmtWhole(report.pendingCount||0)} | needs-fix ${fmtWhole(report.needsFixCount||0)} | exhausted ${fmtWhole(report.exhaustedCount||0)}</div>${open.length?`<div class="pill-row">${renderTags(open,'tag-neutral',4)}</div>`:''}</div>`;
+  });
+  el.innerHTML=html;
+}
+function setAdjacentThemeFilter(status){
+  selectedAdjacentThemeStatus=String(status||'');
+  loadAdjacentThemeCandidates();
+}
+async function loadAdjacentThemeCandidates(){
+  const el=document.getElementById('adjacent-theme-candidates');
+  if(!el)return;
+  const statusQuery=selectedAdjacentThemeStatus?`&status=${encodeURIComponent(selectedAdjacentThemeStatus)}`:'';
+  const {data,cached,cachedAt}=await f(`${API}/reports/adjacent-theme-candidates?limit=8${statusQuery}`,'adjacent-theme-candidates');
+  const candidates=Array.isArray(data?.candidates)?data.candidates:[];
+  const filters=[
+    ['', 'all'],
+    ['needs_evidence','needs'],
+    ['provider_collecting','collecting'],
+    ['ready_for_deep_report','ready'],
+    ['review_ready','review'],
+    ['search_exhausted_not_validated','exhausted'],
+    ['rejected','rejected'],
+  ];
+  let html=`<div class="pill-row" style="margin-bottom:8px">${filters.map(([value,label])=>`<button class="chip ${selectedAdjacentThemeStatus===value?'active':''}" onclick="setAdjacentThemeFilter('${escapeHtml(value)}')">${escapeHtml(label)}</button>`).join('')}</div>`;
+  if(cached)html+=`<div style="margin-bottom:8px">${cachedBadge(cachedAt)}</div>`;
+  if(!candidates.length){
+    el.innerHTML=html+'<div class="meta-line">No adjacent theme candidates for this filter.</div>';
+    return;
+  }
+  candidates.forEach((candidate)=>{
+    const status=String(candidate.status||'candidate');
+    const tagClass=status==='ready_for_deep_report'||status==='review_ready'?'tag-growing':status==='rejected'?'tag-cooling':status==='provider_collecting'?'tag-emerging':'tag-neutral';
+    const terms=Array.isArray(candidate.sourceTerms)?candidate.sourceTerms:[];
+    html+=`<div class="interactive-row"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(candidate.label||candidate.candidateKey||'adjacent candidate')}</strong><span class="tag ${tagClass}">${escapeHtml(status)}</span></div><div class="meta-line" style="margin-top:4px">${escapeHtml(candidate.lane||'lane')} | confidence ${fmt(candidate.confidenceScore||0,0)} | parent ${escapeHtml(candidate.parentSubject||candidate.parentReportId||'report')}</div><div class="meta-line">${escapeHtml(candidate.failureReason||'evidence threshold met')} | ${escapeHtml(candidate.nextAction||'No next action recorded.')}</div>${terms.length?`<div class="pill-row">${renderTags(terms,'tag-neutral',4)}</div>`:''}</div>`;
+  });
+  el.innerHTML=html;
 }
 async function openEmergingTopicDetail(topicId){
   if(!topicId)return;

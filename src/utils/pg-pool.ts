@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { createLogger, type StructuredLogger } from './logger';
+import { createLogger, type StructuredLogger } from './logger.ts';
 
 export interface ManagedPgPoolOptions {
   name: string;

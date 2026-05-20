@@ -13,6 +13,7 @@ import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import pg from 'pg';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { createLogger } from './_shared/structured-logger.mjs';
@@ -56,6 +57,22 @@ import {
   VALID_WATCHLIST_STATES,
   VALID_WATCHLIST_ITEM_TYPES,
 } from './_shared/user-watchlist.mjs';
+import {
+  archiveTrackedTarget,
+  buildTrackedTargetsPayload,
+  buildTrackingDataPathAudit,
+  refreshTrackedTargetHits,
+  updateTrackedTarget,
+  upsertTrackedTarget,
+} from './_shared/tracking-targets.mjs';
+import {
+  buildCrossThemeConnectorsPayload,
+  buildResearchOsStatusPayload,
+  buildResearchQuestionsPayload,
+  queueCrossThemeSourceQueries,
+  reviewCrossThemeCandidate,
+  trackCrossThemeCandidate,
+} from './_shared/cross-theme-api.mjs';
 import { getUserPrefs, setUserPrefs, resetUserPrefs } from './_shared/user-prefs.mjs';
 import { isDemoMode, blockIfDemoMode, loadDemoSnapshot } from './_shared/demo-mode.mjs';
 import { buildModelComparisonPayload } from './_shared/model-comparison.mjs';
@@ -63,11 +80,14 @@ import { makeRouteHandler } from './_shared/route-helper.mjs';
 import { memoize } from './_shared/memoize-payload.mjs';
 import { buildProductQualityPayload } from './_shared/product-quality-metrics.mjs';
 import { sendAlert } from './_shared/alert-notifier.mjs';
+import { loadReportBackfillClosureSummaries } from './_shared/report-backfill-closure.mjs';
+import { loadAdjacentThemeCandidateSummaries } from './_shared/report-adjacent-expansion.mjs';
 import {
   getPendingApprovals,
   loadApprovalById,
   markApprovalReviewed,
 } from './_shared/approval-queue.mjs';
+import { executeSourceQueryApproval } from './_shared/source-query-executor.mjs';
 import { executeProposal, ensureExecutorSchema, reviewCodexProposalById } from './proposal-executor.mjs';
 import {
   buildCompactInvestmentSnapshot,
@@ -147,6 +167,38 @@ import {
   withMeta,
 } from './_shared/dashboard-signal-quality.mjs';
 import { fuseNowcastsIntoLookup } from './_shared/dashboard-nowcast-fusion.mjs';
+import {
+  REPORT_TYPES,
+  buildCrossThemeBottleneckReportBundle,
+  buildEventSignalReportBundle,
+  buildRegimeTransmissionReportBundle,
+  buildSampleReportBundle,
+  buildSymbolSignalReportBundle,
+  buildSystemQualityReportBundle,
+  buildThemeReportBundle,
+  createEvidenceBundle,
+} from './_shared/report-evidence-bundle.mjs';
+import { planReportFigures } from './_shared/report-chart-planner.mjs';
+import { generateReportAnalystDraft } from './_shared/report-llm-analyst.mjs';
+import { attachDeepResearchPack } from './_shared/report-deep-research-pack.mjs';
+import { validateReportBundle } from './_shared/report-validator.mjs';
+import {
+  listReportRegistry,
+  listSourceQueryQueue,
+  readReportArtifactFromStore,
+  writeReportArtifactsToStore,
+  writeReportIndex,
+} from './_shared/report-local-store.mjs';
+import {
+  exportReportArtifacts,
+  loadReportArtifacts,
+} from './_shared/report-exporter.mjs';
+import { buildDbReportBundle } from './_shared/report-db-adapter.mjs';
+import {
+  appendReportFeedback,
+  readReportFeedback,
+  summarizeReportFeedback,
+} from './_shared/report-feedback.mjs';
 
 // Re-exported for test consumers
 // (tests/event-dashboard-topic-article-matching.test.mjs,
@@ -258,6 +310,38 @@ function parseUrl(url) {
     pathname,
     segments: pathname.split('/').filter(Boolean),
     params: new URLSearchParams(qs || ''),
+  };
+}
+
+const DASHBOARD_STATIC_TYPES = {
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml; charset=utf-8',
+};
+
+async function serveDashboardStaticAsset(pathname) {
+  const decodedPathname = decodeURIComponent(String(pathname || '/'));
+  const allowedPrefixes = ['/src/dashboard/'];
+  if (!allowedPrefixes.some((prefix) => decodedPathname.startsWith(prefix))) return null;
+  const ext = path.extname(decodedPathname).toLowerCase();
+  const contentType = DASHBOARD_STATIC_TYPES[ext];
+  if (!contentType) {
+    return { status: 415, contentType: 'text/plain; charset=utf-8', body: 'unsupported asset type' };
+  }
+  const repoRoot = path.resolve('.');
+  const assetPath = path.normalize(path.join(repoRoot, decodedPathname.replace(/^\/+/, '')));
+  if (!assetPath.startsWith(repoRoot + path.sep)) {
+    return { status: 403, contentType: 'text/plain; charset=utf-8', body: 'forbidden' };
+  }
+  if (!existsSync(assetPath)) {
+    return { status: 404, contentType: 'text/plain; charset=utf-8', body: 'not found' };
+  }
+  return {
+    status: 200,
+    contentType,
+    body: await readFile(assetPath, ext === '.svg' ? 'utf8' : 'utf8'),
   };
 }
 
@@ -1367,9 +1451,14 @@ const OPS_ACCUMULATOR_STATE_PATH = path.resolve('data', 'historical', 'accumulat
 const OPS_ALERTS_PATH = path.resolve('data', 'alerts.json');
 const OPS_META_MODEL_URL = process.env.META_MODEL_URL || 'http://127.0.0.1:8100';
 const OPS_DAEMON_FRESH_MS = 30 * 60 * 1000;       // 2x the 15-minute daemon tick
-const OPS_ACCUMULATOR_FRESH_MS = 90 * 60 * 1000;  // accumulator cycles include slow network backfills
+// data-accumulator runs every 120 minutes by contract. Keep the health
+// threshold above that cadence so the service does not oscillate between
+// ok/stale during normal operation.
+const OPS_ACCUMULATOR_FRESH_MS = 150 * 60 * 1000;
 const OPS_HTTP_PROBE_TIMEOUT_MS = 1500;
 const OPS_RECENT_ISSUE_LIMIT = 10;
+const OPS_PYTHON_PROBE_TTL_MS = 5 * 60 * 1000;
+let cachedPythonRuntimeProbe = null;
 
 async function probeFileService(stateFilePath, freshThresholdMs) {
   try {
@@ -1387,6 +1476,32 @@ async function probeFileService(stateFilePath, freshThresholdMs) {
   }
 }
 
+function probePythonRuntime() {
+  const now = Date.now();
+  if (cachedPythonRuntimeProbe && now - cachedPythonRuntimeProbe.at < OPS_PYTHON_PROBE_TTL_MS) {
+    return cachedPythonRuntimeProbe.value;
+  }
+
+  const pythonBin = process.env.PYTHON_BIN || 'python';
+  const probe = spawnSync(pythonBin, ['--version'], {
+    encoding: 'utf8',
+    timeout: 5000,
+    windowsHide: true,
+  });
+  const output = `${probe.stdout || ''}${probe.stderr || ''}`.trim();
+  const ok = probe.status === 0 && /\bPython\s+\d+\.\d+/.test(output);
+  const value = ok
+    ? { status: 'ok', bin: pythonBin, version: output }
+    : {
+      status: 'unavailable',
+      bin: pythonBin,
+      exitCode: probe.status,
+      reason: output || probe.error?.message || 'python runtime not found',
+    };
+  cachedPythonRuntimeProbe = { at: now, value };
+  return value;
+}
+
 async function probeMetaModelService() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPS_HTTP_PROBE_TIMEOUT_MS);
@@ -1397,11 +1512,12 @@ async function probeMetaModelService() {
       status: res.ok ? 'ok' : 'unhealthy',
       http: res.status,
       url: OPS_META_MODEL_URL,
+      pythonRuntime: probePythonRuntime(),
     };
   } catch (err) {
     clearTimeout(timer);
     const reason = err?.name === 'AbortError' ? 'timeout' : String(err?.message || err);
-    return { status: 'unreachable', http: null, url: OPS_META_MODEL_URL, reason };
+    return { status: 'unreachable', http: null, url: OPS_META_MODEL_URL, reason, pythonRuntime: probePythonRuntime() };
   }
 }
 
@@ -1432,13 +1548,18 @@ async function loadRecentOpsAlerts(limit = OPS_RECENT_ISSUE_LIMIT) {
 }
 
 function rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness }) {
-  // Critical conditions: master daemon stale/missing, meta-model unreachable, model failed.
+  // Critical conditions: master daemon stale/missing or model health failed.
+  // A missing meta-model HTTP server is a warning when cached DB-backed
+  // predictions remain usable, and becomes critical only once stale prediction
+  // thresholds disable model-driven ranking.
   if (daemon.status !== 'ok') return 'critical';
-  if (metaModel.status === 'unreachable' || modelLevel === 'critical') return 'critical';
+  if (modelLevel === 'critical') return 'critical';
+  if (Number(freshness?.predictionStaleCount ?? 0) >= 1000) return 'critical';
+  if (metaModel.status === 'unreachable' && Number(freshness?.predictionStaleCount ?? 0) >= 1000) return 'critical';
   // Warning conditions: accumulator stale, calibration warning, feature lag, meta-model unhealthy.
   if (accumulator.status !== 'ok') return 'warning';
   if (modelLevel === 'warning') return 'warning';
-  if (metaModel.status === 'unhealthy') return 'warning';
+  if (['unhealthy', 'unreachable'].includes(metaModel.status)) return 'warning';
   if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) return 'warning';
   if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) return 'warning';
   return 'ok';
@@ -1531,10 +1652,13 @@ async function buildOpsStatusPayload(pool) {
     });
   }
   if (metaModel.status === 'unreachable') {
+    const pythonReason = metaModel.pythonRuntime?.status === 'unavailable'
+      ? ` Python runtime unavailable via ${metaModel.pythonRuntime.bin}: ${metaModel.pythonRuntime.reason}.`
+      : '';
     actionableInstructions.push({
       severity: 'critical',
       condition: 'meta-model-server is unreachable',
-      action: 'Restart: `python scripts/meta-model-server.py` and verify it binds 8100.',
+      action: `Start a real Python runtime with torch/fastapi/uvicorn, then run: \`${metaModel.pythonRuntime?.bin || 'python'} scripts/meta-model-server.py\` and verify it binds 8100.${pythonReason}`,
     });
   }
   if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
@@ -1667,10 +1791,30 @@ async function readLatestDataFreshnessAuditArtifact() {
       findings: [],
     };
   }
-  const file = files[0];
-  const auditPath = path.join(AUDIT_DIR, file);
-  const payload = JSON.parse(await readFile(auditPath, 'utf8'));
-  return normalizeFreshnessAuditPayload(payload, auditPath, { source: 'artifact' });
+  const parseErrors = [];
+  for (const file of files) {
+    const auditPath = path.join(AUDIT_DIR, file);
+    try {
+      const payload = JSON.parse(await readFile(auditPath, 'utf8'));
+      return normalizeFreshnessAuditPayload(payload, auditPath, {
+        source: 'artifact',
+        skippedCorruptArtifacts: parseErrors,
+      });
+    } catch (error) {
+      parseErrors.push({
+        file,
+        error: String(error?.message || error),
+      });
+    }
+  }
+  return {
+    ok: false,
+    error: 'No valid data freshness audit artifact found',
+    auditPath: null,
+    summary: null,
+    findings: [],
+    skippedCorruptArtifacts: parseErrors,
+  };
 }
 
 async function writeDataFreshnessAuditArtifact(payload, now = new Date()) {
@@ -2584,6 +2728,38 @@ async function reviewApprovalQueueItem(queueId, body = {}) {
   try {
     await ensureExecutorSchema(getPool());
     const payload = approval.payload && typeof approval.payload === 'object' ? approval.payload : {};
+    if (String(approval.action_type || '').toLowerCase() === 'source-query') {
+      const execution = await executeSourceQueryApproval(getPool(), {
+        ...approval,
+        payload,
+        status: prevState === 'pending' ? 'approved' : prevState,
+      }, {
+        dryRun: body.dryRun === true,
+      });
+
+      if (body.dryRun === true) {
+        return buildJsonResponse({
+          approval,
+          execution,
+          dryRun: true,
+          alreadyFinal: false,
+          audit: { requestId, dryRun: true },
+        });
+      }
+
+      const reviewed = await loadApprovalById(getPool(), queueId);
+      const nextState = String(reviewed?.status || execution?.status || 'executed');
+      await writeAudit(nextState, `source-query approval executed via dashboard: ${execution?.status || 'unknown'}`);
+      return buildJsonResponse({
+        approval: reviewed || { ...approval, status: execution?.status || 'executed' },
+        execution,
+        alreadyFinal: false,
+        skipped: Boolean(execution?.skipped),
+        needsFix: String(execution?.status || '').toLowerCase() === 'needs-fix',
+        audit: { requestId },
+      });
+    }
+
     const execution = await executeProposal(getPool(), {
       ...payload,
       payload,
@@ -2682,6 +2858,67 @@ async function buildThemeShellSnapshots(params = new URLSearchParams()) {
   });
 }
 
+function sanitizeReportId(value) {
+  const id = String(value || '').trim();
+  if (!/^[A-Za-z0-9_.-]{3,180}$/.test(id)) {
+    throw new Error('invalid report id');
+  }
+  return id;
+}
+
+function buildReportBundleForApi(payload = {}) {
+  const type = payload.reportType || payload.type || REPORT_TYPES.THEME;
+  let bundle;
+  if (payload.sample === true) {
+    bundle = buildSampleReportBundle(type, { subject: payload.subject?.displayName || payload.subject || payload.name });
+  } else if (type === REPORT_TYPES.THEME || type === 'theme') {
+    bundle = buildThemeReportBundle(payload);
+  } else if (type === REPORT_TYPES.CROSS_THEME || type === 'cross-theme' || type === 'cross_theme') {
+    bundle = buildCrossThemeBottleneckReportBundle(payload);
+  } else if (type === REPORT_TYPES.EVENT_SIGNAL || type === 'event' || type === 'event_signal') {
+    bundle = buildEventSignalReportBundle(payload);
+  } else if (type === REPORT_TYPES.REGIME || type === 'regime') {
+    bundle = buildRegimeTransmissionReportBundle(payload);
+  } else if (type === REPORT_TYPES.SYMBOL || type === 'symbol') {
+    bundle = buildSymbolSignalReportBundle(payload);
+  } else if (type === REPORT_TYPES.SYSTEM_QUALITY || type === 'system' || type === 'ops') {
+    bundle = buildSystemQualityReportBundle(payload);
+  } else {
+    bundle = createEvidenceBundle({ ...payload, reportType: type });
+  }
+  return planReportFigures(bundle);
+}
+
+async function buildReportBundleForApiAsync(payload = {}) {
+  if (payload.db === true || payload.live === true || payload.source === 'db') {
+    return buildDbReportBundle(getPool(), {
+      depth: 'deep',
+      ...payload,
+    });
+  }
+  const bundle = buildReportBundleForApi(payload);
+  const wantsDeep = payload.depth === 'deep' || payload.deep === true || payload.researchMode === 'deep';
+  if (!wantsDeep) return bundle;
+  return planReportFigures(await attachDeepResearchPack(bundle));
+}
+
+async function writeReportArtifacts(bundle, analysis) {
+  const result = await writeReportArtifactsToStore({ bundle, analysis, reportRoot: path.join('data', 'reports') });
+  await writeReportIndex(path.join('data', 'reports'));
+  return {
+    reportDir: path.resolve(result.reportDir),
+    manifest: result.manifest,
+    bundle: result.bundle,
+    validation: result.validation,
+    sourceQueryDrafts: result.sourceQueryDrafts,
+    queuedSourceQueries: result.queuedSourceQueries,
+  };
+}
+
+async function readReportArtifact(reportId, artifact) {
+  return readReportArtifactFromStore(reportId, artifact, path.join('data', 'reports'));
+}
+
 export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
   const { pathname, segments, params } = parseUrl(rawUrl);
   const method = String(requestMeta.method || 'GET').toUpperCase();
@@ -2698,6 +2935,11 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     const demoBlock = blockIfDemoMode(method);
     if (demoBlock) {
       return buildJsonResponse(demoBlock.body, demoBlock.status);
+    }
+
+    if (method === 'GET') {
+      const staticAsset = await serveDashboardStaticAsset(pathname);
+      if (staticAsset) return staticAsset;
     }
 
     // ── /api/demo/snapshot (S-Tier C3) ──
@@ -2763,6 +3005,256 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     // ── /api/health ──
+    // --- /api/reports -----------------------------------------------------
+    // Artifact-first intelligence report generator. These routes only write
+    // data/reports/<reportId> artifacts; canonical data remains review-gated.
+    if (segments[0] === 'api' && segments[1] === 'reports') {
+      try {
+        if (method === 'GET' && (!segments[2] || segments[2] === 'latest')) {
+          const reports = await listReportRegistry(path.join('data', 'reports'), { limit: params.get('limit') || 50 });
+          return buildJsonResponse({ ok: true, reports, source: 'artifact-registry' });
+        }
+        if (method === 'GET' && segments[2] === 'source-queue') {
+          const queue = await listSourceQueryQueue(path.join('data', 'reports'), { limit: params.get('limit') || 100 });
+          return buildJsonResponse({ ok: true, queue, source: 'artifact-source-query-queue' });
+        }
+        if (method === 'GET' && segments[2] === 'backfill-closure') {
+          const statusFilter = String(params.get('status') || '').trim();
+          let closureClient = null;
+          try {
+            closureClient = getPool();
+          } catch {
+            closureClient = null;
+          }
+          const summaries = await loadReportBackfillClosureSummaries({
+            client: closureClient,
+            reportRoot: path.join('data', 'reports'),
+            limit: Number(params.get('limit') || 10),
+          });
+          const reports = summaries
+            .filter((summary) => !statusFilter || summary.visualStatus === statusFilter)
+            .map((summary) => ({
+              reportId: summary.reportId,
+              subject: summary.subject,
+              reportType: summary.reportType,
+              evidenceState: summary.evidenceState,
+              evidenceStateLabel: summary.evidenceStateLabel,
+              status: summary.visualStatus,
+              rawVisibleStatus: summary.visibleStatus,
+              openClasses: summary.openClasses,
+              marketTier: summary.marketTier,
+              negativeControlStatus: summary.negativeControlStatus,
+              pendingCount: summary.counts.pending || 0,
+              needsFixCount: summary.counts.needs_fix || 0,
+              exhaustedCount: summary.counts.exhausted || 0,
+              latestReportPath: summary.reportPath,
+              visualStatus: summary.visualStatus,
+              primaryBlocker: summary.primaryBlocker,
+              nextAction: summary.nextAction,
+              classRows: summary.classRows,
+              contradictions: summary.contradictions || [],
+              artifactSchemaStatus: summary.artifactSchemaStatus,
+              artifactSchemaWarning: summary.artifactSchemaWarning,
+              productTier: summary.productTier,
+              productTierLabel: summary.productTierLabel,
+              productTierRole: summary.productTierRole,
+              productTierPrimary: summary.productTierPrimary,
+              lastUpdatedAt: summary.lastUpdatedAt,
+              severity: summary.severity,
+            }));
+          return buildJsonResponse({ ok: true, reports, source: 'report-backfill-closure' });
+        }
+        if (method === 'GET' && segments[2] === 'adjacent-theme-candidates') {
+          const statusFilter = String(params.get('status') || '').trim();
+          let adjacentClient = null;
+          try {
+            adjacentClient = getPool();
+          } catch {
+            adjacentClient = null;
+          }
+          const candidates = await loadAdjacentThemeCandidateSummaries({
+            client: adjacentClient,
+            limit: Number(params.get('limit') || 25),
+            status: statusFilter,
+          });
+          const counts = candidates.reduce((acc, candidate) => {
+            const key = candidate.status || 'candidate';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+          }, {});
+          return buildJsonResponse({
+            ok: true,
+            candidates: candidates.map((candidate) => ({
+              candidateKey: candidate.candidateKey,
+              label: candidate.label,
+              lane: candidate.lane,
+              status: candidate.status,
+              parentSubject: candidate.parentSubject,
+              parentReportId: candidate.parentReportId,
+              confidenceScore: candidate.confidenceScore,
+              failureReason: candidate.failureReason,
+              nextAction: candidate.nextAction,
+              evidenceClasses: candidate.evidenceClasses,
+              sourceTerms: candidate.sourceTerms,
+              issuerCandidates: candidate.issuerCandidates,
+              generatedLane: candidate.generatedLane,
+              discoveryNamespace: candidate.discoveryNamespace,
+              seedLeakageScore: candidate.seedLeakageScore,
+              sourceDiversity: candidate.sourceDiversity,
+              relationSupport: candidate.relationSupport,
+              candidateIssuerCount: candidate.candidateIssuerCount,
+              bridgeAttachedCount: candidate.bridgeAttachedCount,
+              issuerMappingGapCount: candidate.issuerMappingGapCount,
+              latestReportPath: candidate.latestReportPath,
+              updatedAt: candidate.updatedAt,
+            })),
+            counts,
+            source: 'adjacent-theme-candidates',
+          });
+        }
+        if (method === 'GET' && segments[2] === 'index') {
+          const { indexPath } = await writeReportIndex(path.join('data', 'reports'));
+          const raw = await readFile(indexPath, 'utf8');
+          return { status: 200, contentType: 'text/html; charset=utf-8', body: raw };
+        }
+        if (method === 'POST' && segments[2] === 'build-bundle') {
+          const bundle = await buildReportBundleForApiAsync(body || {});
+          return buildJsonResponse({ ok: true, bundle });
+        }
+        if (method === 'POST' && segments[2] === 'generate') {
+          const bundle = await buildReportBundleForApiAsync(body || {});
+          const analysis = await generateReportAnalystDraft(bundle, { provider: body.provider || 'deterministic' });
+          const { reportDir, manifest, bundle: renderedBundle, validation } = await writeReportArtifacts(bundle, analysis);
+          return buildJsonResponse({
+            ok: validation.status !== 'blocked',
+            reportId: renderedBundle.reportId,
+            reportDir,
+            manifest,
+            validation,
+            sourceQueryDrafts: manifest.sourceQueries,
+            htmlPath: path.join(reportDir, 'report.html'),
+          }, validation.status === 'blocked' ? 422 : 200);
+        }
+        if (method === 'GET' && segments.length >= 4 && segments[3] === 'feedback') {
+          const feedback = await readReportFeedback(segments[2]);
+          return buildJsonResponse({ ok: true, reportId: segments[2], feedback, summary: summarizeReportFeedback(feedback) });
+        }
+        if (method === 'POST' && segments.length >= 4 && segments[3] === 'feedback') {
+          const result = await appendReportFeedback(segments[2], body || {});
+          const feedback = await readReportFeedback(segments[2]);
+          return buildJsonResponse({ ...result, summary: summarizeReportFeedback(feedback) });
+        }
+        if (method === 'POST' && segments.length >= 4 && segments[3] === 'export') {
+          const reportDir = path.join('data', 'reports', sanitizeReportId(segments[2]));
+          const { bundle, analysis, validation } = await loadReportArtifacts(reportDir);
+          const exports = await exportReportArtifacts({
+            bundle,
+            analysis,
+            validation,
+            reportDir,
+            pdf: Boolean(body.pdf),
+          });
+          return buildJsonResponse({
+            ok: !exports.pdfError,
+            reportId: segments[2],
+            printHtml: exports.printHtmlPath,
+            pptx: exports.pptxPath,
+            deckManifest: exports.deckManifestPath,
+            pdf: exports.pdfPath,
+            pdfError: exports.pdfError,
+          }, exports.pdfError ? 207 : 200);
+        }
+        if (method === 'GET' && segments.length >= 3) {
+          const reportId = segments[2];
+          const artifactName = segments[3] === 'html' || segments[3] === 'report.html'
+            ? 'report.html'
+            : segments[3] === 'markdown' || segments[3] === 'report.md'
+              ? 'report.md'
+              : segments[3] === 'audit' || segments[3] === 'audit_appendix.html'
+                ? 'audit_appendix.html'
+                : segments[3] === 'audit-json' || segments[3] === 'audit_appendix.json'
+                  ? 'audit_appendix.json'
+                  : segments[3] === 'evidence-csv' || segments[3] === 'evidence_table.csv'
+                    ? 'evidence_table.csv'
+              : segments[3] === 'bundle' || segments[3] === 'bundle.json'
+                ? 'bundle.json'
+                : segments[3] === 'validation' || segments[3] === 'validation.json'
+                  ? 'validation.json'
+                  : segments[3] === 'source-queries' || segments[3] === 'source-query-drafts.json'
+                    ? 'source-query-drafts.json'
+                    : 'manifest.json';
+          const raw = await readReportArtifact(reportId, artifactName);
+          if (!raw) return buildJsonResponse({ ok: false, error: 'report artifact not found' }, 404);
+          if (artifactName === 'report.html' || artifactName === 'audit_appendix.html') {
+            return { status: 200, contentType: 'text/html; charset=utf-8', body: raw };
+          }
+          if (artifactName === 'report.md') {
+            return { status: 200, contentType: 'text/markdown; charset=utf-8', body: raw };
+          }
+          if (artifactName === 'evidence_table.csv') {
+            return { status: 200, contentType: 'text/csv; charset=utf-8', body: raw };
+          }
+          return buildJsonResponse({ ok: true, artifact: artifactName, reportId, data: JSON.parse(raw) });
+        }
+        if (method === 'POST' && segments.length >= 4 && segments[3] === 'validate') {
+          const rawBundle = body.bundle || JSON.parse(await readReportArtifact(segments[2], 'bundle.json') || 'null');
+          if (!rawBundle) return buildJsonResponse({ ok: false, error: 'report bundle not found' }, 404);
+          const rawAnalysis = body.analysis || JSON.parse(await readReportArtifact(segments[2], 'llm-analysis.json') || 'null');
+          const validation = validateReportBundle(rawBundle, { analysis: rawAnalysis });
+          return buildJsonResponse({ ok: validation.status !== 'blocked', validation }, validation.status === 'blocked' ? 422 : 200);
+        }
+        return buildJsonResponse({ ok: false, error: 'unsupported reports route' }, 405);
+      } catch (err) {
+        logger.warn('reports route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'cross-theme-connectors') {
+      try {
+        if (method === 'GET' && segments.length === 2) {
+          return buildJsonResponse(await buildCrossThemeConnectorsPayload(getPool(), params));
+        }
+        if (method === 'POST' && segments.length === 4 && segments[3] === 'review') {
+          return buildJsonResponse(await reviewCrossThemeCandidate(getPool(), segments[2], body));
+        }
+        if (method === 'POST' && segments.length === 4 && segments[3] === 'track') {
+          return buildJsonResponse(await trackCrossThemeCandidate(getPool(), segments[2], body));
+        }
+        if (method === 'POST' && segments.length === 4 && segments[3] === 'source-query') {
+          return buildJsonResponse(await queueCrossThemeSourceQueries(getPool(), segments[2], body));
+        }
+        return buildJsonResponse({ ok: false, error: 'unsupported cross-theme-connectors route' }, 405);
+      } catch (err) {
+        logger.warn('cross-theme-connectors route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'research-questions') {
+      try {
+        if (method === 'GET') {
+          return buildJsonResponse(await buildResearchQuestionsPayload(getPool(), params));
+        }
+        return buildJsonResponse({ ok: false, error: 'unsupported research-questions route' }, 405);
+      } catch (err) {
+        logger.warn('research-questions route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
+    if (segments[0] === 'api' && segments[1] === 'research-os' && segments[2] === 'status') {
+      try {
+        if (method === 'GET') {
+          return buildJsonResponse(await buildResearchOsStatusPayload(getPool()));
+        }
+        return buildJsonResponse({ ok: false, error: 'unsupported research-os/status route' }, 405);
+      } catch (err) {
+        logger.warn('research-os/status route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     if (segments[0] === 'api' && segments[1] === 'health') {
       const payload = await buildHealth();
       return buildJsonResponse(payload, payload.status === 'critical' ? 503 : 200);
@@ -3537,6 +4029,86 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     if (segments[0] === 'api' && segments[1] === 'discovery-triage') {
+      if (method === 'POST' && segments[2] === 'bulk-review') {
+        const requestId = newRequestId();
+        const bodyHash = hashRequestBody(body);
+        const reviewer = String(body.reviewer || 'theme-dashboard').slice(0, 120);
+        const decision = String(body.decision || '').trim().toLowerCase();
+        if (!['canonical', 'watch', 'suppressed'].includes(decision)) {
+          return buildJsonResponse({ ok: false, error: 'decision must be canonical, watch, or suppressed', audit: { requestId } }, 400);
+        }
+        const rawIds = Array.isArray(body.ids)
+          ? body.ids
+          : Array.isArray(body.topicIds)
+            ? body.topicIds
+            : [];
+        const topicIds = Array.from(new Set(rawIds
+          .map((id) => String(id || '').replace(/^triage-/i, '').trim())
+          .filter(Boolean)))
+          .slice(0, 100);
+        if (!topicIds.length) {
+          return buildJsonResponse({ ok: false, error: 'ids must contain at least one discovery topic id', audit: { requestId } }, 400);
+        }
+
+        const prevStateById = new Map();
+        try {
+          const { rows } = await getPool().query(
+            `SELECT id, promotion_state FROM discovery_topics WHERE id = ANY($1::text[])`,
+            [topicIds],
+          );
+          rows.forEach((row) => prevStateById.set(String(row.id), row.promotion_state ?? null));
+        } catch (err) {
+          logger.warn('bulk discovery prev-state lookup failed', { error: String(err?.message || err) });
+        }
+
+        const results = [];
+        for (const topicId of topicIds) {
+          try {
+            const result = await applyDiscoveryTriageDecision({ query: safeQuery }, {
+              topicId,
+              decision,
+              reviewer,
+              reason: String(body.reason || `Decision Inbox bulk keyword decision: ${decision}`),
+            });
+            const nextState = result?.topic?.promotionState
+              ?? result?.topic?.promotion_state
+              ?? result?.review?.decision
+              ?? decision;
+            try {
+              await recordInboxAction(getPool(), {
+                itemType: 'discovery',
+                itemId: topicId,
+                prevState: prevStateById.get(topicId) ?? null,
+                nextState: nextState ? String(nextState) : null,
+                decision,
+                reviewer,
+                requestId,
+                bodyHash,
+                note: body.reason ? String(body.reason) : `Bulk discovery review (${topicIds.length} topics)`,
+              });
+            } catch (auditErr) {
+              logger.warn('inbox bulk audit write failed', {
+                itemType: 'discovery',
+                itemId: topicId,
+                error: String(auditErr?.message || auditErr),
+              });
+            }
+            results.push({ ok: true, topicId, decision, nextState, reviewKey: result?.review?.reviewKey || null });
+          } catch (err) {
+            results.push({ ok: false, topicId, error: String(err?.message || err) });
+          }
+        }
+        const accepted = results.filter((row) => row.ok).length;
+        const failed = results.length - accepted;
+        return buildJsonResponse(withMeta({
+          ok: failed === 0,
+          requested: topicIds.length,
+          accepted,
+          failed,
+          results,
+          audit: { requestId },
+        }, { cacheable: false }), failed ? 207 : 200);
+      }
       if (method === 'POST' && segments[2] === 'review') {
         const requestId = newRequestId();
         const bodyHash = hashRequestBody(body);
@@ -3623,6 +4195,59 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     // userId comes from body.userId or query.user; defaults to 'default' until
     // auth lands. Each successful mutation also writes an inbox-audit row with
     // item_type='e2_signal' (or whatever VALID_WATCHLIST_ITEM_TYPES says).
+    // Private operator tracking layer. These routes write only to
+    // tracked_targets / tracked_target_hits; they do not promote user-entered
+    // terms into discovery_topics, auto taxonomy, or model training tables.
+    if (segments[0] === 'api' && segments[1] === 'tracking-targets') {
+      try {
+        const userId = String(body.userId || params.get('user') || 'default').slice(0, 120);
+
+        if (method === 'GET' && segments[2] === 'audit') {
+          return buildJsonResponse(await buildTrackingDataPathAudit(getPool()));
+        }
+
+        if (method === 'GET' && !segments[2]) {
+          return buildJsonResponse(await buildTrackedTargetsPayload(getPool(), params));
+        }
+
+        if (method === 'POST' && !segments[2]) {
+          const target = await upsertTrackedTarget(getPool(), { ...body, userId });
+          let backfill = null;
+          const shouldBackfill = body.backfill !== false && body.skipBackfill !== true;
+          if (shouldBackfill) {
+            backfill = await refreshTrackedTargetHits(getPool(), target.id, {
+              userId,
+              lookbackDays: body.backfillDays || body.lookbackDays || 180,
+            });
+          }
+          return buildJsonResponse({ ok: true, target, backfill });
+        }
+
+        if (method === 'PATCH' && segments[2] && !segments[3]) {
+          const target = await updateTrackedTarget(getPool(), decodeURIComponent(segments[2]), { ...body, userId });
+          return buildJsonResponse({ ok: true, target });
+        }
+
+        if (method === 'DELETE' && segments[2] && !segments[3]) {
+          const target = await archiveTrackedTarget(getPool(), decodeURIComponent(segments[2]), { userId });
+          return buildJsonResponse({ ok: Boolean(target), target });
+        }
+
+        if (method === 'POST' && segments[2] && segments[3] === 'backfill') {
+          const result = await refreshTrackedTargetHits(getPool(), decodeURIComponent(segments[2]), {
+            userId,
+            lookbackDays: body.backfillDays || body.lookbackDays || params.get('days') || 180,
+          });
+          return buildJsonResponse(result);
+        }
+
+        return buildJsonResponse({ ok: false, error: 'unsupported tracking-targets route' }, 405);
+      } catch (err) {
+        logger.warn('tracking-targets route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     if (segments[0] === 'api' && segments[1] === 'watchlist') {
       try {
         const userId = String(body.userId || params.get('user') || 'default').slice(0, 120);
@@ -4110,19 +4735,28 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       `);
 
       const liveSignalWindowDays = 30;
+      const liveSignalCandidateLimit = 500;
       const signalsRes = await safeQuery(`
         WITH candidate_events AS (
           SELECT eu.canonical_event_id,
+                 eu.symbol AS uplift_symbol,
                  eu.evidence_grade,
                  eu.uplift,
                  eu.t_stat,
                  eu.n_controls,
                  ce.theme,
                  ce.representative_title AS title,
-                 ce.event_date AS updated_at
-            FROM event_uplift eu
-            JOIN canonical_events ce ON ce.id = eu.canonical_event_id
-           WHERE eu.evidence_grade = 'E2'
+                 ce.event_date AS updated_at,
+                 GREATEST(0, CURRENT_DATE - ce.event_date)::int AS age_days,
+                 CASE
+                   WHEN CURRENT_DATE - ce.event_date <= 14 THEN 'fresh_validated'
+                   WHEN CURRENT_DATE - ce.event_date <= 30 THEN 'aging_validated'
+                   ELSE 'historical_validated'
+                 END AS freshness_lane,
+                 ABS(COALESCE(eu.uplift, 0)) * 0.6 + ABS(COALESCE(eu.t_stat, 0)) * 0.4 AS strength_score
+             FROM event_uplift eu
+             JOIN canonical_events ce ON ce.id = eu.canonical_event_id
+            WHERE eu.evidence_grade = 'E2'
              AND ce.event_date >= CURRENT_DATE - INTERVAL '${liveSignalWindowDays} days'
              AND ABS(COALESCE(eu.t_stat, 0)) >= 2
              AND COALESCE(eu.n_controls, 0) >= ${HOT_EVENTS_MIN_PROMOTION_CONTROLS}
@@ -4145,7 +4779,10 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
                ce.theme,
                ce.title,
                ce.updated_at,
-               lo.symbol,
+               ce.age_days,
+               ce.freshness_lane,
+               ce.strength_score,
+               COALESCE(lo.symbol, ce.uplift_symbol) AS symbol,
                lo.forward_return_pct,
                lo.abnormal_return,
                art.sources
@@ -4181,11 +4818,17 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
           ) art ON true
          WHERE NOT (
            COALESCE(aq.known_market_relevance_articles, 0) > 0
-           AND COALESCE(aq.market_relevant_articles, 0) = 0
-           AND COALESCE(aq.low_relevance_articles, 0) > 0
-         )
-         ORDER BY ABS(COALESCE(ce.uplift, 0)) * 0.6 + ABS(COALESCE(ce.t_stat, 0)) * 0.4 DESC
-         LIMIT 100
+            AND COALESCE(aq.market_relevant_articles, 0) = 0
+            AND COALESCE(aq.low_relevance_articles, 0) > 0
+          )
+         ORDER BY
+           CASE ce.freshness_lane
+             WHEN 'fresh_validated' THEN 0
+             WHEN 'aging_validated' THEN 1
+             ELSE 2
+           END ASC,
+           ce.strength_score DESC
+         LIMIT ${liveSignalCandidateLimit}
       `);
       const summaryRows = summaryRes.rows || [];
       const rawRows = summaryRows.reduce((sum, row) => sum + Number(row.count || 0), 0);
@@ -4201,7 +4844,13 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
       const symbolCounts = new Map();
       const seenTitles = new Set();
       const actionableSignals = [];
+      let freshSignalCount = 0;
+      let latestValidatedAt = null;
       for (const row of signalsRes.rows || []) {
+        if (row.freshness_lane === 'fresh_validated') freshSignalCount += 1;
+        if (!latestValidatedAt || (row.updated_at && new Date(row.updated_at) > new Date(latestValidatedAt))) {
+          latestValidatedAt = row.updated_at;
+        }
         const titleKey = normalizeSignalQueueTitle(row.title);
         const symbolKey = String(row.symbol || 'unknown').toUpperCase();
         if (titleKey && seenTitles.has(titleKey)) continue;
@@ -4216,8 +4865,11 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
         signals: actionableSignals,
         meta: {
           liveSignalWindowDays,
+          liveSignalCandidateLimit,
           minPromotionControls: HOT_EVENTS_MIN_PROMOTION_CONTROLS,
           evidenceGradeWindowDays: EVIDENCE_GRADE_WINDOW_DAYS,
+          freshSignalCount,
+          latestValidatedAt,
           rawRows,
           promotedRows: summary.reduce((sum, row) => sum + Number(row.count || 0), 0),
           quarantinedRows: quarantinedCount,

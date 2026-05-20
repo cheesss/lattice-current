@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import { execSync } from 'node:child_process';
 import { loadEnvFile } from './_seed-utils.mjs';
 
 loadEnvFile(import.meta.url);
@@ -28,6 +29,48 @@ const MAX_BACKFILL_DAYS = Number(process.env.MAX_BACKFILL_DAYS) || 365;
 
 const runOnce = process.argv.includes('--once');
 const backfillAll = process.argv.includes('--backfill-all');
+
+function listRunningAccumulatorPeers() {
+  try {
+    if (process.platform === 'win32') {
+      const output = execSync(
+        `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'data-accumulator\\.mjs' } | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"`,
+        { stdio: 'pipe', timeout: 20_000, windowsHide: true },
+      ).toString('utf-8').trim();
+      if (!output) return [];
+      const parsed = JSON.parse(output);
+      const rows = Array.isArray(parsed) ? parsed : [parsed];
+      return rows
+        .map((row) => ({ pid: Number(row?.ProcessId || 0), commandLine: String(row?.CommandLine || '') }))
+        .filter((row) => row.pid > 0 && row.pid !== process.pid)
+        .filter((row) => !/(^|\s)--once(\s|$)/.test(row.commandLine));
+    }
+    const output = execSync('pgrep -af "data-accumulator\\.mjs"', {
+      stdio: 'pipe',
+      timeout: 20_000,
+      windowsHide: true,
+    }).toString('utf-8').trim();
+    if (!output) return [];
+    return output
+      .split(/\r?\n/)
+      .map((line) => {
+        const match = line.match(/^(\d+)\s+(.+)$/);
+        return match ? { pid: Number(match[1]), commandLine: match[2] } : null;
+      })
+      .filter((row) => row && row.pid > 0 && row.pid !== process.pid)
+      .filter((row) => !/(^|\s)--once(\s|$)/.test(row.commandLine));
+  } catch {
+    return [];
+  }
+}
+
+if (!runOnce) {
+  const peers = listRunningAccumulatorPeers();
+  if (peers.length > 0) {
+    process.stderr.write(`[data-accumulator] already running (pid ${peers[0].pid}); refusing duplicate persistent daemon\n`);
+    process.exit(0);
+  }
+}
 
 // Global safety timeout — kill the process if it hangs (10 min for --once, 0 for daemon)
 if (runOnce) {
@@ -84,6 +127,16 @@ function loadState() {
 function saveState(state) {
   fs.mkdirSync(path.dirname(stateFile), { recursive: true });
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+}
+
+function markAccumulatorHeartbeat(state, phase) {
+  state.heartbeat = {
+    ...(state.heartbeat || {}),
+    accumulatorAt: new Date().toISOString(),
+    phase,
+    pid: process.pid,
+  };
+  saveState(state);
 }
 
 // ---------------------------------------------------------------------------
@@ -590,6 +643,7 @@ async function runCycle() {
   const state = loadState();
   state.cycleCount++;
   state.lastRun = new Date().toISOString();
+  markAccumulatorHeartbeat(state, 'cycle-start');
   console.log(`\n========== Accumulation Cycle #${state.cycleCount} ==========`);
   console.log(`Time: ${state.lastRun}`);
 
@@ -613,9 +667,11 @@ async function runCycle() {
   }
 
   // Step 1: Recent Yahoo prices
+  markAccumulatorHeartbeat(state, 'yahoo-prices');
   await fetchYahooPrices(symbols, state);
 
   // Step 2: GDELT backfill (advances 10 days further back each cycle)
+  markAccumulatorHeartbeat(state, 'gdelt-backfill');
   await fetchGdeltBackfill(state);
 
   // Step 3: FRED macro series (every 10 cycles ≈ 20 hours)
@@ -653,14 +709,18 @@ async function runCycle() {
   }
 
   // Step 4: Replay so accumulated data feeds back into the system
+  markAccumulatorHeartbeat(state, 'replay');
   await triggerReplay();
 
   // Step 5: Codex coverage analysis (every 5 cycles)
+  markAccumulatorHeartbeat(state, 'codex-analysis');
   await runCodexAnalysis(state);
 
   // Step 6: Query/symbol lifecycle management
+  markAccumulatorHeartbeat(state, 'lifecycle');
   manageQueryLifecycle(state);
 
+  markAccumulatorHeartbeat(state, 'cycle-complete');
   saveState(state);
   console.log(`========== Cycle #${state.cycleCount} complete, next backfill: -${state.backfillDayOffset} days ==========\n`);
 }

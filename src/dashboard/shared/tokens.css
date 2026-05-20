@@ -102,6 +102,23 @@
   --teal: #67d1c5;
   --blue: var(--blue-info);
 
+  /* Modern institutional cockpit aliases. The legacy lime accent remains
+     available, but new dashboard surfaces should use cyan/blue for primary
+     controls and emerald only for actual success/promotion. */
+  --modern-bg-950: #08081a;
+  --modern-bg-900: #0d0f1f;
+  --modern-bg-850: #15182b;
+  --modern-bg-800: #1f2238;
+  --modern-border-hairline: rgba(165, 180, 252, .08);
+  --modern-border-soft: rgba(165, 180, 252, .16);
+  --modern-accent: #22d3ee;
+  --modern-accent-2: #38bdf8;
+  --modern-success: #34d399;
+  --modern-warning: #fbbf24;
+  --modern-danger: #f43f5e;
+  --modern-violet: #a78bfa;
+  --modern-legacy-lime: #d8f99d;
+
   /* ============================================================
      V3 — FANCY pro-tool palette (Linear / Palantir / Vercel tone)
      Source: research pass 1+2 + "fancy" upgrade pass.

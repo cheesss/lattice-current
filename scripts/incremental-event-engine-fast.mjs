@@ -12,17 +12,19 @@
  */
 
 import pg from 'pg';
+import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
+
+loadOptionalEnvFile();
 
 const PG_CONFIG = {
-  host: process.env.PG_HOST || '192.168.0.2',
-  port: Number(process.env.PG_PORT || 5433),
-  user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD || process.env.PGPASSWORD || process.env.INTEL_PG_PASSWORD || process.env.NAS_PG_PASSWORD || (() => { throw new Error('Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, INTEL_PG_PASSWORD, or NAS_PG_PASSWORD.'); })(),
-  database: process.env.PG_DATABASE || 'lattice',
+  ...resolveNasPgConfig(),
   max: 4,
 };
 
 const SIMILARITY_THRESHOLD = 0.7;
+const SKIP_CONTROLS = process.argv.includes('--skip-controls') || process.env.EVENT_ENGINE_SKIP_CONTROLS === '1';
+const REPAIR_DAYS = Math.max(1, Math.min(3650, Number(process.env.EVENT_ENGINE_REPAIR_DAYS) || 14));
+const FEATURE_REFRESH_DAYS = Math.max(1, Math.min(365, Number(process.env.EVENT_ENGINE_FEATURE_REFRESH_DAYS) || 7));
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -46,25 +48,49 @@ function classifyRegime(vix) {
   return 'balanced';
 }
 
+async function repairCanonicalEventDates(pool) {
+  const result = await pool.query(`
+    WITH target AS (
+      SELECT ce.id,
+             MIN(a.published_at::date) AS article_date
+        FROM canonical_events ce
+        JOIN article_event_map aem ON aem.canonical_event_id = ce.id
+        JOIN articles a ON a.id = aem.article_id
+       WHERE a.published_at >= NOW() - ($1::int * INTERVAL '1 day')
+       GROUP BY ce.id, ce.event_date
+      HAVING COUNT(DISTINCT a.published_at::date) = 1
+         AND ce.event_date IS DISTINCT FROM MIN(a.published_at::date)
+    )
+    UPDATE canonical_events ce
+       SET event_date = target.article_date
+      FROM target
+     WHERE ce.id = target.id
+  `, [REPAIR_DAYS]);
+  if (result.rowCount > 0) {
+    console.log(`  repaired ${result.rowCount} canonical event date keys`);
+  }
+}
+
 async function main() {
   const pool = new pg.Pool(PG_CONFIG);
   const t0 = performance.now();
 
   console.log('incremental-event-engine-fast');
+  await repairCanonicalEventDates(pool);
 
   // ═══════════════════════════════════════════════════════════════════
   // STEP 1: 전부 메모리에 로드 (DB 왕복 2번으로 끝)
   // ═══════════════════════════════════════════════════════════════════
   console.log('\n>> Loading existing events into memory...');
   const existingEvents = await pool.query(`
-    SELECT id, event_date, theme, avg_embedding::text as avg_embedding, article_count
+    SELECT id, to_char(event_date, 'YYYY-MM-DD') as event_date_key, theme, avg_embedding::text as avg_embedding, article_count
     FROM canonical_events
   `);
 
   // 날짜+테마 → 이벤트 목록 인덱스
   const eventIndex = new Map();
   for (const evt of existingEvents.rows) {
-    const key = `${evt.event_date.toISOString().slice(0, 10)}::${evt.theme}`;
+    const key = `${evt.event_date_key}::${evt.theme}`;
     if (!eventIndex.has(key)) eventIndex.set(key, []);
     eventIndex.get(key).push({
       id: evt.id,
@@ -76,7 +102,7 @@ async function main() {
 
   console.log('>> Loading unmapped articles...');
   const unmapped = await pool.query(`
-    SELECT a.id, a.title, a.source, a.theme, DATE(a.published_at) as event_date,
+    SELECT a.id, a.title, a.source, a.theme, to_char(a.published_at::date, 'YYYY-MM-DD') as event_date_key,
            a.embedding::text as embedding
     FROM articles a
     LEFT JOIN article_event_map aem ON aem.article_id = a.id
@@ -106,7 +132,7 @@ async function main() {
   // 날짜+테마 그룹별 처리
   const groups = new Map();
   for (const art of unmapped.rows) {
-    const key = `${art.event_date.toISOString().slice(0, 10)}::${art.theme}`;
+    const key = `${art.event_date_key}::${art.theme}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(art);
   }
@@ -281,27 +307,32 @@ async function runStep2to5(pool) {
   // STEP 4: event_features
   console.log('>> Incremental event_features...');
   const signals = await pool.query(`
-    SELECT DATE(ts) as d, signal_name, value FROM signal_history
+    SELECT to_char(ts::date, 'YYYY-MM-DD') as d, signal_name, value FROM signal_history
     WHERE signal_name IN ('vix','yieldSpread','dollarIndex','oilPrice','hy_credit_spread','marketStress','transmissionStrength','eventIntensity')
     ORDER BY d
   `);
   const dailySig = new Map();
   for (const r of signals.rows) {
-    const d = r.d.toISOString().slice(0, 10);
+    const d = r.d;
     if (!dailySig.has(d)) dailySig.set(d, {});
     dailySig.get(d)[r.signal_name] = Number(r.value);
   }
 
   const newEvts = await pool.query(`
-    SELECT ce.id, ce.event_date, ce.source_count, ce.source_diversity, ce.article_count
+    SELECT ce.id, to_char(ce.event_date, 'YYYY-MM-DD') as event_date_key,
+           ce.source_count, ce.source_diversity, ce.article_count
     FROM canonical_events ce LEFT JOIN event_features ef ON ef.canonical_event_id = ce.id
     WHERE ef.canonical_event_id IS NULL
-  `);
+       OR ce.event_date >= NOW()::date - ($1::int * INTERVAL '1 day')
+       OR COALESCE(ce.source_count, -1) <> COALESCE(ef.source_count, -1)
+       OR COALESCE(ce.article_count, -1) <> COALESCE(ef.article_count, -1)
+       OR ABS(COALESCE(ce.source_diversity, -1) - COALESCE(ef.source_diversity, -1)) > 0.0001
+  `, [FEATURE_REFRESH_DAYS]);
 
   const rm = { crisis: 2.0, 'risk-off': 1.5, balanced: 1.0, 'risk-on': 0.8, 'risk-on-strong': 0.6 };
   const rows = [];
   for (const evt of newEvts.rows) {
-    const d = evt.event_date.toISOString().slice(0, 10);
+    const d = evt.event_date_key;
     const sig = dailySig.get(d) || {};
     const vix = sig.vix ?? null;
     const regime = vix != null ? classifyRegime(vix) : 'balanced';
@@ -341,7 +372,33 @@ async function runStep2to5(pool) {
         $21::double precision[], $22::double precision[], $23::double precision[],
         $24::double precision[], $25::double precision[], $26::double precision[]
       )
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (canonical_event_id) DO UPDATE SET
+        computed_at = NOW(),
+        source_count = EXCLUDED.source_count,
+        source_diversity = EXCLUDED.source_diversity,
+        article_count = EXCLUDED.article_count,
+        hawkes_intensity = EXCLUDED.hawkes_intensity,
+        hawkes_momentum = EXCLUDED.hawkes_momentum,
+        hmm_regime = EXCLUDED.hmm_regime,
+        vix_value = EXCLUDED.vix_value,
+        vix_zscore = EXCLUDED.vix_zscore,
+        vix_momentum = EXCLUDED.vix_momentum,
+        yield_spread = EXCLUDED.yield_spread,
+        oil_price = EXCLUDED.oil_price,
+        dollar_index = EXCLUDED.dollar_index,
+        credit_spread_hy = EXCLUDED.credit_spread_hy,
+        market_stress = EXCLUDED.market_stress,
+        transmission_strength = EXCLUDED.transmission_strength,
+        event_intensity = EXCLUDED.event_intensity,
+        regime_label = EXCLUDED.regime_label,
+        regime_multiplier = EXCLUDED.regime_multiplier,
+        risk_gauge = EXCLUDED.risk_gauge,
+        graph_signal_score = EXCLUDED.graph_signal_score,
+        nmi_score = EXCLUDED.nmi_score,
+        narrative_alignment = EXCLUDED.narrative_alignment,
+        truth_discovery_score = EXCLUDED.truth_discovery_score,
+        legacy_conviction = EXCLUDED.legacy_conviction,
+        legacy_fpr = EXCLUDED.legacy_fpr
     `, [
       rows.map((r) => r.id), rows.map((r) => r.sc), rows.map((r) => r.sd), rows.map((r) => r.ac),
       rows.map((r) => r.hi), rows.map((r) => r.hm), rows.map((r) => r.regime),
@@ -354,31 +411,36 @@ async function runStep2to5(pool) {
     ]);
     fc = rows.length;
   }
-  console.log(`  ${fc} features inserted`);
+  console.log(`  ${fc} features upserted`);
+
+  if (SKIP_CONTROLS) {
+    console.log('>> Controls + uplift skipped (--skip-controls); feature refresh complete');
+    return;
+  }
 
   // STEP 5: matched_controls + uplift (새 이벤트만)
   console.log('>> Incremental controls + uplift...');
   // 간략 버전: 새 이벤트가 적을 때만 실행 (대량이면 별도 배치)
   if (newEvts.rows.length > 0 && newEvts.rows.length < 5000) {
     const sigSnap = await pool.query(`
-      SELECT DATE(ts) as d,
+      SELECT to_char(ts::date, 'YYYY-MM-DD') as d,
              MAX(CASE WHEN signal_name='vix' THEN value END) as vix,
              MAX(CASE WHEN signal_name='yieldSpread' THEN value END) as ys
-      FROM signal_history WHERE signal_name IN ('vix','yieldSpread') GROUP BY DATE(ts)
+      FROM signal_history WHERE signal_name IN ('vix','yieldSpread') GROUP BY to_char(ts::date, 'YYYY-MM-DD')
     `);
     const sm = new Map();
-    for (const r of sigSnap.rows) sm.set(r.d.toISOString().slice(0, 10), { vix: Number(r.vix) || 20, ys: Number(r.ys) || 0, dow: new Date(r.d).getDay() });
+    for (const r of sigSnap.rows) sm.set(r.d, { vix: Number(r.vix) || 20, ys: Number(r.ys) || 0, dow: new Date(`${r.d}T00:00:00Z`).getUTCDay() });
     const allDates = Array.from(sm.keys()).sort();
 
     const unmatched = await pool.query(`
-      SELECT ce.id, ce.event_date, ce.theme FROM canonical_events ce
+      SELECT ce.id, to_char(ce.event_date, 'YYYY-MM-DD') as event_date_key, ce.theme FROM canonical_events ce
       LEFT JOIN matched_controls mc ON mc.canonical_event_id = ce.id
       WHERE mc.canonical_event_id IS NULL
     `);
 
     let mc = 0;
     for (const evt of unmatched.rows) {
-      const d = evt.event_date.toISOString().slice(0, 10);
+      const d = evt.event_date_key;
       const es = sm.get(d);
       if (!es) continue;
       const candidates = allDates

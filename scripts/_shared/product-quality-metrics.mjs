@@ -245,17 +245,48 @@ async function computeActionabilityScore(client) {
         WHERE created_at >= NOW() - INTERVAL '7 days'`,
     );
     const { rows: queueRows } = await client.query(
-      `SELECT COUNT(*)::int AS pending FROM approval_queue WHERE status IN ('pending', 'needs-fix')`,
+      `SELECT COUNT(*)::int AS pending,
+              COUNT(*) FILTER (
+                WHERE action_type IN (
+                  'add-rss',
+                  'attach-theme',
+                  'backfill-source',
+                  'canonical-cross-theme-proposal',
+                  'source-query'
+                )
+              )::int AS actionable_pending,
+              COUNT(*) FILTER (
+                WHERE action_type NOT IN (
+                  'add-rss',
+                  'attach-theme',
+                  'backfill-source',
+                  'canonical-cross-theme-proposal',
+                  'source-query'
+                )
+              )::int AS pending_without_known_action,
+              COUNT(*) FILTER (
+                WHERE action_type = 'source-query'
+                  AND status = 'needs-fix'
+                  AND payload->'repair'->>'exhausted' = 'true'
+              )::int AS exhausted_source_queries
+         FROM approval_queue
+        WHERE status IN ('pending', 'needs-fix')`,
     );
     const actioned = Number(actionedRows[0]?.actioned ?? 0);
     const pending = Number(queueRows[0]?.pending ?? 0);
+    const actionablePending = Number(queueRows[0]?.actionable_pending ?? 0);
+    const pendingWithoutKnownAction = Number(queueRows[0]?.pending_without_known_action ?? 0);
+    const exhaustedSourceQueries = Number(queueRows[0]?.exhausted_source_queries ?? 0);
     const total = actioned + pending;
     return {
-      metric: ratio(actioned, total),
+      metric: ratio(actioned + actionablePending, total),
       sample: total,
       actioned,
       pending,
-      note: 'approximate; requires nextAction-on-card field to refine',
+      actionablePending,
+      pendingWithoutKnownAction,
+      exhaustedSourceQueries,
+      note: 'pending approval/source-query items count as actionable only when the UI has a clear accept/reject/retry/inspect path',
     };
   } catch (err) {
     return { metric: null, error: String(err?.message || err) };

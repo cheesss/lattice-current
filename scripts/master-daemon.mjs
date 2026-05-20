@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import pg from 'pg';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { createLogger } from './_shared/structured-logger.mjs';
@@ -57,6 +57,19 @@ const LEGACY_DUCKDB_SYNC_ENABLED = process.env.ENABLE_LEGACY_DUCKDB_SYNC === 'tr
 const RUN_MAX_BUFFER_BYTES = Math.max(1024 * 1024, Number(process.env.DAEMON_RUN_MAX_BUFFER_BYTES || 64 * 1024 * 1024));
 const STATE_PATH = 'data/daemon-state.json';
 const logger = createLogger('master-daemon');
+
+function optionalTimeoutMs(value, fallback = 0, min = 1, max = Number.MAX_SAFE_INTEGER) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['0', 'off', 'none', 'false', 'disabled', 'no'].includes(normalized)) return 0;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+function timeoutLabel(timeoutMs) {
+  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : 'disabled';
+}
 
 const runningTasks = new Set();
 let pgConfig = null;
@@ -120,24 +133,80 @@ function markHeartbeat(state, phase = 'idle') {
   saveState(state);
 }
 
+function runningHeartbeatPhase(fallback = 'idle') {
+  if (runningTasks.size === 0) return fallback;
+  return `running:${Array.from(runningTasks).join(',').slice(0, 120)}`;
+}
+
 function run(command, timeoutMs = 300_000) {
-  logger.info('running shell command', { command, timeoutMs });
+  const normalizedTimeoutMs = optionalTimeoutMs(timeoutMs, timeoutMs, 1_000, 24 * HOUR_1_MS);
+  const timeoutDisabled = !(Number.isFinite(normalizedTimeoutMs) && normalizedTimeoutMs > 0);
+  const started = Date.now();
+  logger.info('running shell command', { command, timeoutMs: timeoutLabel(normalizedTimeoutMs) });
   try {
-    execSync(command, {
+    const execOptions = {
       stdio: 'pipe',
-      timeout: timeoutMs,
       env: { ...process.env },
       cwd: process.cwd(),
       windowsHide: true,
       maxBuffer: RUN_MAX_BUFFER_BYTES,
+    };
+    if (!timeoutDisabled) execOptions.timeout = normalizedTimeoutMs;
+    execSync(command, execOptions);
+    const durationMs = Date.now() - started;
+    logger.info('shell command completed', { command, timeoutMs: timeoutLabel(normalizedTimeoutMs), durationMs });
+    logger.metric('shell.success_count', 1);
+    return { ok: true, error: '', durationMs };
+  } catch (error) {
+    const durationMs = Date.now() - started;
+    const message = String(error?.message || error).slice(0, 200);
+    logger.warn('shell command failed', { command, timeoutMs: timeoutLabel(normalizedTimeoutMs), durationMs, error: message });
+    logger.metric('shell.error_count', 1);
+    return { ok: false, error: message, durationMs };
+  }
+}
+
+function runNodeScript(scriptPath, args = [], timeoutMs = 300_000) {
+  const argv = [scriptPath, ...args.map((arg) => String(arg))];
+  const normalizedTimeoutMs = optionalTimeoutMs(timeoutMs, timeoutMs, 1_000, 24 * HOUR_1_MS);
+  const timeoutDisabled = !(Number.isFinite(normalizedTimeoutMs) && normalizedTimeoutMs > 0);
+  const started = Date.now();
+  logger.info('running node script', {
+    scriptPath,
+    args: argv.slice(1),
+    timeoutMs: timeoutLabel(normalizedTimeoutMs),
+  });
+  try {
+    const execOptions = {
+      stdio: 'pipe',
+      env: { ...process.env },
+      cwd: process.cwd(),
+      windowsHide: true,
+      maxBuffer: RUN_MAX_BUFFER_BYTES,
+    };
+    if (!timeoutDisabled) execOptions.timeout = normalizedTimeoutMs;
+    execFileSync(process.execPath, argv, execOptions);
+    const durationMs = Date.now() - started;
+    logger.info('node script completed', {
+      scriptPath,
+      timeoutMs: timeoutLabel(normalizedTimeoutMs),
+      durationMs,
     });
     logger.metric('shell.success_count', 1);
-    return { ok: true, error: '' };
+    return { ok: true, error: '', durationMs };
   } catch (error) {
-    const message = String(error?.message || error).slice(0, 200);
-    logger.warn('shell command failed', { command, timeoutMs, error: message });
+    const durationMs = Date.now() - started;
+    const stderr = error?.stderr?.toString?.() || '';
+    const stdout = error?.stdout?.toString?.() || '';
+    const message = String(stderr || stdout || error?.message || error).replace(/\s+/g, ' ').slice(0, 400);
+    logger.warn('node script failed', {
+      scriptPath,
+      timeoutMs: timeoutLabel(normalizedTimeoutMs),
+      durationMs,
+      error: message,
+    });
     logger.metric('shell.error_count', 1);
-    return { ok: false, error: message };
+    return { ok: false, error: message, durationMs };
   }
 }
 
@@ -258,6 +327,7 @@ async function runTask(state, taskName, intervalMs, handler) {
   if (!ONCE && !shouldRun(taskName, intervalMs, state)) return;
 
   runningTasks.add(taskName);
+  markHeartbeat(state, runningHeartbeatPhase());
   let ok = false;
   let errorMessage = '';
   const startedAt = Date.now();
@@ -282,6 +352,7 @@ async function runTask(state, taskName, intervalMs, handler) {
     });
     await markDone(taskName, intervalMs, state, ok, errorMessage);
     runningTasks.delete(taskName);
+    markHeartbeat(state, runningHeartbeatPhase());
   }
 }
 
@@ -299,14 +370,19 @@ async function taskFredBackfill() {
 
 async function taskMarketQuoteRefresh() {
   log('>> market-quote-refresh: fetching delayed market quotes into NAS market_quotes');
-  const result = run('node scripts/refresh-market-quotes-to-nas.mjs', 300_000);
+  const result = run('node scripts/refresh-market-quotes-to-nas.mjs --include-auto-theme-symbols --auto-theme-symbol-limit 160', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskBootstrapMarketQuoteHistory() {
+  log('>> bootstrap-market-quote-history: ensuring 1y daily history for core + auto-theme symbols');
+  const result = run('node scripts/bootstrap-market-quotes-history.mjs --include-auto-theme-symbols --range 1y', 3_600_000);
   return { ok: result.ok, error: result.error };
 }
 
 async function taskBuildMarketReturns() {
   log('>> build-market-returns: rebuilding date-based market_returns table for event-engine joins');
-  const py = process.env.PYTHON_BIN || 'python';
-  const result = run(`${py} scripts/build-market-returns.py`, 1_800_000);
+  const result = run('node --import tsx scripts/build-market-returns.mjs', 1_800_000);
   return { ok: result.ok, error: result.error };
 }
 
@@ -339,8 +415,9 @@ async function taskEventEngineIncremental() {
  * with the hourly task.
  */
 async function taskEventEngineFullControls() {
-  log('>> event-engine-full-controls: full pipeline including controls + uplift (E1/E2/E3/E4 grading)');
-  const result = run('node scripts/incremental-event-engine-fast.mjs', 3_600_000);
+  const repairDays = Math.max(30, Math.min(365, Number(process.env.EVENT_UPLIFT_REPAIR_DAYS) || 90));
+  log(`>> event-engine-full-controls: bounded recent controls + uplift repair (${repairDays}d)`);
+  const result = run(`node --import tsx scripts/repair-recent-event-uplift.mjs --days ${repairDays} --limit 5000`, 3_600_000);
   return { ok: result.ok, error: result.error };
 }
 
@@ -540,7 +617,17 @@ async function taskDynamicRssBackfill() {
   const limit = Math.max(1, Math.min(500, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_LIMIT || 25))));
   const concurrency = Math.max(1, Math.min(20, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_CONCURRENCY || 8))));
   const timeoutMs = Math.max(3_000, Math.min(60_000, Math.floor(Number(process.env.DYNAMIC_RSS_BACKFILL_TIMEOUT_MS || 6_000))));
-  const result = run(`node scripts/backfill-active-rss-sources.mjs --max-sources ${maxSources} --limit ${limit} --concurrency ${concurrency} --timeout-ms ${timeoutMs} --refresh-discovery`, 180_000);
+  const taskTimeoutMs = Math.max(
+    300_000,
+    Math.min(900_000, Number(process.env.DYNAMIC_RSS_BACKFILL_TASK_TIMEOUT_MS || 600_000)),
+  );
+  const result = runNodeScript('scripts/backfill-active-rss-sources.mjs', [
+    '--max-sources', maxSources,
+    '--limit', limit,
+    '--concurrency', concurrency,
+    '--timeout-ms', timeoutMs,
+    '--skip-downstream',
+  ], taskTimeoutMs);
   return { ok: result.ok, error: result.error };
 }
 
@@ -754,6 +841,139 @@ async function taskGenerateWeeklyDigest() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskScheduleIntelligenceReports() {
+  log('>> schedule-intelligence-reports: refreshing draft report schedule manifest and automation guardrails');
+  const result = runNodeScript('scripts/schedule-intelligence-reports.mjs', ['--apply'], 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskReportBackfillDrain() {
+  log('>> report-backfill-drain: queueing deep report research gaps into review-gated source-query approvals');
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(process.env.REPORT_BACKFILL_DRAIN_LIMIT || 25))));
+  const maxAttempts = Math.max(1, Math.min(10, Math.floor(Number(process.env.REPORT_BACKFILL_MAX_ATTEMPTS || 3))));
+  const staleHours = Math.max(1, Math.min(24 * 14, Math.floor(Number(process.env.REPORT_BACKFILL_STALE_HOURS || 48))));
+  const result = runNodeScript('scripts/drain-report-backfill-tasks.mjs', [
+    '--apply',
+    '--limit', limit,
+    '--max-attempts', maxAttempts,
+    '--stale-hours', staleHours,
+  ], 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskReportClosure() {
+  log('>> report-closure: closing report-scoped evidence contracts with provider routing and market validation');
+  const reportLimit = Math.max(1, Math.min(20, Math.floor(Number(process.env.REPORT_CLOSURE_REPORT_LIMIT || 5))));
+  const limit = Math.max(1, Math.min(100, Math.floor(Number(process.env.REPORT_CLOSURE_LIMIT || 40))));
+  const passes = Math.max(1, Math.min(5, Math.floor(Number(process.env.REPORT_CLOSURE_PASSES || 1))));
+  const reportConcurrency = Math.max(1, Math.min(12, Math.floor(Number(process.env.REPORT_CLOSURE_REPORT_CONCURRENCY || 3))));
+  const stepConcurrency = Math.max(1, Math.min(6, Math.floor(Number(process.env.REPORT_CLOSURE_STEP_CONCURRENCY || 2))));
+  const providerConcurrency = Math.max(1, Math.min(12, Math.floor(Number(process.env.REPORT_CLOSURE_PROVIDER_CONCURRENCY || 4))));
+  const sourceQueryConcurrency = Math.max(1, Math.min(12, Math.floor(Number(process.env.REPORT_CLOSURE_SOURCE_QUERY_CONCURRENCY || 4))));
+  const throttleHours = Math.max(0, Math.min(24 * 30, Math.floor(Number(process.env.REPORT_CLOSURE_PROVIDER_THROTTLE_HOURS || 6))));
+  const providers = String(process.env.REPORT_CLOSURE_PROVIDERS || 'fred,eia,sec,fmp,polygon,dod-contracts,usaspending')
+    .split(',')
+    .map((provider) => provider.trim())
+    .filter(Boolean)
+    .join(',');
+  const reportRoot = String(process.env.REPORT_CLOSURE_REPORT_ROOT || 'data/reports');
+  const timeoutMs = optionalTimeoutMs(process.env.REPORT_CLOSURE_TIMEOUT_MS, 0, 900_000, 24 * HOUR_1_MS);
+  const result = runNodeScript('scripts/run-evidence-contract-backfill-cycle.mjs', [
+    '--apply',
+    '--all-reports',
+    '--auto-report-source-query',
+    '--market-validation',
+    '--dashboard-summary',
+    '--regenerate',
+    '--report-root', reportRoot,
+    '--report-limit', reportLimit,
+    '--limit', limit,
+    '--passes', passes,
+    '--report-concurrency', reportConcurrency,
+    '--step-concurrency', stepConcurrency,
+    '--provider-concurrency', providerConcurrency,
+    '--source-query-concurrency', sourceQueryConcurrency,
+    '--providers', providers,
+    '--throttle-hours', throttleHours,
+  ], timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskGenericKpiCollection() {
+  log('>> generic-kpi-collection: discovering theme KPI spines, materializing observations, and queueing missing collection jobs');
+  const limit = Math.max(1, Math.min(500, Math.floor(Number(process.env.GENERIC_KPI_COLLECTION_LIMIT || 80))));
+  const jobLimit = Math.max(1, Math.min(500, Math.floor(Number(process.env.GENERIC_KPI_COLLECTION_JOB_LIMIT || 120))));
+  const result = runNodeScript('scripts/run-generic-kpi-collection.mjs', [
+    '--limit', limit,
+    '--job-limit', jobLimit,
+  ], 600_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskExternalProviderBackfill() {
+  log('>> external-provider-backfill: auto-discovering newly added sources, keywords, symbols, and themes for provider/tracking backfill');
+  const themes = String(process.env.EXTERNAL_PROVIDER_BACKFILL_THEMES || '')
+    .split(',')
+    .map((theme) => theme.trim())
+    .filter(Boolean)
+    .slice(0, 25);
+  const providers = String(process.env.EXTERNAL_PROVIDER_BACKFILL_PROVIDERS || 'fred,eia,fmp,polygon')
+    .split(',')
+    .map((provider) => provider.trim())
+    .filter(Boolean)
+    .join(',');
+  const timeoutMs = optionalTimeoutMs(process.env.EXTERNAL_PROVIDER_BACKFILL_TIMEOUT_MS, 0, 300_000, 24 * HOUR_1_MS);
+  const limit = Math.max(1, Math.min(250, Math.floor(Number(process.env.EXTERNAL_PROVIDER_BACKFILL_LIMIT || 50))));
+  const sinceHours = Math.max(1, Math.min(24 * 365, Math.floor(Number(process.env.EXTERNAL_PROVIDER_BACKFILL_SINCE_HOURS || 24 * 14))));
+  const throttleHours = Math.max(0, Math.min(24 * 30, Math.floor(Number(process.env.EXTERNAL_PROVIDER_BACKFILL_THROTTLE_HOURS || 12))));
+  const trackingLookbackDays = Math.max(1, Math.min(1825, Math.floor(Number(process.env.TRACKING_TARGET_BACKFILL_DAYS || 180))));
+  const args = [
+    '--auto-discover',
+    '--providers', providers,
+    '--limit', limit,
+    '--since-hours', sinceHours,
+    '--throttle-hours', throttleHours,
+    '--tracking-lookback-days', trackingLookbackDays,
+  ];
+  if (themes.length) args.push('--themes', themes.join(','));
+  const result = runNodeScript('scripts/collect-free-external-data.mjs', args, timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskUniversalResearchOrchestrator() {
+  log('>> universal-research-orchestrator: subject discovery -> backfill -> KPI/research cycle -> report regeneration');
+  const limit = Math.max(1, Math.min(250, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_LIMIT || 40))));
+  const sinceHours = Math.max(1, Math.min(24 * 365, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_SINCE_HOURS || 24 * 14))));
+  const providerLimit = Math.max(1, Math.min(250, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_PROVIDER_LIMIT || 50))));
+  const providerThrottleHours = Math.max(0, Math.min(24 * 30, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_PROVIDER_THROTTLE_HOURS || 6))));
+  const coveragePasses = Math.max(1, Math.min(6, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_COVERAGE_PASSES || 2))));
+  const closurePasses = Math.max(1, Math.min(5, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_CLOSURE_PASSES || 2))));
+  const adjacentLimit = Math.max(1, Math.min(100, Math.floor(Number(process.env.UNIVERSAL_RESEARCH_ADJACENT_LIMIT || 25))));
+  const adjacentExpansion = process.env.UNIVERSAL_RESEARCH_ADJACENT_EXPANSION !== '0';
+  const autoReportMode = String(process.env.UNIVERSAL_RESEARCH_AUTO_REPORT_MODE || 'wide');
+  const providers = String(process.env.UNIVERSAL_RESEARCH_PROVIDERS || 'fred,eia,sec,fmp,polygon,dod-contracts')
+    .split(',')
+    .map((provider) => provider.trim())
+    .filter(Boolean)
+    .join(',');
+  const reportRoot = String(process.env.UNIVERSAL_RESEARCH_REPORT_ROOT || 'data/reports');
+  const timeoutMs = optionalTimeoutMs(process.env.UNIVERSAL_RESEARCH_TIMEOUT_MS, 0, 900_000, 24 * HOUR_1_MS);
+  const result = runNodeScript('scripts/run-universal-research-orchestrator.mjs', [
+    '--limit', limit,
+    '--since-hours', sinceHours,
+    '--provider-limit', providerLimit,
+    '--provider-throttle-hours', providerThrottleHours,
+    '--providers', providers,
+    '--coverage-passes', coveragePasses,
+    '--closure-passes', closurePasses,
+    '--report-root', reportRoot,
+    ...(adjacentExpansion ? ['--adjacent-expansion'] : ['--no-adjacent-expansion']),
+    '--adjacent-limit', adjacentLimit,
+    '--auto-report-mode', autoReportMode,
+  ], timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskGenerateFollowedThemeBriefings() {
   log('>> generate-followed-theme-briefings: persisting weekly structural briefing snapshot');
   const result = run('node --import tsx scripts/generate-followed-theme-briefings.mjs --period week --limit 6', 600_000);
@@ -854,6 +1074,89 @@ async function taskCoverageGapAnalysis() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskMineIncomingConnections() {
+  log('>> mine-incoming-connections: mining source-first Research OS signals from new topics, articles, research, code, and entity exposures');
+  const result = run('node scripts/mine-incoming-connections.mjs', 900_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskResearchOsCycle(state) {
+  log('>> research-os-cycle: running ordered incoming->questions->evidence->relations->candidates cycle');
+  const result = run('node scripts/run-research-os-cycle.mjs', 4_800_000);
+  if (result.ok && state?.lastRun) {
+    const now = Date.now();
+    for (const taskName of [
+      'mine-incoming-connections',
+      'research-os-foundation',
+      'collect-research-evidence',
+      'extract-research-relations',
+      'refresh-cross-theme-candidates',
+      'cross-theme-source-expansion',
+      'execute-source-query-approvals',
+      'promote-trusted-graph',
+    ]) {
+      state.lastRun[taskName] = now;
+    }
+  }
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskResearchOsFoundation() {
+  log('>> research-os-foundation: schema, seed graph, and autonomous research questions');
+  const result = run('node scripts/research-os-foundation.mjs --all', 900_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskCollectResearchEvidence() {
+  log('>> collect-research-evidence: building question-level evidence bundles');
+  const result = run('node scripts/collect-research-evidence.mjs --limit=24 --per-question-limit=16', 1_800_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskExtractResearchRelations() {
+  log('>> extract-research-relations: candidate-only relation extraction from evidence bundles');
+  const repair = run('node scripts/repair-research-os-noisy-relations.mjs', 300_000);
+  if (!repair.ok) return { ok: false, error: repair.error };
+  const result = run('node scripts/extract-research-relations.mjs --limit=240', 1_800_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskRefreshCrossThemeCandidates() {
+  log('>> refresh-cross-theme-candidates: scoring hidden bottleneck candidates');
+  const result = run('node scripts/refresh-cross-theme-candidates.mjs --limit=16', 900_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskCrossThemeSourceExpansion() {
+  log('>> cross-theme-source-expansion: queueing approval-gated source queries for weak evidence candidates');
+  const result = run('node scripts/plan-cross-theme-source-expansion.mjs --limit=40', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskExecuteSourceQueryApprovals() {
+  log('>> execute-source-query-approvals: executing approved Research OS source-query approvals and bounded needs-fix retries');
+  const result = run('node scripts/execute-source-query-approvals.mjs --limit=25 --retry-needs-fix', 900_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskPromoteTrustedGraph() {
+  log('>> promote-trusted-graph: promoting reviewed cross-theme candidates without canonical mutation');
+  const result = run('node scripts/promote-trusted-graph.mjs', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskAdjacencyAutoresearch() {
+  log('>> adjacency-autoresearch: isolated eval harness for cross-theme prompts and scoring policy');
+  const result = run('node scripts/run-adjacency-autoresearch.mjs --budget-ms=300000', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskResearchOsPolicyAdvisor() {
+  log('>> research-os-policy-advisor: proposing bounded policy changes with rollback rules');
+  const result = run('node scripts/propose-research-os-policy-changes.mjs', 300_000);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskSourceSelfHeal() {
   log('>> source-self-heal: validating and activating approved healing candidates');
   const result = run('node --import tsx scripts/self-heal-sources.mjs --limit 1', 300_000);
@@ -878,7 +1181,7 @@ async function taskSourceRepairClosedLoop() {
 
 async function taskAutoPipelineLabels() {
   log('>> auto-pipeline-labels: running step 3 (label assignment)');
-  const labelLimit = Math.max(200, Math.min(5000, Math.floor(Number(process.env.AUTO_PIPELINE_LABEL_LIMIT || 1500))));
+  const labelLimit = Math.max(200, Math.min(5000, Math.floor(Number(process.env.AUTO_PIPELINE_LABEL_LIMIT || 5000))));
   const result = run(`node --import tsx scripts/auto-pipeline.mjs --step 3 --limit ${labelLimit}`, 600_000);
   return { ok: result.ok, error: result.error };
 }
@@ -1014,6 +1317,7 @@ const RATES_NOWCAST_ENABLED = process.env.NOWCAST_RATES_ENABLED === 'true';
 
 const TASKS = {
   'market-quote-refresh': { interval: MIN_15_MS, fn: taskMarketQuoteRefresh },
+  'bootstrap-market-quote-history': { interval: DAY_1_MS, fn: taskBootstrapMarketQuoteHistory },
   // NOTE: data-accumulator runs as its own continuous daemon (npm run daemon:accumulator)
   // because each cycle is 5-10 min long and would block downstream master-daemon tasks
   // if inlined here. Keep it OUT of TASKS — verify it's running via process check.
@@ -1081,7 +1385,24 @@ const TASKS = {
   'generate-codex-theme-proposals': { interval: HOUR_6_MS, fn: taskGenerateCodexThemeProposals },
   'generate-followed-theme-briefings': { interval: DAY_1_MS, fn: taskGenerateFollowedThemeBriefings },
   'generate-weekly-digest': { interval: DAY_1_MS, fn: taskGenerateWeeklyDigest },
+  'schedule-intelligence-reports': { interval: HOUR_6_MS, fn: taskScheduleIntelligenceReports },
+  'report-backfill-drain': { interval: HOUR_2_MS, fn: taskReportBackfillDrain },
+  'report-closure': { interval: HOUR_6_MS, fn: taskReportClosure },
+  'external-provider-backfill': { interval: HOUR_2_MS, fn: taskExternalProviderBackfill },
+  'generic-kpi-collection': { interval: HOUR_6_MS, fn: taskGenericKpiCollection },
+  'universal-research-orchestrator': { interval: HOUR_6_MS, fn: taskUniversalResearchOrchestrator },
   'coverage-gap-analysis': { interval: DAY_1_MS, fn: taskCoverageGapAnalysis },
+  'research-os-cycle': { interval: 3 * HOUR_1_MS, fn: taskResearchOsCycle },
+  'mine-incoming-connections': { interval: 3 * HOUR_1_MS, fn: taskMineIncomingConnections },
+  'research-os-foundation': { interval: HOUR_6_MS, fn: taskResearchOsFoundation },
+  'collect-research-evidence': { interval: HOUR_6_MS, fn: taskCollectResearchEvidence },
+  'extract-research-relations': { interval: 12 * HOUR_1_MS, fn: taskExtractResearchRelations },
+  'refresh-cross-theme-candidates': { interval: 3 * HOUR_1_MS, fn: taskRefreshCrossThemeCandidates },
+  'cross-theme-source-expansion': { interval: DAY_1_MS, fn: taskCrossThemeSourceExpansion },
+  'execute-source-query-approvals': { interval: HOUR_6_MS, fn: taskExecuteSourceQueryApprovals },
+  'promote-trusted-graph': { interval: DAY_1_MS, fn: taskPromoteTrustedGraph },
+  'adjacency-autoresearch': { interval: DAY_1_MS, fn: taskAdjacencyAutoresearch },
+  'research-os-policy-advisor': { interval: DAY_1_MS, fn: taskResearchOsPolicyAdvisor },
   'auto-curate': { interval: WEEK_1_MS, fn: taskAutoCurate },
 };
 
@@ -1097,13 +1418,14 @@ async function main() {
   if (!RATES_NOWCAST_ENABLED) {
     process.stderr.write('  [disabled] rates-nowcast (NOWCAST_RATES_ENABLED != true) — see NOWCAST_HANDOFF §5.2\n');
   }
-  process.stderr.write('  15min: market quote refresh, db health\n');
+  process.stderr.write('  15min: market quote refresh (core + auto-theme symbols), db health\n');
   process.stderr.write('  30min: article check, dashboard health, meta-model-infer-burst (adaptive — only when stale predictions ≥ 1000)\n');
   process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, event-engine-incremental, auto-pipeline-sensitivity, sensitivity refresh\n');
-  process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission\n');
+  process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission, report-backfill-drain, external provider/keyword backfill\n');
   process.stderr.write('  4h:    repair-stale-features (dedicated event_features stale detector + repair)\n');
-  process.stderr.write('  daily: event-engine-full-controls (matched_controls + event_uplift grading; the hourly task skips controls for speed)\n');
-    process.stderr.write('  6h:    signal refresh, master-pipeline, executor, data quality, arxiv, hackernews, discovery, reports, self-heal\n');
+  process.stderr.write('  daily: bootstrap-market-quote-history, event-engine-full-controls (matched_controls + event_uplift grading)\n');
+  process.stderr.write('  6h:    signal refresh, master-pipeline, executor, data quality, arxiv, hackernews, discovery, report schedule, report closure, self-heal, generic KPI collection, universal research coverage-closure\n');
+    process.stderr.write('  3-12h: Research OS foundation/evidence/relation/candidate refresh with approval-gated source expansion\n');
     process.stderr.write('  opt-in: duckdb-sync only when ENABLE_LEGACY_DUCKDB_SYNC=true\n');
   process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');
     process.stderr.write('  daily: FRED backfill, pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
@@ -1144,8 +1466,17 @@ async function main() {
     }
   }
 
+  markHeartbeat(state, 'starting');
+  if (!ONCE) {
+    const heartbeatTimer = setInterval(() => {
+      const currentState = loadState();
+      markHeartbeat(currentState, runningHeartbeatPhase());
+    }, 60_000);
+    heartbeatTimer.unref?.();
+  }
+
   await runAllTasks(state);
-  markHeartbeat(state, 'started');
+  markHeartbeat(state, 'idle');
   if (ONCE) return;
 
   setInterval(async () => {

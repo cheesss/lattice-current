@@ -38,6 +38,16 @@ This folder is organized by behavior, not by source tree.
   - `evaluation-pipeline.test.mjs`
   - `storage-envelope.test.mjs`
   - `hot-warm-migrator.test.mjs`
+- If you change intelligence report generation, report output, evidence bundles, provider backfill, or report quality gates:
+  - `report-content-quality.test.mjs`
+  - `report-synthesis-layer.test.mjs`
+  - `report-validator.test.mjs`
+  - `report-compiler.test.mjs`
+  - `report-quality-gates.test.mjs`
+  - `report-db-adapter.test.mjs`
+  - `report-chart-renderer.test.mjs`
+  - `external-provider-backfill-targets.test.mjs`
+  - `universal-research-orchestrator.test.mjs`
 
 ## Design philosophy
 
@@ -60,6 +70,17 @@ This folder is organized by behavior, not by source tree.
 - Verification should cover `collect -> store -> load -> frame -> signal/output` whenever a pipeline path changes.
 - When a test depends on rule thresholds or sizing ladders, derive expectations from the current exported constants instead of freezing old numeric cutoffs in the test body.
 - CI on this branch is organized by signal-first contracts. Keep new tests aligned with those groups instead of adding one more ad-hoc CI command.
+- Report tests should verify both artifact correctness and product semantics. A report can be structurally valid while still capped by weak evidence, missing transcript coverage, source concentration, stale data, or unvalidated causal claims.
+
+## Report test command
+
+Use this focused command after report/data-pack changes:
+
+```powershell
+node --import tsx --test .\tests\report-*.test.mjs .\tests\universal-research-orchestrator.test.mjs .\tests\external-provider-backfill-targets.test.mjs
+```
+
+This suite covers report API contracts, CLI output, compiler behavior, chart rendering, local store, export, validator gates, content quality, synthesis, subject fidelity, quality caps, and provider backfill target extraction.
 
 ## Before deleting a test
 
