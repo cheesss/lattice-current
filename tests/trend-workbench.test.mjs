@@ -8,8 +8,10 @@ import {
 } from '../scripts/_shared/trend-workbench.mjs';
 
 test('buildDiscoveryTriagePayload maps triage rows and summary', async () => {
+  let topicSql = '';
   const safeQuery = async (sql) => {
     if (/FROM discovery_topics dt/.test(sql) && /LEFT JOIN LATERAL/.test(sql)) {
+      topicSql = sql;
       return {
         rows: [{
           id: 'dt-quantum-lab',
@@ -56,6 +58,27 @@ test('buildDiscoveryTriagePayload maps triage rows and summary', async () => {
   assert.equal(payload.items[0].lastReview.decision, 'watch');
   assert.deepEqual(payload.items[0].keywords, ['quantum computing', 'qubit']);
   assert.ok(payload.items[0].structuralScore > 0);
+  assert.match(topicSql, /COALESCE\(dt\.promotion_state, 'watch'\) = 'watch'/);
+  assert.equal(payload.filters.includeFinal, false);
+});
+
+test('buildDiscoveryTriagePayload only includes finalized topics when explicitly requested', async () => {
+  let topicSql = '';
+  const safeQuery = async (sql) => {
+    if (/FROM discovery_topics dt/.test(sql) && /LEFT JOIN LATERAL/.test(sql)) {
+      topicSql = sql;
+      return { rows: [] };
+    }
+    if (/GROUP BY COALESCE\(dt.promotion_state/.test(sql)) {
+      return { rows: [] };
+    }
+    return { rows: [], rowCount: 0, command: 'OK' };
+  };
+
+  const payload = await buildDiscoveryTriagePayload(safeQuery, new URLSearchParams('limit=5&include_final=1'));
+  assert.equal(payload.filters.includeFinal, true);
+  assert.doesNotMatch(topicSql, /COALESCE\(dt\.promotion_state, 'watch'\) = 'watch'/);
+  assert.match(topicSql, /COALESCE\(dt\.promotion_state, 'watch'\) <> 'suppressed'/);
 });
 
 test('applyDiscoveryTriageDecision updates topic and returns review metadata', async () => {

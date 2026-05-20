@@ -76,24 +76,28 @@ async function backfillFRED(client, fromDate) {
 
       const data = await resp.json();
       const observations = data.observations || [];
-      let inserted = 0;
+      const rows = observations
+        .map((obs) => [series.signal, obs.date, parseFloat(obs.value)])
+        .filter((row) => Number.isFinite(row[2]));
 
-      for (const obs of observations) {
-        const value = parseFloat(obs.value);
-        if (isNaN(value) || obs.value === '.') continue;
-
+      if (rows.length > 0) {
+        const values = [];
+        const placeholders = rows.map((row, index) => {
+          const base = index * 3;
+          values.push(row[0], row[1], row[2]);
+          return `($${base + 1}, $${base + 2}::date, $${base + 3}, 'observed', 'backfill-new-sources-fred')`;
+        });
         await client.query(`
           INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
-          VALUES ($1, $2::date, $3, 'observed', 'backfill-new-sources-fred')
+          VALUES ${placeholders.join(',')}
           ON CONFLICT (signal_name, ts) DO UPDATE
             SET value = EXCLUDED.value,
                 value_origin = EXCLUDED.value_origin,
                 writer_id = EXCLUDED.writer_id
-        `, [series.signal, obs.date, value]);
-        inserted++;
+        `, values);
       }
 
-      console.log(`[FRED] ${series.id}: ${inserted}/${observations.length} observations loaded`);
+      console.log(`[FRED] ${series.id}: ${rows.length}/${observations.length} observations loaded`);
 
       // Rate limit: FRED allows ~120 requests/min
       await new Promise(r => setTimeout(r, 600));

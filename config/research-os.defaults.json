@@ -1,0 +1,245 @@
+{
+  "version": "2026-05-03",
+  "seedSimilarityWeightMax": 0.1,
+  "explorationQuotaMin": 0.3,
+  "autonomousQuestionRateTarget": 0.8,
+  "seedDependenceRatioMax": 0.35,
+  "incoming": {
+    "lookbackDays": 14,
+    "maxSignalsPerRun": 80,
+    "minObservationCount": 2,
+    "minSourceCount": 1,
+    "minNoveltyScore": 0.25,
+    "minPriorityScore": 0.35,
+    "seedSimilarityStrongThreshold": 0.25,
+    "questionQuotaMin": 0.25,
+    "repeatedConnectorActiveLimit": 3,
+    "singleSourcePriorityCap": 0.62,
+    "crossSourcePriorityBoost": 0.15,
+    "sourceBridgePriorityBoost": 0.1,
+    "sourceTypeWeights": {
+      "article": 0.55,
+      "discoveryTopic": 0.7,
+      "openalex": 0.8,
+      "github": 0.75,
+      "sec": 0.85,
+      "externalRss": 0.65
+    }
+  },
+  "trustedPromotion": {
+    "minSourceDiversity": 3,
+    "minDirectEvidence": 2,
+    "maxRejectRate": 0.35
+  },
+  "generation": {
+    "maxQuestionsPerRun": 40,
+    "maxThemePairsPerRun": 16,
+    "cooldownHours": 24,
+    "minHotThemeHeat": 0.65,
+    "minThemeMomentum": 0.25,
+    "maxSupplierDiversityForGap": 2,
+    "minNovelPhraseCount": 3,
+    "maxGraphHops": 3,
+    "novelPhraseDenylist": [
+      "emerging tech",
+      "science",
+      "technology",
+      "geopolitics",
+      "macro",
+      "health",
+      "aerospace"
+    ],
+    "questionScoring": {
+      "hotThemeNovelty": 0.35,
+      "themePairNovelty": 0.55,
+      "themePairGap": 0.4,
+      "explanationGapNovelty": 0.7,
+      "novelPhraseNovelty": 1,
+      "novelPhraseGap": 0.5,
+      "sourceDivergenceNovelty": 0.8,
+      "sourceDivergenceGap": 0.5,
+      "sourceDivergenceFallbackHeat": 0.4,
+      "incomingEntityNovelty": 0.9,
+      "incomingEntityGap": 0.55,
+      "sourceBridgeNovelty": 0.85,
+      "sourceBridgeGap": 0.65,
+      "crossSourceConvergenceNovelty": 0.95,
+      "crossSourceConvergenceGap": 0.6,
+      "userInterestHeat": 0.3,
+      "userInterestNovelty": 0.6,
+      "userInterestGap": 0.3,
+      "supplierGapPriorityWeight": 0.1
+    }
+  },
+  "scoring": {
+    "lanes": {
+      "watchScoreMin": 0.75,
+      "weirdNoveltyMin": 0.75,
+      "weakEvidenceMin": 0.5
+    },
+    "weights": {
+      "evidenceQuality": 0.25,
+      "sourceDiversity": 0.2,
+      "crossThemeOverlap": 0.15,
+      "recencyMomentum": 0.15,
+      "novelty": 0.1,
+      "supplierCentrality": 0.1,
+      "userInterestBoost": 0.05,
+      "seedSimilarity": 0.05,
+      "nonObviousFrontier": 0.1
+    },
+    "penalties": {
+      "weakRelation": 0.12,
+      "genericNoise": 0.1,
+      "consensusNarrative": 0.12,
+      "reviewedReject": 0.2
+    },
+    "genericNoise": {
+      "terms": [
+        "technology",
+        "software",
+        "platform",
+        "computing",
+        "digital infrastructure",
+        "environment",
+        "environmental",
+        "ecology",
+        "sustainability",
+        "science",
+        "research breakthrough",
+        "laboratory",
+        "scientific study",
+        "economy",
+        "growth",
+        "business cycle",
+        "gdp",
+        "recession",
+        "macro",
+        "geopolitics",
+        "sovereignty",
+        "alliances",
+        "state visit",
+        "security bloc"
+      ],
+      "evidenceFloor": 0.25,
+      "excludeBelowEvidenceFloor": true
+    }
+  },
+  "automation": {
+    "maxCandidatesPerRun": 120,
+    "maxNewGraphNodesPerDay": 200,
+    "llmTokenBudgetDaily": 200000,
+    "sourceExpansionBudgetDaily": 25,
+    "candidateRefresh": {
+      "hotThemeLimitDefault": 16,
+      "questionThemeLimitMin": 24,
+      "questionThemeLimitMultiplier": 2,
+      "researchQuestionThemeFallbackHeat": 0.45,
+      "researchQuestionThemeFallbackMomentum": 0.45,
+      "frontierThemeLimit": 24,
+      "frontierThemeFallbackHeat": 0.35,
+      "frontierThemeFallbackMomentum": 0.35,
+      "graphThemeFallbackHeat": 0.5,
+      "graphThemeFallbackMomentum": 0.5
+    },
+    "schedules": {
+      "researchQuestionHours": 6,
+      "relationExtractionHours": 12,
+      "candidateRefreshHours": 3,
+      "policyAdvisorHours": 24
+    }
+  },
+  "sourceExpansion": {
+    "minEvidenceQuality": 0.5,
+    "maxQueriesPerCandidate": 5,
+    "candidateLimitDefault": 40,
+    "perQueryEvidenceLimit": 24,
+    "minBundleRelevance": 0.35,
+    "directBundleRelevance": 0.65,
+    "evidenceEdgeConfidence": 0.55,
+    "externalRssMaxItems": 10,
+    "externalRssTimeoutMs": 15000,
+    "externalRssTriggerBelowAccepted": 1,
+    "retry": {
+      "maxAttempts": 3,
+      "maxRewriteTerms": 8,
+      "queryVariantsPerFailure": 3
+    },
+    "queryScoring": {
+      "primaryHit": 0.45,
+      "themeHit": 0.3,
+      "queryOverlap": 0.25
+    }
+  },
+  "relationExtraction": {
+    "quoteLessConfidenceMax": 0.45,
+    "enableApiLlm": false,
+    "llmProvider": "disabled",
+    "llmModel": "",
+    "maxLlmBundlesPerRun": 20,
+    "maxOutputTokens": 900,
+    "temperature": 0,
+    "estimatedPromptTokenDivisor": 4,
+    "technicalCueTerms": [
+      "cryogenic",
+      "cooling",
+      "refrigerator",
+      "cryostat",
+      "hydrogen",
+      "helium",
+      "oxygen",
+      "propellant",
+      "rocket fuel",
+      "alternative fuels",
+      "fuel cell",
+      "thermal",
+      "rotor",
+      "tension link",
+      "engine",
+      "turbine",
+      "battery",
+      "transformer",
+      "grid",
+      "pipeline",
+      "terminal",
+      "electrolysis",
+      "semiconductor",
+      "wafer",
+      "chip",
+      "data center",
+      "fiber",
+      "satellite",
+      "launch vehicle",
+      "sensor",
+      "magnet",
+      "vacuum",
+      "reactor"
+    ],
+    "weakStandaloneCueTerms": [
+      "fuel",
+      "infrastructure",
+      "thermal"
+    ],
+    "noiseContextTerms": [
+      "cost",
+      "costs",
+      "price",
+      "prices",
+      "demand",
+      "regulation",
+      "orders",
+      "agreement",
+      "warns",
+      "scrutiny",
+      "newsletter",
+      "podcast",
+      "subscribe",
+      "promo",
+      "codes"
+    ]
+  },
+  "feedback": {
+    "rejectPenaltyDecayDays": 90,
+    "reviveAfterNewDirectEvidence": 3
+  }
+}

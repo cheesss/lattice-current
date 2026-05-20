@@ -1,36 +1,15 @@
 /**
- * S-Level §Phase 8: Browser E2E for Decision Inbox action+refresh.
+ * S-Level Phase 8: browser E2E for Decision Inbox action + refresh.
  *
- * Per the master plan:
- *   "an operator action must not reappear as actionable after refresh
- *    unless it genuinely failed."
- *
- * This spec is intentionally narrow — it complements the API-level contract
- * test in tests/decision-inbox-action-refresh.test.mjs by verifying the
- * browser UI participates in the contract correctly:
- *
- *   1. Click action on an inbox item.
- *   2. Wait for action API to be called and complete.
- *   3. Reload the page.
- *   4. Verify the same item id is no longer present in the actionable list.
- *
- * The full action behaviour (banners, dryRun, bulk guards, etc.) is already
- * tested in inbox-actions.spec.ts. This spec is the missing "and refresh"
- * coverage that the master plan §Phase 8 calls out specifically.
- *
- * Selectors: this spec deliberately uses ONLY data-surface for navigation
- * and high-level inbox container queries. Action button selectors are
- * looked up by visible text fallback. Once the dashboard split (G2) lands
- * with stable data-test attrs on cards/buttons, this spec gets tightened.
- *
- * Run: npx playwright test e2e/decision-inbox-action-refresh.spec.ts
- *      (Requires `npm run build` first — playwright preview server is :4173)
+ * Contract: an operator action must not reappear as actionable after refresh
+ * unless the backend action genuinely failed.
  */
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const DASHBOARD_URL = 'http://127.0.0.1:4173/event-dashboard.html';
 
 const APPROVAL_FIXTURE_ID = 'approval-action-refresh-001';
+const BLOCKED_APPROVAL_FIXTURE_ID = 'approval-blocked-retry-001';
 const PROPOSAL_FIXTURE_ID = 9_998_001;
 
 type InboxState = {
@@ -75,6 +54,14 @@ async function fulfill(route: Route, body: unknown, status = 200) {
   });
 }
 
+function readJsonFromPostData(raw: string | null): Record<string, unknown> {
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 async function setupRoutes(page: Page) {
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
@@ -85,33 +72,29 @@ async function setupRoutes(page: Page) {
       || url.searchParams.get('includeFinal') === '1';
 
     if (method === 'GET' && path === '/api/proposal-inbox') {
-      // Filter out final states unless include_final=1, mirroring server.
       const proposals = includeFinal
         ? inboxState.proposals
-        : inboxState.proposals.filter((p: any) => !['executed', 'dead'].includes(String(p.status).toLowerCase()));
+        : inboxState.proposals.filter((p: any) => !['executed', 'dead', 'rejected'].includes(String(p.status).toLowerCase()));
       const approvals = includeFinal
         ? inboxState.approvals
         : inboxState.approvals.filter((a: any) => !['approved', 'rejected', 'executed'].includes(String(a.status).toLowerCase()));
       return fulfill(route, { proposals, approvals, summary: { actionableCount: proposals.length + approvals.length } });
     }
 
-    // Mutation endpoint for approval review.
     if (method === 'POST' && path.startsWith('/api/approval-queue/') && path.endsWith('/review')) {
       const queueId = path.split('/')[3];
-      const body = await route.request().postDataJSON().catch(() => ({}));
+      const body = readJsonFromPostData(route.request().postData());
       const decision = String(body?.decision || '').toLowerCase();
       const target = inboxState.approvals.find((a: any) => String(a.id) === String(queueId));
       if (target) {
-        const next = decision === 'reject' ? 'rejected' : 'executed';
-        (target as any).status = next;
+        (target as any).status = decision === 'reject' ? 'rejected' : 'executed';
       }
       return fulfill(route, { approval: target, audit: { requestId: 'mock-' + queueId } });
     }
 
-    // Mutation endpoint for proposal review.
     if (method === 'POST' && path.startsWith('/api/codex-proposals/') && path.endsWith('/review')) {
       const proposalId = path.split('/')[3];
-      const body = await route.request().postDataJSON().catch(() => ({}));
+      const body = readJsonFromPostData(route.request().postData());
       const decision = String(body?.decision || '').toLowerCase();
       const target = inboxState.proposals.find((p: any) => String(p.id) === String(proposalId));
       if (target) {
@@ -120,7 +103,6 @@ async function setupRoutes(page: Page) {
       return fulfill(route, { proposal: target, audit: { requestId: 'mock-' + proposalId } });
     }
 
-    // Generic GET stub for everything else the dashboard wants on boot.
     if (method === 'GET') {
       return fulfill(route, { ok: true, data: null, items: [], events: [], signals: [] });
     }
@@ -136,51 +118,39 @@ async function loadInboxSurface(page: Page) {
   await page.waitForSelector('.surface[data-surface="inbox"].active', { timeout: 5_000 });
 }
 
+async function clickInboxAction(page: Page, itemId: string, action: string) {
+  await page.locator(`.inbox-item[data-id="${itemId}"]`).click();
+  await page.locator(`#inbox-preview-content [data-inbox-action="${action}"][data-inbox-item-id="${itemId}"]`).click();
+}
+
 test.beforeEach(() => {
   resetFixtures();
 });
 
-test.describe('Decision Inbox — action persists after refresh', () => {
+test.describe('Decision Inbox action persists after refresh', () => {
   test('approval rejection does not reappear after reload', async ({ page }) => {
     await setupRoutes(page);
     await loadInboxSurface(page);
 
-    // Confirm the fixture is initially visible (text or id).
-    const initialPage = await page.content();
-    expect(initialPage).toContain(APPROVAL_FIXTURE_ID);
+    await expect(page.locator(`.inbox-item[data-id="approval-${APPROVAL_FIXTURE_ID}"]`)).toBeVisible();
 
-    // Trigger the rejection directly via the page's fetch API. This bypasses
-    // the dashboard's button selectors (which lack stable data-test attrs at
-    // the time of writing — see G2 split design) while still proving the
-    // contract: a successful API write means the item won't come back.
-    const reviewResponse = await page.evaluate(async (id) => {
-      const res = await fetch(`/api/approval-queue/${id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'reject', reviewer: 'sl-day5-e2e', reason: 'refresh test' }),
-      });
-      return { status: res.status, body: await res.json() };
-    }, APPROVAL_FIXTURE_ID);
+    const reviewRequest = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes(`/api/approval-queue/${APPROVAL_FIXTURE_ID}/review`),
+    );
+    await clickInboxAction(page, `approval-${APPROVAL_FIXTURE_ID}`, 'reject');
+    const request = await reviewRequest;
+    expect(readJsonFromPostData(request.postData())).toMatchObject({
+      decision: 'reject',
+      reviewer: 'theme-dashboard',
+    });
+    await expect(page.locator('#inbox-preview-content')).toContainText('REJECTED');
 
-    expect(reviewResponse.status).toBe(200);
-    expect(reviewResponse.body.audit?.requestId).toBeTruthy();
-
-    // Reload the surface.
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.click('.surface-nav-btn[data-surface="inbox"]');
     await page.waitForSelector('.surface[data-surface="inbox"].active', { timeout: 5_000 });
 
-    // The actionable inbox should no longer contain the item id.
-    // We check both by id (rendered into card markup somewhere) and by the
-    // mocked default GET excluding the rejected state.
-    const inboxJson = await page.evaluate(async () => {
-      const res = await fetch('/api/proposal-inbox');
-      return res.json();
-    });
-    const ids = (inboxJson.approvals || []).map((a: { id: unknown }) => String(a.id));
-    expect(ids).not.toContain(APPROVAL_FIXTURE_ID);
+    await expect(page.locator(`.inbox-item[data-id="approval-${APPROVAL_FIXTURE_ID}"]`)).toHaveCount(0);
 
-    // Including final, the item is recoverable for history views.
     const historyJson = await page.evaluate(async () => {
       const res = await fetch('/api/proposal-inbox?include_final=1');
       return res.json();
@@ -193,27 +163,67 @@ test.describe('Decision Inbox — action persists after refresh', () => {
     await setupRoutes(page);
     await loadInboxSurface(page);
 
-    const reviewResponse = await page.evaluate(async (id) => {
-      const res = await fetch(`/api/codex-proposals/${id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'reject', reviewer: 'sl-day5-e2e', reason: 'refresh test' }),
-      });
-      return { status: res.status, body: await res.json() };
-    }, PROPOSAL_FIXTURE_ID);
+    await expect(page.locator(`.inbox-item[data-id="proposal-${PROPOSAL_FIXTURE_ID}"]`)).toBeVisible();
 
-    expect(reviewResponse.status).toBe(200);
-    expect(reviewResponse.body.audit?.requestId).toBeTruthy();
+    const reviewRequest = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes(`/api/codex-proposals/${PROPOSAL_FIXTURE_ID}/review`),
+    );
+    await clickInboxAction(page, `proposal-${PROPOSAL_FIXTURE_ID}`, 'reject');
+    const request = await reviewRequest;
+    expect(readJsonFromPostData(request.postData())).toMatchObject({
+      decision: 'reject',
+      reviewer: 'theme-dashboard',
+    });
+    await expect(page.locator('#inbox-preview-content')).toContainText('REJECTED');
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.click('.surface-nav-btn[data-surface="inbox"]');
     await page.waitForSelector('.surface[data-surface="inbox"].active', { timeout: 5_000 });
 
-    const inboxJson = await page.evaluate(async () => {
-      const res = await fetch('/api/proposal-inbox');
-      return res.json();
+    await expect(page.locator(`.inbox-item[data-id="proposal-${PROPOSAL_FIXTURE_ID}"]`)).toHaveCount(0);
+  });
+
+  test('blocked approval exposes Retry Check and reuses approval execution path', async ({ page }) => {
+    inboxState = {
+      proposals: [],
+      approvals: [
+        {
+          id: BLOCKED_APPROVAL_FIXTURE_ID,
+          action_type: 'add-rss',
+          status: 'needs-fix',
+          payload: {
+            url: 'https://example.test/weak-feed.xml',
+            label: 'Blocked retry fixture',
+            nextAction: 'reject',
+            qualityScore: 0.2,
+            recentItemCount: 1,
+          },
+          reasoning: 'Blocked retry fixture',
+          created_at: new Date().toISOString(),
+        },
+      ],
+    };
+
+    await setupRoutes(page);
+    await loadInboxSurface(page);
+    await page.locator('[data-status-filter="needs-fix"]').click();
+
+    const itemId = `approval-${BLOCKED_APPROVAL_FIXTURE_ID}`;
+    await expect(page.locator(`.inbox-item[data-id="${itemId}"]`)).toBeVisible();
+    await page.locator(`.inbox-item[data-id="${itemId}"]`).click();
+
+    const retryButton = page.locator(`#inbox-preview-content [data-inbox-action="retry"][data-inbox-item-id="${itemId}"]`);
+    await expect(retryButton).toBeVisible();
+    await expect(page.locator(`#inbox-preview-content [data-inbox-action="accept"][data-inbox-item-id="${itemId}"]`)).toHaveCount(0);
+
+    const reviewRequest = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes(`/api/approval-queue/${BLOCKED_APPROVAL_FIXTURE_ID}/review`),
+    );
+    await retryButton.click();
+    const request = await reviewRequest;
+    expect(readJsonFromPostData(request.postData())).toMatchObject({
+      decision: 'accept',
+      reviewer: 'theme-dashboard',
     });
-    const ids = (inboxJson.proposals || []).map((p: { id: unknown }) => Number(p.id));
-    expect(ids).not.toContain(PROPOSAL_FIXTURE_ID);
   });
 });

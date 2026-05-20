@@ -727,8 +727,11 @@ export async function buildSimilarEventsPayload(pool, { eventId, limit = 6 } = {
 /* P1-1: Regime Scenario Lab                                     */
 /* ============================================================ */
 export async function buildRegimeScenarioPayload(pool, { vix = null, yieldSpread = null, oilPrice = null } = {}) {
-  // Determine target regime from inputs (rough heuristic matching regime_conditional_impact convention)
-  const targetRegime = classifyRegime({ vix, yieldSpread, oilPrice });
+  // Determine target regime from all scenario inputs. VIX remains the primary
+  // volatility anchor, while yield-curve inversion and oil shocks can override
+  // an otherwise calm VIX scenario.
+  const regimeClassification = classifyRegime({ vix, yieldSpread, oilPrice });
+  const targetRegime = regimeClassification.regime;
 
   const { rows } = await pool.query(
     `
@@ -759,6 +762,8 @@ export async function buildRegimeScenarioPayload(pool, { vix = null, yieldSpread
     generatedAt: new Date().toISOString(),
     inputs: { vix, yieldSpread, oilPrice },
     targetRegime,
+    regimeScore: regimeClassification.score,
+    regimeDrivers: regimeClassification.drivers,
     predictions,
     summary: {
       totalPairs: predictions.length,
@@ -768,13 +773,94 @@ export async function buildRegimeScenarioPayload(pool, { vix = null, yieldSpread
   };
 }
 
-function classifyRegime({ vix, yieldSpread, oilPrice }) {
+const REGIME_SCENARIO_THRESHOLDS = Object.freeze({
+  vix: {
+    crisis: 30,
+    riskOff: 22,
+    balancedFloor: 15,
+  },
+  yieldSpread: {
+    inversion: 0,
+    deepInversion: -0.5,
+    steep: 1.0,
+  },
+  oilPrice: {
+    easing: 70,
+    shock: 100,
+    severeShock: 115,
+  },
+  score: {
+    crisis: 3.25,
+    riskOff: 1.25,
+    riskOn: -1.25,
+    riskOnStrong: -2.75,
+  },
+});
+
+export function classifyRegime({ vix, yieldSpread, oilPrice }) {
   const v = Number(vix);
   const y = Number(yieldSpread);
-  if (Number.isFinite(v) && v > 30) return 'crisis';
-  if (Number.isFinite(v) && v > 22) return 'risk-off';
-  if (Number.isFinite(v) && v < 15) return 'risk-on';
-  return 'balanced';
+  const o = Number(oilPrice);
+  const drivers = [];
+  let score = 0;
+
+  if (Number.isFinite(v)) {
+    if (v >= REGIME_SCENARIO_THRESHOLDS.vix.crisis) {
+      score += 4.75;
+      drivers.push({ input: 'vix', stance: 'crisis', contribution: 4.75, detail: `VIX ${v.toFixed(1)} is crisis-level` });
+    } else if (v >= REGIME_SCENARIO_THRESHOLDS.vix.riskOff) {
+      score += 2;
+      drivers.push({ input: 'vix', stance: 'risk-off', contribution: 2, detail: `VIX ${v.toFixed(1)} is elevated` });
+    } else if (v < REGIME_SCENARIO_THRESHOLDS.vix.balancedFloor) {
+      score -= 2;
+      drivers.push({ input: 'vix', stance: 'risk-on', contribution: -2, detail: `VIX ${v.toFixed(1)} is calm` });
+    } else {
+      drivers.push({ input: 'vix', stance: 'balanced', contribution: 0, detail: `VIX ${v.toFixed(1)} is neutral` });
+    }
+  }
+
+  if (Number.isFinite(y)) {
+    if (y <= REGIME_SCENARIO_THRESHOLDS.yieldSpread.deepInversion) {
+      score += 1.75;
+      drivers.push({ input: 'yieldSpread', stance: 'risk-off', contribution: 1.75, detail: `yield spread ${y.toFixed(2)} is deeply inverted` });
+    } else if (y < REGIME_SCENARIO_THRESHOLDS.yieldSpread.inversion) {
+      score += 1;
+      drivers.push({ input: 'yieldSpread', stance: 'risk-off', contribution: 1, detail: `yield spread ${y.toFixed(2)} is inverted` });
+    } else if (y >= REGIME_SCENARIO_THRESHOLDS.yieldSpread.steep) {
+      score -= 1;
+      drivers.push({ input: 'yieldSpread', stance: 'risk-on', contribution: -1, detail: `yield spread ${y.toFixed(2)} is steep/constructive` });
+    } else {
+      drivers.push({ input: 'yieldSpread', stance: 'balanced', contribution: 0, detail: `yield spread ${y.toFixed(2)} is neutral` });
+    }
+  }
+
+  if (Number.isFinite(o)) {
+    if (o >= REGIME_SCENARIO_THRESHOLDS.oilPrice.severeShock) {
+      score += 1.75;
+      drivers.push({ input: 'oilPrice', stance: 'risk-off', contribution: 1.75, detail: `oil ${o.toFixed(0)} is a severe energy shock` });
+    } else if (o >= REGIME_SCENARIO_THRESHOLDS.oilPrice.shock) {
+      score += 1;
+      drivers.push({ input: 'oilPrice', stance: 'risk-off', contribution: 1, detail: `oil ${o.toFixed(0)} is elevated` });
+    } else if (o <= REGIME_SCENARIO_THRESHOLDS.oilPrice.easing) {
+      score -= 0.5;
+      drivers.push({ input: 'oilPrice', stance: 'risk-on', contribution: -0.5, detail: `oil ${o.toFixed(0)} is easing` });
+    } else {
+      drivers.push({ input: 'oilPrice', stance: 'balanced', contribution: 0, detail: `oil ${o.toFixed(0)} is neutral` });
+    }
+  }
+
+  let regime = 'balanced';
+  if (score >= REGIME_SCENARIO_THRESHOLDS.score.crisis) {
+    regime = 'crisis';
+  } else if (score >= REGIME_SCENARIO_THRESHOLDS.score.riskOff) {
+    regime = 'risk-off';
+  } else if (score <= REGIME_SCENARIO_THRESHOLDS.score.riskOnStrong) {
+    regime = 'risk-on-strong';
+  } else if (score <= REGIME_SCENARIO_THRESHOLDS.score.riskOn) {
+    regime = 'risk-on';
+  }
+
+  return { regime, score, drivers };
 }
 
 /* ============================================================ */
@@ -863,7 +949,7 @@ export async function buildCurrentRegimeBriefPayload(pool, { useCodex = false, f
     hyCreditSpread: signalMap.hyCreditSpread?.value ?? null,
     marketStress: signalMap.marketStress?.value ?? null,
   };
-  const currentRegime = classifyRegime(inputs);
+  const currentRegime = classifyRegime(inputs).regime;
   const scenario = await buildRegimeScenarioPayload(pool, {
     vix: inputs.vix,
     yieldSpread: inputs.yieldSpread,

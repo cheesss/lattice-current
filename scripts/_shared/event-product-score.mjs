@@ -74,6 +74,40 @@ const THEME_TOKEN_STOPLIST = new Set([
   'and', 'the', 'for', 'with', 'from', 'into', 'over', 'general', 'misc', 'other',
 ]);
 
+const THEME_RELEVANCE_TERMS = {
+  'ai-ml': ['ai', 'artificial intelligence', 'machine learning', 'llm', 'model', 'models', 'openai', 'anthropic', 'nvidia', 'gpu', 'edge ai', 'physical ai'],
+  aerospace: ['aerospace', 'aircraft', 'aviation', 'airline', 'airlines', 'air taxi', 'jet', 'jets', 'launch', 'rocket', 'satellite', 'space force', 'heavy-lift', 'mission assurance', 'inspection technology', 'boeing', 'airbus', 'lockheed', 'northrop'],
+  biotech: ['biotech', 'drug', 'drugs', 'fda', 'clinical', 'trial', 'therapy', 'cancer', 'pharma', 'gene', 'vaccine', 'diagnostic', 'lung', 'rare disease', 'disease'],
+  'brain-computer-interface': ['brain', 'neural', 'neuralink', 'bci', 'interface', 'neurotechnology'],
+  'clean-energy': ['clean energy', 'renewable', 'solar', 'wind', 'battery', 'storage', 'grid', 'climate', 'emissions', 'carbon', 'nuclear', 'geothermal', 'noaa', 'heat', 'warming'],
+  'climate-change': ['climate', 'warming', 'temperature', 'emissions', 'carbon', 'noaa', 'el nino', 'weather', 'heat', 'sea level'],
+  'cloud-infrastructure': ['cloud', 'data center', 'datacenter', 'server', 'compute', 'aws', 'azure', 'google cloud', 'microsoft', 'oracle', 'infrastructure'],
+  conflict: ['war', 'conflict', 'attack', 'missile', 'military', 'troops', 'strike', 'ceasefire', 'israel', 'iran', 'iranian', 'bahrain', 'russia', 'ukraine', 'gaza'],
+  cybersecurity: ['cyber', 'cybersecurity', 'security', 'malware', 'ransomware', 'vulnerability', 'flaw', 'breach', 'exploit', 'cve', 'stuxnet', 'engineering software', 'edr'],
+  'defense-industrial': ['defense', 'defence', 'military', 'pentagon', 'navy', 'naval', 'army', 'air force', 'air defence', 'missile', 'drone', 'combat', 'munition', 'weapons', 'shipyard', 'fincantieri', 'fremm'],
+  diplomacy: ['diplomacy', 'summit', 'treaty', 'ceasefire', 'negotiation', 'sanction', 'foreign minister', 'embassy'],
+  'emerging-tech': ['technology', 'startup', 'innovation', 'robot', 'quantum', 'ai', 'biotech', 'semiconductor', 'fusion', 'space'],
+  'developer-platforms': ['developer', 'github', 'repository', 'repositories', 'software', 'platform', 'administrative tools', 'rce', 'git push', 'api'],
+  'fiscal-policy': ['fiscal', 'budget', 'tax', 'deficit', 'treasury', 'spending', 'debt', 'government funding'],
+  'food-agriculture': ['food', 'agriculture', 'farm', 'crop', 'corn', 'soy', 'wheat', 'fertilizer', 'harvest'],
+  'fusion-energy': ['fusion', 'tokamak', 'plasma', 'nuclear', 'reactor', 'energy'],
+  geopolitics: ['geopolitics', 'sanction', 'war', 'border', 'military', 'diplomacy', 'election', 'trade', 'tariff'],
+  'inflation-costs': ['inflation', 'prices', 'costs', 'cpi', 'commodity', 'oil', 'gas', 'food price'],
+  macroeconomics: ['macro', 'economy', 'rates', 'fed', 'inflation', 'gdp', 'dollar', 'yield', 'recession'],
+  migration: ['migration', 'migrant', 'refugee', 'border', 'asylum', 'immigration'],
+  'monetary-policy': ['fed', 'rates', 'interest rate', 'central bank', 'treasury', 'yield', 'inflation'],
+  'quantum-computing': ['quantum', 'qubit', 'qubits', 'superconducting', 'ionq', 'rigetti'],
+  'resource-scarcity': ['scarcity', 'water', 'commodity', 'copper', 'lithium', 'critical minerals', 'shortage', 'supply'],
+  'robotics-automation': ['robot', 'robots', 'robotics', 'automation', 'autonomous', 'humanoid', 'factory', 'industrial'],
+  sanctions: ['sanction', 'controls', 'export control', 'embargo', 'blacklist', 'restriction'],
+  semiconductor: ['semiconductor', 'chip', 'chips', 'gpu', 'fab', 'foundry', 'wafer', 'advanced node', 'advanced nodes', 'drc', 'design rule', 'closure', 'tsmc', 'nvidia', 'amd', 'intel', 'asml'],
+  space: ['space', 'satellite', 'rocket', 'launch', 'orbit', 'space force', 'heavy-lift', 'lunar', 'nasa'],
+  'supply-chain-security': ['supply chain', 'shipping', 'ship', 'tanker', 'strait', 'hormuz', 'maritime', 'freight', 'port', 'logistics', 'cargo', 'oil', 'rig', 'backlog', 'baltic', 'red sea', 'chokepoint', 'umbilical', 'umbilicals', 'offshore', 'gas project'],
+  'technology-general': ['technology', 'software', 'hardware', 'platform', 'developer', 'chip', 'cloud', 'ai', 'cyber'],
+  'trade-globalization': ['trade', 'tariff', 'globalization', 'export', 'import', 'supply chain', 'customs', 'china', 'shipping', 'commerce'],
+  'urban-infrastructure': ['urban', 'city', 'cities', 'street', 'streets', 'road', 'roads', 'transit', 'infrastructure', 'grants', 'air taxi'],
+};
+
 function themeTokenSet(theme) {
   if (!theme || typeof theme !== 'string') return new Set();
   const raw = theme.trim().toLowerCase();
@@ -99,16 +133,31 @@ function themeTokenSet(theme) {
  */
 export function computeThemeKeywordOverlap(event = {}) {
   const tokens = themeTokenSet(event.theme);
-  if (tokens.size === 0) return null;
   const title = String(event.title || event.representative_title || '').toLowerCase();
   if (!title) return null;
+  const themeKey = String(event.theme || '').trim().toLowerCase();
+  const relevanceTerms = THEME_RELEVANCE_TERMS[themeKey] || [];
+  let domainScore = null;
+  if (relevanceTerms.length > 0) {
+    let hits = 0;
+    for (const term of relevanceTerms) {
+      const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = term.includes(' ')
+        ? new RegExp(safe, 'i')
+        : new RegExp(`(^|[^a-z0-9])${safe}([^a-z0-9]|$)`, 'i');
+      if (re.test(title)) hits += 1;
+    }
+    domainScore = hits > 0 ? clamp(0.60 + Math.min(0.35, hits * 0.10), 0, 1) : 0;
+  }
+
+  if (tokens.size === 0) return domainScore;
   let hit = 0;
   for (const t of tokens) {
     // Word-boundary-ish check — avoid 'ai' matching inside 'gain'.
     const re = new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i');
     if (re.test(title)) hit += 1;
   }
-  return hit / tokens.size;
+  return Math.max(hit / tokens.size, domainScore ?? 0);
 }
 
 function ageDays(eventDate, now = new Date()) {
@@ -163,7 +212,11 @@ export function computeThemeRelevance(event = {}) {
   // assignment may be wrong even when the rest of the signals look healthy.
   const overlap = computeThemeKeywordOverlap(event);
   if (overlap !== null) {
-    if (overlap >= 0.5) {
+    if (overlap >= 0.6) {
+      score = Math.max(score, 0.75);
+      score = Math.min(1, score + 0.05);
+      rationale.push(`domain-overlap:${(overlap * 100).toFixed(0)}%`);
+    } else if (overlap >= 0.5) {
       score = Math.min(1, score + 0.10);
       rationale.push(`keyword-overlap:${(overlap * 100).toFixed(0)}%`);
     } else if (overlap === 0) {
@@ -175,6 +228,10 @@ export function computeThemeRelevance(event = {}) {
   }
 
   return { value: floorComponent(score), rationale };
+}
+
+export function getThemeRelevanceTerms(theme) {
+  return [...(THEME_RELEVANCE_TERMS[String(theme || '').trim().toLowerCase()] || [])];
 }
 
 export function computeEvidenceWeight(event = {}) {
@@ -352,9 +409,16 @@ export function rankByProductScore(events, options = {}) {
  */
 export function classifyEventLane(event = {}) {
   const productScore = Number(event.productScore ?? 0);
-  const promoted = Boolean(event.promotionEligible);
+  const themeRelevance = Number(
+    event.scoreBreakdown?.components?.themeRelevance
+    ?? event.components?.themeRelevance
+    ?? event.themeRelevanceScore
+    ?? 1,
+  );
+  const promoted = Boolean(event.promotionEligible) && themeRelevance >= 0.6;
   if (promoted) return 'validated';
   if (productScore < 0.05) return 'noise';
+  if (Boolean(event.promotionEligible) && themeRelevance < 0.6) return 'noise';
   return 'watch';
 }
 
@@ -385,7 +449,13 @@ export function computeValidationStatus(event = {}) {
     || event.bestEvidenceGrade
     || '',
   ).toUpperCase();
-  const promoted = Boolean(event.promotionEligible);
+  const themeRelevance = Number(
+    event.scoreBreakdown?.components?.themeRelevance
+    ?? event.components?.themeRelevance
+    ?? event.themeRelevanceScore
+    ?? 1,
+  );
+  const promoted = Boolean(event.promotionEligible) && themeRelevance >= 0.6;
   const score = Number(event.productScore ?? 0);
   const flags = Array.isArray(event.qualityFlags) ? event.qualityFlags : [];
   const blockers = [];
@@ -401,6 +471,12 @@ export function computeValidationStatus(event = {}) {
     blockers.push({
       code: 'low-market-relevance',
       reason: 'Promotion blocked: linked articles do not show market relevance. May be off-topic or low-impact for this theme.',
+    });
+  }
+  if (Boolean(event.promotionEligible) && themeRelevance < 0.6) {
+    blockers.push({
+      code: 'low-theme-relevance',
+      reason: 'Promotion blocked: statistical uplift exists, but the event title does not match the assigned theme strongly enough for a primary signal.',
     });
   }
   if (flags.includes('raw-grade-not-promoted') && !promoted) {

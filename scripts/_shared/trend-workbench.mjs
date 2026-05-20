@@ -286,6 +286,7 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
   const parentTheme = normalizeParentTheme(params.get('parent_theme') || '');
   const limit = clamp(Number(params.get('limit') || 12), 1, 40);
   const includeSuppressed = params.get('include_suppressed') === '1';
+  const includeFinal = params.get('include_final') === '1' || params.get('includeFinal') === '1';
   const includeStale = params.get('include_stale') === '1';
   const includeBroad = params.get('include_broad') === '1';
   const values = [];
@@ -294,6 +295,8 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
   if (params.has('decision') || params.has('promotion_state')) {
     filterSql += ` AND COALESCE(dt.promotion_state, 'watch') = $${index++}`;
     values.push(decision);
+  } else if (!includeFinal) {
+    filterSql += ` AND COALESCE(dt.promotion_state, 'watch') = 'watch'`;
   } else if (!includeSuppressed) {
     filterSql += ` AND COALESCE(dt.promotion_state, 'watch') <> 'suppressed'`;
   }
@@ -421,6 +424,7 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
       category,
       parentTheme,
       includeSuppressed,
+      includeFinal,
       includeStale,
       includeBroad,
       limit,

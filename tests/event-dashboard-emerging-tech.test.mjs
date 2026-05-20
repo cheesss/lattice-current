@@ -32,10 +32,10 @@ test('event dashboard exposes emerging-tech and report routes', async () => {
     assert.ok(Object.prototype.hasOwnProperty.call(topicDetailPayload, 'report'));
 
     const reportDetailResponse = await fetch(`http://127.0.0.1:${port}/api/reports/nonexistent-report`);
-    assert.equal(reportDetailResponse.status, 200);
+    assert.equal(reportDetailResponse.status, 404);
     const reportDetailPayload = await reportDetailResponse.json();
-    assert.ok(Object.prototype.hasOwnProperty.call(reportDetailPayload, 'report'));
-    assert.ok(Object.prototype.hasOwnProperty.call(reportDetailPayload, 'topic'));
+    assert.equal(reportDetailPayload.ok, false);
+    assert.ok(Object.prototype.hasOwnProperty.call(reportDetailPayload, 'error'));
 
     const digestResponse = await fetch(`http://127.0.0.1:${port}/api/digest/weekly`);
     assert.equal(digestResponse.status, 200);

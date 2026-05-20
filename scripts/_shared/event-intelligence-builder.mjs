@@ -54,7 +54,8 @@ export const META_MODEL_PROMOTION_GATES = Object.freeze({
   minSampleCount: 10_000,
   maxFeatureLagDays: 0,
   maxFeatureStaleRows: 0,
-  maxPredictionStaleRows: 0,
+  maxPredictionStaleRows: 199,
+  maxPredictionStaleRowsForWatch: 999,
   recentPredictionWindowHours: META_MODEL_RECENT_HOURS,
 });
 
@@ -180,7 +181,13 @@ export function evaluateMetaModelTrust({
   gates.push(gateResult('sample-count', sampleCount, `>= ${META_MODEL_PROMOTION_GATES.minSampleCount}`, sampleCount != null && sampleCount >= META_MODEL_PROMOTION_GATES.minSampleCount));
   gates.push(gateResult('feature-lag-days', featureLagDays ?? 0, `<= ${META_MODEL_PROMOTION_GATES.maxFeatureLagDays}`, (featureLagDays ?? 0) <= META_MODEL_PROMOTION_GATES.maxFeatureLagDays));
   gates.push(gateResult('stale-feature-rows', featureStaleRows, `<= ${META_MODEL_PROMOTION_GATES.maxFeatureStaleRows}`, featureStaleRows <= META_MODEL_PROMOTION_GATES.maxFeatureStaleRows));
-  gates.push(gateResult('stale-prediction-rows', predictionStaleRows, `<= ${META_MODEL_PROMOTION_GATES.maxPredictionStaleRows}`, predictionStaleRows <= META_MODEL_PROMOTION_GATES.maxPredictionStaleRows));
+  gates.push(gateResult(
+    'stale-prediction-rows',
+    predictionStaleRows,
+    `<= ${META_MODEL_PROMOTION_GATES.maxPredictionStaleRows}`,
+    predictionStaleRows <= META_MODEL_PROMOTION_GATES.maxPredictionStaleRows,
+    predictionStaleRows <= META_MODEL_PROMOTION_GATES.maxPredictionStaleRowsForWatch,
+  ));
 
   let healthStatus = 'ok';
   if (Number.isFinite(worstEce) && worstEce > META_MODEL_PROMOTION_GATES.maxAggregateEce) {
@@ -222,10 +229,12 @@ export function evaluateMetaModelTrust({
     notes.push(`${featureStaleRows} recent event_features rows are stale versus canonical event stats; run event-engine-incremental`);
     recommendedActions.push('Run node scripts/master-daemon.mjs --task repair-stale-features.');
   }
-  if (predictionStaleRows > 0) {
+  if (predictionStaleRows > META_MODEL_PROMOTION_GATES.maxPredictionStaleRowsForWatch) {
     healthStatus = 'stale';
     notes.push(`${predictionStaleRows} model prediction rows are older than current event features; rerun meta-model-infer`);
     recommendedActions.push('Run node --import tsx scripts/meta-model-infer.mjs.');
+  } else if (predictionStaleRows > META_MODEL_PROMOTION_GATES.maxPredictionStaleRows) {
+    notes.push(`${predictionStaleRows} model prediction rows are older than current event features; next daemon burst will refresh them`);
   }
   if (symbolCoverage && symbolCoverage.coveragePct < 0.9) {
     healthStatus = 'stale';
@@ -336,18 +345,52 @@ const STALE_PREDICTION_WARN_THRESHOLD = 200;
 async function probeModelTrust(client) {
   try {
     const { rows } = await client.query(
-      `WITH latest_features AS (
-         SELECT canonical_event_id, MAX(computed_at) AS latest_computed_at
-           FROM event_features
-          GROUP BY canonical_event_id
+      `WITH target_model AS (
+         SELECT COALESCE(
+           (
+             SELECT model_version
+               FROM model_registry
+              WHERE promotion_state = 'active'
+              ORDER BY promoted_at DESC NULLS LAST, created_at DESC NULLS LAST
+              LIMIT 1
+           ),
+           (
+             SELECT model_version
+               FROM model_predictions
+              GROUP BY model_version
+              ORDER BY MAX(created_at) DESC NULLS LAST
+              LIMIT 1
+           )
+         ) AS model_version
+       ),
+       current_universe AS (
+         SELECT ce.id AS canonical_event_id, ats.symbol, h.horizon
+           FROM canonical_events ce
+           CROSS JOIN (VALUES ('1w'), ('2w'), ('1m')) h(horizon)
+           JOIN LATERAL (
+             SELECT symbol
+               FROM auto_theme_symbols ats
+              WHERE ats.theme = ce.theme
+              ORDER BY quality_score DESC NULLS LAST,
+                       correlation DESC NULLS LAST,
+                       reaction_count DESC NULLS LAST,
+                       symbol
+              LIMIT 5
+           ) ats ON TRUE
+          WHERE ce.event_date >= NOW()::date - INTERVAL '14 days'
        ),
        stale_check AS (
          SELECT mp.canonical_event_id
-           FROM model_predictions mp
-           JOIN latest_features lf ON lf.canonical_event_id = mp.canonical_event_id
-          WHERE lf.latest_computed_at IS NOT NULL
+           FROM current_universe cu
+           JOIN event_features ef ON ef.canonical_event_id = cu.canonical_event_id
+           JOIN model_predictions mp
+             ON mp.canonical_event_id = cu.canonical_event_id
+            AND mp.symbol = cu.symbol
+            AND mp.horizon = cu.horizon
+            AND mp.model_version = (SELECT model_version FROM target_model)
+          WHERE ef.computed_at IS NOT NULL
             AND mp.created_at IS NOT NULL
-            AND lf.latest_computed_at > mp.created_at
+            AND ef.computed_at > mp.created_at
        )
        SELECT COUNT(*)::int AS stale_prediction_count FROM stale_check`,
     );

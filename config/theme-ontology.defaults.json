@@ -1,0 +1,620 @@
+{
+  "version": "theme-ontology-v1",
+  "global": {
+    "nonIssuerSymbols": [
+      "SPY",
+      "QQQ",
+      "DIA",
+      "IWM",
+      "GLD",
+      "SLV",
+      "TLT",
+      "IEF",
+      "SHY",
+      "UUP",
+      "USO",
+      "UNG",
+      "DBC",
+      "XLE",
+      "XLK",
+      "XLV",
+      "XLI",
+      "XLF",
+      "XLY",
+      "XRT",
+      "EFA",
+      "EEM",
+      "ICLN",
+      "ARKK",
+      "BOTZ",
+      "HACK",
+      "CIBR",
+      "IBB",
+      "XBI",
+      "KRE",
+      "KBE",
+      "IYT",
+      "XTN",
+      "JETS",
+      "TAN",
+      "FAN",
+      "URA",
+      "COPX",
+      "LIT",
+      "REMX",
+      "XME",
+      "XOP",
+      "XHB",
+      "GDX",
+      "GDXJ",
+      "SOXX",
+      "SMH",
+      "BDRY",
+      "ITA",
+      "XAR",
+      "PPA",
+      "DFEN",
+      "NATO",
+      "EU",
+      "UN",
+      "US",
+      "USA",
+      "DOD",
+      "MOD",
+      "MW",
+      "LLM",
+      "FY",
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q4",
+      "^VIX",
+      "VIX",
+      "CL=F",
+      "DX-Y.NYB"
+    ]
+  },
+  "archetypes": [
+    {
+      "key": "defense_industrial",
+      "label": "Defense Industrial",
+      "themeIds": ["defense-industrial", "defense", "aerospace-defense"],
+      "matchPatterns": ["defense", "defence", "military", "munitions", "missile", "aerospace", "procurement"],
+      "issuerUniverse": {
+        "minDirectManagementCommentarySymbols": 3,
+        "excludeSymbols": ["ITA", "UUP", "PPA", "XAR", "DFEN"]
+      },
+      "discovery": {
+        "drivers": [
+          {
+            "name": "missile replenishment cycle",
+            "importance": 0.96,
+            "geopoliticalRelevance": 0.94,
+            "mechanism": "conflict drawdown and allied rearmament can pull forward missile, interceptor, and munition orders",
+            "whyNow": "procurement awards and management commentary should show whether replenishment demand is becoming backlog conversion"
+          },
+          {
+            "name": "allied procurement funding",
+            "importance": 0.9,
+            "geopoliticalRelevance": 0.92,
+            "mechanism": "budget commitments and foreign military sales convert geopolitical risk into funded defense demand"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "solid rocket motor capacity",
+            "nodeType": "component",
+            "importance": 0.98,
+            "constraintScore": 0.96,
+            "mechanism": "missile replenishment depends on motor production capacity and qualified energetic-material supply",
+            "triggerTerms": ["solid rocket motor", "interceptor production", "energetic materials", "Aerojet Rocketdyne", "Northrop Grumman rocket motor"],
+            "sourceQueries": [
+              "\"solid rocket motor\" \"production capacity\" missile interceptor Aerojet Northrop backlog",
+              "\"solid rocket motor\" \"qualified supplier\" energetic materials missile production",
+              "\"solid rocket motor\" \"launch vehicle\" missile capacity supplier"
+            ]
+          },
+          {
+            "name": "munitions production capacity",
+            "nodeType": "infrastructure",
+            "importance": 0.95,
+            "constraintScore": 0.94,
+            "mechanism": "order growth matters only if production lines can convert funded demand into deliveries"
+          },
+          {
+            "name": "shipyard throughput",
+            "nodeType": "infrastructure",
+            "importance": 0.86,
+            "constraintScore": 0.82,
+            "mechanism": "naval procurement and maintenance backlogs can turn yard capacity into a limiting bottleneck"
+          }
+        ],
+        "components": [
+          { "name": "interceptors", "importance": 0.92, "constraintScore": 0.82 },
+          { "name": "guidance electronics", "importance": 0.84, "constraintScore": 0.7 },
+          { "name": "radiation-hardened electronics", "importance": 0.78, "constraintScore": 0.68 }
+        ],
+        "materials": [
+          { "name": "ammonium perchlorate", "importance": 0.86, "constraintScore": 0.84 },
+          { "name": "energetic binders", "importance": 0.8, "constraintScore": 0.78 },
+          { "name": "specialty alloys", "importance": 0.72, "constraintScore": 0.68 }
+        ],
+        "suppliers": [
+          { "name": "Aerojet Rocketdyne", "symbol": "LHX", "importance": 0.84 },
+          { "name": "Northrop Grumman", "symbol": "NOC", "importance": 0.8 },
+          { "name": "Lockheed Martin", "symbol": "LMT", "importance": 0.78 }
+        ],
+        "policyTriggers": [
+          { "name": "NATO defense spending commitments", "importance": 0.86, "geopoliticalRelevance": 0.92 },
+          { "name": "foreign military sales approvals", "importance": 0.82, "geopoliticalRelevance": 0.88 }
+        ],
+        "technicalSignals": [
+          { "name": "interceptor production-rate expansion", "importance": 0.9, "constraintScore": 0.88 },
+          { "name": "munition line qualification", "importance": 0.86, "constraintScore": 0.84 }
+        ]
+      },
+      "requiredKpis": [
+        {
+          "kpiKey": "defense_backlog",
+          "displayName": "Defense backlog",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["sec_filings_evidence", "transcript_evidence", "industry_kpi_observations"],
+          "freshnessSlaHours": 2160,
+          "priority": 96,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Backlog or funded backlog evidence for defense primes or suppliers.",
+          "queryTerms": ["backlog", "funded backlog", "orders", "defense primes"]
+        },
+        {
+          "kpiKey": "defense_book_to_bill",
+          "displayName": "Defense book-to-bill",
+          "dataPack": "fundamentalPack",
+          "unit": "ratio",
+          "sourceTypes": ["transcript_evidence", "sec_filings_evidence", "company_fundamentals"],
+          "freshnessSlaHours": 2160,
+          "priority": 94,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Book-to-bill, bookings, or order intake evidence.",
+          "queryTerms": ["book-to-bill", "bookings", "orders", "order intake"]
+        },
+        {
+          "kpiKey": "defense_contract_awards",
+          "displayName": "Defense contract awards",
+          "dataPack": "policyPack",
+          "unit": "items",
+          "sourceTypes": ["policy_evidence", "daily_curated_news", "approval_queue", "dod_contract_awards"],
+          "freshnessSlaHours": 720,
+          "priority": 94,
+          "requiredFor": "thesis_validation",
+          "critical": true,
+          "definitionText": "Government contract award, procurement, or program award evidence.",
+          "queryTerms": ["contract award", "procurement", "DoD", "program award"]
+        },
+        {
+          "kpiKey": "defense_procurement_budget_lines",
+          "displayName": "Procurement budget line items",
+          "dataPack": "policyPack",
+          "unit": "items",
+          "sourceTypes": ["policy_evidence", "daily_curated_news", "dod_contract_awards"],
+          "freshnessSlaHours": 2160,
+          "priority": 91,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Budget line item, authorization, appropriations, or procurement plan evidence.",
+          "queryTerms": ["procurement budget", "procurement funds", "budget line", "appropriations", "authorization"]
+        },
+        {
+          "kpiKey": "defense_program_delays",
+          "displayName": "Defense program delays",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["daily_curated_news", "policy_evidence", "sec_filings_evidence"],
+          "freshnessSlaHours": 2160,
+          "priority": 84,
+          "requiredFor": "thesis_validation",
+          "critical": false,
+          "definitionText": "Delay, cost overrun, milestone slip, or execution-risk evidence.",
+          "queryTerms": ["program delay", "cost overrun", "milestone", "schedule slip"]
+        },
+        {
+          "kpiKey": "defense_munitions_capacity",
+          "displayName": "Munitions capacity",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["daily_curated_news", "industry_kpi_observations", "policy_evidence", "dod_contract_awards"],
+          "freshnessSlaHours": 2160,
+          "priority": 90,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Munitions, missile, ammunition, or production capacity evidence.",
+          "queryTerms": ["munitions capacity", "missile production", "ammunition", "ammunition production", "production capacity"]
+        },
+        {
+          "kpiKey": "defense_shipyard_throughput",
+          "displayName": "Shipyard throughput",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["daily_curated_news", "industry_kpi_observations", "policy_evidence"],
+          "freshnessSlaHours": 2160,
+          "priority": 82,
+          "requiredFor": "thesis_validation",
+          "critical": false,
+          "definitionText": "Shipyard throughput, submarine build rate, naval maintenance, or capacity evidence.",
+          "queryTerms": ["shipyard throughput", "submarine", "naval shipbuilding", "maintenance backlog"]
+        },
+        {
+          "kpiKey": "defense_missile_air_defense_demand",
+          "displayName": "Missile and air-defense demand",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["daily_curated_news", "policy_evidence", "transcript_evidence", "dod_contract_awards"],
+          "freshnessSlaHours": 1440,
+          "priority": 90,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Missile, interceptor, air-defense, or replenishment demand evidence.",
+          "queryTerms": ["missile demand", "missile defense", "air defense", "air and missile defense", "interceptor", "replenishment"]
+        },
+        {
+          "kpiKey": "defense_nato_eu_budget_commitments",
+          "displayName": "NATO/EU budget commitments",
+          "dataPack": "policyPack",
+          "unit": "items",
+          "sourceTypes": ["policy_evidence", "daily_curated_news"],
+          "freshnessSlaHours": 2160,
+          "priority": 82,
+          "requiredFor": "thesis_validation",
+          "critical": false,
+          "definitionText": "NATO, EU, allied spending, procurement pledge, or budget commitment evidence.",
+          "queryTerms": ["NATO budget", "EU defense spending", "allied procurement", "budget commitment"]
+        },
+        {
+          "kpiKey": "defense_segment_revenue_guidance",
+          "displayName": "Defense segment revenue guidance",
+          "dataPack": "fundamentalPack",
+          "unit": "items",
+          "sourceTypes": ["transcript_evidence", "sec_filings_evidence", "company_fundamentals"],
+          "freshnessSlaHours": 2160,
+          "priority": 92,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Segment revenue, guidance, margin, or defense program commentary.",
+          "queryTerms": ["segment revenue", "guidance", "margin", "defense segment"]
+        },
+        {
+          "kpiKey": "direct_management_commentary",
+          "displayName": "Direct issuer management commentary",
+          "dataPack": "transcriptPack",
+          "unit": "symbols",
+          "sourceTypes": ["transcript_evidence", "sec_filings_evidence"],
+          "freshnessSlaHours": 2160,
+          "priority": 98,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Direct issuer management commentary on demand, backlog, bookings, capacity, supply, or guidance.",
+          "queryTerms": ["earnings call transcript", "management commentary", "backlog", "book-to-bill", "guidance"]
+        }
+      ],
+      "anchorFitRules": {
+        "highTerms": ["contract award", "defense procurement", "DoD procurement", "procurement budget", "backlog", "book-to-bill", "munitions", "missile", "air defense", "shipyard", "NATO spending", "defense budget", "program award"],
+        "mediumTerms": ["geopolitics", "sanction", "conflict", "military", "defense policy", "security assistance", "rearmament"],
+        "lowTerms": ["ufo", "alien", "generic politics", "election", "shipping crisis", "freight procurement", "culture", "consumer"]
+      }
+    },
+    {
+      "key": "data_center_infrastructure",
+      "label": "Data Center Infrastructure",
+      "themeIds": ["cloud-infrastructure", "data-center", "ai-ml"],
+      "matchPatterns": ["cloud", "data center", "datacenter", "ai", "compute", "infrastructure"],
+      "issuerUniverse": { "minDirectManagementCommentarySymbols": 3 },
+      "discovery": {
+        "drivers": [
+          {
+            "name": "AI workload growth",
+            "importance": 0.95,
+            "mechanism": "training and inference demand can translate into hyperscaler capex, accelerator orders, and data-center buildout"
+          },
+          {
+            "name": "sovereign AI buildout",
+            "importance": 0.82,
+            "geopoliticalRelevance": 0.76,
+            "mechanism": "national AI programs can move demand from software attention into physical compute infrastructure"
+          }
+        ],
+        "constraints": [
+          { "name": "grid interconnection queue", "nodeType": "infrastructure", "importance": 0.96, "constraintScore": 0.95 },
+          { "name": "data center power availability", "nodeType": "infrastructure", "importance": 0.95, "constraintScore": 0.94 },
+          { "name": "liquid cooling capacity", "nodeType": "component", "importance": 0.84, "constraintScore": 0.78 },
+          { "name": "transformer supply", "nodeType": "component", "importance": 0.82, "constraintScore": 0.8 }
+        ],
+        "components": [
+          { "name": "accelerator clusters", "importance": 0.9, "constraintScore": 0.76 },
+          { "name": "high-voltage switchgear", "importance": 0.78, "constraintScore": 0.76 },
+          { "name": "fiber interconnect", "importance": 0.72, "constraintScore": 0.62 }
+        ],
+        "materials": [
+          { "name": "copper", "importance": 0.74, "constraintScore": 0.68 },
+          { "name": "electrical steel", "importance": 0.7, "constraintScore": 0.66 }
+        ],
+        "suppliers": [
+          { "name": "Eaton", "symbol": "ETN", "importance": 0.76 },
+          { "name": "Vertiv", "symbol": "VRT", "importance": 0.78 },
+          { "name": "Quanta Services", "symbol": "PWR", "importance": 0.74 }
+        ],
+        "technicalSignals": [
+          { "name": "rack power density", "importance": 0.84, "constraintScore": 0.78 },
+          { "name": "interconnection wait times", "importance": 0.9, "constraintScore": 0.86 }
+        ]
+      },
+      "requiredKpis": [
+        {
+          "kpiKey": "data_center_power_capacity",
+          "displayName": "Data center power and MW capacity",
+          "dataPack": "industryPack",
+          "unit": "MW",
+          "sourceTypes": ["industry_kpi_observations", "daily_curated_news", "sec_filings_evidence"],
+          "freshnessSlaHours": 1440,
+          "priority": 94,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Power availability, MW capacity, grid interconnection, or data-center capacity evidence.",
+          "queryTerms": ["data center power", "MW capacity", "grid interconnection", "power demand"]
+        },
+        {
+          "kpiKey": "hyperscaler_capex",
+          "displayName": "Hyperscaler capex",
+          "dataPack": "fundamentalPack",
+          "unit": "items",
+          "sourceTypes": ["sec_companyfacts_facts", "transcript_evidence", "sec_filings_evidence"],
+          "freshnessSlaHours": 2160,
+          "priority": 92,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Cloud or AI capex evidence from hyperscalers and infrastructure-exposed issuers.",
+          "queryTerms": ["hyperscaler capex", "AI capex", "cloud capex", "data center investment"]
+        },
+        {
+          "kpiKey": "accelerator_server_shipments",
+          "displayName": "Accelerator/server shipments",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["industry_kpi_observations", "daily_curated_news", "transcript_evidence"],
+          "freshnessSlaHours": 2160,
+          "priority": 88,
+          "requiredFor": "thesis_validation",
+          "critical": false,
+          "definitionText": "GPU, accelerator, server shipment, or deployment evidence.",
+          "queryTerms": ["GPU shipments", "accelerator orders", "server shipments", "deployment"]
+        }
+      ],
+      "anchorFitRules": {
+        "highTerms": ["capex", "cloud revenue", "accelerator", "gpu", "data center", "MW", "power demand", "grid interconnection", "server"],
+        "mediumTerms": ["enterprise AI", "platform deployment", "agent security", "productivity", "AI adoption"],
+        "lowTerms": ["labor", "copyright", "consumer", "gaming", "culture", "election"]
+      }
+    },
+    {
+      "key": "semiconductor",
+      "label": "Semiconductor",
+      "themeIds": ["semiconductors", "chip", "ai-chips"],
+      "matchPatterns": ["semiconductor", "chip", "foundry", "wafer", "hbm"],
+      "discovery": {
+        "drivers": [
+          { "name": "AI accelerator demand", "importance": 0.94, "mechanism": "compute demand becomes semiconductor demand through accelerator, memory, and packaging capacity" },
+          { "name": "chip sovereignty policy", "importance": 0.8, "geopoliticalRelevance": 0.82 }
+        ],
+        "constraints": [
+          { "name": "advanced packaging capacity", "nodeType": "infrastructure", "importance": 0.96, "constraintScore": 0.95 },
+          { "name": "HBM supply", "nodeType": "component", "importance": 0.94, "constraintScore": 0.92 },
+          { "name": "EUV tool availability", "nodeType": "component", "importance": 0.82, "constraintScore": 0.78 }
+        ],
+        "components": [
+          { "name": "chiplets", "importance": 0.78, "constraintScore": 0.66 },
+          { "name": "interposers", "importance": 0.76, "constraintScore": 0.68 }
+        ],
+        "materials": [
+          { "name": "photoresist", "importance": 0.72, "constraintScore": 0.66 },
+          { "name": "substrates", "importance": 0.82, "constraintScore": 0.76 }
+        ],
+        "suppliers": [
+          { "name": "ASML", "symbol": "ASML", "importance": 0.84 },
+          { "name": "TSMC", "symbol": "TSM", "importance": 0.86 },
+          { "name": "SK Hynix", "importance": 0.8 }
+        ],
+        "technicalSignals": [
+          { "name": "CoWoS capacity expansion", "importance": 0.9, "constraintScore": 0.88 },
+          { "name": "HBM qualification cycle", "importance": 0.86, "constraintScore": 0.84 }
+        ]
+      },
+      "requiredKpis": [
+        {
+          "kpiKey": "semiconductor_capacity_utilization",
+          "displayName": "Foundry and capacity utilization",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["industry_kpi_observations", "transcript_evidence", "daily_curated_news"],
+          "freshnessSlaHours": 2160,
+          "priority": 90,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Foundry utilization, wafer starts, HBM capacity, or advanced-packaging capacity evidence.",
+          "queryTerms": ["foundry utilization", "wafer starts", "HBM capacity", "advanced packaging"]
+        }
+      ],
+      "anchorFitRules": {
+        "highTerms": ["wafer", "foundry", "hbm", "advanced packaging", "euv", "fab", "capacity"],
+        "mediumTerms": ["chip", "semiconductor", "ai accelerator", "memory"],
+        "lowTerms": ["generic technology", "consumer electronics"]
+      }
+    },
+    {
+      "key": "clean_energy",
+      "label": "Clean Energy",
+      "themeIds": ["clean-energy", "climate-change", "solar", "wind"],
+      "matchPatterns": ["clean energy", "renewable", "solar", "wind", "climate", "battery"],
+      "discovery": {
+        "drivers": [
+          { "name": "electrification demand", "importance": 0.86, "mechanism": "power demand growth can turn grid equipment and interconnection queues into deployment bottlenecks" },
+          { "name": "subsidy and permitting cycle", "importance": 0.82, "geopoliticalRelevance": 0.72 }
+        ],
+        "constraints": [
+          { "name": "grid interconnection queue", "nodeType": "infrastructure", "importance": 0.94, "constraintScore": 0.92 },
+          { "name": "transformer supply", "nodeType": "component", "importance": 0.86, "constraintScore": 0.84 },
+          { "name": "permitting backlog", "nodeType": "policy", "importance": 0.78, "constraintScore": 0.74 }
+        ],
+        "components": [
+          { "name": "high-voltage switchgear", "importance": 0.78, "constraintScore": 0.74 },
+          { "name": "inverters", "importance": 0.72, "constraintScore": 0.62 }
+        ],
+        "materials": [
+          { "name": "copper", "importance": 0.82, "constraintScore": 0.76 },
+          { "name": "electrical steel", "importance": 0.74, "constraintScore": 0.7 }
+        ],
+        "suppliers": [
+          { "name": "Quanta Services", "symbol": "PWR", "importance": 0.74 },
+          { "name": "Eaton", "symbol": "ETN", "importance": 0.72 }
+        ],
+        "policyTriggers": [
+          { "name": "interconnection reform", "importance": 0.82, "geopoliticalRelevance": 0.7 },
+          { "name": "tax credit guidance", "importance": 0.72, "geopoliticalRelevance": 0.68 }
+        ]
+      },
+      "requiredKpis": [
+        {
+          "kpiKey": "clean_energy_interconnection_queue",
+          "displayName": "Interconnection and project queue",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["industry_kpi_observations", "policy_evidence", "daily_curated_news"],
+          "freshnessSlaHours": 2160,
+          "priority": 88,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Interconnection queue, project pipeline, PPA, cancellation, or storage deployment evidence.",
+          "queryTerms": ["interconnection queue", "PPA", "project pipeline", "storage deployment"]
+        }
+      ],
+      "anchorFitRules": {
+        "highTerms": ["PPA", "interconnection", "project pipeline", "module price", "storage deployment", "subsidy"],
+        "mediumTerms": ["renewable", "solar", "wind", "grid", "battery"],
+        "lowTerms": ["generic climate", "weather"]
+      }
+    },
+    {
+      "key": "space",
+      "label": "Space",
+      "themeIds": ["space", "space-economy", "satellite"],
+      "matchPatterns": ["space", "satellite", "launch", "rocket"],
+      "discovery": {
+        "drivers": [
+          { "name": "launch cadence expansion", "importance": 0.9, "mechanism": "higher launch cadence can expose bottlenecks in propulsion, avionics, payload integration, and range capacity" },
+          { "name": "defense space architecture", "importance": 0.84, "geopoliticalRelevance": 0.82 }
+        ],
+        "constraints": [
+          {
+            "name": "solid rocket motor capacity",
+            "nodeType": "component",
+            "importance": 0.9,
+            "constraintScore": 0.86,
+            "mechanism": "launch cadence and defense-space architecture can depend on qualified solid motor production capacity",
+            "triggerTerms": ["solid rocket motor", "launch vehicle", "mission backlog", "Northrop Grumman rocket motor"],
+            "sourceQueries": [
+              "\"solid rocket motor\" \"launch vehicle\" production capacity supplier",
+              "\"solid rocket motor\" mission backlog launch cadence supplier",
+              "\"solid rocket motor\" missile launch capacity Northrop Aerojet"
+            ]
+          },
+          { "name": "radiation-hardened electronics", "nodeType": "component", "importance": 0.84, "constraintScore": 0.8 },
+          { "name": "launch range availability", "nodeType": "infrastructure", "importance": 0.76, "constraintScore": 0.7 }
+        ],
+        "components": [
+          { "name": "optical inter-satellite links", "importance": 0.82, "constraintScore": 0.74 },
+          { "name": "star trackers", "importance": 0.68, "constraintScore": 0.58 }
+        ],
+        "materials": [
+          { "name": "radiation-hardened wafers", "importance": 0.74, "constraintScore": 0.7 },
+          { "name": "specialty alloys", "importance": 0.66, "constraintScore": 0.58 }
+        ],
+        "suppliers": [
+          { "name": "Rocket Lab", "symbol": "RKLB", "importance": 0.72 },
+          { "name": "Northrop Grumman", "symbol": "NOC", "importance": 0.7 }
+        ],
+        "technicalSignals": [
+          { "name": "constellation deployment cadence", "importance": 0.86, "constraintScore": 0.72 },
+          { "name": "payload integration backlog", "importance": 0.78, "constraintScore": 0.72 }
+        ]
+      },
+      "requiredKpis": [
+        {
+          "kpiKey": "space_launch_cadence",
+          "displayName": "Launch cadence and backlog",
+          "dataPack": "industryPack",
+          "unit": "items",
+          "sourceTypes": ["daily_curated_news", "industry_kpi_observations", "sec_filings_evidence"],
+          "freshnessSlaHours": 1440,
+          "priority": 90,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "Launch cadence, mission backlog, payload, constellation deployment, or failure-rate evidence.",
+          "queryTerms": ["launch cadence", "mission backlog", "payload", "constellation deployment"]
+        }
+      ],
+      "anchorFitRules": {
+        "highTerms": ["launch", "mission", "payload", "constellation", "contract award", "failure rate"],
+        "mediumTerms": ["satellite", "space force", "rocket"],
+        "lowTerms": ["astronomy", "culture"]
+      }
+    },
+    {
+      "key": "cybersecurity",
+      "label": "Cybersecurity",
+      "themeIds": ["cybersecurity", "cyber-security"],
+      "matchPatterns": ["cyber", "security", "breach", "ransomware"],
+      "discovery": {
+        "drivers": [
+          { "name": "agentic AI attack surface", "importance": 0.86, "mechanism": "AI agents and automated workflows can create new identity, permission, and tool-poisoning risks" },
+          { "name": "regulatory cyber disclosure", "importance": 0.76, "geopoliticalRelevance": 0.68 }
+        ],
+        "constraints": [
+          { "name": "identity governance capacity", "nodeType": "infrastructure", "importance": 0.82, "constraintScore": 0.74 },
+          { "name": "secure model access control", "nodeType": "component", "importance": 0.8, "constraintScore": 0.72 }
+        ],
+        "components": [
+          { "name": "secrets management", "importance": 0.76, "constraintScore": 0.68 },
+          { "name": "runtime threat detection", "importance": 0.78, "constraintScore": 0.7 }
+        ],
+        "suppliers": [
+          { "name": "CrowdStrike", "symbol": "CRWD", "importance": 0.72 },
+          { "name": "Palo Alto Networks", "symbol": "PANW", "importance": 0.72 }
+        ],
+        "technicalSignals": [
+          { "name": "tool poisoning incidents", "importance": 0.84, "constraintScore": 0.74 },
+          { "name": "identity attack telemetry", "importance": 0.78, "constraintScore": 0.72 }
+        ]
+      },
+      "requiredKpis": [
+        {
+          "kpiKey": "cyber_arr_billings_signal",
+          "displayName": "Cyber ARR and billings signal",
+          "dataPack": "fundamentalPack",
+          "unit": "items",
+          "sourceTypes": ["transcript_evidence", "sec_filings_evidence", "company_fundamentals"],
+          "freshnessSlaHours": 2160,
+          "priority": 88,
+          "requiredFor": "investment_memo",
+          "critical": true,
+          "definitionText": "ARR, NRR, billings, seat expansion, breach volume, or security-spend evidence.",
+          "queryTerms": ["ARR", "NRR", "billings", "security spend", "seat expansion"]
+        }
+      ],
+      "anchorFitRules": {
+        "highTerms": ["ARR", "billings", "breach", "ransomware", "security spend", "seat expansion"],
+        "mediumTerms": ["cybersecurity", "vulnerability", "threat"],
+        "lowTerms": ["generic software"]
+      }
+    }
+  ]
+}

@@ -77,6 +77,25 @@ test('runtime scripts must not contain the old hardcoded NAS password', async ()
   }
 });
 
+test('ops status freshness thresholds match actual daemon cadence', async () => {
+  const source = await read('scripts/event-dashboard-api.mjs');
+  assert.match(source, /OPS_DAEMON_FRESH_MS = 30 \* 60 \* 1000/);
+  assert.match(source, /OPS_ACCUMULATOR_FRESH_MS = 150 \* 60 \* 1000/);
+  assert.match(source, /rollUpOpsLevel/);
+  assert.match(source, /healthStatus: modelHealthStatus/);
+  assert.match(source, /effectiveECE/);
+  assert.match(source, /promotionGates/);
+  assert.match(source, /recommendedActions/);
+});
+
+test('read-only calibration API does not emit alerts unless explicitly requested', async () => {
+  const source = await read('scripts/event-dashboard-api.mjs');
+  assert.match(source, /segments\[0\] === 'api' && segments\[1\] === 'calibration'/);
+  assert.match(source, /emit_alert/);
+  assert.match(source, /emitAlert \? \{ alertFn: sendAlert \} : \{\}/);
+  assert.match(source, /message\.startsWith\('Meta-model calibration drift:'\)/);
+});
+
 test('locale JSON files must parse cleanly before runtime language loading', async () => {
   const localeFiles = (await readdir(path.join(ROOT, 'src/locales')))
     .filter((name) => name.endsWith('.json'))
@@ -126,6 +145,76 @@ test('dashboard surfaces must resolve API base dynamically for local and deploye
   assert.equal(dashboard.includes("const API='http://localhost:46200/api'"), false);
   assert.equal(dashboard.includes("const NAS_API = 'http://localhost:46200/api'"), false);
   assert.equal(mapLens.includes("const API = 'http://localhost:46200/api'"), false);
+});
+
+test('dashboard deep report flow stays DB-first with local API fallback and clear status', async () => {
+  const dashboard = await read('event-dashboard.html');
+  assert.match(dashboard, /id="deep-research-report-section"/, 'home should expose the primary deep report workflow');
+  assert.match(dashboard, /Same Deep Research generator as above/, 'workspace shortcut should not read as a second generator');
+  assert.match(dashboard, /function setDeepReportStatus\(html\)/, 'status should mirror across both deep report entry points');
+  assert.match(dashboard, /id="deep-report-status-workspace"/, 'workspace shortcut should have a mirrored status target');
+  assert.match(dashboard, /const SIGNAL_API_PORT='46200'/, 'dashboard should preserve the local signal API port fallback');
+  assert.equal(
+    dashboard.includes("candidates.push(`http://localhost:${SIGNAL_API_PORT}/api`);"),
+    true,
+    'report generation should keep localhost:46200 as a fallback candidate',
+  );
+  assert.equal(
+    dashboard.includes('fetch(`${base}/reports/generate`,'),
+    true,
+    'deep report generation should POST to /reports/generate',
+  );
+  assert.match(dashboard, /requestDeepReport\(\{\.\.\.basePayload,db:false,source:'offline-fallback',sample:false\}\)/);
+  assert.match(dashboard, /Open report/, 'successful generation should surface the report link');
+});
+
+test('dashboard followed themes should stay compact and canonicalized', async () => {
+  const dashboard = await read('event-dashboard.html');
+  assert.match(dashboard, /function renderThemeCompactRow/, 'followed themes should render through compact rows');
+  assert.match(dashboard, /class="theme-collapse"/, 'followed theme lists should be collapsible');
+  assert.match(dashboard, /theme-watchlist-rail/, 'followed themes should expose a compact chip rail');
+  assert.match(dashboard, /function normalizeThemeRecordMap/, 'legacy localStorage theme metadata should be canonicalized');
+  assert.equal(
+    dashboard.includes(".replace(/[^a-z0-9]+/g,'-')"),
+    true,
+    'theme keys should collapse spaces, slashes, and underscores to a single canonical slug',
+  );
+});
+
+test('decision inbox should not resurface finalized discovery triage items', async () => {
+  const dashboard = await read('event-dashboard.html');
+  assert.match(dashboard, /function isFinalDiscoveryTriageItem\(triage\)/);
+  assert.match(dashboard, /state === 'canonical' \|\| state === 'suppressed'/);
+  assert.match(dashboard, /\.filter\(\(triage\) => !isFinalDiscoveryTriageItem\(triage\)\)/);
+});
+
+test('decision inbox exposes a safe accept-all keyword path for discovery items', async () => {
+  const dashboard = await read('event-dashboard.html');
+  const api = await read('scripts/event-dashboard-api.mjs');
+  assert.match(dashboard, /id="inbox-accept-keywords"/, 'decision inbox should expose an accept-all keywords button');
+  assert.match(dashboard, /function getVisibleKeywordInboxItems\(\)/, 'bulk keyword action should operate on currently visible inbox items');
+  assert.match(dashboard, /item\.type === 'triage'/, 'bulk keyword action should only target discovery triage items');
+  assert.match(dashboard, /function inboxAcceptAllKeywords\(\)/, 'dashboard should implement a dedicated bulk keyword action');
+  assert.match(dashboard, /\/discovery-triage\/bulk-review/, 'dashboard should call the server bulk-review endpoint');
+  assert.match(api, /segments\[2\] === 'bulk-review'/, 'API should expose discovery-triage bulk-review');
+  assert.match(api, /\.slice\(0, 100\)/, 'bulk-review should cap request fanout');
+  assert.match(api, /recordInboxAction\(getPool\(\), \{[\s\S]*itemType: 'discovery'/, 'bulk-review should write inbox audit rows');
+});
+
+test('blocked approval items must expose a safe retry path instead of a dead accept state', async () => {
+  const dashboard = await read('event-dashboard.html');
+  assert.match(dashboard, /data-inbox-action="retry"/, 'blocked approval rows should show a Retry Check button');
+  assert.match(dashboard, /retry: 'accept'/, 'retry should map to the existing server-side approval execution path');
+  assert.match(dashboard, /Retry Check re-runs the same server-side gates/, 'retry copy should explain that validation gates still apply');
+});
+
+test('ops surface must expose model trust as a first-class card', async () => {
+  const dashboard = await read('event-dashboard.html');
+  assert.match(dashboard, /id="operator-model-health"/);
+  assert.match(dashboard, /async function loadModelHealth\(\)/);
+  assert.match(dashboard, /Promotion gates/);
+  assert.match(dashboard, /Effective ECE/);
+  assert.match(dashboard, /loadModelHealth\(\)/);
 });
 
 test('user-facing event uplift routes must bound the historical evidence window', async () => {

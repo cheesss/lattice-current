@@ -7,6 +7,7 @@ import { ensureArticleAnalysisTables } from './_shared/article-analysis-schema.m
 import { classifyArticleAgainstTaxonomy, resolveThemeTaxonomy } from './_shared/theme-taxonomy.mjs';
 import { scoreThemeSymbolMappings } from './_shared/theme-symbol-quality.mjs';
 import { createWhereBuilder } from './_shared/query-builder.mjs';
+import { ensureCuratedThemeSymbols } from './migrations/seed-theme-symbols-curation.mjs';
 
 loadOptionalEnvFile();
 
@@ -15,6 +16,11 @@ const DEFAULT_LIMIT = 10000;
 const STEP_SET = new Set([1, 2, 3, 4, 5]);
 export const AUTO_THEME_CONFIDENT_THRESHOLD = 0.72;
 export const AUTO_THEME_UNCERTAIN_THRESHOLD = 0.62;
+export const OUTCOME_HORIZONS = Object.freeze([
+  { name: '1w', days: 7 },
+  { name: '2w', days: 14 },
+  { name: '1m', days: 30 },
+]);
 const AUTO_THEME_UPSERT_CHUNK_SIZE = 400;
 let pgConfig = null;
 let pgConfigError = null;
@@ -679,9 +685,12 @@ async function step2RefreshThemeSymbols(client) {
   await bulkReplaceThemeSymbolCandidates(client, scoredRows);
   const acceptedRows = scoredRows.filter((row) => row.eligible);
   await bulkReplaceThemeSymbols(client, acceptedRows);
+  const fallbackSeed = await ensureCuratedThemeSymbols(client);
   return {
     candidateCount: scoredRows.length,
     acceptedCount: acceptedRows.length,
+    fallbackInserted: fallbackSeed.inserted,
+    fallbackSkipped: fallbackSeed.skipped,
     topAccepted: acceptedRows.slice(0, 15),
   };
 }
@@ -689,7 +698,34 @@ async function step2RefreshThemeSymbols(client) {
 async function step3LabelOutcomes(client, options) {
   const builder = createWhereBuilder([
     `t.auto_theme <> 'unknown'`,
-    `NOT EXISTS (SELECT 1 FROM labeled_outcomes lo WHERE lo.article_id = t.article_id)`,
+    `EXISTS (
+      WITH ranked_symbols AS (
+        SELECT theme, symbol
+        FROM (
+          SELECT theme, symbol,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY theme
+                   ORDER BY quality_score DESC NULLS LAST, correlation DESC NULLS LAST, symbol
+                 ) AS rn
+          FROM auto_theme_symbols
+          WHERE symbol IS NOT NULL AND symbol <> ''
+        ) ranked
+        WHERE ranked.rn <= 5
+      ),
+      outcome_horizons(horizon, days) AS (
+        VALUES ${OUTCOME_HORIZONS.map((h) => `('${h.name}', ${h.days})`).join(', ')}
+      )
+      SELECT 1
+      FROM ranked_symbols rs
+      JOIN outcome_horizons oh ON TRUE
+      LEFT JOIN labeled_outcomes lo
+        ON lo.article_id = t.article_id
+       AND lo.symbol = rs.symbol
+       AND lo.horizon = oh.horizon
+      WHERE rs.theme = t.auto_theme
+        AND a.published_at <= NOW() - (oh.days::int * INTERVAL '1 day')
+        AND lo.article_id IS NULL
+    )`,
   ]);
   if (options.since) {
     builder.addValue(options.since, (placeholder) => `a.published_at >= ${placeholder}::timestamptz`);
@@ -697,67 +733,171 @@ async function step3LabelOutcomes(client, options) {
   const { whereClause, params: queryParams } = builder.build();
   queryParams.push(options.limit);
 
-  const { rows: newArticles } = await client.query(`
+  const { rows: articles } = await client.query(`
     SELECT t.article_id, t.auto_theme, a.published_at
-    FROM auto_article_themes t
-    JOIN articles a ON a.id = t.article_id
-    ${whereClause}
-    ORDER BY a.published_at DESC
-    LIMIT $${queryParams.length}
+      FROM auto_article_themes t
+      JOIN articles a ON a.id = t.article_id
+      ${whereClause}
+     ORDER BY a.published_at DESC
+     LIMIT $${queryParams.length}
   `, queryParams);
 
-  let labeled = 0;
-  for (const article of newArticles) {
-    const { rows: symbols } = await client.query(`
-      SELECT symbol
-      FROM auto_theme_symbols
-      WHERE theme = $1
-      ORDER BY quality_score DESC NULLS LAST, correlation DESC NULLS LAST
-      LIMIT 5
-    `, [article.auto_theme]);
+  if (articles.length === 0) {
+    return { articleCount: 0, candidateLabelCount: 0, labeledCount: 0, labeledArticles: 0 };
+  }
 
-    for (const { symbol } of symbols) {
-      for (const horizon of [{ name: '1w', days: 7 }, { name: '2w', days: 14 }, { name: '1m', days: 30 }]) {
-        const { rows: prices } = await client.query(`
-          SELECT price::float AS price, valid_time_start
+  const themes = Array.from(new Set(articles.map((row) => row.auto_theme).filter(Boolean)));
+  const { rows: symbolRows } = await client.query(`
+    SELECT theme, symbol
+      FROM (
+        SELECT theme, symbol,
+               ROW_NUMBER() OVER (
+                 PARTITION BY theme
+                 ORDER BY quality_score DESC NULLS LAST, correlation DESC NULLS LAST, symbol
+               ) AS rn
+          FROM auto_theme_symbols
+         WHERE theme = ANY($1::text[])
+           AND symbol IS NOT NULL AND symbol <> ''
+      ) ranked
+     WHERE rn <= 5
+  `, [themes]);
+
+  const symbolsByTheme = new Map();
+  for (const row of symbolRows) {
+    const bucket = symbolsByTheme.get(row.theme) || [];
+    bucket.push(row.symbol);
+    symbolsByTheme.set(row.theme, bucket);
+  }
+  const symbols = Array.from(new Set(symbolRows.map((row) => row.symbol))).sort();
+  if (symbols.length === 0) {
+    return { articleCount: articles.length, candidateLabelCount: 0, labeledCount: 0, labeledArticles: 0 };
+  }
+
+  const times = articles.map((row) => new Date(row.published_at).getTime()).filter(Number.isFinite);
+  const minIso = new Date(Math.min(...times)).toISOString();
+  const maxIso = new Date(Math.max(...times) + 45 * 86_400_000).toISOString();
+  const { rows: priceRows } = await client.query(`
+    SELECT symbol, ts, price
+      FROM (
+        SELECT symbol, valid_time_start::timestamptz AS ts, price::float AS price, 2 AS source_priority
           FROM worldmonitor_intel.historical_raw_items
-          WHERE provider = 'yahoo-chart'
-            AND symbol = $1
-            AND valid_time_start >= $2::timestamptz
-            AND valid_time_start <= $2::timestamptz + INTERVAL '${horizon.days + 2} days'
-          ORDER BY valid_time_start
-          LIMIT 2
-        `, [symbol, article.published_at]);
+         WHERE provider = 'yahoo-chart'
+           AND symbol = ANY($1::text[])
+           AND price IS NOT NULL
+           AND valid_time_start::timestamptz >= $2::timestamptz
+           AND valid_time_start::timestamptz <= $3::timestamptz
+        UNION ALL
+        SELECT symbol, valid_time_start::timestamptz AS ts, price::float AS price, 2 AS source_priority
+          FROM raw_items
+         WHERE provider = 'yahoo-chart'
+           AND symbol = ANY($1::text[])
+           AND price IS NOT NULL
+           AND valid_time_start::timestamptz >= $2::timestamptz
+           AND valid_time_start::timestamptz <= $3::timestamptz
+        UNION ALL
+        SELECT symbol, observed_at::timestamptz AS ts, last_price::float AS price, 3 AS source_priority
+          FROM market_quotes
+         WHERE symbol = ANY($1::text[])
+           AND last_price IS NOT NULL
+           AND observed_at >= $2::timestamptz
+           AND observed_at <= $3::timestamptz
+      ) price_points
+     ORDER BY symbol, ts ASC, source_priority DESC
+  `, [symbols, minIso, maxIso]);
 
-        if (prices.length < 2) continue;
-        const entry = Number(prices[0].price);
-        const exit = Number(prices[1].price);
-        if (!(entry > 0)) continue;
-        const returnPct = ((exit - entry) / entry) * 100;
-        await client.query(`
-          INSERT INTO labeled_outcomes (
-            article_id, theme, symbol, published_at, horizon,
-            entry_price, exit_price, forward_return_pct, hit
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          ON CONFLICT (article_id, symbol, horizon) DO NOTHING
-        `, [
+  const pricesBySymbol = new Map();
+  for (const row of priceRows) {
+    const ts = new Date(row.ts).getTime();
+    const price = Number(row.price);
+    if (!Number.isFinite(ts) || !(price > 0)) continue;
+    const bucket = pricesBySymbol.get(row.symbol) || [];
+    const last = bucket[bucket.length - 1];
+    if (last && last.day === new Date(ts).toISOString().slice(0, 10)) {
+      // Query ordering puts higher source_priority first for equal timestamps;
+      // for same-day duplicates keep the earliest retained point.
+      continue;
+    }
+    bucket.push({ time: ts, day: new Date(ts).toISOString().slice(0, 10), price });
+    pricesBySymbol.set(row.symbol, bucket);
+  }
+
+  function firstAtOrAfter(series, targetTime) {
+    let lo = 0;
+    let hi = series.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (series[mid].time < targetTime) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo < series.length ? series[lo] : null;
+  }
+
+  const values = [];
+  const candidateArticleIds = new Set();
+  const insertedArticleIds = new Set();
+  let candidateLabelCount = 0;
+
+  for (const article of articles) {
+    const articleSymbols = symbolsByTheme.get(article.auto_theme) || [];
+    const publishedAt = new Date(article.published_at);
+    const pubTime = publishedAt.getTime();
+    if (!Number.isFinite(pubTime)) continue;
+    for (const symbol of articleSymbols) {
+      const series = pricesBySymbol.get(symbol) || [];
+      if (series.length < 2) continue;
+      const entry = firstAtOrAfter(series, pubTime);
+      if (!entry) continue;
+      for (const horizon of OUTCOME_HORIZONS) {
+        candidateLabelCount += 1;
+        const exit = firstAtOrAfter(series, pubTime + horizon.days * 86_400_000);
+        if (!exit || !(entry.price > 0) || !(exit.price > 0) || exit.time <= entry.time) continue;
+        const returnPct = ((exit.price - entry.price) / entry.price) * 100;
+        values.push([
           article.article_id,
           article.auto_theme,
           symbol,
           article.published_at,
           horizon.name,
-          entry,
-          exit,
+          entry.price,
+          exit.price,
           returnPct,
           returnPct > 0,
         ]);
-        labeled += 1;
+        candidateArticleIds.add(article.article_id);
       }
     }
   }
 
-  return { articleCount: newArticles.length, labeledCount: labeled };
+  let labeled = 0;
+  const chunkSize = 1000;
+  for (let offset = 0; offset < values.length; offset += chunkSize) {
+    const chunk = values.slice(offset, offset + chunkSize);
+    const params = [];
+    const placeholders = chunk.map((row, rowIndex) => {
+      const base = rowIndex * 9;
+      params.push(...row);
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`;
+    }).join(',\n');
+    const result = await client.query(`
+      INSERT INTO labeled_outcomes (
+        article_id, theme, symbol, published_at, horizon,
+        entry_price, exit_price, forward_return_pct, hit
+      )
+      VALUES ${placeholders}
+      ON CONFLICT (article_id, symbol, horizon) DO NOTHING
+      RETURNING article_id
+    `, params);
+    labeled += result.rows.length;
+    for (const row of result.rows) insertedArticleIds.add(row.article_id);
+  }
+
+  return {
+    articleCount: articles.length,
+    candidateLabelCount,
+    labeledCount: labeled,
+    candidateArticles: candidateArticleIds.size,
+    labeledArticles: insertedArticleIds.size,
+  };
 }
 
 async function step4RefreshAnalysisArtifacts(client, options) {

@@ -46,6 +46,7 @@ const RUNTIME_PATTERNS = [
   /^data\/codex-(agent-discover|source-repair-runs)/,
   /^data\/openclaw-(agent-runs|webhook)/,
   /^data\/verification-screenshots\//,
+  /^data\/meta-.*\.pt$/,
   /^data\/retrain-state\.json$/,
   /^data\/failed-proposals\.json$/,
   /^data\/verify-e2e-result\.json$/,
@@ -157,6 +158,36 @@ async function checkApiSmoke() {
   }
 }
 
+// ---- 4b. user-value semantic health ----
+async function checkSemanticHealth() {
+  const endpoints = [
+    { path: '/api/ops/status', levelPath: ['summary', 'level'] },
+    { path: '/api/product-quality', levelPath: ['summary', 'level'] },
+  ];
+  for (const endpoint of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(`${API_BASE}${endpoint.path}`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) {
+        log('semantic-health', 'WARN', `${endpoint.path} ${res.status}`);
+        continue;
+      }
+      const payload = await res.json();
+      let level = payload;
+      for (const key of endpoint.levelPath) level = level?.[key];
+      if (level === 'ok') {
+        log('semantic-health', 'OK', `${endpoint.path} summary.level=ok`);
+      } else {
+        log('semantic-health', 'FAIL', `${endpoint.path} summary.level=${level || 'missing'}`);
+      }
+    } catch (err) {
+      log('semantic-health', 'FAIL', `${API_BASE}${endpoint.path} unavailable`, err.message);
+    }
+  }
+}
+
 // ---- 5. daemon freshness ----
 async function checkDaemonFreshness() {
   try {
@@ -193,6 +224,7 @@ checkTypecheck();
 checkGitPurity();
 checkDuckdbHygiene();
 await checkApiSmoke();
+await checkSemanticHealth();
 await checkDaemonFreshness();
 
 const failed = results.filter((r) => r.status === 'FAIL');

@@ -52,6 +52,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     onlyUrl: '',
     dryRun: false,
     refreshDiscovery: false,
+    skipDownstream: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -72,6 +73,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (key === 'url') out.onlyUrl = String(value || '');
     else if (key === 'dry-run' || key === 'dryRun') out.dryRun = true;
     else if (key === 'refresh-discovery' || key === 'refreshDiscovery') out.refreshDiscovery = true;
+    else if (key === 'skip-downstream' || key === 'skipDownstream') out.skipDownstream = true;
   }
   out.maxSources = Math.max(1, Math.min(500, Math.floor(Number(out.maxSources) || 80)));
   out.limit = Math.max(1, Math.min(500, Math.floor(Number(out.limit) || 100)));
@@ -371,7 +373,7 @@ async function mapArticlesToCanonicalEvents(client, articleRefs) {
       a.title,
       a.source,
       COALESCE(NULLIF(t.auto_theme, ''), NULLIF(a.theme, ''), 'unknown') AS theme,
-      DATE(a.published_at) AS event_date
+      to_char(a.published_at::date, 'YYYY-MM-DD') AS event_date_key
     FROM articles a
     LEFT JOIN auto_article_themes t ON t.article_id = a.id
     LEFT JOIN article_event_map aem ON aem.article_id = a.id
@@ -384,9 +386,8 @@ async function mapArticlesToCanonicalEvents(client, articleRefs) {
 
   const groups = new Map();
   for (const row of rows) {
-    const date = row.event_date instanceof Date
-      ? row.event_date.toISOString().slice(0, 10)
-      : String(row.event_date).slice(0, 10);
+    const date = String(row.event_date_key || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     const theme = normalizeText(row.theme).toLowerCase();
     const key = `${date}::${theme}`;
     if (!groups.has(key)) groups.set(key, { date, theme, articles: [] });
@@ -508,9 +509,9 @@ async function retagExistingArticleThemes(client, source, articleRefs) {
   return retagged;
 }
 
-async function insertSourceItems(client, source, items, { dryRun = false } = {}) {
+async function insertSourceItems(client, source, items, { dryRun = false, skipDownstream = false } = {}) {
   if (dryRun) {
-    return { inserted: 0, themed: 0, eventMapped: 0, pendingOutcomes: 0, fetched: items.length };
+    return { inserted: 0, themed: 0, eventMapped: 0, pendingOutcomes: 0, fetched: items.length, downstreamSkipped: Boolean(skipDownstream) };
   }
 
   let inserted = 0;
@@ -587,6 +588,17 @@ async function insertSourceItems(client, source, items, { dryRun = false } = {})
     }
   }
 
+  if (skipDownstream) {
+    return {
+      inserted,
+      themed,
+      eventMapped: 0,
+      pendingOutcomes: 0,
+      fetched: items.length,
+      downstreamSkipped: true,
+    };
+  }
+
   const existingRefs = await loadExistingArticleRefsForSource(client, source, Math.max(items.length, articleIds.length, 60))
     .catch(() => []);
   const downstreamRefs = [...articleIds, ...existingRefs];
@@ -602,6 +614,7 @@ async function insertSourceItems(client, source, items, { dryRun = false } = {})
     eventMapped,
     pendingOutcomes,
     fetched: items.length,
+    downstreamSkipped: false,
   };
 }
 
@@ -631,6 +644,7 @@ export async function backfillActiveRssSources(options = {}) {
     themed: 0,
     eventMapped: 0,
     pendingOutcomes: 0,
+    downstreamSkipped: Boolean(args.skipDownstream),
     failed: 0,
     sources: [],
   };
@@ -664,7 +678,10 @@ export async function backfillActiveRssSources(options = {}) {
     for (const entry of fetchedResults.filter(Boolean)) {
       const { source, items } = entry;
       try {
-        const result = await insertSourceItems(client, source, items, { dryRun: args.dryRun });
+        const result = await insertSourceItems(client, source, items, {
+          dryRun: args.dryRun,
+          skipDownstream: args.skipDownstream,
+        });
         summary.fetched += result.fetched;
         summary.inserted += result.inserted;
         summary.themed += result.themed;
