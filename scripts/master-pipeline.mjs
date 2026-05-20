@@ -81,43 +81,51 @@ async function runPipeline() {
     `);
 
     // GDELT goldstein → marketStress: 높은 갈등(-goldstein) = 높은 stress
+    // value_origin='proxy' — 정본은 refresh-fred-signals-to-nas의 composite formula.
+    // 이 INSERT는 backfill/historical 보조이며 ON CONFLICT DO NOTHING으로 기존 값 보존.
     const gdeltStress = await client.query(`
-      INSERT INTO signal_history (signal_name, ts, value)
+      INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
       SELECT 'marketStress',
              date::timestamptz,
-             LEAST(1.0, GREATEST(0.0, (-AVG(avg_goldstein) + 5) / 10.0))
+             LEAST(1.0, GREATEST(0.0, (-AVG(avg_goldstein) + 5) / 10.0)),
+             'proxy',
+             'master-pipeline-step0-gdelt'
       FROM gdelt_daily_agg
       WHERE cameo_root IN ('14','17','18','19','20') AND country = 'US'
       GROUP BY date
       ON CONFLICT (signal_name, ts) DO NOTHING
     `);
-    console.log(`  marketStress: ${gdeltStress.rowCount} rows from GDELT goldstein`);
+    console.log(`  marketStress (proxy): ${gdeltStress.rowCount} rows from GDELT goldstein`);
 
     // GDELT tone → transmissionStrength: 극단적 tone = 높은 transmission
     const gdeltTx = await client.query(`
-      INSERT INTO signal_history (signal_name, ts, value)
+      INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
       SELECT 'transmissionStrength',
              date::timestamptz,
-             LEAST(1.0, GREATEST(0.0, ABS(AVG(avg_tone)) / 10.0))
+             LEAST(1.0, GREATEST(0.0, ABS(AVG(avg_tone)) / 10.0)),
+             'proxy',
+             'master-pipeline-step0-gdelt'
       FROM gdelt_daily_agg
       WHERE cameo_root IN ('14','17','18','19','20') AND country = 'US'
       GROUP BY date
       ON CONFLICT (signal_name, ts) DO NOTHING
     `);
-    console.log(`  transmissionStrength: ${gdeltTx.rowCount} rows from GDELT tone`);
+    console.log(`  transmissionStrength (proxy): ${gdeltTx.rowCount} rows from GDELT tone`);
 
     // GDELT event count → hawkes proxy (normalized event intensity)
     const gdeltHawkes = await client.query(`
-      INSERT INTO signal_history (signal_name, ts, value)
+      INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
       SELECT 'eventIntensity',
              date::timestamptz,
-             LEAST(1.0, GREATEST(0.0, LN(1 + SUM(event_count)) / 10.0))
+             LEAST(1.0, GREATEST(0.0, LN(1 + SUM(event_count)) / 10.0)),
+             'proxy',
+             'master-pipeline-step0-gdelt'
       FROM gdelt_daily_agg
       WHERE cameo_root IN ('14','17','18','19','20') AND country = 'US'
       GROUP BY date
       ON CONFLICT (signal_name, ts) DO NOTHING
     `);
-    console.log(`  eventIntensity: ${gdeltHawkes.rowCount} rows`);
+    console.log(`  eventIntensity (proxy): ${gdeltHawkes.rowCount} rows`);
 
     // GPR proxy from GDELT keywords (if macro_gpr doesn't exist)
     await client.query(`
@@ -139,10 +147,11 @@ async function runPipeline() {
     `);
     console.log(`  macro_gpr proxy: ${gprProxy.rowCount} rows from article keywords`);
 
-    // GPR → signal_history
+    // GPR → signal_history (article keyword proxy, not observed GPR index)
     await client.query(`
-      INSERT INTO signal_history (signal_name, ts, value)
-      SELECT 'gpr', date::timestamptz, LEAST(1.0, gpr_index / 50.0)
+      INSERT INTO signal_history (signal_name, ts, value, value_origin, writer_id)
+      SELECT 'gpr', date::timestamptz, LEAST(1.0, gpr_index / 50.0),
+             'proxy', 'master-pipeline-step0-gdelt'
       FROM macro_gpr
       ON CONFLICT (signal_name, ts) DO NOTHING
     `);

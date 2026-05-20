@@ -1,5 +1,7 @@
 # Backtest System Explainer
 
+> **Status**: reference (replay-system educational doc; supporting tool, not primary product surface)
+
 작성일: 2026-04-01
 대상 저장소: `lattice-current-fix`
 
@@ -988,4 +990,3 @@ RAG:
 ## 25. 다음에 읽으면 좋은 문서
 
 - 기술 심화판: `BACKTEST_SYSTEM_DEEP_DIVE_2026-04-01.md`
-- 운영자용 1페이지 요약: `BACKTEST_OPERATOR_QUICKSTART_2026-04-01.md`

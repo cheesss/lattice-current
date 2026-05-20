@@ -14,6 +14,19 @@ import { logAutomationAction } from './_shared/automation-audit.mjs';
 import { queueForApproval, requiresApproval } from './_shared/approval-queue.mjs';
 import { ALLOWED_BACKFILL_SOURCES, validateBackfillArgs } from './_shared/backfill-whitelist.mjs';
 import { isTrustedFeedUrl } from './_shared/feed-trust.mjs';
+import { createOpenClawEvent, emitOpenClawEvent } from './_shared/openclaw-webhook-emitter.mjs';
+import { attemptSourceRepair, isSameHostname } from './_shared/source-repair.mjs';
+import { queueCodexSourceCodeRepair } from './_shared/codex-source-code-repair.mjs';
+import {
+  isLowValueGoogleNewsSource,
+  lowValueGoogleNewsReason,
+} from './_shared/google-news-source-policy.mjs';
+import {
+  classifyArticleAgainstTaxonomy,
+  getCanonicalParentTheme,
+  mapThemeToTaxonomy,
+  resolveThemeTaxonomy,
+} from './_shared/theme-taxonomy.mjs';
 
 loadOptionalEnvFile();
 
@@ -27,6 +40,33 @@ const DEAD_QUEUE_PATH = path.resolve('data', 'dead-proposals.json');
 const RESULTS_PATH = path.resolve('data', 'executor-results.json');
 const BACKFILL_LOG_DIR = path.resolve('data', 'backfill-logs');
 const MAX_RETRIES = Math.max(1, Number(process.env.PROPOSAL_EXECUTOR_MAX_RETRIES || 2));
+const SPECIALIST_SOURCE_THEME_FALLBACKS = new Set([
+  'aerospace',
+  'ai-ml',
+  'biotech',
+  'clean-energy',
+  'cloud-infrastructure',
+  'cybersecurity',
+  'defense-industrial',
+  'robotics-automation',
+  'semiconductor',
+  'space',
+  'supply-chain-security',
+]);
+
+const SPECIALIST_SOURCE_NAME_PATTERNS = new Map([
+  ['aerospace', /\b(aerospace|flightglobal|aviation|airspace)\b/i],
+  ['ai-ml', /\b(ai|machine learning|techcrunch|the verge)\b/i],
+  ['biotech', /\b(biopharma|biotech|medcity)\b/i],
+  ['clean-energy', /\b(clean energy|pv magazine|utility dive|canary|energy storage|climate)\b/i],
+  ['cloud-infrastructure', /\b(data center|datacenter|cloud|siliconangle|dcd)\b/i],
+  ['cybersecurity', /\b(securityweek|bleepingcomputer|infosecurity|dark reading|the record|cso)\b/i],
+  ['defense-industrial', /\b(defense|war zone|war on the rocks|military)\b/i],
+  ['robotics-automation', /\b(robot|robotics|automation)\b/i],
+  ['semiconductor', /\b(semiconductor|chip|foundry)\b/i],
+  ['space', /\b(space|payload|satellite|rocket)\b/i],
+  ['supply-chain-security', /\b(offshore energy|splash247|joc|shipping|maritime|freight|logistics|supply chain)\b/i],
+]);
 
 export const FINAL_PROPOSAL_STATUSES = new Set(['executed', 'rejected', 'skipped', 'dead']);
 
@@ -48,11 +88,49 @@ function saveJsonArray(filePath, items) {
   writeFileSync(filePath, JSON.stringify(items, null, 2));
 }
 
-function proposalKey(proposal) {
+export function proposalKey(proposal) {
+  const type = proposal.type || proposal.proposal_type || 'unknown';
+  const payload = proposal.payload && typeof proposal.payload === 'object' ? proposal.payload : proposal;
+  const typeSpecificKey = [
+    payload.attachmentKey,
+    payload.targetTheme,
+    payload.id,
+    payload.theme,
+    payload.symbol,
+    payload.url,
+    payload.name,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join('|');
   return [
-    proposal.type || proposal.proposal_type || 'unknown',
-    proposal._dbId || proposal.id || proposal.symbol || proposal.url || proposal.theme || proposal.name || 'anonymous',
+    type,
+    proposal._dbId || typeSpecificKey || 'anonymous',
   ].join('::');
+}
+
+export function resolveAddRssApprovalGate({
+  url,
+  originalUrl,
+  proposal = {},
+  repaired = false,
+} = {}) {
+  const normalizedUrl = String(url || '').trim();
+  const normalizedOriginalUrl = String(originalUrl || normalizedUrl).trim();
+  const crossDomainRepairRequiresApproval = Boolean(repaired)
+    && !isSameHostname(normalizedOriginalUrl, normalizedUrl)
+    && process.env.SOURCE_REPAIR_ALLOW_CROSS_DOMAIN_AUTO_APPLY !== 'true';
+  const trustedOrApproved = isTrustedFeedUrl(normalizedUrl)
+    || proposal.human_approved === true
+    || proposal.humanApproved === true;
+  const requiresApproval = (!trustedOrApproved) || crossDomainRepairRequiresApproval;
+  return {
+    requiresApproval,
+    crossDomainRepairRequiresApproval,
+    reason: crossDomainRepairRequiresApproval
+      ? `auto-repaired source changed domain and requires approval: ${normalizedOriginalUrl} -> ${normalizedUrl}`
+      : `untrusted RSS domain requires approval after probe: ${normalizedUrl}`,
+  };
 }
 
 function mergeUniqueProposals(...groups) {
@@ -361,8 +439,372 @@ export async function reviewCodexProposalById(client, proposalId, decision, opti
   }
 }
 
+async function handleAddRssDryRun(proposal, options) {
+  const { url, name } = proposal;
+  const theme = resolveAddRssTheme(proposal);
+  if (!url) return { dryRun: true, skipped: true, reason: 'missing URL', summary: 'dry-run add-rss: missing URL' };
+  const feedNameForPolicy = sanitizeFeedDisplayName(name, url);
+  if (isLowValueGoogleNewsSource({
+    url,
+    feedName: feedNameForPolicy,
+    category: theme,
+    theme: proposal.theme,
+    topics: [proposal.theme, proposal.normalizedTheme, proposal.parentTheme].filter(Boolean),
+  })) {
+    const reason = lowValueGoogleNewsReason({ url });
+    return {
+      dryRun: true,
+      skipped: true,
+      reason,
+      summary: `DRY RUN: would reject ${feedNameForPolicy || url} (${reason})`,
+      url,
+      feedName: feedNameForPolicy,
+      nextAction: 'reject',
+    };
+  }
+
+  try {
+    const { probeSource } = await import('./_shared/source-probe.mjs');
+    const probe = await probeSource(url, { theme });
+
+    const wouldRegister = probe.nextAction === 'register' || probe.nextAction === 'review';
+    const repair = wouldRegister ? null : await attemptSourceRepair({
+      inputUrl: url,
+      theme,
+      name,
+      reason: proposal.reason || '',
+      probe,
+      minQualityScore: options.minQualityScore ?? 0.65,
+      maxCandidates: Number(process.env.SOURCE_REPAIR_MAX_CANDIDATES || 48),
+      enableLlm: options.enableSourceRepairLlm === true
+        || process.env.SOURCE_REPAIR_DRY_RUN_LLM_ENABLED === 'true',
+    });
+    const repairedWouldRegister = Boolean(repair?.best);
+    const activeProbe = repair?.best?.probe || probe;
+    const activeUrl = repair?.best
+      ? (repair.best.resolvedUrl || repair.best.url)
+      : (activeProbe.resolvedUrl || url);
+    const feedName = sanitizeFeedDisplayName(name, activeUrl);
+    const approvalGate = (wouldRegister || repairedWouldRegister)
+      ? resolveAddRssApprovalGate({
+        url: activeUrl,
+        originalUrl: url,
+        proposal,
+        repaired: repairedWouldRegister,
+      })
+      : { requiresApproval: false, reason: null, crossDomainRepairRequiresApproval: false };
+    const wouldSeedCount = activeProbe.sampleItems.length;
+
+    return {
+      dryRun: true,
+      skipped: !(wouldRegister || repairedWouldRegister),
+      pendingApproval: approvalGate.requiresApproval || undefined,
+      reason: wouldRegister || repairedWouldRegister
+        ? (approvalGate.requiresApproval ? approvalGate.reason : null)
+        : `quality ${probe.qualityScore.toFixed(2)} below threshold or feed not found`,
+      summary: approvalGate.requiresApproval
+        ? `DRY RUN: would queue approval for ${feedName || activeProbe.domain || activeUrl}`
+        : wouldRegister
+        ? `DRY RUN: would register ${feedName || probe.domain} via ${probe.connectorKind}`
+        : repairedWouldRegister
+          ? `DRY RUN: would auto-repair ${feedName || probe.domain} via ${repair.best.connectorKind}`
+          : `DRY RUN: would skip ${probe.nextAction}`,
+      // probe results
+      resolvedUrl: activeProbe.resolvedUrl,
+      connectorKind: activeProbe.connectorKind,
+      qualityScore: activeProbe.qualityScore,
+      qualityBreakdown: activeProbe.qualityBreakdown,
+      recentItemCount: activeProbe.qualityBreakdown.recentItemCount,
+      sampleItems: activeProbe.sampleItems,
+      wouldRegister: (wouldRegister || repairedWouldRegister) && !approvalGate.requiresApproval,
+      wouldQueueApproval: approvalGate.requiresApproval || undefined,
+      wouldSeedCount,
+      warnings: activeProbe.warnings,
+      errors: activeProbe.errors,
+      nextAction: activeProbe.nextAction,
+      probeStatus: activeProbe.status,
+      probeTraceId: activeProbe.traceId,
+      originalProbe: {
+        resolvedUrl: probe.resolvedUrl,
+        connectorKind: probe.connectorKind,
+        qualityScore: probe.qualityScore,
+        recentItemCount: probe.qualityBreakdown.recentItemCount,
+        nextAction: probe.nextAction,
+        probeTraceId: probe.traceId,
+      },
+      repair: repair ? summarizeSourceRepair(repair) : null,
+      repaired: repairedWouldRegister,
+      repairedUrl: repair?.best?.resolvedUrl || repair?.best?.url || null,
+      crossDomainRepairRequiresApproval: approvalGate.crossDomainRepairRequiresApproval || undefined,
+      // legacy fields for UI compat
+      url,
+      feedName,
+      quality: { score: activeProbe.qualityScore, ...activeProbe.qualityBreakdown },
+    };
+  } catch (err) {
+    return {
+      dryRun: true,
+      skipped: true,
+      reason: String(err?.message || err),
+      summary: `dry-run add-rss: probe failed`,
+      url,
+    };
+  }
+}
+
+function summarizeSourceRepair(repair) {
+  if (!repair) return null;
+  return {
+    attempted: Boolean(repair.attempted),
+    repaired: Boolean(repair.repaired),
+    reason: repair.reason || null,
+    llmSkippedReason: repair.llmSkippedReason || null,
+    best: repair.best ? {
+      url: repair.best.url,
+      resolvedUrl: repair.best.resolvedUrl,
+      connectorKind: repair.best.connectorKind,
+      qualityScore: repair.best.qualityScore,
+      recentItemCount: repair.best.recentItemCount,
+      reason: repair.best.reason || null,
+      source: repair.best.source || null,
+    } : null,
+    attempts: (repair.attempts || []).slice(0, 8).map((attempt) => ({
+      url: attempt.url,
+      resolvedUrl: attempt.resolvedUrl,
+      connectorKind: attempt.connectorKind,
+      qualityScore: attempt.qualityScore,
+      recentItemCount: attempt.recentItemCount,
+      nextAction: attempt.nextAction,
+      accepted: Boolean(attempt.accepted),
+      source: attempt.source || null,
+    })),
+  };
+}
+
+function resolveAddRssTheme(proposal = {}) {
+  const candidates = [
+    proposal.normalizedTheme,
+    proposal.parentTheme,
+    proposal.theme,
+  ];
+  for (const candidate of candidates) {
+    const mapped = mapThemeToTaxonomy(candidate);
+    if (mapped && mapped !== 'unknown') return mapped;
+  }
+  return String(proposal.theme || 'politics').trim() || 'politics';
+}
+
+function stripXmlCdata(value) {
+  return String(value || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+}
+
+function stripHtmlTags(value) {
+  return stripXmlCdata(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function extractXmlTag(block, tag) {
+  const match = String(block || '').match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i'));
+  return match ? stripXmlCdata(match[1]) : '';
+}
+
+function extractXmlBlocks(xml, tag) {
+  const blocks = [];
+  const blockRe = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'gi');
+  let match;
+  while ((match = blockRe.exec(String(xml || ''))) !== null) {
+    blocks.push(match[1] || '');
+  }
+  return blocks;
+}
+
+function resolveMaybeRelativeUrl(value, baseUrl) {
+  const raw = stripXmlCdata(value);
+  if (!raw) return '';
+  try {
+    return new URL(raw, baseUrl).href;
+  } catch {
+    return raw;
+  }
+}
+
+function titleFromUrl(value) {
+  try {
+    const parsed = new URL(value);
+    const segment = parsed.pathname.split('/').filter(Boolean).pop() || parsed.hostname;
+    return decodeURIComponent(segment).replace(/[-_]+/g, ' ').trim() || parsed.hostname;
+  } catch {
+    return String(value || '').slice(0, 120);
+  }
+}
+
+function publisherNameFromUrl(value) {
+  try {
+    const hostname = new URL(String(value || '')).hostname.toLowerCase().replace(/^www\./, '');
+    const base = hostname.split('.')[0] || hostname;
+    const known = {
+      'bleepingcomputer': 'BleepingComputer',
+      'csoonline': 'CSO Online',
+      'darkreading': 'Dark Reading',
+      'defensenews': 'Defense News',
+      'iata': 'IATA',
+      'icao': 'ICAO',
+      'infosecurity-magazine': 'Infosecurity Magazine',
+      'securityweek': 'SecurityWeek',
+      'spacenews': 'SpaceNews',
+      'theregister': 'The Register',
+    };
+    if (known[base]) return known[base];
+    return base
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ') || hostname;
+  } catch {
+    return '';
+  }
+}
+
+export function sanitizeFeedDisplayName(name, url = '') {
+  const original = String(name || '').trim();
+  let clean = original
+    .replace(/^Codex\s+(?:E2E|Retest)\s+/i, '')
+    .replace(/\s+source\s+\d{8}$/i, '')
+    .replace(/\s+source$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const wordCount = clean ? clean.split(/\s+/).length : 0;
+  const generatedTopicName = /\bsource(?:\s+\d{8})?$/i.test(original) && wordCount > 4;
+  if (!clean || /^(?:rss|feed|source)$/i.test(clean) || generatedTopicName) {
+    clean = publisherNameFromUrl(url);
+  }
+  return clean || 'RSS';
+}
+
+export function classifySeedItemTheme(item, sourceName, sourceTheme, probe) {
+  const classified = classifyArticleAgainstTaxonomy({
+    title: item?.title || '',
+  });
+  if (classified.theme && classified.theme !== 'unknown') return classified.theme;
+
+  const canonicalSourceTheme = mapThemeToTaxonomy(sourceTheme);
+  if (canonicalSourceTheme !== 'unknown') {
+    const themeRelevance = Number(probe?.qualityBreakdown?.themeRelevance ?? 0);
+    if (themeRelevance >= 0.65) return canonicalSourceTheme;
+    const specialistSourceName = SPECIALIST_SOURCE_NAME_PATTERNS.get(canonicalSourceTheme)?.test(String(sourceName || ''));
+    if (
+      SPECIALIST_SOURCE_THEME_FALLBACKS.has(canonicalSourceTheme)
+      && (themeRelevance >= 0.5 || specialistSourceName)
+    ) {
+      return canonicalSourceTheme;
+    }
+    const sourceMeta = resolveThemeTaxonomy(canonicalSourceTheme);
+    if (sourceMeta.parentTheme === 'geopolitics' || canonicalSourceTheme === 'geopolitics') {
+      return 'unknown';
+    }
+    return getCanonicalParentTheme(canonicalSourceTheme) || canonicalSourceTheme;
+  }
+
+  return sourceTheme || 'tech';
+}
+
+function normalizeSeedItem(item, baseUrl) {
+  const url = resolveMaybeRelativeUrl(item?.url || item?.link || '', baseUrl);
+  const title = stripHtmlTags(item?.title || '') || titleFromUrl(url);
+  const rawDate = item?.date || item?.publishedAt || item?.updatedAt || item?.lastmod;
+  const parsedDate = rawDate && !Number.isNaN(Date.parse(rawDate))
+    ? new Date(rawDate).toISOString()
+    : new Date().toISOString();
+  if (!title || !url) return null;
+  return {
+    title: title.slice(0, 500),
+    url,
+    date: parsedDate,
+  };
+}
+
+export function parseResolvedSourceItems(sourceText, baseUrl = '') {
+  const text = String(sourceText || '');
+  const items = [];
+
+  for (const block of extractXmlBlocks(text, 'item')) {
+    items.push({
+      title: extractXmlTag(block, 'title'),
+      url: extractXmlTag(block, 'link') || extractXmlTag(block, 'guid'),
+      publishedAt: extractXmlTag(block, 'pubDate') || extractXmlTag(block, 'dc:date'),
+    });
+  }
+
+  for (const block of extractXmlBlocks(text, 'entry')) {
+    const linkHref = String(block || '').match(/<link[^>]+href=["']([^"']+)["']/i)?.[1];
+    items.push({
+      title: extractXmlTag(block, 'title'),
+      url: linkHref || extractXmlTag(block, 'link') || extractXmlTag(block, 'id'),
+      publishedAt: extractXmlTag(block, 'published') || extractXmlTag(block, 'updated'),
+    });
+  }
+
+  for (const block of extractXmlBlocks(text, 'url')) {
+    const loc = extractXmlTag(block, 'loc');
+    if (!loc) continue;
+    items.push({
+      title: extractXmlTag(block, 'news:title') || titleFromUrl(loc),
+      url: loc,
+      publishedAt: extractXmlTag(block, 'news:publication_date') || extractXmlTag(block, 'lastmod'),
+    });
+  }
+
+  if (items.length === 0 && /<html[\s>]/i.test(text)) {
+    const anchorRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let match;
+    while ((match = anchorRe.exec(text)) !== null && items.length < 100) {
+      const title = stripHtmlTags(match[2]);
+      const url = resolveMaybeRelativeUrl(match[1], baseUrl);
+      if (title.length >= 10 && url) {
+        items.push({ title, url, publishedAt: null });
+      }
+    }
+  }
+
+  const seen = new Set();
+  return items
+    .map((item) => normalizeSeedItem(item, baseUrl))
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.url.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+async function fetchResolvedSourceItems(effectiveUrl, fallbackItems = []) {
+  const fallback = (fallbackItems || [])
+    .map((item) => normalizeSeedItem(item, effectiveUrl))
+    .filter(Boolean);
+  try {
+    const response = await fetch(effectiveUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`source fetch ${response.status}`);
+    const text = await response.text();
+    const parsed = parseResolvedSourceItems(text, effectiveUrl);
+    if (parsed.length > 0) {
+      return { items: parsed, source: 'resolved-url' };
+    }
+    return { items: fallback, source: 'probe-sample-fallback', warning: 'resolved URL parsed zero items' };
+  } catch (error) {
+    return {
+      items: fallback,
+      source: 'probe-sample-fallback',
+      warning: String(error?.message || error || 'resolved URL fetch failed'),
+    };
+  }
+}
+
 export async function executeProposal(client, proposal, options = {}) {
   if (options.dryRun && proposal.type !== 'backfill-source') {
+    // add-rss는 dryRun이어도 실제 Source Probe 수행
+    if (proposal.type === 'add-rss') {
+      return handleAddRssDryRun(proposal, options);
+    }
     return {
       dryRun: true,
       reason: `would execute ${proposal.type}`,
@@ -644,90 +1086,358 @@ async function handleAddSymbol(client, proposal) {
   };
 }
 
-async function handleAddRss(client, proposal) {
-  const { url, name, theme } = proposal;
+async function handleAddRss(client, proposal, options = {}) {
+  let { url, name } = proposal;
+  const theme = resolveAddRssTheme(proposal);
   if (!url) throw new Error('Missing RSS url');
+  name = sanitizeFeedDisplayName(name, url);
+  if (isLowValueGoogleNewsSource({
+    url,
+    feedName: name,
+    category: theme,
+    theme: proposal.theme,
+    topics: [proposal.theme, proposal.normalizedTheme, proposal.parentTheme].filter(Boolean),
+  })) {
+    return {
+      skipped: true,
+      reason: lowValueGoogleNewsReason({ url }),
+      url,
+      feedName: name,
+      nextAction: 'reject',
+    };
+  }
 
-  if (!isTrustedFeedUrl(url) && !proposal.human_approved) {
+  const { probeSource } = await import('./_shared/source-probe.mjs');
+  let probe = await probeSource(url, { theme });
+  const originalUrl = url;
+  const originalProbe = probe;
+  let effectiveUrl = probe.resolvedUrl || url;
+  let repair = null;
+
+  if (probe.nextAction === 'reject' || probe.nextAction === 'manual-adapter') {
+    repair = await attemptSourceRepair({
+      inputUrl: url,
+      theme,
+      name,
+      reason: proposal.reason || '',
+      probe,
+      minQualityScore: options.minQualityScore ?? 0.65,
+      maxCandidates: Number(process.env.SOURCE_REPAIR_MAX_CANDIDATES || 48),
+      enableLlm: options.enableSourceRepairLlm === true
+        || process.env.SOURCE_REPAIR_SYNC_LLM_ENABLED === 'true',
+    });
+
+    if (repair?.best) {
+      url = repair.best.resolvedUrl || repair.best.url;
+      probe = repair.best.probe;
+      effectiveUrl = probe.resolvedUrl || url;
+      name = sanitizeFeedDisplayName(name, effectiveUrl);
+    } else {
+      const codexCodeRepair = await queueCodexSourceCodeRepair({
+        url,
+        theme,
+        name,
+        reason: proposal.reason || '',
+        probe,
+        repair: repair ? summarizeSourceRepair(repair) : null,
+      });
+      const result = {
+        skipped: true,
+        reason: `probe ${probe.nextAction}: quality ${probe.qualityScore.toFixed(2)}`,
+        url,
+        resolvedUrl: effectiveUrl,
+        connectorKind: probe.connectorKind,
+        nextAction: probe.nextAction,
+        qualityScore: probe.qualityScore,
+        recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+        sampleItems: probe.sampleItems,
+        warnings: probe.warnings,
+        errors: probe.errors,
+        probeTraceId: probe.traceId,
+        codexCodeRepair,
+        repair: summarizeSourceRepair(repair),
+      };
+      await emitOpenClawEvent(createOpenClawEvent({
+        eventType: 'source-probe-failed',
+        severity: probe.nextAction === 'manual-adapter' ? 'review' : 'warning',
+        theme,
+        entityType: 'source',
+        entityId: url,
+        surface: 'decision-inbox',
+        summary: `Source probe rejected ${name || url}`,
+        payload: {
+          name,
+          url,
+          resolvedUrl: effectiveUrl,
+          connectorKind: probe.connectorKind,
+          nextAction: probe.nextAction,
+          qualityScore: probe.qualityScore,
+          recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+          probeTraceId: probe.traceId,
+          repair: summarizeSourceRepair(repair),
+          codexCodeRepair,
+        },
+      }));
+      return result;
+    }
+  }
+  name = sanitizeFeedDisplayName(name, effectiveUrl);
+  const effectiveTheme = String(repair?.best?.category || theme || 'politics').trim().toLowerCase() || 'politics';
+  const inheritedProposalTopics = effectiveTheme === theme ? [theme] : [];
+  const effectiveTopics = Array.from(new Set([
+    effectiveTheme,
+    ...inheritedProposalTopics,
+    ...(Array.isArray(repair?.best?.topics) ? repair.best.topics : []),
+  ].filter(Boolean))).slice(0, 12);
+
+  const approvalGate = resolveAddRssApprovalGate({
+    url,
+    originalUrl,
+    proposal,
+    repaired: Boolean(repair?.best),
+  });
+
+  if (approvalGate.requiresApproval) {
     const queued = await queueForApproval(client, {
       type: 'add-rss',
-      params: { url, name, theme, reason: proposal.reason || '' },
-      reason: `untrusted RSS domain requires approval: ${url}`,
+      params: {
+        url,
+        name,
+        theme: effectiveTheme,
+        reason: proposal.reason || '',
+        inputUrl: probe.inputUrl,
+        resolvedUrl: effectiveUrl,
+        connectorKind: probe.connectorKind,
+        nextAction: probe.nextAction,
+        qualityScore: probe.qualityScore,
+        recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+        sampleItems: probe.sampleItems.slice(0, 3),
+        warnings: probe.warnings,
+        probeTraceId: probe.traceId,
+        repairOf: repair?.best ? originalUrl : null,
+        repair: repair ? summarizeSourceRepair(repair) : null,
+      },
+      reason: `${approvalGate.reason} (quality=${probe.qualityScore.toFixed(2)})`,
     });
-    return {
+    const result = {
       pendingApproval: true,
       reason: 'awaiting human approval',
       approvalId: queued.id,
       url,
+      resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      nextAction: probe.nextAction,
+      qualityScore: probe.qualityScore,
+      repaired: Boolean(repair?.best),
+      repair: repair ? summarizeSourceRepair(repair) : null,
+      theme: effectiveTheme,
+      topics: effectiveTopics,
     };
+    await emitOpenClawEvent(createOpenClawEvent({
+      eventType: 'approval-created',
+      severity: 'review',
+      theme: effectiveTheme,
+      entityType: 'approval',
+      entityId: String(queued.id),
+      surface: 'decision-inbox',
+      summary: `Untrusted source queued for approval: ${name || url}`,
+      payload: {
+        approvalId: queued.id,
+        proposalType: 'add-rss',
+        url,
+        resolvedUrl: effectiveUrl,
+        connectorKind: probe.connectorKind,
+        qualityScore: probe.qualityScore,
+        nextAction: probe.nextAction,
+        theme: effectiveTheme,
+        topics: effectiveTopics,
+        repaired: Boolean(repair?.best),
+        repairOf: repair?.best ? originalUrl : null,
+      },
+    }));
+    return result;
   }
 
-  const { evaluateAndRegisterFeed } = await import('../src/services/server/autonomous-discovery.ts');
-  const registration = await evaluateAndRegisterFeed(url, theme || 'politics', {
+  const { registerProbedSource } = await import('./_shared/discovered-source-registry.mjs');
+  const registration = await registerProbedSource(client, probe, effectiveTheme, {
     feedName: name || 'rss',
     lang: 'en',
-    topics: [theme].filter(Boolean),
+    topics: effectiveTopics,
     autoRegister: true,
+    minScore: options.minQualityScore ?? 0.65,
+    humanApproved: options.humanApproved === true || proposal.human_approved === true,
+    budgetExempt: options.humanApproved === true || proposal.human_approved === true,
   });
   if (!registration.registered) {
-    return {
+    const result = {
       skipped: true,
       reason: registration.reason || 'feed quality below threshold',
       quality: registration.quality,
       url,
+      resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      nextAction: probe.nextAction,
+      qualityScore: probe.qualityScore,
+      recentItemCount: probe.qualityBreakdown?.recentItemCount || 0,
+      sampleItems: probe.sampleItems,
+      warnings: probe.warnings,
+      errors: probe.errors,
+      probeTraceId: probe.traceId,
+      repair: repair ? summarizeSourceRepair(repair) : null,
+      theme: effectiveTheme,
+      topics: effectiveTopics,
     };
+    await emitOpenClawEvent(createOpenClawEvent({
+      eventType: 'source-rejected',
+      severity: 'review',
+      theme: effectiveTheme,
+      entityType: 'source',
+      entityId: url,
+      surface: 'decision-inbox',
+      summary: `Source registration rejected ${name || url}`,
+      payload: {
+        name,
+        url,
+        resolvedUrl: effectiveUrl,
+        reason: result.reason,
+        quality: registration.quality,
+        connectorKind: probe.connectorKind,
+        probeTraceId: probe.traceId,
+        repair: repair ? summarizeSourceRepair(repair) : null,
+      },
+    }));
+    return result;
   }
 
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`RSS fetch ${response.status}`);
-  const text = await response.text();
-
-  const items = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>|<entry>([\s\S]*?)<\/entry>/gi;
-  let match;
-  while ((match = itemRegex.exec(text)) !== null) {
-    const content = match[1] || match[2] || '';
-    const title = content.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, '').trim() || '';
-    const link = content.match(/<link[^>]*href="([^"]*)"[^>]*\/?>|<link[^>]*>([\s\S]*?)<\/link>/i);
-    const pubDate = content.match(/<pubDate>([\s\S]*?)<\/pubDate>|<published>([\s\S]*?)<\/published>|<updated>([\s\S]*?)<\/updated>/i);
-    if (title) {
-      items.push({
-        title: title.slice(0, 500),
-        url: (link?.[1] || link?.[2] || '').trim(),
-        date: pubDate ? new Date(pubDate[1] || pubDate[2] || pubDate[3]).toISOString() : new Date().toISOString(),
-      });
-    }
-  }
+  const seeded = await fetchResolvedSourceItems(effectiveUrl, probe.sampleItems);
+  const items = seeded.items;
 
   let inserted = 0;
   for (const item of items.slice(0, 100)) {
+    const articleTheme = classifySeedItemTheme(item, name, effectiveTheme || 'tech', probe);
     try {
-      await client.query(`
+      const insertResult = await client.query(`
         INSERT INTO articles (source, theme, published_at, title, url)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT DO NOTHING
-      `, [name || 'rss', theme || 'tech', item.date, item.title, item.url]);
-      inserted += 1;
+        RETURNING id
+      `, [name || 'rss', articleTheme, item.date, item.title, item.url]);
+      inserted += Number(insertResult?.rowCount || 0);
+      const articleId = Number(insertResult?.rows?.[0]?.id || 0);
+      if (articleId > 0) {
+        await client.query(`
+          INSERT INTO auto_article_themes (article_id, auto_theme, confidence, method)
+          VALUES ($1, $2, $3, 'rss-title-classifier')
+          ON CONFLICT (article_id) DO UPDATE SET
+            auto_theme = CASE
+              WHEN auto_article_themes.auto_theme IS NULL OR auto_article_themes.auto_theme = 'unknown'
+              THEN EXCLUDED.auto_theme
+              ELSE auto_article_themes.auto_theme
+            END,
+            confidence = GREATEST(auto_article_themes.confidence, EXCLUDED.confidence),
+            method = CASE
+              WHEN auto_article_themes.auto_theme IS NULL OR auto_article_themes.auto_theme = 'unknown'
+              THEN EXCLUDED.method
+              ELSE auto_article_themes.method
+            END,
+            updated_at = NOW()
+        `, [articleId, articleTheme, articleTheme === effectiveTheme ? 0.65 : 0.58]);
+      }
     } catch {
       // ignore duplicates
     }
   }
 
-  await client.query(`
-    INSERT INTO auto_article_themes (article_id, auto_theme, confidence, method)
-    SELECT a.id, $1, 0.5, 'rss-default'
-    FROM articles a
-    WHERE a.source = $2
-      AND NOT EXISTS (SELECT 1 FROM auto_article_themes t WHERE t.article_id = a.id)
-  `, [theme || 'tech', name || 'rss']);
+  let downstreamBackfill = null;
+  try {
+    const { backfillActiveRssSources } = await import('./backfill-active-rss-sources.mjs');
+    downstreamBackfill = await backfillActiveRssSources({
+      onlyUrl: effectiveUrl,
+      maxSources: 1,
+      limit: Math.max(10, Math.min(100, items.length || 30)),
+      concurrency: 1,
+      noCursor: true,
+      refreshDiscovery: false,
+      dryRun: false,
+    });
+  } catch (error) {
+    downstreamBackfill = {
+      ok: false,
+      error: String(error?.message || error || 'downstream backfill/link failed'),
+    };
+  }
 
-  return {
+  let discoveryRefresh = null;
+  if (inserted > 0 && options.refreshDiscovery !== false) {
+    try {
+      const { refreshDiscoveryFromRecentThemes } = await import('./refresh-discovery-from-recent-themes.mjs');
+      discoveryRefresh = await refreshDiscoveryFromRecentThemes({
+        days: 30,
+        limit: 80,
+        minCount: 2,
+        themes: [effectiveTheme || 'tech'],
+        dryRun: false,
+      });
+    } catch (error) {
+      discoveryRefresh = {
+        ok: false,
+        error: String(error?.message || error || 'discovery refresh failed'),
+      };
+    }
+  }
+
+  const result = {
     summary: `RSS ${name}: registered and seeded ${inserted} articles`,
     feedName: name,
     url,
+    resolvedUrl: effectiveUrl,
+    connectorKind: probe.connectorKind,
+    probeTraceId: probe.traceId,
     articleCount: inserted,
+    downstreamBackfill: downstreamBackfill
+      ? {
+        ok: downstreamBackfill.ok !== false,
+        inserted: downstreamBackfill.inserted || 0,
+        themed: downstreamBackfill.themed || 0,
+        eventMapped: downstreamBackfill.eventMapped || 0,
+        pendingOutcomes: downstreamBackfill.pendingOutcomes || 0,
+        error: downstreamBackfill.error || null,
+      }
+      : null,
+    seedSource: seeded.source,
+    seedWarning: seeded.warning || null,
     quality: registration.quality,
+    repaired: Boolean(repair?.best),
+    repairOf: repair?.best ? originalUrl : null,
+    originalProbeTraceId: repair?.best ? originalProbe.traceId : null,
+    repair: repair ? summarizeSourceRepair(repair) : null,
+    discoveryRefresh,
+    theme: effectiveTheme,
+    topics: effectiveTopics,
   };
+  await emitOpenClawEvent(createOpenClawEvent({
+    eventType: repair?.best ? 'source-repaired' : 'source-registered',
+    severity: 'info',
+    theme: effectiveTheme,
+    entityType: 'source',
+    entityId: url,
+    surface: 'ops',
+    summary: `Source registered ${name || url}`,
+    payload: {
+      name,
+      url,
+      resolvedUrl: effectiveUrl,
+      connectorKind: probe.connectorKind,
+      articleCount: inserted,
+      seedSource: seeded.source,
+      seedWarning: seeded.warning || null,
+      quality: registration.quality,
+      probeTraceId: probe.traceId,
+      repaired: Boolean(repair?.best),
+      repairOf: repair?.best ? originalUrl : null,
+    },
+  }));
+  return result;
 }
 
 async function handleAddTheme(client, proposal) {
@@ -739,14 +1449,20 @@ async function handleAddTheme(client, proposal) {
   const triggerCondition = triggers.map((_, index) => `title ILIKE $${index + 1}`).join(' OR ');
   const matched = await client.query(`SELECT id FROM articles WHERE ${triggerCondition}`, triggers.map((term) => `%${term}%`));
 
-  for (const row of matched.rows) {
+  if (matched.rows.length) {
     await client.query(`
       INSERT INTO auto_article_themes (article_id, auto_theme, confidence, method)
-      VALUES ($1, $2, 0.7, 'codex-theme-proposal')
+      SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::double precision[], $4::text[])
+        AS t(article_id, auto_theme, confidence, method)
       ON CONFLICT (article_id) DO UPDATE
       SET auto_theme = EXCLUDED.auto_theme
       WHERE auto_article_themes.confidence < 0.7
-    `, [row.id, id]);
+    `, [
+      matched.rows.map((r) => r.id),
+      matched.rows.map(() => id),
+      matched.rows.map(() => 0.7),
+      matched.rows.map(() => 'codex-theme-proposal'),
+    ]);
   }
 
   const resolvedSymbols = [
@@ -757,50 +1473,114 @@ async function handleAddTheme(client, proposal) {
     .filter(Boolean);
 
   if (resolvedSymbols.length) {
-    for (const symbol of resolvedSymbols) {
-      if (!symbol) continue;
-      await client.query(`
-          INSERT INTO auto_theme_symbols (theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
-          VALUES ($1, $2, 0, 0, 1.0, 'codex-theme-proposal')
-          ON CONFLICT (theme, symbol) DO NOTHING
-      `, [id, symbol]);
-    }
+    await client.query(`
+      INSERT INTO auto_theme_symbols
+        (theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
+      SELECT * FROM UNNEST(
+        $1::text[], $2::text[], $3::double precision[], $4::int[],
+        $5::double precision[], $6::text[]
+      ) AS t(theme, symbol, avg_abs_reaction, reaction_count, correlation, method)
+      ON CONFLICT (theme, symbol) DO NOTHING
+    `, [
+      resolvedSymbols.map(() => id),
+      resolvedSymbols,
+      resolvedSymbols.map(() => 0),
+      resolvedSymbols.map(() => 0),
+      resolvedSymbols.map(() => 1.0),
+      resolvedSymbols.map(() => 'codex-theme-proposal'),
+    ]);
   }
 
   // --- Backfill labeled_outcomes for every matched article × symbol × horizon ---
+  // Bulk pattern: fetch published_at once, fetch each symbol's full price
+  // window once, compute all outcomes in memory, then a single bulk INSERT.
+  // Replaces a prior 3-nested loop that issued up to ~12k round-trips on
+  // large proposals (100 articles × 20 symbols × 3 horizons × 2 queries each).
+  const HORIZONS = [
+    { name: '1w', days: 7 },
+    { name: '2w', days: 14 },
+    { name: '1m', days: 30 },
+  ];
+  const MAX_HORIZON_SLACK_DAYS = Math.max(...HORIZONS.map((h) => h.days)) + 2;
   let outcomeCount = 0;
 
-  for (const row of matched.rows) {
-    const articleId = row.id;
-    // Fetch article published_at for price lookups
-    const artResult = await client.query('SELECT published_at FROM articles WHERE id = $1', [articleId]);
-    if (artResult.rows.length === 0) continue;
-    const publishedAt = artResult.rows[0].published_at;
+  if (matched.rows.length && resolvedSymbols.length) {
+    const articleIds = matched.rows.map((r) => r.id);
+    const { rows: artRows } = await client.query(
+      'SELECT id, published_at FROM articles WHERE id = ANY($1::bigint[])',
+      [articleIds],
+    );
+    const publishedAtById = new Map(artRows.map((r) => [r.id, r.published_at]));
 
-    for (const symbol of resolvedSymbols) {
-      for (const horizon of [{ name: '1w', days: 7 }, { name: '2w', days: 14 }, { name: '1m', days: 30 }]) {
-        const prices = await client.query(`
-          SELECT price
+    const publishedMs = artRows
+      .map((r) => (r.published_at ? new Date(r.published_at).getTime() : null))
+      .filter((t) => Number.isFinite(t));
+    const priceSeriesBySymbol = new Map();
+    if (publishedMs.length) {
+      const minStart = new Date(Math.min(...publishedMs));
+      const maxEnd = new Date(Math.max(...publishedMs) + MAX_HORIZON_SLACK_DAYS * 86_400_000);
+      for (const symbol of resolvedSymbols) {
+        const { rows: priceRows } = await client.query(`
+          SELECT valid_time_start, price
           FROM worldmonitor_intel.historical_raw_items
           WHERE provider = 'yahoo-chart' AND symbol = $1
             AND valid_time_start >= $2::timestamptz
-            AND valid_time_start <= $2::timestamptz + INTERVAL '${horizon.days + 2} days'
+            AND valid_time_start <= $3::timestamptz
           ORDER BY valid_time_start
-          LIMIT 2
-        `, [symbol, publishedAt]);
-        if (prices.rows.length < 2) continue;
-        const entry = Number(prices.rows[0].price);
-        const exit = Number(prices.rows[1].price);
-        if (entry <= 0) continue;
-        const ret = ((exit - entry) / entry) * 100;
-
-        await client.query(`
-          INSERT INTO labeled_outcomes (article_id, theme, symbol, published_at, horizon, entry_price, exit_price, forward_return_pct, hit)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          ON CONFLICT (article_id, symbol, horizon) DO NOTHING
-        `, [articleId, id, symbol, publishedAt, horizon.name, entry, exit, ret, ret > 0]);
-        outcomeCount += 1;
+        `, [symbol, minStart, maxEnd]);
+        priceSeriesBySymbol.set(
+          symbol,
+          priceRows.map((r) => ({ t: new Date(r.valid_time_start).getTime(), p: Number(r.price) })),
+        );
       }
+    }
+
+    const outcomes = [];
+    for (const row of matched.rows) {
+      const articleId = row.id;
+      const publishedAt = publishedAtById.get(articleId);
+      if (!publishedAt) continue;
+      const pubTs = new Date(publishedAt).getTime();
+      for (const symbol of resolvedSymbols) {
+        const series = priceSeriesBySymbol.get(symbol);
+        if (!series?.length) continue;
+        for (const horizon of HORIZONS) {
+          const endTs = pubTs + (horizon.days + 2) * 86_400_000;
+          const within = series.filter((s) => s.t >= pubTs && s.t <= endTs);
+          if (within.length < 2) continue;
+          const entry = within[0].p;
+          const exit = within[1].p;
+          if (!(entry > 0) || !Number.isFinite(exit)) continue;
+          const ret = ((exit - entry) / entry) * 100;
+          outcomes.push({ articleId, symbol, publishedAt, horizon: horizon.name, entry, exit, ret });
+        }
+      }
+    }
+
+    if (outcomes.length) {
+      await client.query(`
+        INSERT INTO labeled_outcomes
+          (article_id, theme, symbol, published_at, horizon,
+           entry_price, exit_price, forward_return_pct, hit)
+        SELECT * FROM UNNEST(
+          $1::bigint[], $2::text[], $3::text[], $4::timestamptz[], $5::text[],
+          $6::double precision[], $7::double precision[],
+          $8::double precision[], $9::bool[]
+        ) AS t(article_id, theme, symbol, published_at, horizon,
+               entry_price, exit_price, forward_return_pct, hit)
+        ON CONFLICT (article_id, symbol, horizon) DO NOTHING
+      `, [
+        outcomes.map((o) => o.articleId),
+        outcomes.map(() => id),
+        outcomes.map((o) => o.symbol),
+        outcomes.map((o) => o.publishedAt),
+        outcomes.map((o) => o.horizon),
+        outcomes.map((o) => o.entry),
+        outcomes.map((o) => o.exit),
+        outcomes.map((o) => o.ret),
+        outcomes.map((o) => o.ret > 0),
+      ]);
+      outcomeCount = outcomes.length;
     }
   }
 

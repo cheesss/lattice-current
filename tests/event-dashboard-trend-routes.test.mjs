@@ -126,6 +126,36 @@ test('event dashboard exposes trend workbench routes', async () => {
     assert.equal(insightsResponse.status, 200);
     const insightsPayload = await insightsResponse.json();
     assert.ok(Object.prototype.hasOwnProperty.call(insightsPayload, 'periodType'));
+
+    const whatifResponse = await fetch(`http://127.0.0.1:${port}/api/whatif`);
+    assert.equal(whatifResponse.status, 200);
+    const whatifPayload = await whatifResponse.json();
+    assert.ok(Array.isArray(whatifPayload.strategies));
+
+    const upliftResponse = await fetch(`http://127.0.0.1:${port}/api/event-uplift-grades`);
+    assert.equal(upliftResponse.status, 200);
+    const upliftPayload = await upliftResponse.json();
+    assert.ok(Array.isArray(upliftPayload.grades));
+    assert.ok(Array.isArray(upliftPayload.signals));
+
+    const digestResponse = await fetch(`http://127.0.0.1:${port}/api/daily-digest?date=today&limit=5`);
+    assert.equal(digestResponse.status, 200);
+    const digestPayload = await digestResponse.json();
+    assert.equal(typeof digestPayload.meta, 'object');
+    assert.ok(Object.prototype.hasOwnProperty.call(digestPayload.meta, 'generatedAt'));
+    assert.ok(Object.prototype.hasOwnProperty.call(digestPayload.meta, 'dataUpdatedAt'));
+    assert.ok(Object.prototype.hasOwnProperty.call(digestPayload.meta, 'mode'));
+    const digestUpdatedAt = Date.parse(digestPayload.meta.dataUpdatedAt || '');
+    const digestAgeHours = Number.isFinite(digestUpdatedAt)
+      ? Math.max(0, (Date.now() - digestUpdatedAt) / 3600000)
+      : Infinity;
+    if (String(digestPayload.window || '').includes('72h-fallback')) {
+      assert.equal(digestPayload.meta.mode, 'fallback');
+      assert.equal(digestPayload.meta.stale, true);
+    } else if (String(digestPayload.source || '').includes('fallback')) {
+      assert.equal(digestPayload.meta.mode, 'live');
+      assert.equal(digestPayload.meta.stale, digestAgeHours > 24);
+    }
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

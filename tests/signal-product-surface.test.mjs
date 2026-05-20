@@ -15,9 +15,9 @@ describe('signal-first product surface guardrails', () => {
 
   it('reframes workspaces around signal and decision support instead of replay-first workflows', () => {
     const source = readFileSync(repoPath('src/config/workspaces.ts'), 'utf8');
-    assert.equal(source.includes("featuredPanels: ['live-news', 'event-intelligence', 'insights', 'macro-signals']"), true);
+    assert.equal(source.includes("featuredPanels: ['investment-ideas', 'event-intelligence', 'hawkes-heatmap', 'evidence-distribution']"), true);
     assert.equal(source.includes("title: 'Validate Workspace'"), true);
-    assert.equal(source.includes("featuredPanels: ['backtest-lab', 'investment-workflow', 'investment-ideas', 'macro-signals']"), true);
+    assert.equal(source.includes("featuredPanels: ['backtest-lab', 'calibration-scatter', 'alpha-decay', 'evidence-distribution']"), true);
     assert.equal(source.includes("featuredPanels: ['dataflow-ops', 'source-ops', 'runtime-config', 'resource-profiler']"), true);
   });
 
@@ -136,13 +136,21 @@ describe('signal-first product surface guardrails', () => {
     assert.equal(snapshotBuilderSource.includes('transmissionFreshnessHours'), true);
   });
 
+  it('keeps structural-alert and theme-shell snapshot period selection aligned with the active dashboard horizon', () => {
+    const dashboardSource = readFileSync(repoPath('event-dashboard.html'), 'utf8');
+    const apiSource = readFileSync(repoPath('scripts/event-dashboard-api.mjs'), 'utf8');
+    assert.equal(dashboardSource.includes("const params=new URLSearchParams([['period',period],['limit','8']]);"), true);
+    assert.equal(dashboardSource.includes("`${API}/theme-shell-snapshots?period=${encodeURIComponent(period)}`"), true);
+    assert.equal(apiSource.includes('period: resolveDashboardPeriod(params),'), true);
+  });
+
   it('propagates evolution focus into the embedded 2D map lens context', () => {
     const dashboardSource = readFileSync(repoPath('event-dashboard.html'), 'utf8');
     const mapLensSource = readFileSync(repoPath('src/theme-map-lens.ts'), 'utf8');
     assert.equal(dashboardSource.includes('evolutionParent:state.evolutionParent||null'), true);
     assert.equal(dashboardSource.includes('emitEmbeddedContext();'), true);
     assert.equal(mapLensSource.includes('evolutionParent: string | null;'), true);
-    assert.equal(mapLensSource.includes('resolvePreset(context.theme, context.evolutionParent)'), true);
+    assert.equal(mapLensSource.includes('resolvePreset(effectiveContext.theme, effectiveContext.evolutionParent)'), true);
   });
 
   it('keeps hotspots and conflict overlays enabled by default across all theme map presets', () => {

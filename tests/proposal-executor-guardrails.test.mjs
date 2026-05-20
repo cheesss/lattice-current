@@ -15,7 +15,7 @@ test('proposal executor includes retry and dead-letter queues', () => {
   assert.match(source, /queueForApproval/);
   assert.match(source, /backfill-source/);
   assert.match(source, /isTrustedFeedUrl/);
-  assert.match(source, /evaluateAndRegisterFeed/);
+  assert.match(source, /registerProbedSource/);
   assert.match(source, /case 'attach-theme'/);
   assert.match(source, /handleAttachTheme/);
   assert.match(source, /targetTheme/);

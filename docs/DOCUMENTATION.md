@@ -37,7 +37,19 @@ Use these first. They describe the current branch, not historical experiments.
 | --- | --- |
 | [../README.md](../README.md) | Top-level repository overview |
 | [../CLAUDE.md](../CLAUDE.md) | Project conventions, scripts, NAS tables, code modification principles |
-| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Most recent comprehensive handoff including 2026-04-14 data robustness work |
+| [./AGENT_NEXT_SESSION.md](./AGENT_NEXT_SESSION.md) | **READ FIRST in a new chat session.** Concise reading order, daemon liveness checks, topic-specific file map, common gotchas, bringup sequence. |
+| [./PROJECT_HANDOFF_2026-04-27.md](./PROJECT_HANDOFF_2026-04-27.md) | **Current** — 14-commit sprint covering ML pipeline activation, data-pipeline cascade fixes, perf audit, root-cause closures |
+| [./PROJECT_HANDOFF_2026-04-23.md](./PROJECT_HANDOFF_2026-04-23.md) | Architectural reference for OpenClaw + decision-engine internals (still authoritative for those subsystems) |
+| [./SESSION_IMPROVEMENTS_2026-04-23.md](./SESSION_IMPROVEMENTS_2026-04-23.md) | Source repair, OpenClaw, freshness, scheduler, validation fixes (4-23 session log) |
+| [./SESSION_HANDOFF_2026-04-12.md](./SESSION_HANDOFF_2026-04-12.md) | Historical repo-wide handoff; superseded for current operation by PROJECT_HANDOFF_2026-04-23 |
+| [./NOWCAST_HANDOFF_2026-04-18.md](./NOWCAST_HANDOFF_2026-04-18.md) | Nowcast subsystem state: Phase 0–5 shipped, gate + fuse filter enforced, rates redesign opened as separate track. OpenClaw exposure via `lattice.get_nowcast_status` (added 2026-04-23) |
+| [./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md](./NOWCAST_RATES_REDESIGN_TRACK_2026-04-18.md) | Open track — why rates models failed acceptance gate and candidate redesign directions |
+| [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_EXPLAINED_2026-04-18.md) | End-to-end workflow narrative — layer-by-layer explanation: source-add path, keyword/theme-add path, observed/estimated split, operationally-important routes |
+| [./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md](./CONNECTED_SYSTEM_WORKFLOW_VISUAL_2026-04-18.md) | High-level visual walk-through of the detailed workflow |
+| [./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.html](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.html) / [.svg](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.svg) / [.png](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.png) / [.mmd](./CONNECTED_SYSTEM_WORKFLOW_DETAILED_2026-04-18.mmd) | Zoomable HTML / SVG / PNG renders + Mermaid source for the detailed workflow diagram (companions to the EXPLAINED doc above) |
+| [./WORKFLOW_SOURCE_ADD_PATH_2026-04-18.md](./WORKFLOW_SOURCE_ADD_PATH_2026-04-18.md) | Code-level deep-dive of the source-add path — detectors, quality gate, review, executor, self-heal loop |
+| [./WORKFLOW_KEYWORD_THEME_ADD_PATH_2026-04-18.md](./WORKFLOW_KEYWORD_THEME_ADD_PATH_2026-04-18.md) | Code-level deep-dive of the keyword + theme-add path — LLM proposal generation, evidence enrichment, bulk executor, downstream propagation |
+| [./WORKFLOW_OPENCLAW_INTEGRATION_PATH_2026-04-18.md](./WORKFLOW_OPENCLAW_INTEGRATION_PATH_2026-04-18.md) | Code-level deep-dive of the OpenClaw integration path — channels, TaskFlow, source repair delivery, scheduler retry escalation, briefing |
 | [./ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime, data, and storage architecture |
 | [./USER_GUIDE.md](./USER_GUIDE.md) | Operator-oriented quick start and runtime usage |
 | [./ALGORITHMS.md](./ALGORITHMS.md) | Active signal, evidence, and admission logic |
@@ -55,12 +67,14 @@ Use these first. They describe the current branch, not historical experiments.
 | [./TROUBLESHOOTING_INDEX.md](./TROUBLESHOOTING_INDEX.md) | Symptom-to-fix quick reference |
 | [./DASHBOARD_DATA_CONTINUITY_AUDIT_2026-04-14.md](./DASHBOARD_DATA_CONTINUITY_AUDIT_2026-04-14.md) | Most recent dashboard data freshness/fallback audit |
 | [./COMPREHENSIVE_REVIEW_PROMPT.md](./COMPREHENSIVE_REVIEW_PROMPT.md) | Master prompt for full-stack project review (used 2026-04-14) |
+| [./OPENCLAW_INTEGRATION_ARCHITECTURE_2026-04-16.md](./OPENCLAW_INTEGRATION_ARCHITECTURE_2026-04-16.md) | OpenClaw control-plane integration plan for channels, TaskFlow automation, source repair, scheduler retry, and briefing |
 
 ## How to read the repo now
 
-1. Start with the workspace shell and live operator loop.
-2. Read event resolution and evidence-quality logic.
-3. Read replay and NAS docs only if you are validating historical behavior or debugging storage.
+1. Start with `PROJECT_HANDOFF_2026-04-23.md`.
+2. Read `SESSION_IMPROVEMENTS_2026-04-23.md` only when you need the exact latest change log.
+3. Read the workflow docs for code-level source, theme, Decision Inbox, and OpenClaw paths.
+4. Read replay, NAS, and old plan docs only if you are validating historical behavior or debugging storage.
 
 Do not infer the current product identity from old plan files, handoff notes, or archived backtest experiments.
 
@@ -76,6 +90,11 @@ Recently removed (2026-04-14 cleanup):
 - `docs/API_KEY_DEPLOYMENT.md` — referenced obsolete WORLDMONITOR_API_KEY gating
 - `docs/TAURI_VALIDATION_REPORT.md` — environment-specific one-off report
 - `docs/branding/nanobanana-prompt.md` — one-off design brief
+
+Recently removed (2026-04-23 cleanup):
+
+- `docs/NOWCAST_PLAN_ISSUES_2026-04-17.md` — superseded by `NOWCAST_HANDOFF_2026-04-18.md` (§3 commit map + §6 gap table absorbed all P1 issues)
+- `docs/NOWCAST_ESTIMATION_ARCHITECTURE_PLAN_2026-04-17.md` — superseded by `NOWCAST_HANDOFF_2026-04-18.md` (original design doc; Phase 0–5 implementation landed across commits `62825c96` / `746a0e58` / `8bce577b` / `87c21b6d`)
 
 ## Current implementation notes
 

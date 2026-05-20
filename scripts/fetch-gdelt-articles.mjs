@@ -47,6 +47,33 @@ function buildSummary(article) {
   ].filter(Boolean).join(' | ');
 }
 
+export function parseGdeltSeenDate(value, fallback = new Date()) {
+  const raw = String(value || '').trim();
+  if (/^\d{14}$/.test(raw)) {
+    const date = new Date(Date.UTC(
+      Number(raw.slice(0, 4)),
+      Number(raw.slice(4, 6)) - 1,
+      Number(raw.slice(6, 8)),
+      Number(raw.slice(8, 10)),
+      Number(raw.slice(10, 12)),
+      Number(raw.slice(12, 14)),
+    ));
+    if (Number.isFinite(date.valueOf())) return date.toISOString();
+  }
+  if (/^\d{8}$/.test(raw)) {
+    const date = new Date(Date.UTC(
+      Number(raw.slice(0, 4)),
+      Number(raw.slice(4, 6)) - 1,
+      Number(raw.slice(6, 8)),
+    ));
+    if (Number.isFinite(date.valueOf())) return date.toISOString();
+  }
+  const parsed = raw ? new Date(raw) : new Date(fallback);
+  if (Number.isFinite(parsed.valueOf())) return parsed.toISOString();
+  const fallbackDate = new Date(fallback);
+  return Number.isFinite(fallbackDate.valueOf()) ? fallbackDate.toISOString() : new Date().toISOString();
+}
+
 export async function runGdeltArticlesBackfill(options = {}) {
   const args = { ...parseArgs([]), ...options };
   const query = (Array.isArray(args.keywords) && args.keywords.length > 0)
@@ -77,7 +104,7 @@ export async function runGdeltArticlesBackfill(options = {}) {
         [
           'gdelt-doc',
           'emerging-tech',
-          article.seendate ? new Date(article.seendate).toISOString() : new Date().toISOString(),
+          parseGdeltSeenDate(article.seendate),
           String(article.title || '').trim().slice(0, 500),
           buildSummary(article),
           String(article.url || '').trim(),

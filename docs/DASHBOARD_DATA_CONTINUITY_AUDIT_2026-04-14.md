@@ -1,387 +1,152 @@
 # Dashboard Data Continuity Audit (2026-04-14)
-> **Status**: partial (P0 article binding shipped; P1 fallback/stale badges shipped; P1 structural-alerts source-of-truth and transmission freshness still open)  
+
+> **Status**: P0 resolved · P1 resolved (structural alerts, transmission freshness) · P1 partial (today fallback label, digest empty state, stale badges) · P2 open  
+> **Last updated**: 2026-04-15
 
 This audit documents dashboard-level data continuity issues found while inspecting the active theme shell and its backing APIs on 2026-04-14.
 
-The goal of this audit is to separate three cases that were being conflated in the UI:
+The goal is to separate three cases:
 
 1. Data is genuinely missing.
 2. Data exists, but the dashboard surface is reading an older or different corpus.
 3. Data exists and is current, but the UI does not disclose fallback/stale mode clearly enough.
 
-## Scope
+---
 
-This audit covered the active dashboard surface and its major API dependencies, including:
+## Resolution Summary (as of 2026-04-15)
 
-- `live-status`
-- `theme-shell-snapshots`
-- `daily-digest`
-- `trend-pyramid`
-- `theme-evolution`
-- `category-trends`
-- `insights/quarterly`
-- `structural-alerts`
-- `discovery-triage`
-- `reports/latest`
-- `digest/weekly`
-- `today`
-- `calibration`
-- `event-uplift-grades`
-- `alpha-decay`
-- `signal-correlation`
-- `regime-timeline`
-- `emerging-tech`
-- `emerging-tech/:topicId`
-- `theme-brief/:theme`
+| # | Issue | Priority | Status |
+|---|-------|----------|--------|
+| 1 | Emerging topic article binding stuck in 2025 | P0 | **Resolved** — P0 article binding shipped |
+| 2 | `today` fallback hidden as normal mode | P1 | **Partially resolved** — stale/fallback badges added; label wording still generic |
+| 3 | `Articles today = 0` vs non-empty fallback feed | P1 | **Partially resolved** — fallback badge present; KPI/feed source alignment still in progress |
+| 4 | Daily digest shows no items despite large article volume | P1 | **Partially resolved** — empty state distinguishes fallback vs unavailable |
+| 5 | Structural alerts empty in one surface, present in another | P1 | **Resolved** — verified via local API: structural 8 items and risk highlights 4 items use same period/theme ordering. No longer contradictory. |
+| 6 | Investment snapshot wrapper fresh, internals null/old | P1 | **Partially resolved** — `buildFreshnessFields()` propagates oldest internal timestamp; stale badge shown when internals lag |
+| 7 | Validation snapshot old, not shown as old | P1 | **Resolved** — stale badge shown when `updatedAt` older than SLA threshold |
+| 8 | Transmission freshness inconsistent across layers | P1 | **Resolved** — verified: `transmission.fresh=true`, `geoPressure.transmissionFresh=true`, both `freshnessHours=20.1`, `stale: false`. Tests pass. |
+| 9 | Source Ops and Codex quality materially older | P2 | Open — strong stale badge on Source Ops card is in place; Codex quality cadence still slow |
 
-## Executive Summary
-
-The main finding is not "the system has no 2026 data."
-
-The actual state is:
-
-- 2026 data does exist in several live and refreshed surfaces.
-- Some dashboard sections are correctly reading 2026 data.
-- Some sections are only updating the summary row or report wrapper, while the underlying evidence/article binding remains stuck on an older corpus.
-- Some sections are in fallback mode or effectively empty, but the UI still presents them as if they were current and authoritative.
-
-The largest continuity break is the `Selected Topic` / `Emerging Technology Watchlist` detail surface.
+---
 
 ## What Was Confirmed Healthy
 
-The following surfaces do show 2026 data and are not globally broken:
+The following surfaces show 2026 data and are not globally broken:
 
-- `reports/latest`
-  - report generation timestamps reach `2026-04-14`
-- `emerging-tech`
-  - topic `updatedAt` values reach `2026-04-13`
-- `today`
-  - events are present with `publishedAt` in `2026-04-10`
-- `theme-brief/climate-change`
-  - article evidence from `2026-04-06` to `2026-04-07`
-- `theme-brief/materials-science`
-  - article evidence from `2026-04-07`
-- `signals/history`
-  - at least VIX history reaches `2026-04-14`
-- `heatmap`
-  - `updatedAt` reaches `2026-04-14`
-- `whatif`
-  - `updatedAt` reaches `2026-04-14`
-- `map-lens-overlays`
-  - `updatedAt` reaches `2026-04-14`
+- `reports/latest` — generation timestamps reach 2026-04-14
+- `emerging-tech` — topic `updatedAt` values reach 2026-04-13
+- `today` — events present with `publishedAt` in 2026-04-10
+- `theme-brief/climate-change` — article evidence from 2026-04-06 to 2026-04-07
+- `theme-brief/materials-science` — article evidence from 2026-04-07
+- `signals/history` — VIX history reaches 2026-04-14
+- `heatmap` — `updatedAt` reaches 2026-04-14
+- `whatif` — `updatedAt` reaches 2026-04-14
+- `map-lens-overlays` — `updatedAt` reaches 2026-04-14
 
-This is important because it rules out the theory that "all recent data stopped coming in."
+---
 
-## Confirmed Data Continuity Breaks
+## Issue Detail
 
-### 1. Emerging topic detail is updated in 2026, but linked article evidence is stuck in 2025
+### 1. Emerging topic article binding (P0) — RESOLVED
 
-This is the most important break.
+**Original symptom**: `topic.updatedAt` = 2026-04-13, but `articles[]` top out at 2025-12.
 
-Observed on:
+**Resolution**: Article binding rebuilt so recent linked articles surface correctly. UI shows "Latest linked article" separately from "recent" corpus when gap exists.
 
-- `/api/emerging-tech/dt-4536ea1f6989`
-- `/api/emerging-tech/dt-f84a250cd10b`
-- `/api/emerging-tech/dt-6cfaba39920c`
+---
 
-Symptoms:
+### 2. `today` feed fallback visibility (P1) — PARTIALLY RESOLVED
 
-- `topic.updatedAt` is `2026-04-13`
-- `report.generated_at` is `2026-04-13`
-- but `articles[]` and `report.top_articles[]` top out in `2025-12`
-- `monthlyCounts` also stop at `2025-12`
+**Original symptom**: `meta.window = "7d-fallback"`, overwhelmingly arxiv, `theme: unknown` — presented like a live-events feed.
 
-Interpretation:
+**Current state**: Fallback badge added. Feed label still says "Today's Events" even in fallback mode.
 
-- the topic/report row is being refreshed
-- but the linked article corpus or report article selection is still using an older article set
-- this creates the misleading impression that there are no recent geopolitics/conflict articles
+**Remaining**: Change label to "Recent Events (7d fallback)" or similar when `meta.window !== "24h"`.
 
-Impact:
+---
 
-- `Recent articles` in the topic detail is currently not trustworthy as a "recent" surface
-- the topic summary and metrics may be current, while the displayed article evidence is stale
+### 3. `Articles today = 0` vs non-empty fallback (P1) — PARTIALLY RESOLVED
 
-Priority: `P0`
+**Current state**: Fallback mode badge shown. KPI counts and feed source still draw from slightly different corpora.
 
-### 2. `Today` feed is populated, but it is a 7-day fallback dominated by `arxiv` with `theme: unknown`
+**Remaining**: Align KPI count source with the same ingestion class the `today` feed uses.
 
-Observed on:
+---
 
-- `/api/today`
+### 4. Daily digest empty state (P1) — PARTIALLY RESOLVED
 
-Symptoms:
+**Current state**: Empty state now distinguishes `no digest items` vs `fallback mode` vs `unavailable`.
 
-- response is not empty
-- `meta.window = "7d-fallback"`
-- current items are overwhelmingly `arxiv`
-- current items carry `theme: "unknown"`
-- this diverges sharply from the user expectation of "today's key events"
+**Remaining**: Surface `source = "article_fallback_72h"` explicitly in the digest header.
 
-Impact:
+---
 
-- the dashboard looks active but not operator-useful
-- a fallback feed is being rendered like a primary live-events feed
+### 5. Structural alerts source-of-truth (P1) — RESOLVED
 
-Priority: `P1`
+**Original symptom**: `/api/structural-alerts?period=quarter` returned `items: []` while `risk.highlights` had multiple alerts.
 
-### 3. `Articles today = 0` coexists with non-empty fallback event feed
+**Resolution**: Both surfaces now use the same `period` parameter. Structural alert computation and risk snapshot highlight selection share the same underlying alert set — risk shows top 4 from the same ordered list. Verified via local API comparison: structural 8 items, risk highlights 4 items, same leading themes, no contradictions.
 
-Observed across:
+---
 
-- top KPI strip / `live-status`
-- `/api/today`
+### 6. Investment snapshot partial hydration (P1) — PARTIALLY RESOLVED
 
-Symptoms:
+**Original symptom**: `investment.generatedAt` fresh but `signalRuntime = null`, `experimentRegistry = null`.
 
-- `Articles today` shows `0`
-- `/api/today` still returns multiple 2026 events
-- this is not necessarily inconsistent at the data-model level, but it is inconsistent at the UX level
+**Resolution**: `buildFreshnessFields()` added to all 7 snapshot builders — exposes `oldestInternalUpdatedAt` so UI prefers internal timestamp over wrapper `generatedAt`. Stale badge shown when internal lag exceeds SLA.
 
-Interpretation:
+**Remaining**: `signalRuntime` and `experimentRegistry` hydration depends on runtime pipeline frequency. Not a UI fix.
 
-- top KPI is likely counting one ingestion class or one freshness rule
-- `today` surface is falling back to a broader or different corpus
+---
 
-Impact:
+### 7. Validation snapshot age (P1) — RESOLVED
 
-- users cannot tell whether the system is actually idle or operating in fallback mode
+**Original symptom**: `validation.updatedAt = 2026-04-05`, card rendered as active.
 
-Priority: `P1`
+**Resolution**: Stale badge appears when `updatedAt` older than 48h threshold. `snapshotStaleBadge()` now prefers `oldestInternalUpdatedAt` over wrapper timestamp.
 
-### 4. Daily digest has global article volume but no digest items
+---
 
-Observed on:
+### 8. Transmission freshness inconsistency (P1) — RESOLVED
 
-- `/api/daily-digest?period=quarter`
+**Original symptom**: `fresh = false`, `freshnessHours ≈ 365`, source `updatedAt = 2026-03-30`, but nested source meta still `stale: false`.
 
-Symptoms:
+**Resolution**: Verified via local API (2026-04-15): `transmission.fresh = true`, `geoPressure.transmissionFresh = true`, both `freshnessHours = 20.1`, `stale: false` at all layers. `edgeEventIdentity()` composite key replaced title-only deduplication. Transmission freshness tests pass.
 
-- `source = "article_fallback_72h"`
-- `window = "72h-fallback"`
-- `items = []`
-- `supportingStats.totalArticles = 67302`
+---
 
-Interpretation:
+### 9. Source Ops and Codex quality lag (P2) — OPEN
 
-- article volume exists
-- digest selection/curation is not producing visible items for the current dashboard surface
+**Current state**: Strong stale badge on Source Ops card when `generatedAt` > 48h old. Codex quality cadence still produces updates ~every 4–7 days.
 
-Impact:
+**Remaining**: Accelerate Codex quality refresh interval in daemon schedule, or add explicit "last updated N days ago" label to the Codex panel.
 
-- the user sees an empty briefing despite the system claiming large corpus availability
+---
 
-Priority: `P1`
-
-### 5. Structural alerts are empty in one surface but present in another
-
-Observed on:
-
-- `/api/structural-alerts?period=quarter&limit=8`
-- `/api/theme-shell-snapshots` -> `risk.highlights`
-
-Symptoms:
-
-- direct structural alerts API returns `items: []`
-- risk snapshot still contains multiple structural highlights
-
-Interpretation:
-
-- alert presentation is drawing from different source logic or different filtering layers
-- users can get contradictory answers depending on which card they read
-
-Impact:
-
-- confidence in the alerting layer drops
-- difficult to know which alert surface is canonical
-
-Priority: `P1`
-
-### 6. Investment snapshot wrapper refreshes, but key internal state is null or old
-
-Observed on:
-
-- `/api/theme-shell-snapshots`
-
-Symptoms:
-
-- `investment.generatedAt` updates
-- but:
-  - `signalRuntime = null`
-  - `experimentRegistry = null`
-- several persistent investment caches are last updated on `2026-04-05`
-
-Interpretation:
-
-- the shell snapshot is being rebuilt
-- but core investment intelligence subcomponents are not fully hydrated into the surface
-
-Impact:
-
-- the card looks current while parts of the underlying decision state are missing
-
-Priority: `P1`
-
-### 7. Validation snapshot is old but not strongly presented as old
-
-Observed on:
-
-- `/api/theme-shell-snapshots` -> `validation`
-
-Symptoms:
-
-- `validation.updatedAt = 2026-04-05`
-- the card still renders as a normal active surface
-
-Impact:
-
-- validation may be read as current operator truth when it is actually a stale offline artifact
-
-Priority: `P1`
-
-### 8. Transmission explicitly reports stale age, but internal freshness metadata is inconsistent
-
-Observed on:
-
-- `/api/theme-shell-snapshots` -> `transmission`
-
-Symptoms:
-
-- `fresh = false`
-- `freshnessHours ~= 365`
-- source `updatedAt = 2026-03-30`
-- yet nested source meta still reports `stale: false`
-
-Interpretation:
-
-- freshness is being computed at multiple layers with inconsistent rules
-
-Impact:
-
-- UI may show correct stale messaging in one place and healthy source metadata in another
-
-Priority: `P1`
-
-### 9. Source Ops and Codex quality are significantly older than the rest of the live shell
-
-Observed on:
-
-- `/api/theme-shell-snapshots` -> `sourceOps`
-- `/api/codex-quality`
-- `/api/codex-latest`
-
-Symptoms:
-
-- `sourceOps.generatedAt = 2026-04-08`
-- `source-credibility` updated at `2026-04-05`
-- `codex-quality.lastCallAt = 2026-04-08`
-- `codex-latest.discoveries.generatedAt = 2026-04-04`
-
-Impact:
-
-- these look like current operational panels but are materially older than the rest of the dashboard
-
-Priority: `P2`
-
-## Important Non-Issues
-
-The following should not be misclassified as continuity failures without more evidence:
-
-### 1. Empty followed-theme briefing
-
-Observed on:
-
-- `/api/followed-theme-briefing?period=week`
-
-Current state:
-
-- `itemCount = 0`
-- `persisted = false`
-
-This may simply reflect the current browser workspace having no followed themes. It is not enough on its own to call this a broken data surface.
-
-### 2. Theme briefs are not globally stale
-
-`theme-brief` endpoints for at least `climate-change` and `materials-science` demonstrate that recent 2026 article evidence can appear correctly in the product. This means the evidence layer itself is not uniformly dead.
-
-## Root Cause Pattern
-
-The failures are not random. They cluster into three recurring patterns:
+## Root Cause Patterns (historical reference)
 
 ### Pattern A: Fresh wrapper, stale body
 
-Examples:
-
-- `Selected Topic`
-- topic `report.top_articles`
-- validation wrapper
-- source ops wrapper
-
-The outer object shows a recent `updatedAt` or `generatedAt`, but the evidence or sub-artifact inside is old.
+Examples: Selected Topic, validation wrapper, source ops wrapper.  
+**Fix applied**: `buildFreshnessFields()` propagates oldest internal timestamp to all snapshot builders.
 
 ### Pattern B: Fallback mode hidden as normal mode
 
-Examples:
-
-- `today`
-- `daily-digest`
-- top KPI vs fallback feed
-
-The system is degrading gracefully, but the UI does not clearly state that it is operating in fallback mode.
+Examples: `today`, `daily-digest`.  
+**Fix applied**: Stale/fallback badges added. Explicit label updates pending.
 
 ### Pattern C: Parallel surfaces disagree
 
-Examples:
+Examples: structural alerts vs risk.highlights, transmission freshness flags.  
+**Fix applied**: Unified period parameter, `edgeEventIdentity()` for transmission deduplication. Both verified resolved.
 
-- `structural-alerts` vs `risk.highlights`
-- transmission freshness flags
+---
 
-Two surfaces that should describe the same state do not agree on whether something is present or stale.
+## Remaining Acceptance Criteria
 
-## Priority Remediation Order
+The following are not yet fully met:
 
-### P0
-
-1. Rebuild `emerging-tech/:topicId` article binding so that:
-   - recent linked articles are actually recent
-   - old linked articles are explicitly labeled as legacy fallback
-   - monthly topic evidence can extend into 2026 where data exists
-
-### P1
-
-2. Surface fallback mode explicitly in `today` and `daily-digest`
-3. Unify structural alert source-of-truth across alert surfaces
-4. Mark investment and validation cards as partial/stale when subcomponents are null or old
-5. Make transmission freshness logic consistent across summary and nested source metadata
-
-### P2
-
-6. Add strong stale badges to Source Ops and Codex quality panels
-7. Review whether `today` should exclude `arxiv`-only fallback from the primary operator surface
-
-## Acceptance Criteria For Fixes
-
-The continuity issue should be considered fixed only when all of the following are true:
-
-1. `Selected Topic` can show a 2026 recent linked article when 2026 data exists in the system.
-2. If no recent linked article exists, the UI explicitly says:
-   - `No recent linked articles`
-   - and separately shows `Latest linked article`
-3. `today` clearly indicates whether it is:
-   - primary 24h live feed
-   - 7-day fallback
-   - collecting/no live feed
-4. `daily-digest` distinguishes:
-   - no digest items
-   - digest in fallback mode
-   - digest unavailable
-5. structural alert surfaces agree on the same alert set or clearly document different scopes
-6. any card reading data older than its product SLA shows a stale or partial-state indicator
-
-## Current Working Diagnosis
-
-The most accurate current statement is:
-
-> 2026 data is present in the system, but several dashboard surfaces are not bound to the newest evidence layer. The dashboard currently mixes fresh summaries, stale linked evidence, hidden fallback modes, and partially hydrated operator state.
-
-That diagnosis should be used as the baseline for further fixes.
+- [ ] `today` label clearly says "7-day fallback" (not just badge) when `meta.window !== "24h"`
+- [ ] `daily-digest` header shows source name (`"article_fallback_72h"`) in fallback mode
+- [ ] KPI `Articles today` count aligned with `today` feed ingestion class
+- [ ] Codex quality refresh cadence increased or lag label added

@@ -16,6 +16,22 @@ AI is not the main branch's autonomous trading engine.
 
 ## Active AI surfaces
 
+## 2026-04-22 Quality Gates
+
+The dashboard and OpenClaw briefing surfaces now apply explicit evidence gates before showing AI-assisted suggestions as operator-facing information:
+
+- Live status excludes opaque discovery IDs such as `dt-*` and uses canonical theme labels.
+- Daily digest falls back to current article evidence without marking fresh selected-date data as stale.
+- Discovery triage suppresses stale, broad, and low-information topic rows by default, and strips generic keywords such as wire names, years, and filler terms.
+- Structural alerts hide low-confidence breakout, lifecycle, share-shift, and cooling alerts unless they meet minimum article-count and source-diversity requirements.
+- Source approvals no longer keep stale `needs-fix` RSS proposals visible indefinitely. Repeated failed source probes are rejected by cleanup after the repair window.
+- `add-rss` simulate and accept paths avoid synchronous long-running LLM repair by default. Fast probe and heuristic repair run inline; Codex source-code repair is queued asynchronously for repairable reject/manual-adapter failures.
+- RSS source names are sanitized before seeding so proposal/test labels such as `Codex E2E ... source 20260422` never become operator-facing publisher names.
+- Newly seeded RSS articles are classified by article title first. Broad feeds are not allowed to stamp every item with the source proposal theme; weak matches fall back to the canonical parent theme instead.
+- Daily FRED spread signals use a 72-hour live freshness window to avoid false stale warnings around normal daily release cadence.
+
+The goal is that AI surfaces provide concise evidence-backed operating context. They should not recycle stale cache data, opaque IDs, low-sample percent changes, or homepage URLs that have not passed source probing.
+
 ### Summarization and briefing
 
 LLM-backed summarization still supports live and historical interpretation surfaces.

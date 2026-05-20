@@ -1,0 +1,12 @@
+[plugins.entries.openclaw-lattice-control-plane]
+enabled = true
+
+[plugins.entries.openclaw-lattice-control-plane.config]
+latticeApiBaseUrl = "http://127.0.0.1:46200"
+latticeUiBaseUrl = "http://127.0.0.1:4173"
+defaultTheme = "materials-science"
+timeoutMs = 10000
+
+# Optional sidecar read-only observability
+sidecarBaseUrl = "http://127.0.0.1:6077"
+sidecarToken = ""

@@ -1,9 +1,10 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './styles/main.css';
 
-import { DeckGLMap, type DeckMapView, type TimeRange } from './components/DeckGLMap';
+import { DeckGLMap, type CountryClickPayload, type DeckMapView, type TimeRange } from './components/DeckGLMap';
 import { DEFAULT_MAP_LAYERS } from './config';
 import type { MapLayers, NewsItem } from './types';
+import { getCountryAtCoordinates, getCountryNameByCode } from './services/country-geometry';
 import { fetchEarthquakes } from './services/earthquakes';
 import { fetchWeatherAlerts } from './services/weather';
 import { fetchInternetOutages, isOutagesConfigured } from './services/infrastructure';
@@ -43,6 +44,14 @@ type SourceStatus = {
 };
 
 type LensThemeFilter = 'all' | 'conflict' | 'macro' | 'tech' | 'energy' | 'climate';
+type LensZoomPresetId = 'global' | 'regional' | 'country' | 'city';
+
+type CountryEvidenceSelection = {
+  lat: number;
+  lon: number;
+  code: string | null;
+  name: string;
+};
 
 type MapLensEventMarker = {
   id: string;
@@ -87,7 +96,28 @@ type MapLensOverlayPayload = {
   transmissionArcs: MapLensTransmissionArc[];
 };
 
-const API = 'http://localhost:46200/api';
+const SIGNAL_API_PORT = '46200';
+
+function normalizeApiBase(raw: string | null | undefined): string {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  return value.replace(/\/+$/, '').replace(/\/api$/, '/api');
+}
+
+function resolveSignalApiBase(): string {
+  if (typeof window === 'undefined') return `http://localhost:${SIGNAL_API_PORT}/api`;
+  const params = new URLSearchParams(window.location.search || '');
+  const explicit = normalizeApiBase(params.get('api') || window.localStorage.getItem('lattice:signal-api-base'));
+  if (explicit) return explicit;
+  if (window.location.protocol === 'file:') return `http://localhost:${SIGNAL_API_PORT}/api`;
+  const host = window.location.hostname || 'localhost';
+  const origin = window.location.origin;
+  if (window.location.port === SIGNAL_API_PORT) return `${origin}/api`;
+  if (host === 'localhost' || host === '127.0.0.1') return `http://${host}:${SIGNAL_API_PORT}/api`;
+  return `${origin}/api`;
+}
+
+const API = resolveSignalApiBase();
 const REFRESH_MS = 180_000;
 const OVERLAY_COLLAPSE_KEY = 'theme-map-lens:overlay-collapsed';
 const PERIOD_LABELS: Record<LensContext['period'], string> = {
@@ -105,6 +135,21 @@ const FILTER_THEME_OVERRIDES: Record<LensThemeFilter, string | null> = {
   energy: 'energy-transition',
   climate: 'climate-change',
 };
+const ZOOM_PRESET_ZOOMS: Record<LensZoomPresetId, number> = {
+  global: 1.65,
+  regional: 3.15,
+  country: 4.7,
+  city: 7.25,
+};
+const BASE_SIGNAL_LAYERS: Array<keyof MapLayers> = ['hotspots'];
+const RELATIONSHIP_LAYER_KEYS: Array<keyof MapLayers> = [
+  'tradeRoutes',
+  'waterways',
+  'economic',
+  'stockExchanges',
+  'financialCenters',
+  'centralBanks',
+];
 const EMPTY_CONTEXT: LensContext = {
   theme: null,
   period: 'quarter',
@@ -137,14 +182,32 @@ let currentContext: LensContext = { ...EMPTY_CONTEXT };
 let currentPreset = buildCrossDomainPreset();
 let refreshHandle: number | null = null;
 let activeThemeFilter: LensThemeFilter = 'all';
+let activeZoomPreset: LensZoomPresetId = 'global';
 let relationshipMode = false;
 let localPeriodOverride: LensContext['period'] | null = null;
 let overlayCollapsed = false;
+let renderPausedByHost = false;
+let lastOverlayPayload: MapLensOverlayPayload | null = null;
+let selectedCountry: CountryEvidenceSelection | null = null;
 
 function createEmptyLayers(): MapLayers {
   const next = { ...DEFAULT_MAP_LAYERS } as Record<string, boolean>;
   Object.keys(next).forEach((key) => { next[key] = false; });
   return next as unknown as MapLayers;
+}
+
+function createBudgetedLayers(themeLayers: Array<keyof MapLayers>): MapLayers {
+  const uniqueKeys = Array.from(new Set([...BASE_SIGNAL_LAYERS, ...themeLayers]));
+  return enableLayers(createEmptyLayers(), uniqueKeys.slice(0, 3));
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function humanize(value: string | null | undefined): string {
@@ -223,26 +286,9 @@ function buildCrossDomainPreset(): LensPreset {
   return {
     id: 'cross-domain',
     label: 'Cross-domain risk',
-    description: 'Balanced preset across geopolitical, infrastructure, macro, and technology layers.',
+    description: 'Small default budget: event hotspots, E2 markers, and the strongest cross-domain context layer.',
     view: 'global',
-    layers: enableLayers(createEmptyLayers(), [
-      'conflicts',
-      'hotspots',
-      'cables',
-      'pipelines',
-      'waterways',
-      'outages',
-      'cyberThreats',
-      'protests',
-      'military',
-      'natural',
-      'ucdpEvents',
-      'climate',
-      'economic',
-      'tradeRoutes',
-      'datacenters',
-      'gpsJamming',
-    ]),
+    layers: createBudgetedLayers(['conflicts', 'economic']),
   };
 }
 
@@ -250,22 +296,9 @@ function buildTechnologyPreset(): LensPreset {
   return {
     id: 'technology-science',
     label: 'Technology and science',
-    description: 'Hardware, compute, network, research geography, and global risk overlays without globe mode.',
+    description: 'Technology preset keeps compute geography and cyber/event signals visible without turning on relationship overlays.',
     view: 'global',
-    layers: enableLayers(createEmptyLayers(), [
-      'conflicts',
-      'datacenters',
-      'startupHubs',
-      'cloudRegions',
-      'accelerators',
-      'techHQs',
-      'cables',
-      'outages',
-      'cyberThreats',
-      'minerals',
-      'spaceports',
-      'hotspots',
-    ]),
+    layers: createBudgetedLayers(['datacenters', 'cyberThreats']),
   };
 }
 
@@ -273,22 +306,9 @@ function buildMacroPreset(): LensPreset {
   return {
     id: 'macro-investment',
     label: 'Macro and market impact',
-    description: 'Country, infrastructure, and conflict context for market stress, trade, liquidity, and exposure.',
+    description: 'Macro preset prioritizes event/E2 markers with market geography; relationship arcs stay opt-in.',
     view: 'global',
-    layers: enableLayers(createEmptyLayers(), [
-      'conflicts',
-      'economic',
-      'stockExchanges',
-      'financialCenters',
-      'centralBanks',
-      'commodityHubs',
-      'waterways',
-      'tradeRoutes',
-      'cables',
-      'outages',
-      'hotspots',
-      'datacenters',
-    ]),
+    layers: createBudgetedLayers(['economic', 'stockExchanges']),
   };
 }
 
@@ -296,20 +316,9 @@ function buildClimatePreset(): LensPreset {
   return {
     id: 'climate-resilience',
     label: 'Climate and resilience',
-    description: 'Climate anomalies, natural events, fires, chokepoints, and geopolitical risk spillovers.',
+    description: 'Climate preset keeps anomaly and event evidence first; infrastructure spillovers require relationship mode.',
     view: 'global',
-    layers: enableLayers(createEmptyLayers(), [
-      'conflicts',
-      'climate',
-      'natural',
-      'fires',
-      'weather',
-      'waterways',
-      'outages',
-      'cables',
-      'renewableInstallations',
-      'hotspots',
-    ]),
+    layers: createBudgetedLayers(['climate', 'natural']),
   };
 }
 
@@ -317,26 +326,9 @@ function buildGeopoliticalPreset(): LensPreset {
   return {
     id: 'geopolitics-risk',
     label: 'Geopolitics and conflict',
-    description: 'Conflict zones, force posture, infrastructure risk, population stress, and border spillovers.',
+    description: 'Geopolitical preset emphasizes live event/E2 markers and conflict evidence; routes and country links are opt-in.',
     view: 'global',
-    layers: enableLayers(createEmptyLayers(), [
-      'conflicts',
-      'bases',
-      'cables',
-      'pipelines',
-      'hotspots',
-      'outages',
-      'cyberThreats',
-      'protests',
-      'military',
-      'natural',
-      'ucdpEvents',
-      'displacement',
-      'climate',
-      'tradeRoutes',
-      'iranAttacks',
-      'gpsJamming',
-    ]),
+    layers: createBudgetedLayers(['conflicts', 'ucdpEvents']),
   };
 }
 
@@ -441,7 +433,7 @@ function renderToolbarState(): void {
 
   const collapseButton = document.getElementById('lens-collapse-toggle') as HTMLButtonElement | null;
   if (collapseButton) {
-    collapseButton.textContent = overlayCollapsed ? '+' : '−';
+    collapseButton.textContent = overlayCollapsed ? 'Show' : 'Hide';
     collapseButton.classList.toggle('active', !overlayCollapsed);
     collapseButton.setAttribute('aria-expanded', String(!overlayCollapsed));
     collapseButton.setAttribute('aria-label', overlayCollapsed ? 'Expand overlay panels' : 'Collapse overlay panels');
@@ -463,9 +455,15 @@ function renderToolbarState(): void {
   const relationshipButton = document.getElementById('lens-relationship-toggle') as HTMLButtonElement | null;
   if (relationshipButton) {
     relationshipButton.classList.toggle('active', relationshipMode);
-    relationshipButton.textContent = relationshipMode ? 'Relationship mode · On' : 'Relationship mode';
+    relationshipButton.textContent = relationshipMode ? 'Relationship mode - On' : 'Relationship mode';
     relationshipButton.setAttribute('aria-pressed', String(relationshipMode));
   }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-zoom-preset]').forEach((button) => {
+    const isActive = button.dataset.zoomPreset === activeZoomPreset;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
 }
 
 function mapPeriod(period: string | null | undefined): LensContext['period'] {
@@ -535,7 +533,154 @@ function toSignalNewsItem(marker: MapLensEventMarker | MapLensE2SignalMarker): N
   };
 }
 
+function formatCoordinate(value: number, axis: 'lat' | 'lon'): string {
+  if (!Number.isFinite(value)) return 'not resolved';
+  const suffix = axis === 'lat'
+    ? value >= 0 ? 'N' : 'S'
+    : value >= 0 ? 'E' : 'W';
+  return `${Math.abs(value).toFixed(2)}${suffix}`;
+}
+
+function formatCountryCoords(country: CountryEvidenceSelection): string {
+  return `${formatCoordinate(country.lat, 'lat')} / ${formatCoordinate(country.lon, 'lon')}`;
+}
+
+function normalizeCountrySelection(payload: CountryClickPayload): CountryEvidenceSelection {
+  const lat = Number(payload.lat);
+  const lon = Number(payload.lon);
+  const payloadCode = sanitizeToken(payload.code).toUpperCase();
+  const validPayloadCode = /^[A-Z]{2}$/.test(payloadCode) ? payloadCode : '';
+  const coordinateHit = Number.isFinite(lat) && Number.isFinite(lon)
+    ? getCountryAtCoordinates(lat, lon, validPayloadCode ? [validPayloadCode] : undefined)
+    : null;
+  const code = validPayloadCode || sanitizeToken(coordinateHit?.code).toUpperCase();
+  const validCode = /^[A-Z]{2}$/.test(code) ? code : null;
+  const payloadName = sanitizeToken(payload.name);
+  const derivedName = validCode ? sanitizeToken(getCountryNameByCode(validCode)) : '';
+  const coordinateName = sanitizeToken(coordinateHit?.name);
+  const name = payloadName
+    || derivedName
+    || coordinateName
+    || (validCode ? `Country ${validCode}` : 'Open water / no country boundary');
+  return {
+    lat: Number.isFinite(lat) ? lat : 0,
+    lon: Number.isFinite(lon) ? lon : 0,
+    code: validCode,
+    name,
+  };
+}
+
+function markerMatchesCountry(country: CountryEvidenceSelection, lat: number, lon: number): boolean {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  if (!country.code) {
+    return Math.abs(lat - country.lat) <= 2.5 && Math.abs(lon - country.lon) <= 2.5;
+  }
+  const hit = getCountryAtCoordinates(lat, lon, [country.code]) ?? getCountryAtCoordinates(lat, lon);
+  return hit?.code === country.code;
+}
+
+function formatEvidenceDate(value: string | null | undefined): string {
+  if (!value) return 'live window';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'live window';
+  return date.toLocaleDateString();
+}
+
+function buildCountryEvidenceItems(country: CountryEvidenceSelection): string[] {
+  const payload = lastOverlayPayload;
+  if (!payload) return [];
+
+  const e2 = payload.e2Signals
+    .filter((marker) => markerMatchesCountry(country, marker.lat, marker.lon))
+    .slice(0, 3)
+    .map((marker) => {
+      const symbol = sanitizeToken(marker.symbol) || 'E2 signal';
+      const grade = sanitizeToken(marker.evidenceGrade) || 'E2';
+      const uplift = Number.isFinite(Number(marker.uplift)) ? `${Number(marker.uplift).toFixed(2)}% uplift` : 'uplift pending';
+      return `<div class="lens-evidence-item"><strong>${escapeHtml(grade)} - ${escapeHtml(symbol)}</strong>${escapeHtml(marker.title)}<br><span style="opacity:.72">${escapeHtml(uplift)} | ${escapeHtml(formatEvidenceDate(marker.publishedAt))}</span></div>`;
+    });
+
+  const events = payload.eventMarkers
+    .filter((marker) => markerMatchesCountry(country, marker.lat, marker.lon))
+    .slice(0, 3)
+    .map((marker) => (
+      `<div class="lens-evidence-item"><strong>Event hotspot</strong>${escapeHtml(marker.title)}<br><span style="opacity:.72">Intensity ${Number(marker.intensity || 0).toFixed(1)} | ${escapeHtml(formatEvidenceDate(marker.publishedAt))}</span></div>`
+    ));
+
+  const arcs = payload.transmissionArcs
+    .filter((arc) => (
+      markerMatchesCountry(country, arc.sourceLat, arc.sourceLon)
+      || markerMatchesCountry(country, arc.targetLat, arc.targetLon)
+      || Boolean(country.code && sanitizeToken(arc.targetLabel).toUpperCase().includes(country.code))
+      || Boolean(sanitizeToken(arc.targetLabel).toLowerCase().includes(country.name.toLowerCase()))
+    ))
+    .slice(0, 2)
+    .map((arc) => (
+      `<div class="lens-evidence-item"><strong>Relationship arc</strong>${escapeHtml(arc.title || arc.targetLabel)}<br><span style="opacity:.72">${escapeHtml(arc.relationType)} | strength ${Number(arc.strength || 0).toFixed(1)}</span></div>`
+    ));
+
+  return [...e2, ...events, ...arcs];
+}
+
+function renderCountryEvidenceDrawer(country: CountryEvidenceSelection): void {
+  selectedCountry = country;
+  const effectiveContext = getEffectiveContext(currentContext);
+  const active = activeLayerKeys(map.getState().layers);
+  const items = buildCountryEvidenceItems(country);
+  const generatedAt = lastOverlayPayload?.generatedAt ? new Date(lastOverlayPayload.generatedAt) : null;
+  const notes = [
+    country.code
+      ? `${country.name} resolved from country boundary ${country.code}.`
+      : 'No country boundary resolved; showing coordinate-level context instead.',
+    relationshipMode
+      ? 'Relationship mode is active; arcs and country-link overlays are included.'
+      : 'Relationship mode is off; event hotspots and E2 markers stay primary.',
+    generatedAt && Number.isFinite(generatedAt.getTime())
+      ? `Overlay generated ${generatedAt.toLocaleString()}.`
+      : 'Overlay generation time is not available.',
+  ];
+
+  setText('lens-country-title', country.name);
+  setText('lens-country-code', country.code ?? 'not resolved');
+  setText('lens-country-coords', formatCountryCoords(country));
+  setText('lens-country-context', `${humanize(effectiveContext.theme || 'global')} / ${PERIOD_LABELS[effectiveContext.period]}`);
+  setText('lens-country-layers', `${active.length} active`);
+  setHtml('lens-country-notes', notes.map((note) => `<li>${escapeHtml(note)}</li>`).join(''));
+  setHtml(
+    'lens-country-evidence',
+    items.length ? items.join('') : '<div class="lens-empty">No matched E2/event evidence in the current theme and period.</div>',
+  );
+
+  const drawer = document.getElementById('lens-country-drawer');
+  drawer?.classList.add('open');
+  drawer?.setAttribute('aria-hidden', 'false');
+}
+
+function closeCountryEvidenceDrawer(): void {
+  selectedCountry = null;
+  map.clearCountryHighlight();
+  const drawer = document.getElementById('lens-country-drawer');
+  drawer?.classList.remove('open');
+  drawer?.setAttribute('aria-hidden', 'true');
+}
+
+function applyZoomPreset(preset: LensZoomPresetId): void {
+  activeZoomPreset = preset;
+  const focus = selectedCountry ?? map.getCenter() ?? { lat: 20, lon: 0 };
+  if (preset === 'global') {
+    map.setView('global');
+  } else {
+    map.setCenter(focus.lat, focus.lon, ZOOM_PRESET_ZOOMS[preset]);
+  }
+  renderToolbarState();
+  const target = preset === 'country' && !selectedCountry
+    ? 'Country preset is centered on the current viewport until a country is selected.'
+    : `${humanize(preset)} zoom preset is active.`;
+  setText('lens-notes', `${target} Relationship overlays remain ${relationshipMode ? 'visible' : 'opt-in'}.`);
+}
+
 async function refreshDynamicData(): Promise<void> {
+  if (renderPausedByHost) return;
   const effectiveContext = getEffectiveContext(currentContext);
   const layers = map.getState().layers;
   const statuses: SourceStatus[] = [];
@@ -560,6 +705,7 @@ async function refreshDynamicData(): Promise<void> {
 
   tasks.push(record('signal-map', 'Event hotspots and E2 markers', async () => {
     const overlays = await fetchMapLensOverlays(effectiveContext);
+    lastOverlayPayload = overlays;
     const signalMarkers = [
       ...overlays.eventMarkers.map((marker) => ({
         id: marker.id,
@@ -599,7 +745,7 @@ async function refreshDynamicData(): Promise<void> {
       ...overlays.e2Signals.map((marker) => ({
         lat: marker.lat,
         lon: marker.lon,
-        title: `${marker.symbol || 'E2'} · ${marker.title}`,
+        title: `${marker.symbol || 'E2'} - ${marker.title}`,
         threatLevel: 'critical',
         timestamp: marker.publishedAt ? new Date(marker.publishedAt) : new Date(),
       })),
@@ -715,6 +861,10 @@ async function refreshDynamicData(): Promise<void> {
 
   await Promise.all(tasks);
   renderSourceStatuses(statuses);
+  if (selectedCountry) {
+    renderCountryEvidenceDrawer(selectedCountry);
+  }
+  if (renderPausedByHost) return;
   map.render();
 }
 
@@ -724,19 +874,20 @@ function applyContext(context: LensContext): void {
   currentPreset = resolvePreset(effectiveContext.theme, effectiveContext.evolutionParent);
   const nextLayers = { ...currentPreset.layers };
   if (relationshipMode) {
-    nextLayers.tradeRoutes = true;
-    nextLayers.waterways = true;
-    nextLayers.economic = true;
-    nextLayers.stockExchanges = true;
-    nextLayers.financialCenters = true;
-    nextLayers.centralBanks = true;
+    for (const key of RELATIONSHIP_LAYER_KEYS) {
+      nextLayers[key] = true;
+    }
   }
   map.setLayers(nextLayers);
   map.setView(currentPreset.view);
   map.setTimeRange(periodToTimeRange(effectiveContext.period));
   map.setRelationshipMode(relationshipMode);
   renderPresetMeta(currentPreset, effectiveContext, nextLayers);
+  if (selectedCountry) {
+    renderCountryEvidenceDrawer(selectedCountry);
+  }
   renderToolbarState();
+  if (renderPausedByHost) return;
   map.render();
   void refreshDynamicData();
 }
@@ -745,8 +896,21 @@ function installBridge(): void {
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin) return;
     const message = event.data as { source?: string; type?: string; payload?: unknown } | null;
-    if (!message || message.source !== 'theme-workspace' || message.type !== 'wm-map-lens-context') return;
-    applyContext(normalizeContext(message.payload));
+    if (!message || message.source !== 'theme-workspace') return;
+    if (message.type === 'wm-map-lens-context') {
+      applyContext(normalizeContext(message.payload));
+      return;
+    }
+    if (message.type === 'wm-map-lens-visibility') {
+      const payload = message.payload as { paused?: unknown } | null;
+      const nextPaused = Boolean(payload?.paused);
+      const changed = renderPausedByHost !== nextPaused;
+      renderPausedByHost = nextPaused;
+      map.setRenderPaused(nextPaused);
+      if (!nextPaused && changed) {
+        applyContext(currentContext);
+      }
+    }
   });
 
   if (window.parent !== window) {
@@ -772,6 +936,13 @@ function installControls(): void {
     });
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-zoom-preset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextPreset = String(button.dataset.zoomPreset || 'global') as LensZoomPresetId;
+      applyZoomPreset(nextPreset in ZOOM_PRESET_ZOOMS ? nextPreset : 'global');
+    });
+  });
+
   const periodSlider = document.getElementById('lens-period-slider') as HTMLInputElement | null;
   periodSlider?.addEventListener('input', () => {
     const index = Math.max(0, Math.min(FILTER_PERIODS.length - 1, Number(periodSlider.value) || 0));
@@ -785,6 +956,10 @@ function installControls(): void {
     applyContext(currentContext);
   });
 
+  document.getElementById('lens-country-close')?.addEventListener('click', () => {
+    closeCountryEvidenceDrawer();
+  });
+
   renderToolbarState();
 }
 
@@ -796,6 +971,18 @@ function installMapObservers(): void {
     const view = humanize(state.view);
     const relationshipCopy = relationshipMode ? 'Relationship mode is active, so transmission and country-link arcs are emphasized.' : 'Switch relationship mode on to emphasize transmission and country-link arcs.';
     setText('lens-notes', `The 3D globe is intentionally removed here. Current view is ${view}. ${relationshipCopy}`);
+  });
+  map.setOnCountryClick((payload) => {
+    const country = normalizeCountrySelection(payload);
+    renderCountryEvidenceDrawer(country);
+    if (country.code) {
+      map.highlightCountry(country.code);
+    } else {
+      map.clearCountryHighlight();
+    }
+    if (activeZoomPreset === 'country' || activeZoomPreset === 'city') {
+      map.setCenter(country.lat, country.lon, ZOOM_PRESET_ZOOMS[activeZoomPreset]);
+    }
   });
 }
 

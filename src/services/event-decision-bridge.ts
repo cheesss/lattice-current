@@ -51,10 +51,18 @@ export async function loadEvidenceGrades(): Promise<Map<string, string>> {
       logger.warn('evidence grades fetch failed', { status: resp.status });
       return evidenceCache ?? new Map();
     }
-    const rows: Array<{ theme: string; symbol: string; horizon: string; evidence_grade: string }> = await resp.json();
+    const payload = await resp.json() as
+      | Array<{ theme?: string; symbol?: string; horizon?: string; evidence_grade?: string; evidenceGrade?: string }>
+      | { signals?: Array<{ theme?: string; symbol?: string; horizon?: string; evidence_grade?: string; evidenceGrade?: string }> };
+    const rows = Array.isArray(payload) ? payload : Array.isArray(payload.signals) ? payload.signals : [];
     const cache = new Map<string, string>();
     for (const row of rows) {
-      cache.set(evidenceCacheKey(row.theme, row.symbol, row.horizon), row.evidence_grade);
+      const theme = row.theme;
+      const symbol = row.symbol;
+      const horizon = row.horizon;
+      const grade = row.evidenceGrade || row.evidence_grade;
+      if (!theme || !symbol || !horizon || !grade) continue;
+      cache.set(evidenceCacheKey(theme, symbol, horizon), grade);
     }
     evidenceCache = cache;
     evidenceCacheExpiry = Date.now() + EVIDENCE_CACHE_TTL_MS;

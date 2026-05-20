@@ -22,7 +22,7 @@ PG = {
     "host": os.environ.get("PG_HOST", "192.168.0.2"),
     "port": int(os.environ.get("PG_PORT", 5433)),
     "user": os.environ.get("PG_USER", "postgres"),
-    "password": os.environ.get("PG_PASSWORD", os.environ.get("PGPASSWORD", "lattice1234")),
+    "password": require_pg_password(),
     "dbname": os.environ.get("PG_DATABASE", "lattice"),
 }
 
@@ -108,6 +108,8 @@ def main():
     conn.commit()
 
     # Step 3: Update abnormal_return using date-based join (covers previously NULL rows)
+    # NOTE: PostgreSQL UPDATE...FROM cannot reference the target table's alias inside
+    # the FROM/JOIN ON clauses. Move alias-dependent predicates to WHERE.
     cur.execute("""
         UPDATE labeled_outcomes lo
         SET market_return = mr.forward_return_pct,
@@ -115,8 +117,8 @@ def main():
         FROM articles a
         JOIN market_returns mr ON mr.trade_date = DATE(a.published_at)
             AND mr.symbol = 'SPY'
-            AND mr.horizon = lo.horizon
         WHERE a.id = lo.article_id
+            AND mr.horizon = lo.horizon
             AND lo.symbol != 'SPY'
             AND lo.forward_return_pct IS NOT NULL
             AND lo.abnormal_return IS NULL
@@ -125,7 +127,6 @@ def main():
     print(f"  abnormal_return updated (date-based): {updated} rows")
 
     # Step 4: Update sector_return where possible
-    # Build sector mapping in SQL
     sector_cases = []
     for sym, etf in SYMBOL_TO_SECTOR.items():
         sector_cases.append(f"WHEN '{sym}' THEN '{etf}'")
@@ -136,9 +137,9 @@ def main():
         SET sector_return = mr.forward_return_pct
         FROM articles a
         JOIN market_returns mr ON mr.trade_date = DATE(a.published_at)
+        WHERE a.id = lo.article_id
             AND mr.symbol = ({sector_case_sql})
             AND mr.horizon = lo.horizon
-        WHERE a.id = lo.article_id
             AND lo.sector_return IS NULL
             AND lo.forward_return_pct IS NOT NULL
     """)

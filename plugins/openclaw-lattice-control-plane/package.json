@@ -1,0 +1,36 @@
+{
+  "name": "@lattice/openclaw-lattice-control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw control-plane tools for local Lattice operator surfaces, including guarded review actions.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "smoke": "node ./smoke-check.mjs --skip-sidecar",
+    "smoke:all": "node ./smoke-check.mjs"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2",
+      "pluginSdkVersion": "2026.3.24-beta.2"
+    }
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "openclaw": "2026.4.14",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.41"
+  }
+}

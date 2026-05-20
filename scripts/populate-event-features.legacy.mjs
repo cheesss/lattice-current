@@ -22,7 +22,7 @@ const PG_CONFIG = {
   host: process.env.PG_HOST || '192.168.0.2',
   port: Number(process.env.PG_PORT || 5433),
   user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD || process.env.PGPASSWORD || 'lattice1234',
+  password: process.env.PG_PASSWORD || process.env.PGPASSWORD || process.env.INTEL_PG_PASSWORD || process.env.NAS_PG_PASSWORD || (() => { throw new Error('Missing PostgreSQL password. Set PG_PASSWORD, PGPASSWORD, INTEL_PG_PASSWORD, or NAS_PG_PASSWORD.'); })(),
   database: process.env.PG_DATABASE || 'lattice',
 };
 

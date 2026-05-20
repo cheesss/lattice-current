@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
-import { mkdir, open, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import type { HistoricalBackfillOptions, HistoricalFrameLoadOptions } from '../importer/historical-stream-worker';
 import { listHistoricalDatasets, loadHistoricalReplayFramesFromDuckDb, processHistoricalDump } from '../importer/historical-stream-worker';
@@ -78,7 +78,7 @@ import {
 // The orchestration cycle is re-exported from ./automation-orchestrator.
 
 type HistoricalProvider = 'fred' | 'alfred' | 'gdelt-doc' | 'coingecko' | 'acled' | 'yahoo-chart' | 'rss-feed';
-type AutomationJobKind = 'fetch' | 'import' | 'replay' | 'walk-forward' | 'theme-discovery' | 'theme-proposer' | 'candidate-expansion' | 'source-automation' | 'keyword-lifecycle' | 'dataset-discovery' | 'self-tuning' | 'retention';
+type AutomationJobKind = 'fetch' | 'import' | 'replay' | 'walk-forward' | 'theme-discovery' | 'theme-proposer' | 'candidate-expansion' | 'source-automation' | 'source-repair' | 'keyword-lifecycle' | 'dataset-discovery' | 'self-tuning' | 'retention';
 type ThemeAutomationMode = 'manual' | 'guarded-auto' | 'full-auto';
 type GapSeverity = 'watch' | 'elevated' | 'critical';
 
@@ -247,6 +247,14 @@ export interface IntelligenceAutomationCycleResult {
   registeredDatasets: string[];
   tuningAction: 'idle' | 'observe' | 'promote' | 'rollback';
   sourceAutomation: Awaited<ReturnType<typeof runSourceAutomationSweep>>;
+  sourceRepairClosedLoop: {
+    ok: boolean;
+    successes: number;
+    pipelineSuccesses: number;
+    countedSuccesses: number;
+    auditPath?: string;
+    error?: string;
+  };
   queueOpenCount: number;
 }
 
@@ -721,6 +729,26 @@ async function markActiveCycleFailed(args: {
   } catch {
     // Best effort only. The original failure should remain the primary signal.
   }
+  try {
+    const { createOpenClawEvent, emitOpenClawEvent } = await import('../../../scripts/_shared/openclaw-webhook-emitter.mjs');
+    await emitOpenClawEvent(createOpenClawEvent({
+      eventType: 'scheduler-cycle-failed',
+      severity: 'critical',
+      entityType: 'scheduler-cycle',
+      entityId: current.id || 'active-cycle',
+      surface: 'ops',
+      summary: `Intelligence automation cycle failed at ${failedStage}`,
+      payload: {
+        cycleId: current.id,
+        stage: failedStage,
+        lastError: message,
+        completedDatasets: typeof args.completedDatasets === 'number' ? args.completedDatasets : current.completedDatasets,
+        touchedDatasets: Array.isArray(args.touchedDatasets) ? args.touchedDatasets : current.touchedDatasets,
+      },
+    }));
+  } catch {
+    // Webhook emission is best effort only.
+  }
 }
 
 function normalizeRegistry(raw?: Partial<IntelligenceAutomationRegistry> | null): IntelligenceAutomationRegistry {
@@ -834,7 +862,15 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
 
 async function writeJsonFile(filePath: string, payload: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8');
+  const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  const body = JSON.stringify(payload, null, 2);
+  try {
+    await writeFile(tmpPath, body, 'utf8');
+    await rename(tmpPath, filePath);
+  } catch (error) {
+    await rm(tmpPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 export async function loadAutomationRegistry(registryPath = DEFAULT_REGISTRY_PATH): Promise<IntelligenceAutomationRegistry> {
@@ -2320,6 +2356,54 @@ async function runCandidateExpansionSweep(args: {
   return { themeIds, acceptedAny };
 }
 
+async function runSourceRepairClosedLoopFromScheduler(): Promise<IntelligenceAutomationCycleResult['sourceRepairClosedLoop']> {
+  const startedAt = nowIso();
+  try {
+    const { execSync } = await import('child_process');
+    const target = clamp(Math.floor(Number(process.env.SOURCE_REPAIR_CLOSED_LOOP_TARGET || 20)), 1, 50);
+    const limit = clamp(Math.floor(Number(process.env.SOURCE_REPAIR_CLOSED_LOOP_LIMIT || 300)), 1, 500);
+    const maxCandidates = clamp(Math.floor(Number(process.env.SOURCE_REPAIR_MAX_CANDIDATES || 48)), 1, 80);
+    const backfillLimit = clamp(Math.floor(Number(process.env.SOURCE_REPAIR_BACKFILL_LIMIT || 60)), 1, 300);
+    const dailyBudget = clamp(Math.floor(Number(process.env.SOURCE_REPAIR_DAILY_RSS_BUDGET || 120)), 0, 500);
+    const timeoutMs = clamp(Math.floor(Number(process.env.SOURCE_REPAIR_CLOSED_LOOP_TIMEOUT_MS || 900_000)), 30_000, 1_800_000);
+    const stdout = execSync(
+      [
+        'node --import tsx scripts/run-source-repair-closed-loop.mjs',
+        '--apply',
+        '--catalog-bootstrap',
+        '--full-heuristic',
+        '--count-historical-successes',
+        `--target-successes ${target}`,
+        `--limit ${limit}`,
+        `--max-candidates ${maxCandidates}`,
+        `--backfill-limit ${backfillLimit}`,
+        `--daily-rss-budget ${dailyBudget}`,
+      ].join(' '),
+      {
+        cwd: process.cwd(),
+        timeout: timeoutMs,
+        stdio: 'pipe',
+      },
+    ).toString('utf8');
+    const parsed = JSON.parse(stdout);
+    return {
+      ok: Boolean(parsed.ok),
+      successes: Number(parsed.successes || 0),
+      pipelineSuccesses: Number(parsed.pipelineSuccesses || 0),
+      countedSuccesses: Number(parsed.countedSuccesses ?? parsed.pipelineSuccesses ?? 0),
+      auditPath: parsed.auditPath ? String(parsed.auditPath) : undefined,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      successes: 0,
+      pipelineSuccesses: 0,
+      countedSuccesses: 0,
+      error: `${startedAt}: ${error instanceof Error ? error.message : String(error)}`.slice(0, 500),
+    };
+  }
+}
+
 export async function runIntelligenceAutomationCycle(args: {
   registryPath?: string;
   statePath?: string;
@@ -2724,6 +2808,27 @@ export async function runIntelligenceAutomationCycle(args: {
   ), state);
   await flushAutomationState(state, statePath, registry.defaults.retentionDays);
 
+  updateActiveCycle(state, {
+    stage: 'global:source-repair-closed-loop',
+    datasetId: null,
+    completedDatasets,
+    touchedDatasets: Array.from(touchedDatasets),
+  });
+  const sourceRepairClosedLoop = await runSourceRepairClosedLoopFromScheduler();
+  appendRun(state, {
+    id: `global:source-repair:${nowIso()}`,
+    datasetId: 'global',
+    kind: 'source-repair',
+    status: sourceRepairClosedLoop.ok ? 'ok' : 'error',
+    startedAt: nowIso(),
+    completedAt: nowIso(),
+    attempts: 1,
+    detail: sourceRepairClosedLoop.ok
+      ? `counted=${sourceRepairClosedLoop.countedSuccesses} new=${sourceRepairClosedLoop.pipelineSuccesses} audit=${sourceRepairClosedLoop.auditPath || 'n/a'}`
+      : `failed: ${sourceRepairClosedLoop.error || 'unknown'}`,
+  });
+  await flushAutomationState(state, statePath, registry.defaults.retentionDays);
+
   if (manualTrigger || shouldRunEvery(state.lastKeywordLifecycleAt, registry.defaults.keywordLifecycleEveryMinutes, nowMs)) {
     updateActiveCycle(state, {
       stage: 'global:keyword-lifecycle',
@@ -3033,7 +3138,7 @@ export async function runIntelligenceAutomationCycle(args: {
   try {
     const { execSync } = await import('child_process');
     execSync('node --import tsx scripts/auto-pipeline.mjs --step 3 --step 5 --limit 500', {
-      cwd: path.resolve(path.dirname(statePath), '..'),
+      cwd: process.cwd(),
       timeout: 120_000,
       stdio: 'pipe',
     });
@@ -3068,6 +3173,54 @@ export async function runIntelligenceAutomationCycle(args: {
   });
   await flushAutomationState(state, statePath, registry.defaults.retentionDays);
 
+  try {
+    const { emitEventDecisionAlerts } = await import('../../../scripts/_shared/event-decision-alerts.mjs');
+    await emitEventDecisionAlerts({ sinceHours: 24, tThreshold: 2.0, limit: 20 });
+  } catch {
+    // best effort
+  }
+
+  try {
+    const { createOpenClawEvent, emitOpenClawEvents } = await import('../../../scripts/_shared/openclaw-webhook-emitter.mjs');
+    await emitOpenClawEvents([
+      createOpenClawEvent({
+        eventType: 'scheduler-cycle-completed',
+        severity: 'info',
+        entityType: 'scheduler-cycle',
+        entityId: cycleId,
+        surface: 'ops',
+        summary: `Intelligence automation cycle completed`,
+        payload: {
+          cycleId,
+          datasetCount: enabledDatasets.length,
+          touchedDatasets: Array.from(touchedDatasets),
+          promotedThemes,
+          candidateThemes,
+          registeredDatasets,
+          tuningAction,
+          queueOpenCount: state.themeQueue.filter((item) => item.status === 'open').length,
+        },
+      }),
+      createOpenClawEvent({
+        eventType: 'brief-ready',
+        severity: 'info',
+        entityType: 'brief',
+        entityId: cycleId,
+        surface: 'home',
+        summary: 'Daily operator brief is ready after the latest automation cycle',
+        payload: {
+          cycleId,
+          briefKinds: ['daily'],
+          touchedDatasets: Array.from(touchedDatasets),
+          promotedThemes,
+          candidateThemes,
+        },
+      }),
+    ]);
+  } catch {
+    // Webhook emission is best effort only.
+  }
+
   return {
     startedAt,
     completedAt: nowIso(),
@@ -3080,6 +3233,7 @@ export async function runIntelligenceAutomationCycle(args: {
     registeredDatasets,
     tuningAction,
     sourceAutomation,
+    sourceRepairClosedLoop,
     queueOpenCount: state.themeQueue.filter((item) => item.status === 'open').length,
   };
   } catch (error) {
@@ -3113,12 +3267,26 @@ export async function runIntelligenceAutomationWorker(args: {
   once?: boolean;
 } = {}): Promise<void> {
   const intervalMs = Math.max(1, Math.round(args.pollIntervalMinutes || 5)) * 60_000;
+  let consecutiveFailures = 0;
   do {
-    await runIntelligenceAutomationCycle({
-      registryPath: args.registryPath,
-      statePath: args.statePath,
-    });
+    const cycleStart = Date.now();
+    try {
+      await runIntelligenceAutomationCycle({
+        registryPath: args.registryPath,
+        statePath: args.statePath,
+      });
+      consecutiveFailures = 0;
+    } catch (error) {
+      consecutiveFailures += 1;
+      const message = String((error as Error)?.stack || (error as Error)?.message || error);
+      process.stderr.write(
+        `[intelligence-automation-worker] cycle failed (consecutive=${consecutiveFailures}, durationMs=${Date.now() - cycleStart}): ${message.slice(0, 800)}\n`,
+      );
+    }
     if (args.once) return;
-    await sleep(intervalMs);
+    const backoffMs = consecutiveFailures > 0
+      ? Math.min(intervalMs * Math.pow(2, Math.min(consecutiveFailures - 1, 4)), 30 * 60_000)
+      : intervalMs;
+    await sleep(backoffMs);
   } while (true);
 }

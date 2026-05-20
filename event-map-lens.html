@@ -40,6 +40,12 @@
     .lens-chip.active,.lens-mode-btn.active,.lens-icon-btn.active{
       border-color:rgba(126,224,129,.36);background:rgba(126,224,129,.12);color:#d8ffe0
     }
+    .lens-toolbar-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--lens-muted);margin-right:2px}
+    .lens-zoom-btn{
+      appearance:none;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);color:var(--lens-text);
+      border-radius:10px;padding:8px 10px;font:inherit;font-size:12px;cursor:pointer;transition:.18s ease
+    }
+    .lens-zoom-btn.active{border-color:rgba(124,184,255,.42);background:rgba(124,184,255,.13);color:#dbeafe}
     .lens-slider-wrap{display:flex;align-items:center;gap:10px;min-width:260px}
     .lens-slider{width:180px;accent-color:#7ee081}
     .lens-slider-labels{display:flex;gap:10px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--lens-muted)}
@@ -82,6 +88,24 @@
     .lens-footer .lens-card{pointer-events:auto;max-width:520px}
     .lens-theme-stack{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
     .lens-theme-chip{padding:6px 10px;border-radius:999px;background:rgba(126,224,129,.1);border:1px solid rgba(126,224,129,.2);font-size:12px;color:#d8ffe0}
+    .lens-country-drawer{
+      position:absolute;top:78px;right:16px;bottom:16px;z-index:6;width:min(390px,calc(100vw - 32px));
+      transform:translateX(calc(100% + 24px));opacity:0;pointer-events:none;transition:opacity .2s ease, transform .22s ease;
+      background:rgba(7,14,22,.9);border:1px solid rgba(255,255,255,.1);border-radius:20px;box-shadow:var(--lens-shadow);
+      backdrop-filter:blur(22px);padding:16px;display:flex;flex-direction:column;gap:14px
+    }
+    .lens-country-drawer.open{transform:translateX(0);opacity:1;pointer-events:auto}
+    .lens-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .lens-drawer-close{
+      appearance:none;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:var(--lens-text);
+      border-radius:999px;width:34px;height:34px;cursor:pointer;font-size:18px;line-height:1
+    }
+    .lens-drawer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .lens-evidence-list{display:grid;gap:8px;overflow:auto;padding-right:4px}
+    .lens-evidence-item{padding:10px 11px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.065);font-size:12px;line-height:1.35}
+    .lens-evidence-item strong{display:block;margin-bottom:4px;color:var(--lens-text)}
+    .lens-note-list{margin:0;padding-left:18px;color:var(--lens-muted);font-size:12px;line-height:1.45}
+    .lens-note-list li{margin:0 0 6px}
     #lens-root.overlay-collapsed .lens-overlay,
     #lens-root.overlay-collapsed .lens-footer{
       opacity:0;transform:translateY(-10px);pointer-events:none
@@ -94,6 +118,7 @@
       .lens-toolbar{top:12px;left:12px;right:12px}
       .lens-overlay{grid-template-columns:1fr}
       .lens-footer{flex-direction:column;align-items:stretch}
+      .lens-country-drawer{top:92px;right:12px;bottom:12px}
     }
   </style>
 </head>
@@ -102,7 +127,7 @@
     <div id="lens-map" aria-label="Theme map lens"></div>
     <div class="lens-toolbar" aria-label="Map lens controls">
       <div class="lens-toolbar-toggle">
-        <button id="lens-collapse-toggle" class="lens-icon-btn" type="button" aria-expanded="true" aria-label="Collapse overlay panels">−</button>
+        <button id="lens-collapse-toggle" class="lens-icon-btn" type="button" aria-expanded="true" aria-label="Collapse overlay panels">Hide</button>
       </div>
       <div class="lens-toolbar-group" id="lens-filter-bar">
         <button class="lens-chip active" type="button" data-filter="all">All</button>
@@ -111,6 +136,13 @@
         <button class="lens-chip" type="button" data-filter="tech">Tech</button>
         <button class="lens-chip" type="button" data-filter="energy">Energy</button>
         <button class="lens-chip" type="button" data-filter="climate">Climate</button>
+      </div>
+      <div class="lens-toolbar-group" aria-label="Zoom presets">
+        <span class="lens-toolbar-label">Zoom</span>
+        <button class="lens-zoom-btn active" type="button" data-zoom-preset="global">Global</button>
+        <button class="lens-zoom-btn" type="button" data-zoom-preset="regional">Regional</button>
+        <button class="lens-zoom-btn" type="button" data-zoom-preset="country">Country</button>
+        <button class="lens-zoom-btn" type="button" data-zoom-preset="city">City</button>
       </div>
       <div class="lens-toolbar-group lens-slider-wrap">
         <div class="lens-slider-stack">
@@ -157,6 +189,33 @@
         <div id="lens-notes" class="lens-copy">The 3D globe is intentionally removed here. Manual layer toggles still work inside the map chrome so existing risk-region and relationship views stay usable.</div>
       </section>
     </div>
+    <aside id="lens-country-drawer" class="lens-country-drawer" aria-hidden="true" aria-label="Country evidence drawer">
+      <div class="lens-drawer-head">
+        <div>
+          <div class="lens-kicker">Country Evidence</div>
+          <h2 id="lens-country-title" class="lens-title">Select a country</h2>
+        </div>
+        <button id="lens-country-close" class="lens-drawer-close" type="button" aria-label="Close country evidence drawer">x</button>
+      </div>
+      <div class="lens-drawer-grid">
+        <div class="lens-stat"><div class="lens-stat-label">Code</div><div id="lens-country-code" class="lens-stat-value">not selected</div></div>
+        <div class="lens-stat"><div class="lens-stat-label">Lat / Lon</div><div id="lens-country-coords" class="lens-stat-value">not selected</div></div>
+        <div class="lens-stat"><div class="lens-stat-label">Theme / Period</div><div id="lens-country-context" class="lens-stat-value">Global / Quarter</div></div>
+        <div class="lens-stat"><div class="lens-stat-label">Active Layers</div><div id="lens-country-layers" class="lens-stat-value">0 active</div></div>
+      </div>
+      <div>
+        <div class="lens-kicker">Operator Notes</div>
+        <ul id="lens-country-notes" class="lens-note-list">
+          <li>Click a country or country-linked node to open evidence.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="lens-kicker">Matched Evidence</div>
+        <div id="lens-country-evidence" class="lens-evidence-list">
+          <div class="lens-empty">No country selected.</div>
+        </div>
+      </div>
+    </aside>
   </div>
   <script type="module" src="/src/theme-map-lens.ts"></script>
 </body>

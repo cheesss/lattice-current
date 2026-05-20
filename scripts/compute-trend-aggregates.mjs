@@ -14,6 +14,7 @@ import {
   isCanonicalThemeKey,
   resolveThemeTaxonomy,
 } from './_shared/theme-taxonomy.mjs';
+import { isLowValueGoogleNewsSourceName } from './_shared/google-news-source-policy.mjs';
 
 loadOptionalEnvFile();
 
@@ -529,7 +530,7 @@ async function loadArticleCorpus(client, options) {
 
   return {
     earliestLoadedDate: formatDateUtc(earliestDate),
-    rows: rows.map((row) => {
+    rows: rows.filter((row) => !isLowValueGoogleNewsSourceName(row.source)).map((row) => {
       const publishedDate = toDateOnly(row.published_date);
       const taxonomyFallback = resolveThemeTaxonomy(
         looksLikeDiscoveryTopic(row.theme)

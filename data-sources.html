@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Sources · Lattice Current</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/dashboard/shared/tokens.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:linear-gradient(180deg,var(--bg-void) 0%,var(--bg-base) 50%,#08090b 100%);color:var(--text);font-family:var(--font-sans);font-size:13px;line-height:1.65;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:920px;margin:0 auto;padding:36px 24px 64px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+h1{font-size:28px;line-height:1.15;font-weight:600;color:var(--text-loud);margin-bottom:8px}
+.tagline{color:var(--muted);font-size:14px;max-width:760px;margin-bottom:24px}
+h2{font-size:15px;font-weight:600;color:var(--text-loud);margin:24px 0 10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:20px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border-dim);vertical-align:top}
+th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.src{font-weight:600;color:var(--text-loud);white-space:nowrap}
+td.role{color:var(--text-base)}
+td.terms a{font-size:12px}
+.callout{padding:14px 18px;border:1px solid var(--border-base);border-radius:12px;background:rgba(28,32,40,.5);margin:18px 0;color:var(--text-loud);font-size:12.5px}
+footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--border-dim);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="eyebrow">Attribution</div>
+  <h1>Data sources</h1>
+  <p class="tagline">Lattice Current ingests public news, market data, research metadata, and code-activity signals from the providers below. The aggregation, ranking, and evidence-grading logic is original; the underlying data is licensed by each provider on their own terms.</p>
+
+  <h2>News and curated feeds</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Role</th><th>License / terms</th></tr></thead>
+    <tbody>
+      <tr><td class="src">RSS publishers (40+)</td><td class="role">Headlines and short summaries via RSS feeds (Guardian, NYT, Reuters, Bloomberg, FT, AP, BBC, NPR, Al Jazeera, Politico, etc.)</td><td class="terms">Each publisher's RSS terms apply. We link to original articles and store only metadata + truncated excerpts under fair-use research. See <a href="/vercel.json">/vercel.json</a> for the full allowed-domain list.</td></tr>
+      <tr><td class="src">GDELT 2.0</td><td class="role">Global event records (CAMEO-coded)</td><td class="terms"><a href="https://www.gdeltproject.org/about.html#termsofuse" target="_blank" rel="noopener">GDELT terms</a> — public domain / open-access for non-commercial research.</td></tr>
+      <tr><td class="src">Hacker News</td><td class="role">Tech and startup signal via hnrss.org</td><td class="terms">Public submissions; HN platform terms apply.</td></tr>
+      <tr><td class="src">arXiv</td><td class="role">Research-evidence layer</td><td class="terms"><a href="https://arxiv.org/help/api/tou" target="_blank" rel="noopener">arXiv API terms</a> — usage allowed with attribution + rate limits.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Market and economic data</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Role</th><th>License / terms</th></tr></thead>
+    <tbody>
+      <tr><td class="src">Yahoo Finance</td><td class="role">Delayed equity quotes for SPY, sector ETFs, and event-mapped tickers</td><td class="terms">Yahoo Finance personal-use; no redistribution of the raw quote stream. We persist daily returns only (no order book, no real-time).</td></tr>
+      <tr><td class="src">FRED (St. Louis Fed)</td><td class="role">Macro signals (VIX, yield spread, oil, dollar, etc.)</td><td class="terms"><a href="https://fred.stlouisfed.org/legal/" target="_blank" rel="noopener">FRED terms</a> — public domain US gov data.</td></tr>
+      <tr><td class="src">SEC EDGAR</td><td class="role">Filings and entity metadata for theme-symbol mapping</td><td class="terms"><a href="https://www.sec.gov/about/data/data-services" target="_blank" rel="noopener">SEC data services</a> — public domain.</td></tr>
+      <tr><td class="src">USGS Earthquake</td><td class="role">Geo-event signal feed</td><td class="terms">Public domain US gov data.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Research and code activity</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Role</th><th>License / terms</th></tr></thead>
+    <tbody>
+      <tr><td class="src">OpenAlex</td><td class="role">Research-paper graph for theme reinforcement</td><td class="terms"><a href="https://openalex.org/about" target="_blank" rel="noopener">OpenAlex</a> — CC0; free use with attribution requested.</td></tr>
+      <tr><td class="src">GitHub</td><td class="role">Code-activity reinforcement (repo pushes, language footprint)</td><td class="terms">GitHub REST/GraphQL API terms; we use search + repo metadata only.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Models and code libraries</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Role</th><th>License / terms</th></tr></thead>
+    <tbody>
+      <tr><td class="src">PyTorch / Lightning</td><td class="role">Meta-model training (multi-task MLP)</td><td class="terms">BSD-3-Clause / Apache-2.0.</td></tr>
+      <tr><td class="src">LightGBM, scikit-learn</td><td class="role">Model comparison baselines</td><td class="terms">MIT / BSD-3-Clause.</td></tr>
+      <tr><td class="src">Ollama (nomic-embed-text, gemma3)</td><td class="role">Local embedding + classification fallback</td><td class="terms">MIT (Ollama). Underlying model weights have their own licenses; check before redistribution.</td></tr>
+      <tr><td class="src">Codex CLI (Anthropic)</td><td class="role">LLM narrative generation for theme briefs</td><td class="terms">Anthropic API terms apply.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Aggregation rights.</strong> Lattice Current's ranking, lane classification, evidence-grading, and product-quality metrics are original work licensed under AGPL v3.0. The underlying data remains under each provider's license — we re-publish only metadata, evidence-grade scores, and links back to the originals.
+  </div>
+
+  <footer>
+    <div>Last revised 2026-05-01</div>
+    <div>
+      <a href="/event-dashboard.html">← Dashboard</a>
+      &nbsp;·&nbsp;
+      <a href="/license.html">License</a>
+      &nbsp;·&nbsp;
+      <a href="/terms.html">Terms of use</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

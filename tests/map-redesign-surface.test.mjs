@@ -46,5 +46,8 @@ describe('map redesign guardrails', () => {
     assert.equal(apiSource.includes("if (segments[0] === 'api' && segments[1] === 'map-lens-overlays') {"), true);
     assert.equal(apiSource.includes('transmissionArcs'), true);
     assert.equal(apiSource.includes("evidence_grade = 'E2'"), true);
+    assert.equal(apiSource.includes('HOT_EVENTS_MIN_PROMOTION_CONTROLS'), true);
+    assert.equal(apiSource.includes('COALESCE(eu.n_controls, 0) >='), true);
+    assert.equal(apiSource.includes('market_relevance'), true);
   });
 });

@@ -4,6 +4,41 @@ import { getThemeConfig, resolveThemeTaxonomy } from './theme-taxonomy.mjs';
 const REVIEW_DECISIONS = new Set(['canonical', 'watch', 'suppressed']);
 const ALERT_SEVERITIES = new Set(['critical', 'high', 'medium', 'low']);
 const NOTE_STATUS = new Set(['active', 'archived']);
+const LOW_INFORMATION_DISCOVERY_KEYWORDS = new Set([
+  'aol',
+  'april',
+  'author',
+  'best',
+  'booms',
+  'comment',
+  'comments',
+  'dogs',
+  'firm',
+  'how',
+  'insider',
+  'life',
+  'missing',
+  'news',
+  'now',
+  'one',
+  'pace',
+  'reuters',
+  'said',
+  'says',
+  'seattle',
+  'third',
+  'tim',
+  'today',
+  'watching',
+  'world',
+  'views',
+]);
+const BROAD_DISCOVERY_LABELS = new Set([
+  'emerging tech',
+  'geopolitics',
+  'macroeconomics',
+  'technology',
+]);
 
 export const TREND_WORKBENCH_SCHEMA_STATEMENTS = [
   `
@@ -95,6 +130,15 @@ function unique(values = []) {
   return Array.from(new Set(asArray(values).map((value) => safeTrim(value)).filter(Boolean)));
 }
 
+function sanitizeDiscoveryKeywords(keywords = []) {
+  return unique(keywords)
+    .map((item) => normalizeTheme(item).replace(/^-+|-+$/g, ''))
+    .filter((item) => item.length >= 3)
+    .filter((item) => !/^\d{4}$/.test(item))
+    .filter((item) => !LOW_INFORMATION_DISCOVERY_KEYWORDS.has(item))
+    .slice(0, 8);
+}
+
 function clamp(value, min, max) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return min;
@@ -128,6 +172,19 @@ function toIsoDate(value) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? null : date.toISOString().slice(0, 10);
+}
+
+function toIsoTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date.toISOString();
+}
+
+function ageHours(value) {
+  const iso = toIsoTimestamp(value);
+  if (!iso) return null;
+  const age = (Date.now() - Date.parse(iso)) / 36e5;
+  return Number.isFinite(age) ? Math.max(0, age) : null;
 }
 
 function normalizeDecision(value) {
@@ -181,6 +238,16 @@ function mapDiscoveryTriageRow(row) {
   } : null;
   const theme = normalizeTheme(row?.normalized_theme || '');
   const taxonomy = theme ? resolveThemeTaxonomy(theme) : null;
+  const sources = asArray(row?.sources)
+    .map((source) => ({
+      id: Number(source?.id || 0),
+      title: safeTrim(source?.title),
+      source: safeTrim(source?.source),
+      publishedAt: source?.publishedAt || source?.published_at || null,
+      url: safeTrim(source?.url),
+    }))
+    .filter((source) => source.id > 0 && source.title && source.url)
+    .slice(0, 6);
   return {
     id: safeTrim(row?.id),
     label: safeTrim(row?.label) || safeTrim(row?.id),
@@ -199,8 +266,16 @@ function mapDiscoveryTriageRow(row) {
     sourceQualityScore: round(row?.source_quality_score || 0, 2),
     structuralScore: deriveDiscoveryStructuralScore(row),
     updatedAt: row?.updated_at || null,
+    firstSeen: row?.first_seen || null,
+    lastSeen: row?.last_seen || null,
+    latestLinkedArticleAt: row?.latest_linked_article_at || null,
+    dataUpdatedAt: row?.latest_linked_article_at || row?.last_seen || row?.updated_at || null,
+    dataAgeHours: round(ageHours(row?.latest_linked_article_at || row?.last_seen || row?.updated_at), 1),
+    dataStale: Number(ageHours(row?.latest_linked_article_at || row?.last_seen || row?.updated_at)) > 72,
     lastReview: review,
-    keywords: unique(row?.keywords || []).slice(0, 8),
+    keywords: sanitizeDiscoveryKeywords(row?.keywords || []),
+    sourceCount: sources.length,
+    sources,
   };
 }
 
@@ -211,6 +286,8 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
   const parentTheme = normalizeParentTheme(params.get('parent_theme') || '');
   const limit = clamp(Number(params.get('limit') || 12), 1, 40);
   const includeSuppressed = params.get('include_suppressed') === '1';
+  const includeStale = params.get('include_stale') === '1';
+  const includeBroad = params.get('include_broad') === '1';
   const values = [];
   let index = 1;
   let filterSql = `WHERE dt.status IN ('labeled', 'reported')`;
@@ -227,6 +304,13 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
   if (parentTheme) {
     filterSql += ` AND COALESCE(NULLIF(dt.normalized_parent_theme, ''), dt.parent_theme) = $${index++}`;
     values.push(parentTheme);
+  }
+  if (!includeBroad) {
+    values.push(Array.from(BROAD_DISCOVERY_LABELS));
+    filterSql += ` AND LOWER(COALESCE(NULLIF(dt.label, ''), dt.id)) <> ALL($${index++}::text[])`;
+  }
+  if (!includeStale) {
+    filterSql += ` AND COALESCE(topic_articles.latest_linked_article_at, dt.last_seen, dt.updated_at) >= NOW() - INTERVAL '72 hours'`;
   }
   values.push(limit);
   const rows = await safeQuery(`
@@ -248,12 +332,43 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
       dt.novelty,
       dt.source_quality_score,
       dt.keywords,
+      dt.first_seen,
+      dt.last_seen,
       dt.updated_at,
+      topic_articles.latest_linked_article_at,
+      topic_sources.sources,
       review.decision AS last_review_decision,
       review.reason AS last_review_reason,
       review.reviewer AS last_reviewer,
       review.decided_at AS last_decided_at
     FROM discovery_topics dt
+    LEFT JOIN LATERAL (
+      SELECT MAX(a.published_at) AS latest_linked_article_at
+      FROM discovery_topic_articles dta
+      JOIN articles a ON a.id = dta.article_id
+      WHERE dta.topic_id = dt.id
+    ) topic_articles ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(jsonb_agg(
+        jsonb_build_object(
+          'id', ranked.id,
+          'title', ranked.title,
+          'source', ranked.source,
+          'publishedAt', ranked.published_at,
+          'url', ranked.url
+        )
+        ORDER BY ranked.published_at DESC NULLS LAST
+      ), '[]'::jsonb) AS sources
+      FROM (
+        SELECT a.id, a.title, a.source, a.published_at, a.url
+        FROM discovery_topic_articles dta
+        JOIN articles a ON a.id = dta.article_id
+        WHERE dta.topic_id = dt.id
+          AND NULLIF(a.url, '') IS NOT NULL
+        ORDER BY a.published_at DESC NULLS LAST
+        LIMIT 6
+      ) ranked
+    ) topic_sources ON TRUE
     LEFT JOIN LATERAL (
       SELECT decision, reason, reviewer, decided_at
       FROM discovery_topic_reviews review
@@ -267,6 +382,10 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
         WHEN 'watch' THEN 0
         WHEN 'canonical' THEN 1
         ELSE 2
+      END,
+      CASE
+        WHEN COALESCE(topic_articles.latest_linked_article_at, dt.last_seen, dt.updated_at) >= NOW() - INTERVAL '72 hours' THEN 0
+        ELSE 1
       END,
       dt.momentum DESC NULLS LAST,
       dt.article_count DESC,
@@ -291,15 +410,29 @@ export async function buildDiscoveryTriagePayload(safeQuery, params = new URLSea
     summary[normalizeDecision(row.promotion_state)] = Number(row.count || 0);
   }
   const items = rows.rows.map(mapDiscoveryTriageRow);
+  const latestDataUpdatedAt = items
+    .map((item) => toIsoTimestamp(item.dataUpdatedAt))
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] || null;
+  const staleItems = items.filter((item) => item.dataStale).length;
   return {
     filters: {
       decision: params.has('decision') || params.has('promotion_state') ? decision : '',
       category,
       parentTheme,
       includeSuppressed,
+      includeStale,
+      includeBroad,
       limit,
     },
     summary,
+    meta: {
+      dataUpdatedAt: latestDataUpdatedAt,
+      stale: items.length > 0 && staleItems === items.length,
+      staleReason: items.length > 0 && staleItems === items.length
+        ? 'all visible discovery topics are older than 72 hours'
+        : null,
+    },
     items,
   };
 }
@@ -442,6 +575,33 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
   const periodType = safeTrim(params.get('period') || 'week').toLowerCase() || 'week';
   const status = params.has('status') ? normalizeStatus(params.get('status')) : 'open';
   const limit = clamp(Number(params.get('limit') || 10), 1, 40);
+  const maxAgeHours = clamp(Number(params.get('max_age_hours') || process.env.STRUCTURAL_ALERT_MAX_AGE_HOURS || 96), 1, 720);
+  const includeLowConfidence = params.get('include_low_confidence') === '1';
+  const minBreakoutSourceDiversity = clamp(
+    Number(params.get('min_breakout_source_diversity') || process.env.STRUCTURAL_ALERT_MIN_BREAKOUT_SOURCE_DIVERSITY || 0.15),
+    0,
+    1,
+  );
+  const minBreakoutArticleCount = clamp(
+    Number(params.get('min_breakout_article_count') || process.env.STRUCTURAL_ALERT_MIN_BREAKOUT_ARTICLE_COUNT || 10),
+    1,
+    1000,
+  );
+  const minShareShiftArticleCount = clamp(
+    Number(params.get('min_share_shift_article_count') || process.env.STRUCTURAL_ALERT_MIN_SHARE_ARTICLE_COUNT || 10),
+    1,
+    1000,
+  );
+  const minLifecycleArticleCount = clamp(
+    Number(params.get('min_lifecycle_article_count') || process.env.STRUCTURAL_ALERT_MIN_LIFECYCLE_ARTICLE_COUNT || 10),
+    1,
+    1000,
+  );
+  const minCoolingArticleCount = clamp(
+    Number(params.get('min_cooling_article_count') || process.env.STRUCTURAL_ALERT_MIN_COOLING_ARTICLE_COUNT || 10),
+    1,
+    1000,
+  );
   const values = [];
   let index = 1;
   let sql = `
@@ -449,8 +609,42 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
     FROM theme_structural_alerts
     WHERE status = $${index++}
       AND period_type = $${index++}
+      AND COALESCE(updated_at, last_seen_at, first_seen_at, snapshot_date::timestamptz) >= NOW() - ($${index++}::double precision * INTERVAL '1 hour')
   `;
-  values.push(status, periodType);
+  values.push(status, periodType, maxAgeHours);
+  if (!includeLowConfidence) {
+    sql += `
+      AND NOT (
+        alert_type = 'acceleration-breakout'
+        AND (
+          COALESCE(NULLIF(metadata->>'sourceDiversity', '')::double precision, 0) < $${index++}
+          OR COALESCE(NULLIF(metadata->>'articleCount', '')::double precision, 0) < $${index++}
+        )
+      )
+    `;
+    values.push(minBreakoutSourceDiversity, minBreakoutArticleCount);
+    sql += `
+      AND NOT (
+        alert_type IN ('share-jump', 'share-fade')
+        AND COALESCE(NULLIF(metadata->>'articleCount', '')::double precision, 0) < $${index++}
+      )
+    `;
+    values.push(minShareShiftArticleCount);
+    sql += `
+      AND NOT (
+        alert_type = 'lifecycle-transition'
+        AND COALESCE(NULLIF(metadata->>'articleCount', '')::double precision, 0) < $${index++}
+      )
+    `;
+    values.push(minLifecycleArticleCount);
+    sql += `
+      AND NOT (
+        alert_type = 'cooling-reversal'
+        AND COALESCE(NULLIF(metadata->>'articleCount', '')::double precision, 0) < $${index++}
+      )
+    `;
+    values.push(minCoolingArticleCount);
+  }
   if (themes.length) {
     sql += ` AND theme = ANY($${index++})`;
     values.push(themes);
@@ -476,6 +670,18 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
       themes,
       limit,
       scope: themes.length ? 'followed' : 'all',
+      maxAgeHours,
+      includeLowConfidence,
+      minBreakoutSourceDiversity,
+      minBreakoutArticleCount,
+      minShareShiftArticleCount,
+      minLifecycleArticleCount,
+      minCoolingArticleCount,
+    },
+    meta: {
+      staleOpenAlertsHidden: true,
+      staleRule: `updated_at within ${maxAgeHours}h`,
+      lowConfidenceBreakoutsHidden: !includeLowConfidence,
     },
     items: rows.rows.map(mapAlertRow),
   };

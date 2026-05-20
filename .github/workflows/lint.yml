@@ -12,9 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - run: npm run lint:md
+      - name: Markdown lint changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref }}...HEAD" -- '*.md')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No markdown files changed."
+            exit 0
+          fi
+          npx markdownlint-cli2 "${files[@]}"

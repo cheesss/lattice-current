@@ -1,5 +1,6 @@
 # Code Rigor And Investment-Grade Upgrade Plan
-> **Status**: partial (Phase 1 risk/sizing audits shipped; Phase 2 backtest integrity ongoing)  
+>
+> **Status**: partial (Phase 1 risk/sizing audits shipped; Phase 2 backtest integrity ongoing). Last reviewed 2026-04-23 — referenced files (`idea-generator.ts`, `historical-intelligence.ts`, `weight-learner.ts`, `rag-retriever.ts`) remain in `src/services/` on main. Note: backtest-heavy ML modules (`elastic-net`, `gradient-boosting`, `bayesian-logistic`, `ensemble-predictor`, `cma-es`, `isotonic-calibrator`, `ml-walk-forward`, `cpcv`) were removed from main and preserved on `legacy/backtest`; Phase 2 "backtest integrity" applies to the replay/validation stack that still ships on main, not to the removed modules.
 
 Date: 2026-04-02
 
@@ -53,15 +54,19 @@ So the plan treats this as a caller-boundary and model-promotion problem, not a 
 ## Design Principles
 
 1. Fix root causes, not symptoms.
+
 - no more theme-by-theme patching as the main strategy.
 
 2. Make training and evaluation boundaries explicit.
+
 - if a component sees future information, it does not qualify as a production-quality signal.
 
 3. Promote by evidence, not by backtest cosmetics.
+
 - every strategy change must survive robustness checks before it can influence live decisions.
 
 4. Separate signal quality from portfolio quality.
+
 - good signal generation cannot compensate for missing risk controls.
 
 ## Workstream A: Immediate Code Hardening
@@ -81,9 +86,11 @@ Current issue:
 Action:
 
 Option 1:
+
 - remove the dead boost path entirely until article embeddings and labeled outcomes are real.
 
 Option 2:
+
 - gate RAG behind an explicit runtime capability flag:
   - embeddings available,
   - labeled outcomes available,

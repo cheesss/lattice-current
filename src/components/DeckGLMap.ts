@@ -270,7 +270,7 @@ const VIEW_PRESETS: Record<DeckMapView, { longitude: number; latitude: number; z
 };
 
 const MAP_INTERACTION_MODE: MapInteractionMode =
-  import.meta.env.VITE_MAP_INTERACTION_MODE === 'flat' ? 'flat' : '3d';
+import.meta.env.VITE_MAP_INTERACTION_MODE === '3d' ? '3d' : 'flat';
 const DEFAULT_MAP_PROJECTION: MapProjectionMode =
   import.meta.env.VITE_MAP_PROJECTION === 'mercator' ? 'mercator' : 'globe';
 const MILITARY_FLIGHT_MARKER_LIMIT_BASE = Number.isFinite(Number(import.meta.env.VITE_MILITARY_FLIGHTS_MAX_MARKERS))
@@ -6458,7 +6458,7 @@ export class DeckGLMap {
         map.setPaintProperty(DeckGLMap.HYBRID_SATELLITE_LAYER_ID, 'raster-opacity', theme === 'light' ? 0.08 : 0.14);
       }
 
-      if (!map.getSource(DeckGLMap.HYBRID_TERRAIN_SOURCE_ID)) {
+      if (MAP_INTERACTION_MODE === '3d' && !map.getSource(DeckGLMap.HYBRID_TERRAIN_SOURCE_ID)) {
         map.addSource(DeckGLMap.HYBRID_TERRAIN_SOURCE_ID, {
           type: 'raster-dem',
           url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
@@ -6505,7 +6505,13 @@ export class DeckGLMap {
           return `${ts}Z [API] INTERCEPT :: ${capture.requestUrl.slice(0, 88)} :: ${capture.schemaHint.toUpperCase()} :: ${capture.category.toUpperCase()}`;
         }),
       ];
-      const streamText = (lines.length > 0 ? lines : ['LOADER ACTIVE :: awaiting next discovery cycle']).join('   //   ');
+      // Empty-state copy is informative rather than alarming: previous "AWAITING NEXT
+      // DISCOVERY CYCLE" looked like data was missing even when the main map had
+      // 36+ markers plotted. The border stream is source-ops + network-discovery
+      // captures only — silence here just means no NEW sources were touched
+      // this cycle, not that the map is empty.
+      const idleNote = `READY :: live map active · no new source ops this cycle · next refresh in ~5min`;
+      const streamText = (lines.length > 0 ? lines : [idleNote]).join('   //   ');
       this.borderStreamTracks.forEach((track) => {
         track.textContent = `${streamText}   //   ${streamText}`;
       });
@@ -6895,6 +6901,22 @@ export class DeckGLMap {
         } catch { /* style not done loading */ }
         map.getCanvas().style.cursor = '';
       }
+    });
+
+    map.on('click', (e) => {
+      if (!this.onCountryClick) return;
+      const features = map.queryRenderedFeatures(e.point, { layers: ['country-interactive'] });
+      const properties = (features?.[0]?.properties ?? {}) as Record<string, unknown>;
+      const rawCode = properties['ISO3166-1-Alpha-2'] ?? properties.ISO_A2 ?? properties.iso_a2;
+      const code = typeof rawCode === 'string' ? rawCode.trim().toUpperCase() : '';
+      const rawName = properties.name ?? properties.NAME ?? properties.admin;
+      const name = typeof rawName === 'string' ? rawName.trim() : '';
+      const fallback = this.resolveCountryFromCoordinate(e.lngLat.lng, e.lngLat.lat);
+      this.onCountryClick({
+        lat: e.lngLat.lat,
+        lon: e.lngLat.lng,
+        ...(fallback || (/^[A-Z]{2}$/.test(code) && name ? { code, name } : {})),
+      });
     });
   }
 

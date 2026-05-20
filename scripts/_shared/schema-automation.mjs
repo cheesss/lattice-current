@@ -43,12 +43,28 @@ export const AUTOMATION_SCHEMA_STATEMENTS = [
       action_type TEXT NOT NULL,
       payload JSONB NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'approved', 'rejected', 'executed')),
+        CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix')),
       reasoning TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       reviewed_at TIMESTAMPTZ,
       reviewer TEXT
     );
+  `,
+  `
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'approval_queue_status_check'
+          AND conrelid = 'approval_queue'::regclass
+      ) THEN
+        ALTER TABLE approval_queue
+          ADD CONSTRAINT approval_queue_status_check
+          CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'needs-fix'));
+      END IF;
+    END
+    $$;
   `,
   `
     CREATE INDEX IF NOT EXISTS idx_approval_queue_status_time

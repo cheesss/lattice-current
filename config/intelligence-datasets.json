@@ -91,7 +91,7 @@
     {
       "id": "acled-middle-east",
       "label": "ACLED Middle East",
-      "enabled": true,
+      "enabled": false,
       "provider": "acled",
       "fetchArgs": {
         "country": "Iran|Israel|Lebanon|Syria|Yemen",

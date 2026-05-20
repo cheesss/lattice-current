@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { ensureEmergingTechSchema } from './_shared/schema-emerging-tech.mjs';
 import { runCodexJsonPrompt } from './_shared/codex-json.mjs';
+import { buildTopicArticleProfile, buildTopicRecentArticleScore } from './event-dashboard-api.mjs';
 
 loadOptionalEnvFile();
 
@@ -175,26 +176,104 @@ async function loadTopics(client, options) {
   return rows;
 }
 
-async function loadTopicContext(client, topicId, parentTheme) {
-  const [articlesResponse, symbolsResponse] = await Promise.all([
-    client.query(`
-      SELECT a.id, a.title, a.source, a.published_at, a.url
-      FROM discovery_topic_articles dta
-      JOIN articles a ON a.id = dta.article_id
-      WHERE dta.topic_id = $1
-      ORDER BY a.published_at DESC
-      LIMIT 10
-    `, [topicId]),
-    client.query(`
-      SELECT symbol, avg_return, hit_rate, sample_size
-      FROM stock_sensitivity_matrix
-      WHERE theme = $1 OR theme = $2
-      ORDER BY sample_size DESC, ABS(avg_return) DESC NULLS LAST
-      LIMIT 10
-    `, [topicId, String(parentTheme || 'emerging-tech')]).catch(() => ({ rows: [] })),
-  ]);
+async function loadTopicContext(client, topic) {
+  const articleProfile = buildTopicArticleProfile(topic);
+  const allQueryTerms = [...articleProfile.strong, ...articleProfile.support, ...(articleProfile.geoContext || []), ...(articleProfile.focusTerms || [])];
+  const candidateTermCount = Math.min(allQueryTerms.length, 16);
+  const candidateWhere = allQueryTerms
+    .slice(0, candidateTermCount)
+    .map((_, index) => `(a.title ILIKE $${index + 1} OR COALESCE(a.summary, '') ILIKE $${index + 1})`)
+    .join(' OR ');
+  const excludeArxiv = String(topic.parent_theme || '') === 'geopolitics' || String(topic.category || '') === 'geopolitics';
+
+  const linkedArticlesResponse = await client.query(`
+    SELECT a.id, a.title, a.summary, a.source, a.published_at, a.url, a.theme, a.legacy_theme
+    FROM discovery_topic_articles dta
+    JOIN articles a ON a.id = dta.article_id
+    WHERE dta.topic_id = $1
+    ORDER BY a.published_at DESC
+    LIMIT 300
+  `, [topic.id]);
+  const candidateArticlesResponse = await client.query(`
+    SELECT a.id, a.title, a.summary, a.source, a.published_at, a.url, a.theme, a.legacy_theme
+    FROM articles a
+    WHERE a.published_at >= NOW() - INTERVAL '90 days'
+      ${excludeArxiv ? "AND COALESCE(a.source, '') NOT ILIKE 'arxiv%'" : ''}
+      AND (${candidateWhere || 'FALSE'})
+    ORDER BY a.published_at DESC
+    LIMIT 300
+  `, allQueryTerms.slice(0, candidateTermCount).map((term) => `%${term}%`).length
+    ? allQueryTerms.slice(0, candidateTermCount).map((term) => `%${term}%`)
+    : []);
+  const symbolsResponse = await client.query(`
+    SELECT symbol, avg_return, hit_rate, sample_size
+    FROM stock_sensitivity_matrix
+    WHERE theme = $1 OR theme = $2
+    ORDER BY sample_size DESC, ABS(avg_return) DESC NULLS LAST
+    LIMIT 10
+  `, [topic.id, String(topic.parent_theme || 'emerging-tech')]).catch(() => ({ rows: [] }));
+
+  const linkedArticles = linkedArticlesResponse.rows.map((row) => ({
+    id: Number(row.id || 0),
+    title: String(row.title || ''),
+    source: String(row.source || ''),
+    published_at: row.published_at,
+    url: String(row.url || ''),
+    summary: String(row.summary || ''),
+    theme: String(row.theme || ''),
+    legacy_theme: String(row.legacy_theme || ''),
+    match_type: 'linked',
+  }));
+  const linkedById = new Map(linkedArticles.map((article) => [article.id, article]));
+
+  const recentCandidates = [];
+  for (const row of candidateArticlesResponse.rows) {
+    const candidate = {
+      id: Number(row.id || 0),
+      title: String(row.title || ''),
+      source: String(row.source || ''),
+      published_at: row.published_at,
+      url: String(row.url || ''),
+      summary: String(row.summary || ''),
+      theme: String(row.theme || ''),
+      legacy_theme: String(row.legacy_theme || ''),
+      match_type: linkedById.has(Number(row.id || 0)) ? 'linked' : 'derived',
+    };
+    const scoring = buildTopicRecentArticleScore(candidate, topic.id, topic.parent_theme, articleProfile);
+    const isLinked = linkedById.has(candidate.id);
+    if (!isLinked && scoring.strongHitCount < 1 && scoring.focusHitCount < 1) continue;
+    if (excludeArxiv && (scoring.geoHitCount < 1 || scoring.focusHitCount < 1)) continue;
+    if (scoring.score < (isLinked ? 4 : 8)) continue;
+    recentCandidates.push({ ...candidate, score: scoring.score });
+  }
+
+  for (const article of linkedArticles) {
+    const publishedAt = article.published_at ? new Date(article.published_at).getTime() : 0;
+    if (!(publishedAt > 0) || (Date.now() - publishedAt) > 90 * 24 * 36e5) continue;
+    const scoring = buildTopicRecentArticleScore(article, topic.id, topic.parent_theme, articleProfile);
+    if (excludeArxiv && (scoring.geoHitCount < 1 || scoring.focusHitCount < 1)) continue;
+    if (scoring.score < 4) continue;
+    recentCandidates.push({ ...article, score: scoring.score });
+  }
+
+  const articles = [];
+  const seenIds = new Set();
+  for (const article of recentCandidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return new Date(b.published_at) - new Date(a.published_at);
+  })) {
+    if (seenIds.has(article.id)) continue;
+    seenIds.add(article.id);
+    articles.push(article);
+    if (articles.length >= 10) break;
+  }
+
+  const latestLinkedArticles = linkedArticles
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+    .slice(0, 10);
+
   return {
-    articles: articlesResponse.rows,
+    articles: articles.length > 0 ? articles : latestLinkedArticles,
     relatedSymbols: symbolsResponse.rows,
   };
 }
@@ -287,7 +366,7 @@ export async function runTechReportGeneration(options = {}) {
     const reports = [];
     const topicContexts = [];
     for (const topic of topics) {
-      const context = await loadTopicContext(client, topic.id, topic.parent_theme);
+      const context = await loadTopicContext(client, topic);
       topicContexts.push({ topic, context });
     }
 

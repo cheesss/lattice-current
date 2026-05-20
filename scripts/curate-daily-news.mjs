@@ -14,6 +14,7 @@ import {
   isCanonicalThemeKey,
   resolveThemeTaxonomy,
 } from './_shared/theme-taxonomy.mjs';
+import { isLowValueGoogleNewsSourceName } from './_shared/google-news-source-policy.mjs';
 
 loadOptionalEnvFile();
 
@@ -275,7 +276,7 @@ async function loadCandidateArticles(client, config) {
     LIMIT $3
   `, params);
 
-  return rows.map((row) => ({
+  return rows.filter((row) => !isLowValueGoogleNewsSourceName(row.source)).map((row) => ({
     id: Number(row.id),
     title: String(row.title || '').trim(),
     summary: String(row.summary || '').trim(),

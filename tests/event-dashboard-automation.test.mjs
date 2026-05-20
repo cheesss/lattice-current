@@ -4,8 +4,10 @@ import pg from 'pg';
 
 import {
   loadApprovalById,
+  queueForApproval,
   reviewApprovalQueueItemById,
 } from '../scripts/_shared/approval-queue.mjs';
+import { AUTOMATION_SCHEMA_STATEMENTS } from '../scripts/_shared/schema-automation.mjs';
 import {
   deriveProposalExecutionStatus,
   reviewCodexProposalById,
@@ -24,6 +26,12 @@ process.env.PGPASSWORD ||= 'test';
 function normalizeSql(text) {
   return String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
+
+test('automation schema allows needs-fix approval queue status', () => {
+  const schema = AUTOMATION_SCHEMA_STATEMENTS.join('\n');
+  assert.match(schema, /needs-fix/);
+  assert.match(schema, /approval_queue_status_check/);
+});
 
 function createApprovalQueueClient(seed = {}) {
   let row = seed ? {
@@ -103,7 +111,12 @@ function createProposalClient(seed = {}) {
       const sql = normalizeSql(text);
       calls.push({ sql, values });
 
-      if (sql.startsWith('create table') || sql.startsWith('create index')) {
+      if (
+        sql.startsWith('create table')
+        || sql.startsWith('create index')
+        || sql.startsWith('alter table')
+        || sql.startsWith('do $$')
+      ) {
         return { rows: [] };
       }
 
@@ -217,7 +230,7 @@ test('event dashboard review routes update proposal and approval payloads', { co
   const restorePool = installPoolQueryMock(async (text, values = []) => {
     const sql = normalizeSql(text);
 
-    if (sql.startsWith('create table') || sql.startsWith('create index')) {
+    if (sql.startsWith('create table') || sql.startsWith('create index') || sql.startsWith('alter table')) {
       return { rows: [] };
     }
 
@@ -342,6 +355,68 @@ test('approval queue helpers load items and respect final review state', { concu
     client.calls.filter((call) => call.sql.startsWith('update approval_queue')).length,
     1,
   );
+});
+
+test('queueForApproval dedupes existing pending source URLs', { concurrency: false }, async () => {
+  let row = {
+    id: 19,
+    action_type: 'add-rss',
+    payload: { url: 'https://example.com/feed.xml', qualityScore: 0.2 },
+    status: 'needs-fix',
+    reasoning: 'old failed probe',
+    created_at: '2026-04-09T00:00:00.000Z',
+  };
+  let insertCount = 0;
+  const calls = [];
+  const client = {
+    async query(text, values = []) {
+      const sql = normalizeSql(text);
+      calls.push({ sql, values });
+      if (sql.includes('from approval_queue') && sql.includes("regexp_replace(payload->>'url'")) {
+        return { rows: [row] };
+      }
+      if (sql.startsWith('update approval_queue')) {
+        row = {
+          ...row,
+          payload: JSON.parse(values[1]),
+          status: 'pending',
+          reasoning: [row.reasoning, values[2]].filter(Boolean).join('\n'),
+        };
+        return {
+          rows: [{
+            id: row.id,
+            action_type: row.action_type,
+            status: row.status,
+            created_at: row.created_at,
+          }],
+        };
+      }
+      if (sql.startsWith('insert into approval_queue')) {
+        insertCount += 1;
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+
+  const queued = await queueForApproval(client, {
+    type: 'add-rss',
+    params: {
+      url: 'https://example.com/feed.xml/',
+      name: 'Example Feed',
+      qualityScore: 0.88,
+    },
+    reason: 'new passing probe',
+  });
+
+  assert.equal(queued.id, 19);
+  assert.equal(queued.status, 'pending');
+  assert.equal(queued.deduped, true);
+  assert.equal(insertCount, 0);
+  assert.equal(row.payload.qualityScore, 0.88);
+  assert.match(row.reasoning, /new passing probe/);
+  assert.equal(calls.find((call) => call.sql.includes('from approval_queue'))?.values?.[1], 'https://example.com/feed.xml');
+  assert.equal(calls.filter((call) => call.sql.startsWith('update approval_queue')).length, 1);
 });
 
 test('proposal execution helpers derive statuses and avoid rewriting final proposals', { concurrency: false }, async () => {

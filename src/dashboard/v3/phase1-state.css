@@ -1,0 +1,264 @@
+/*
+ * V3 Phase 1 — State components stylesheet.
+ *
+ * Loaded by phase1-state.mjs via <link rel="stylesheet"> injection so the
+ * inline event-dashboard.html doesn't need to know about it. Consumes the
+ * v3 design tokens from src/dashboard/shared/tokens.css.
+ *
+ * Documented classes:
+ *   .v3-fresh                   freshness pill root
+ *   .v3-fresh-dot               status dot
+ *   .v3-fresh-state-live        state variant: <30s
+ *   .v3-fresh-state-stale       state variant: 30s..5min
+ *   .v3-fresh-state-paused      state variant: >5min or manual
+ *   .v3-fresh-label             "data" / custom label
+ *   .v3-fresh-ts                last-updated timestamp (mono)
+ *   .v3-fresh-btn               manual refresh button
+ *
+ *   .v3-skel                    skeleton root
+ *   .v3-skel-list/-card/-table/-tile  shape variants
+ *   .v3-skel-bar                a single shimmering bar
+ *   .v3-skel-line               horizontal text-line bar
+ *   .v3-skel-dot                circular leading bar
+ *   .v3-skel-cell               table cell bar
+ *   .v3-skel-block              full-width block
+ *   .v3-skel-row, .v3-skel-trow row containers
+ *   .v3-skel-col                vertical group inside a list row
+ *   .v3-skel-w-30..-90          width modifiers (percent of container)
+ *
+ *   .v3-row-accepted            optimistic accept tint (success)
+ *   .v3-row-rejected            optimistic reject tint (failure)
+ *   .v3-row-snoozed             optimistic snooze tint (deferred)
+ *
+ *   [data-v3-pulse]             value-pulse animation hook
+ */
+
+/* ============================================================
+   Freshness pill
+   ============================================================ */
+.v3-fresh {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v3-space-2);
+  height: 28px;
+  padding: 0 var(--v3-space-2);
+  border: 1px solid var(--v3-border-hairline);
+  border-radius: var(--v3-radius-sm);
+  background: var(--v3-bg-900);
+  color: var(--v3-text-soft);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.v3-fresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--v3-freshness-paused);
+  flex-shrink: 0;
+  transition: background-color var(--v3-motion-base) var(--v3-ease-out),
+              box-shadow var(--v3-motion-base) var(--v3-ease-out);
+}
+
+.v3-fresh-state-live .v3-fresh-dot {
+  background: var(--v3-freshness-live);
+  box-shadow: 0 0 0 3px rgba(70, 167, 88, 0.18);
+}
+
+.v3-fresh-state-stale .v3-fresh-dot {
+  background: var(--v3-freshness-stale);
+  box-shadow: 0 0 0 3px rgba(255, 178, 36, 0.18);
+}
+
+.v3-fresh-state-paused .v3-fresh-dot {
+  background: var(--v3-freshness-paused);
+  box-shadow: none;
+}
+
+.v3-fresh-label {
+  color: var(--v3-text-soft);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.v3-fresh-ts {
+  color: var(--v3-text-base);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: 11px;
+}
+
+.v3-fresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: var(--v3-space-1);
+  padding: 0;
+  border: 1px solid var(--v3-border-hairline);
+  border-radius: var(--v3-radius-sm);
+  background: transparent;
+  color: var(--v3-text-soft);
+  cursor: pointer;
+  transition: color var(--v3-motion-fast) var(--v3-ease-out),
+              border-color var(--v3-motion-fast) var(--v3-ease-out),
+              background-color var(--v3-motion-fast) var(--v3-ease-out);
+}
+
+.v3-fresh-btn:hover {
+  color: var(--v3-text-loud);
+  border-color: var(--v3-border-soft);
+  background: var(--v3-bg-850);
+}
+
+.v3-fresh-btn:active {
+  background: var(--v3-bg-800);
+}
+
+.v3-fresh-btn:focus-visible {
+  outline: 1px solid var(--v3-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================================
+   Skeleton loader
+   ============================================================ */
+.v3-skel {
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: var(--v3-space-3);
+  box-sizing: border-box;
+  background: transparent;
+  color: transparent;
+}
+
+.v3-skel-bar {
+  display: block;
+  background: var(--v3-bg-850);
+  border-radius: var(--v3-radius-sm);
+  animation: v3-skel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes v3-skel-pulse {
+  0%   { background-color: var(--v3-bg-850); }
+  50%  { background-color: var(--v3-bg-800); }
+  100% { background-color: var(--v3-bg-850); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-skel-bar { animation: none; }
+}
+
+.v3-skel-line   { height: 10px; width: 100%; margin: var(--v3-space-2) 0; }
+.v3-skel-dot    { width: 12px; height: 12px; border-radius: 999px; flex-shrink: 0; }
+.v3-skel-block  { height: 56px; width: 100%; margin-top: var(--v3-space-2); }
+.v3-skel-cell   { height: 12px; flex: 1; }
+.v3-skel-head   { height: 12px; }
+.v3-skel-foot   { height: 8px; opacity: 0.7; }
+
+.v3-skel-w-30 { width: 30%; }
+.v3-skel-w-40 { width: 40%; }
+.v3-skel-w-50 { width: 50%; }
+.v3-skel-w-60 { width: 60%; }
+.v3-skel-w-80 { width: 80%; }
+.v3-skel-w-90 { width: 90%; }
+
+/* List variant */
+.v3-skel-list .v3-skel-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--v3-space-3);
+  padding: var(--v3-space-2) 0;
+  border-bottom: 1px solid var(--v3-border-hairline);
+}
+.v3-skel-list .v3-skel-row:last-child { border-bottom: none; }
+.v3-skel-list .v3-skel-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--v3-space-1);
+}
+
+/* Table variant */
+.v3-skel-table .v3-skel-trow {
+  display: flex;
+  gap: var(--v3-space-3);
+  padding: var(--v3-space-2) 0;
+  border-bottom: 1px solid var(--v3-border-hairline);
+}
+.v3-skel-table .v3-skel-thead .v3-skel-cell { opacity: 0.7; }
+.v3-skel-table .v3-skel-trow:last-child { border-bottom: none; }
+
+/* Tile / card variants stack their bars vertically by default */
+.v3-skel-tile,
+.v3-skel-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v3-space-2);
+}
+
+/* ============================================================
+   Optimistic row tints — added by callers via runOptimistic.apply()
+   ============================================================ */
+.v3-row-accepted {
+  background: linear-gradient(90deg, rgba(70, 167, 88, 0.10), transparent 60%);
+  border-left: 2px solid var(--v3-sev-ok);
+  transition: background-color var(--v3-motion-base) var(--v3-ease-out);
+}
+
+.v3-row-rejected {
+  background: linear-gradient(90deg, rgba(229, 77, 46, 0.10), transparent 60%);
+  border-left: 2px solid var(--v3-sev-critical);
+  transition: background-color var(--v3-motion-base) var(--v3-ease-out);
+  opacity: 0.7;
+}
+
+.v3-row-snoozed {
+  background: linear-gradient(90deg, rgba(255, 178, 36, 0.10), transparent 60%);
+  border-left: 2px solid var(--v3-sev-warning);
+  transition: background-color var(--v3-motion-base) var(--v3-ease-out);
+  opacity: 0.85;
+}
+
+/* ============================================================
+   Value pulse — short box-shadow + fade triggered by pulseValue()
+   ============================================================ */
+[data-v3-pulse] {
+  position: relative;
+  animation: v3-pulse-neutral 400ms var(--v3-ease-out) 1;
+  border-radius: var(--v3-radius-sm);
+}
+
+[data-v3-pulse="up"] {
+  animation-name: v3-pulse-up;
+}
+
+[data-v3-pulse="down"] {
+  animation-name: v3-pulse-down;
+}
+
+@keyframes v3-pulse-neutral {
+  0%   { box-shadow: 0 0 0 1px var(--accent); }
+  60%  { box-shadow: 0 0 0 1px var(--accent); }
+  100% { box-shadow: 0 0 0 1px transparent; }
+}
+
+@keyframes v3-pulse-up {
+  0%   { box-shadow: 0 0 0 1px var(--v3-dir-up); }
+  60%  { box-shadow: 0 0 0 1px var(--v3-dir-up); }
+  100% { box-shadow: 0 0 0 1px transparent; }
+}
+
+@keyframes v3-pulse-down {
+  0%   { box-shadow: 0 0 0 1px var(--v3-dir-down); }
+  60%  { box-shadow: 0 0 0 1px var(--v3-dir-down); }
+  100% { box-shadow: 0 0 0 1px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-v3-pulse] { animation: none; }
+}
