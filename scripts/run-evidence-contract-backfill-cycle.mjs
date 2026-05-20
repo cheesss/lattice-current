@@ -39,12 +39,14 @@ const RUNTIME_DIR = path.join(process.cwd(), 'data', 'runtime');
 const DEFAULT_STATE_PATH = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle-state.json');
 const STATE_SHARD_DIR = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle-state-shards');
 const STEP_LOG_PATH = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle.steps.jsonl');
+const RESULT_ARTIFACT_DIR = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle-results');
 
 const DRAIN_STEP_DEFAULT_TIMEOUT_MS = 5 * 60_000;
 const PROVIDER_STEP_DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const SOURCE_QUERY_STEP_DEFAULT_TIMEOUT_MS = 15 * 60_000;
 const REGENERATE_STEP_DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const MAX_BUFFER = Math.max(1_000_000, Number(process.env.EVIDENCE_BACKFILL_MAX_BUFFER_BYTES || 12_000_000));
+const STDOUT_TAIL_BYTES = Math.max(256, Number(process.env.EVIDENCE_BACKFILL_STDOUT_TAIL_BYTES || 2_048));
 
 function optionalTimeoutMs(value, fallback = 0, min = 1, max = Number.MAX_SAFE_INTEGER) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -57,6 +59,181 @@ function optionalTimeoutMs(value, fallback = 0, min = 1, max = Number.MAX_SAFE_I
 
 function timeoutLabel(timeoutMs) {
   return Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : 'disabled';
+}
+
+function stableRunId(prefix = 'evidence-contract-backfill-cycle') {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const entropy = Math.random().toString(36).slice(2, 8);
+  return `${prefix}-${stamp}-${entropy}`;
+}
+
+function compactText(value, maxBytes = STDOUT_TAIL_BYTES) {
+  const text = String(value || '');
+  if (Buffer.byteLength(text, 'utf8') <= maxBytes) return text;
+  const tail = Buffer.from(text, 'utf8').subarray(-maxBytes).toString('utf8');
+  return `[truncated ${Buffer.byteLength(text, 'utf8') - Buffer.byteLength(tail, 'utf8')} bytes]\n${tail}`;
+}
+
+function countArray(value) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function compactJsonSummary(value) {
+  if (!value || typeof value !== 'object') return null;
+  const summary = {};
+  for (const key of [
+    'ok',
+    'dryRun',
+    'apply',
+    'mode',
+    'status',
+    'reason',
+    'reportId',
+    'reportDir',
+    'statePath',
+    'artifactPath',
+    'htmlPath',
+    'path',
+    'generated',
+    'inserted',
+    'updated',
+    'unchanged',
+    'queued',
+    'executed',
+    'accepted',
+    'skipped',
+    'failed',
+    'routeCount',
+    'providerCount',
+    'taskCount',
+    'bundleCount',
+    'approvalCount',
+    'sourceQueryCount',
+    'unblockStatus',
+    'evidenceState',
+    'visualStatus',
+    'marketTier',
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) summary[key] = value[key];
+  }
+  for (const [sourceKey, targetKey] of [
+    ['steps', 'stepCount'],
+    ['results', 'resultCount'],
+    ['tasks', 'taskCount'],
+    ['routes', 'routeCount'],
+    ['routePlans', 'routePlanCount'],
+    ['openClasses', 'openClassCount'],
+    ['criticalOpenClasses', 'criticalOpenClassCount'],
+    ['blockers', 'blockerCount'],
+    ['warnings', 'warningCount'],
+    ['bundles', 'bundleCount'],
+    ['items', 'itemCount'],
+    ['rows', 'rowCount'],
+    ['articles', 'articleCount'],
+    ['awards', 'awardCount'],
+    ['queryVariants', 'queryVariantCount'],
+  ]) {
+    if (Array.isArray(value[sourceKey])) summary[targetKey] = value[sourceKey].length;
+  }
+  if (value.unblockDelta && typeof value.unblockDelta === 'object') {
+    summary.unblockDelta = {
+      statusChanged: Boolean(value.unblockDelta.statusChanged),
+      beforeStatus: value.unblockDelta.beforeStatus || null,
+      afterStatus: value.unblockDelta.afterStatus || null,
+      changedClassCount: countArray(value.unblockDelta.changedClasses),
+    };
+  }
+  return Object.keys(summary).length ? summary : null;
+}
+
+export function compactStepResult(step = {}) {
+  const jsonSummary = compactJsonSummary(step.json);
+  return {
+    name: step.name || 'unnamed-step',
+    ok: step.ok !== false,
+    skipped: Boolean(step.skipped),
+    durationMs: step.durationMs ?? null,
+    timeoutMs: step.timeoutMs ?? null,
+    error: step.error ? compactText(step.error, 1_000) : null,
+    stdoutTail: step.stdoutTail ? compactText(step.stdoutTail, STDOUT_TAIL_BYTES) : null,
+    jsonSummary,
+  };
+}
+
+function compactDashboardSummary(summary) {
+  if (!summary) return null;
+  const reports = Array.isArray(summary.reports) ? summary.reports : Array.isArray(summary) ? summary : [];
+  return {
+    ok: summary.ok !== false,
+    reportCount: reports.length || Number(summary.reportCount || 0),
+    statusCounts: summary.statusCounts || reports.reduce((acc, row) => {
+      const key = row?.visualStatus || row?.evidenceState || row?.status || 'unknown';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+    blockerCount: reports.reduce((sum, row) => sum + countArray(row?.openClasses || row?.criticalOpenClasses), 0),
+    reportIds: reports.map((row) => row?.reportId).filter(Boolean).slice(0, 20),
+  };
+}
+
+export function compactEvidenceBackfillCycleResult(result = {}) {
+  const steps = Array.isArray(result.steps) ? result.steps.map(compactStepResult) : [];
+  const childResults = Array.isArray(result.results)
+    ? result.results.map((child) => compactEvidenceBackfillCycleResult(child))
+    : [];
+  const reportIds = [
+    result.reportId,
+    ...childResults.map((child) => child.reportId),
+  ].filter(Boolean);
+  const reportDirs = [
+    result.reportDir,
+    ...(Array.isArray(result.reportDirs) ? result.reportDirs : []),
+    ...childResults.map((child) => child.reportDir),
+  ].filter(Boolean);
+  const stepCounts = [...steps, ...childResults.flatMap((child) => child.steps || [])].reduce((acc, step) => {
+    const key = step.ok === false ? 'failed' : step.skipped ? 'skipped' : 'ok';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  return {
+    ok: result.ok !== false,
+    allReports: Boolean(result.allReports),
+    apply: Boolean(result.apply),
+    dryRun: result.dryRun !== false,
+    reportId: result.reportId || null,
+    reportDir: result.reportDir || null,
+    reportCount: Number(result.reportCount || (reportDirs.length ? reportDirs.length : reportIds.length || 0)),
+    reportIds: Array.from(new Set(reportIds)).slice(0, 50),
+    reportDirs: Array.from(new Set(reportDirs)).slice(0, 50),
+    routeCount: Number(result.routeCount || 0),
+    providerCount: Number(result.providerCount || countArray(result.providers)),
+    providers: Array.isArray(result.providers) ? result.providers.slice(0, 20) : undefined,
+    steps,
+    childResults,
+    stepCounts,
+    dashboardSummary: compactDashboardSummary(result.dashboardSummary),
+    closureSummary: compactJsonSummary(result.closureSummary),
+    marketValidation: compactJsonSummary(result.marketValidation),
+    unblockDeltaSummary: compactJsonSummary({ unblockDelta: result.unblockDelta })?.unblockDelta || null,
+    errorSummary: result.error ? compactText(result.error, 1_000) : null,
+  };
+}
+
+export async function writeEvidenceBackfillCycleResultArtifact(result = {}, options = {}) {
+  const artifactPath = options.artifactOut
+    ? path.resolve(options.artifactOut)
+    : path.join(RESULT_ARTIFACT_DIR, `${stableRunId()}.json`);
+  try {
+    await writeJson(artifactPath, result);
+  } catch (error) {
+    await writeJson(artifactPath, {
+      ok: false,
+      errorKind: /Invalid string length/i.test(String(error?.message || error)) ? 'serialization_failed' : 'artifact_write_failed',
+      error: String(error?.message || error),
+      compactResult: compactEvidenceBackfillCycleResult(result),
+    });
+  }
+  return artifactPath;
 }
 
 function writeStepLog(entry) {
@@ -172,6 +349,7 @@ export function parseEvidenceBackfillCycleArgs(argv = process.argv.slice(2)) {
       .filter(Boolean),
     throttleHours: boundedInt(readArg(argv, 'throttle-hours'), 6, 0, 24 * 30),
     statePath: readArg(argv, 'state-path') || null,
+    artifactOut: readArg(argv, 'artifact-out') || null,
     userStatePathProvided: Boolean(readArg(argv, 'state-path')),
     maxAttempts: boundedInt(readArg(argv, 'max-attempts'), 3, 1, 10),
   };
@@ -1302,12 +1480,35 @@ const isDirectRun = (() => {
 
 if (isDirectRun) {
   runEvidenceContractBackfillCycle(parseEvidenceBackfillCycleArgs())
-    .then((result) => {
-      console.log(JSON.stringify(result, null, 2));
+    .then(async (result) => {
+      const options = parseEvidenceBackfillCycleArgs();
+      const artifactPath = await writeEvidenceBackfillCycleResultArtifact(result, options);
+      const summary = {
+        ...compactEvidenceBackfillCycleResult(result),
+        artifactPath,
+      };
+      console.log(JSON.stringify(summary, null, 2));
       if (!result.ok) process.exitCode = 1;
     })
-    .catch((error) => {
-      console.error(JSON.stringify({ ok: false, error: String(error?.message || error) }, null, 2));
+    .catch(async (error) => {
+      const failure = {
+        ok: false,
+        error: String(error?.message || error),
+        stack: String(error?.stack || ''),
+      };
+      let artifactPath = null;
+      try {
+        const options = parseEvidenceBackfillCycleArgs();
+        artifactPath = await writeEvidenceBackfillCycleResultArtifact(failure, options);
+      } catch {
+        artifactPath = null;
+      }
+      console.error(JSON.stringify({
+        ok: false,
+        error: compactText(error?.message || error, 1_000),
+        errorKind: /Invalid string length/i.test(String(error?.message || error)) ? 'serialization_failed' : 'execution_failed',
+        artifactPath,
+      }, null, 2));
       process.exitCode = 1;
     });
 }

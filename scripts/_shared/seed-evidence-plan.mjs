@@ -138,6 +138,45 @@ function additionalEvidenceClassesForSeed(seed = {}) {
   return uniqueStrings(out, 12);
 }
 
+const TARGET_THEME_INCOMPATIBLE_CLASSES = Object.freeze({
+  'ai-ml': ['mission_award', 'propulsion_constraint', 'missile_replenishment'],
+  'cloud-infrastructure': ['mission_award', 'propulsion_constraint', 'missile_replenishment'],
+  'data-center-infrastructure': ['mission_award', 'propulsion_constraint', 'missile_replenishment'],
+  'clean-energy': ['mission_award', 'propulsion_constraint', 'missile_replenishment', 'cloud_revenue'],
+  semiconductor: ['mission_award', 'propulsion_constraint', 'missile_replenishment', 'cloud_revenue'],
+  semiconductors: ['mission_award', 'propulsion_constraint', 'missile_replenishment', 'cloud_revenue'],
+  'defense-industrial': ['cloud_revenue'],
+  space: ['cloud_revenue'],
+});
+
+function normalizeEvidenceClassesForTarget(seed = {}, evidenceClasses = []) {
+  const targetTheme = compact(seed.theme?.key || seed.theme?.label).toLowerCase();
+  const incompatible = new Set([
+    ...(TARGET_THEME_INCOMPATIBLE_CLASSES[targetTheme] || []),
+    ...(targetTheme.includes('ai') ? TARGET_THEME_INCOMPATIBLE_CLASSES['ai-ml'] : []),
+    ...(targetTheme.includes('cloud') ? TARGET_THEME_INCOMPATIBLE_CLASSES['cloud-infrastructure'] : []),
+    ...(targetTheme.includes('clean') ? TARGET_THEME_INCOMPATIBLE_CLASSES['clean-energy'] : []),
+    ...(targetTheme.includes('defense') ? TARGET_THEME_INCOMPATIBLE_CLASSES['defense-industrial'] : []),
+  ]);
+  const retained = [];
+  const removed = [];
+  for (const evidenceClass of uniqueStrings(evidenceClasses, 32)) {
+    if (incompatible.has(evidenceClass)) removed.push(evidenceClass);
+    else retained.push(evidenceClass);
+  }
+  return {
+    evidenceClasses: retained,
+    contaminationWarning: removed.length ? {
+      seedId: seed.seedId || null,
+      sourceTheme: uniqueStrings([seed.lineage?.sourceTypes, seed.lineage?.sourceIds], 8).join(', '),
+      targetTheme: seed.theme?.key || seed.theme?.label || '',
+      removedEvidenceClasses: removed,
+      retainedEvidenceClasses: retained,
+      contaminationWarning: 'adjacent_lane_evidence_class_renormalized_to_target_theme',
+    } : null,
+  };
+}
+
 function evidenceUseForRoute(route = {}) {
   const evidenceClass = String(route.evidenceClass || '');
   if (evidenceClass === 'negative_control') return 'negative_control_candidate';
@@ -253,11 +292,12 @@ function buildMarketValidationPlan(seed = {}, routes = []) {
 
 export function buildRouteAwareSeedEvidencePlan(seed = {}, options = {}) {
   const base = buildSeedEvidencePlan(seed);
-  const evidenceClasses = uniqueStrings([
+  const normalized = normalizeEvidenceClassesForTarget(seed, uniqueStrings([
     base.evidenceClasses,
     seed.expectedEvidenceClasses,
     additionalEvidenceClassesForSeed(seed),
-  ], 32);
+  ], 32));
+  const evidenceClasses = normalized.evidenceClasses;
   const providerRoutePlans = evidenceClasses.map((evidenceClass) => routeEvidenceProvider(routeInputForSeed(seed, evidenceClass, options)));
   const sourceQueryDrafts = buildSourceQueryDrafts(seed, providerRoutePlans, options);
   const negativeControlDrafts = sourceQueryDrafts.filter((draft) => draft.desiredEvidenceClass === 'negative_control');
@@ -283,6 +323,7 @@ export function buildRouteAwareSeedEvidencePlan(seed = {}, options = {}) {
     marketValidationPlan: buildMarketValidationPlan(seed, providerRoutePlans),
     blockedRoutes,
     providerGapLabels,
+    contaminationWarnings: normalized.contaminationWarning ? [normalized.contaminationWarning] : [],
     enqueueDefault: false,
     enqueueAllowed: true,
     nextAction: sourceQueryDrafts.length
@@ -384,4 +425,5 @@ export const __test = {
   additionalEvidenceClassesForSeed,
   evidenceUseForRoute,
   sourceQueryDraftForRoute,
+  normalizeEvidenceClassesForTarget,
 };

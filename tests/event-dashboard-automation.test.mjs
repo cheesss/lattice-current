@@ -59,6 +59,9 @@ test('dashboard exposes report backfill closure summary without approval executi
   assert.match(dashboardApiSource, /artifactSchemaWarning/);
   assert.match(dashboardApiSource, /productTierLabel/);
   assert.match(dashboardApiSource, /productTierPrimary/);
+  assert.match(dashboardApiSource, /summarizeSidecarImportReplayHealth/);
+  assert.match(dashboardApiSource, /sidecarImportReplay/);
+  assert.match(dashboardApiSource, /replay_skipped_sidecar_unreachable/);
   assert.match(dashboardApiSource, /adjacent-theme-candidates/);
   assert.match(dashboardApiSource, /loadAdjacentThemeCandidateSummaries/);
   assert.match(dashboardApiSource, /generatedLane/);
@@ -104,6 +107,22 @@ test('dashboard exposes operator seed provider gap review without mutation contr
   assert.match(seedSurface, /Audit details/);
   assert.match(seedSurface, /mutationPolicy/);
   assert.match(modernSurfaceIndexSource, /installResearchSeedsSurface/);
+});
+
+test('dashboard exposes seed bias diagnostics as audit-only surface', () => {
+  const routeStart = dashboardApiSource.indexOf("segments[2] === 'bias-diagnostics'");
+  const routeBlock = dashboardApiSource.slice(routeStart, routeStart + 2200);
+  assert.notEqual(routeStart, -1);
+  assert.match(dashboardApiSource, /runSeedBiasBackfillOrchestrator/);
+  assert.match(routeBlock, /writeArtifacts:\s*false/);
+  assert.match(routeBlock, /recommendedBackfillTasks/);
+  assert.match(routeBlock, /boundaries/);
+
+  const seedSurface = readFileSync(new URL('../src/dashboard/surfaces/research-seeds.mjs', import.meta.url), 'utf8');
+  assert.match(seedSurface, /Seed bias diagnostics/);
+  assert.match(seedSurface, /\/api\/research-seeds\/bias-diagnostics/);
+  assert.match(seedSurface, /data-seed-bias-audit/);
+  assert.match(seedSurface, /visualStatus and accepted evidence matrix remain the readiness source of truth/);
 });
 
 test('dashboard exposes operator seed lifecycle review routes with guarded mutations', () => {
@@ -300,6 +319,13 @@ function createOperatorSeedDashboardRow(overrides = {}) {
     promotionEligible: false,
     query: 'solid rocket motor no shortage substitute supplier',
   };
+  const mechanismDraft = {
+    operatorSeedId: 'msd-dashboard-seed',
+    desiredEvidenceClass: 'mechanism_validation',
+    evidenceUse: 'supporting_context',
+    promotionEligible: false,
+    query: 'official solid rocket motor capacity expansion',
+  };
   return {
     seed_id: 'msd-dashboard-seed',
     seed_key: 'msd-dashboard-seed',
@@ -321,13 +347,40 @@ function createOperatorSeedDashboardRow(overrides = {}) {
         { evidenceClass: 'negative_control', promotionEligible: false, negativeControlIntent: true, executableCollectors: ['source-query'], queryVariants: ['solid rocket motor no shortage substitute supplier'] },
       ],
       sourceQueryDrafts: [
+        mechanismDraft,
         negativeDraft,
         { operatorSeedId: 'msd-dashboard-seed', desiredEvidenceClass: 'market_validation', evidenceUse: 'supporting_context', promotionEligible: false, query: 'LHX SRM market reaction' },
       ],
       negativeControlDrafts: [negativeDraft],
       marketValidationPlan: { evidenceClass: 'market_validation', promotionFromSourceQueryAllowed: false, status: 'planned' },
+      acceptedEvidence: [{
+        seedId: 'msd-dashboard-seed',
+        evidenceClass: 'issuer_exposure',
+        source: 'official-company',
+        evidenceUse: 'promotion_candidate',
+        coveredEvidenceClasses: ['issuer_exposure'],
+      }, {
+        seedId: 'msd-dashboard-seed',
+        evidenceClass: 'mechanism_validation',
+        source: 'government-official',
+        evidenceUse: 'promotion_candidate',
+        coveredEvidenceClasses: ['mechanism_validation'],
+      }],
+      holdoutValidation: {
+        items: [{ seedId: 'msd-dashboard-seed', holdoutConfirmed: true, confirmationCount: 1, contradictionCount: 0 }],
+      },
+      negativeControlSurvival: {
+        items: [{ seedId: 'msd-dashboard-seed', survivalStatus: 'CHECKED_NO_DIRECT' }],
+      },
+      issuerBridge: { status: 'closed' },
+      marketValidation: { localControlledMarketData: true, tier: 'screening_grade' },
       blockedRoutes: [],
       providerGapLabels: ['provider_gap_patent_api'],
+      outcomeLedger: [{
+        evidenceClass: 'negative_control',
+        outcomeTier: 'negative_control_candidate',
+        negativeControlClosure: 'checked_no_direct',
+      }],
       enqueueDefault: false,
       enqueueAllowed: true,
     },

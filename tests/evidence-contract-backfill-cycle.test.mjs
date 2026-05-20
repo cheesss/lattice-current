@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
   buildEvidenceBackfillCyclePlan,
+  compactEvidenceBackfillCycleResult,
+  compactStepResult,
   extractEvidenceContractTasksFromArtifact,
   loadDbBackfillTasks,
   loadTasksFromDbIfNeeded,
   runEvidenceContractBackfillCycle,
   summarizeUnblockDelta,
+  writeEvidenceBackfillCycleResultArtifact,
 } from '../scripts/run-evidence-contract-backfill-cycle.mjs';
 
 test('evidence contract backfill cycle builds provider routes from report artifact in dry-run', async () => {
@@ -253,6 +256,61 @@ test('evidence contract backfill cycle blocks issuer routes with no issuer unive
     assert.equal(issuerRoute.route.executableCollectors.length, 0);
     assert.equal(plan.routes.some((row) => row.route.parentReadyForAdjacent === false), true);
     assert.equal(plan.providers.length > 0, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('evidence contract backfill cycle compacts huge child output and persists full artifact', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'lattice-evidence-cycle-result-'));
+  try {
+    const hugeBundles = Array.from({ length: 500 }, (_, index) => ({
+      id: `bundle-${index}`,
+      title: 'x'.repeat(1_000),
+      articles: Array.from({ length: 5 }, (__, articleIndex) => ({ id: `${index}-${articleIndex}`, body: 'y'.repeat(500) })),
+    }));
+    const result = {
+      ok: true,
+      allReports: true,
+      apply: true,
+      reportCount: 1,
+      reportDirs: [dir],
+      results: [{
+        ok: true,
+        reportId: 'RPT-big',
+        reportDir: dir,
+        steps: [{
+          name: 'source-query-execution:pass-1',
+          ok: true,
+          durationMs: 123,
+          stdoutTail: 'z'.repeat(5_000),
+          json: {
+            ok: true,
+            bundles: hugeBundles,
+            articles: hugeBundles,
+            routePlans: hugeBundles,
+            accepted: 12,
+          },
+        }],
+        unblockDelta: { statusChanged: true, beforeStatus: 'blocked', afterStatus: 'targeted_backfill_needed', changedClasses: [{ evidenceClass: 'issuer_exposure' }] },
+      }],
+      dashboardSummary: { reports: [{ reportId: 'RPT-big', visualStatus: 'blocked', openClasses: ['issuer_exposure'] }] },
+    };
+
+    const artifactPath = path.join(dir, 'cycle-result.json');
+    await writeEvidenceBackfillCycleResultArtifact(result, { artifactOut: artifactPath });
+    const compact = compactEvidenceBackfillCycleResult(result);
+    const compactStep = compactStepResult(result.results[0].steps[0]);
+
+    assert.equal(compact.ok, true);
+    assert.equal(compact.reportCount, 1);
+    assert.equal(compact.childResults[0].steps[0].jsonSummary.bundleCount, 500);
+    assert.equal(compact.childResults[0].steps[0].jsonSummary.articleCount, 500);
+    assert.equal(compact.childResults[0].steps[0].jsonSummary.routePlanCount, 500);
+    assert.equal(compactStep.stdoutTail.includes('[truncated'), true);
+    assert.ok(JSON.stringify(compact).length < 25_000);
+    const persisted = JSON.parse(await readFile(artifactPath, 'utf8'));
+    assert.equal(persisted.results[0].steps[0].json.bundles.length, 500);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

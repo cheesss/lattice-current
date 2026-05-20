@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import pg from 'pg';
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync, execSync, spawn } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { createLogger } from './_shared/structured-logger.mjs';
@@ -51,6 +51,10 @@ const CIRCUIT_BREAKER_COOLDOWN_MS = Number(process.env.DAEMON_CIRCUIT_BREAKER_CO
 const DASHBOARD_HEALTH_URL = String(process.env.EVENT_DASHBOARD_API_URL || 'http://127.0.0.1:46200/api/health').trim();
 const DASHBOARD_HEALTH_TIMEOUT_MS = Number(process.env.DASHBOARD_HEALTH_TIMEOUT_MS || 60_000);
 const DASHBOARD_RESTART_CMD = String(process.env.EVENT_DASHBOARD_RESTART_CMD || '').trim();
+const SIDECAR_PORT = Number(process.env.SIDECAR_PORT || 46123);
+const SIDECAR_HEALTH_URL = String(process.env.SIDECAR_HEALTH_URL || `http://127.0.0.1:${SIDECAR_PORT}/api/local-runtime-observability`).trim();
+const SIDECAR_HEALTH_TIMEOUT_MS = Number(process.env.SIDECAR_HEALTH_TIMEOUT_MS || 10_000);
+const DAEMON_START_SIDECAR = process.env.DAEMON_START_SIDECAR === 'true';
 const DB_RESTART_CMD = String(process.env.DB_RESTART_CMD || '').trim();
 const DUCKDB_SYNC_TIMEOUT_MS = Number(process.env.DUCKDB_SYNC_TIMEOUT_MS || (2 * HOUR_1_MS));
 const LEGACY_DUCKDB_SYNC_ENABLED = process.env.ENABLE_LEGACY_DUCKDB_SYNC === 'true';
@@ -100,18 +104,44 @@ function ensureDataDir() {
 function loadState() {
   try {
     if (existsSync(STATE_PATH)) {
-      return JSON.parse(readFileSync(STATE_PATH, 'utf-8'));
+      return normalizeDaemonState(JSON.parse(readFileSync(STATE_PATH, 'utf-8')));
     }
   } catch {
     // corrupted state: start fresh
   }
 
-  return {
+  return normalizeDaemonState({
     lastRun: {},
     taskResults: {},
     failures: {},
     health: {},
+  });
+}
+
+function normalizeDaemonState(state) {
+  const next = {
+    lastRun: {},
+    taskResults: {},
+    failures: {},
+    health: {},
+    ...(state || {}),
   };
+  const reportClosureFailure = next.failures?.['report-closure'];
+  if (
+    reportClosureFailure?.disabledUntil
+    && /Invalid string length/i.test(String(reportClosureFailure.lastError || ''))
+  ) {
+    next.failures['report-closure'] = { consecutive: 0, disabledUntil: 0, lastError: '' };
+    next.lastRun['report-closure'] = 0;
+    next.taskResults['report-closure'] = {
+      ok: true,
+      at: new Date().toISOString(),
+      error: '',
+      consecutiveFailures: 0,
+      note: 'cleared stale serialization_failed circuit after compact report-closure stdout patch',
+    };
+  }
+  return next;
 }
 
 function saveState(state) {
@@ -198,15 +228,27 @@ function runNodeScript(scriptPath, args = [], timeoutMs = 300_000) {
     const durationMs = Date.now() - started;
     const stderr = error?.stderr?.toString?.() || '';
     const stdout = error?.stdout?.toString?.() || '';
-    const message = String(stderr || stdout || error?.message || error).replace(/\s+/g, ' ').slice(0, 400);
+    let artifactPath = '';
+    let compactChildError = '';
+    try {
+      const parsed = JSON.parse(String(stdout || stderr || '').trim());
+      artifactPath = parsed?.artifactPath || '';
+      compactChildError = parsed?.error || parsed?.errorSummary || '';
+    } catch {
+      // child output was not compact JSON
+    }
+    const message = String(compactChildError || stderr || stdout || error?.message || error)
+      .replace(/\s+/g, ' ')
+      .slice(0, 400);
     logger.warn('node script failed', {
       scriptPath,
       timeoutMs: timeoutLabel(normalizedTimeoutMs),
       durationMs,
       error: message,
+      artifactPath: artifactPath || undefined,
     });
     logger.metric('shell.error_count', 1);
-    return { ok: false, error: message, durationMs };
+    return { ok: false, error: artifactPath ? `${message} artifactPath=${artifactPath}` : message, durationMs, artifactPath };
   }
 }
 
@@ -664,6 +706,75 @@ async function taskDashboardHealth(state) {
     }
 
     return { ok: false, error: message };
+  }
+}
+
+function maybeStartSidecar() {
+  if (!DAEMON_START_SIDECAR) {
+    return { started: false, reason: 'DAEMON_START_SIDECAR is not true' };
+  }
+  const existing = listRunningNodeProcesses('src-tauri[\\\\/]sidecar[\\\\/]local-api-server\\.mjs')
+    .concat(listRunningNodeProcesses('local-api-server\\.mjs'));
+  if (existing.length) {
+    return { started: false, reason: 'already_running', pid: existing[0].pid };
+  }
+  const child = spawn(process.execPath, ['src-tauri/sidecar/local-api-server.mjs'], {
+    cwd: process.cwd(),
+    env: { ...process.env },
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  child.unref();
+  return { started: true, pid: child.pid };
+}
+
+async function taskSidecarHealth(state) {
+  log(`>> sidecar-health: checking ${SIDECAR_HEALTH_URL}`);
+  const checkedAt = new Date().toISOString();
+  try {
+    const response = await fetch(SIDECAR_HEALTH_URL, { signal: AbortSignal.timeout(SIDECAR_HEALTH_TIMEOUT_MS) });
+    const bodyText = await response.text();
+    let payload = null;
+    try {
+      payload = bodyText ? JSON.parse(bodyText) : null;
+    } catch {
+      payload = null;
+    }
+    const status = response.status === 423
+      ? 'busy_lock'
+      : response.ok && payload
+        ? 'ok'
+        : response.ok
+          ? 'bad_response'
+          : `http_${response.status}`;
+    state.health.sidecar = {
+      ok: status === 'ok',
+      status,
+      checkedAt,
+      port: SIDECAR_PORT,
+      autoStartEnabled: DAEMON_START_SIDECAR,
+      payload: status === 'ok' ? payload : null,
+      bodyPreview: status === 'ok' ? undefined : bodyText.slice(0, 300),
+    };
+    saveState(state);
+    logger.metric('sidecar.healthy', status === 'ok' ? 1 : 0);
+    return { ok: true, status };
+  } catch (error) {
+    const startResult = maybeStartSidecar();
+    const message = String(error?.message || error || 'sidecar unreachable');
+    state.health.sidecar = {
+      ok: false,
+      status: 'unreachable',
+      checkedAt,
+      port: SIDECAR_PORT,
+      autoStartEnabled: DAEMON_START_SIDECAR,
+      error: message,
+      startResult,
+    };
+    saveState(state);
+    logger.metric('sidecar.healthy', 0);
+    return { ok: true, status: 'unreachable', error: message, startResult };
   }
 }
 
@@ -1374,6 +1485,7 @@ const TASKS = {
   'article-check': { interval: MIN_30_MS, fn: taskArticleCheck },
   'dynamic-rss-backfill': { interval: HOUR_1_MS, fn: taskDynamicRssBackfill },
   'dashboard-health': { interval: MIN_30_MS, fn: taskDashboardHealth },
+  'sidecar-health': { interval: MIN_30_MS, fn: taskSidecarHealth },
   'db-health': { interval: MIN_15_MS, fn: taskDbHealth },
   'embedding-refresh': { interval: HOUR_1_MS, fn: taskGenerateEmbeddings },
   'auto-pipeline-labels': { interval: HOUR_2_MS, fn: taskAutoPipelineLabels },
@@ -1445,7 +1557,7 @@ async function main() {
     process.stderr.write('  [disabled] rates-nowcast (NOWCAST_RATES_ENABLED != true) — see NOWCAST_HANDOFF §5.2\n');
   }
   process.stderr.write('  15min: market quote refresh (core + auto-theme symbols), db health\n');
-  process.stderr.write('  30min: article check, dashboard health, meta-model-infer-burst (adaptive — only when stale predictions ≥ 1000)\n');
+  process.stderr.write('  30min: article check, dashboard health, sidecar import/replay health, meta-model-infer-burst (adaptive — only when stale predictions ≥ 1000)\n');
   process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, event-engine-incremental, auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission, report-backfill-drain, external provider/keyword backfill\n');
   process.stderr.write('  4h:    repair-stale-features (dedicated event_features stale detector + repair)\n');

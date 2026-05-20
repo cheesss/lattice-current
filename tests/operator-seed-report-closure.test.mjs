@@ -28,7 +28,35 @@ function seedFromPrompt(prompt, overrides = {}) {
 }
 
 function rowForSeed(seed, overrides = {}) {
-  const evidencePlan = buildRouteAwareSeedEvidencePlan(seed, { queryLimitPerClass: 1 });
+  const evidencePlan = {
+    ...buildRouteAwareSeedEvidencePlan(seed, { queryLimitPerClass: 1 }),
+    acceptedEvidence: [{
+      seedId: seed.seedId,
+      evidenceClass: 'issuer_exposure',
+      source: 'official-company',
+      evidenceUse: 'promotion_candidate',
+      coveredEvidenceClasses: ['issuer_exposure'],
+    }, {
+      seedId: seed.seedId,
+      evidenceClass: 'mechanism_validation',
+      source: 'government-official',
+      evidenceUse: 'promotion_candidate',
+      coveredEvidenceClasses: ['mechanism_validation'],
+    }],
+    holdoutValidation: {
+      items: [{ seedId: seed.seedId, holdoutConfirmed: true, confirmationCount: 1, contradictionCount: 0 }],
+    },
+    negativeControlSurvival: {
+      items: [{ seedId: seed.seedId, survivalStatus: 'CHECKED_NO_DIRECT' }],
+    },
+    issuerBridge: { status: 'closed' },
+    marketValidation: { localControlledMarketData: true, tier: 'screening_grade' },
+    outcomeLedger: [{
+      evidenceClass: 'negative_control',
+      outcomeTier: 'negative_control_candidate',
+      negativeControlClosure: 'checked_no_direct',
+    }],
+  };
   return {
     seed_id: seed.seedId,
     seed_key: seed.seedId,
@@ -78,11 +106,11 @@ test('Phase E closure blocks negative-control invalidators before report promoti
 });
 
 test('Phase E universal subject preserves seed evidence plan and readiness boundaries', () => {
-  const seed = seedFromPrompt('AI data center rack density raises power demand and transformer lead-time constraints.', {
-    themeKey: 'cloud-infrastructure',
-    themeLabel: 'Data Center Infrastructure',
-    seedTerms: ['data center power constraint'],
-    issuerCandidates: ['ETN', 'VRT'],
+  const seed = seedFromPrompt('Regional launch pad cadence raises helium reclaim, cryogenic fuel farm, and ground support equipment constraints.', {
+    themeKey: 'space',
+    themeLabel: 'Space',
+    seedTerms: ['launch pad cryogenic ground support equipment'],
+    issuerCandidates: ['ABCX'],
   });
   const row = rowForSeed(seed);
   const subject = buildOperatorSeedUniversalSubject(row);
