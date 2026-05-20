@@ -19,6 +19,8 @@ test('provider adapter proposal exposes required activation schema fields', () =
 
   assert.equal(proposals.length, 1);
   const proposal = proposals[0];
+  assert.equal(proposal.providerName, 'patent_api');
+  assert.equal(proposal.fillsEvidenceClass, 'technical_qualification');
   assert.equal(typeof proposal.authRequired, 'boolean');
   assert.equal(typeof proposal.apiKeyRequired, 'boolean');
   assert.ok(proposal.rateLimit);
@@ -30,8 +32,10 @@ test('provider adapter proposal exposes required activation schema fields', () =
   assert.equal(proposal.failureModes.includes('provider_rate_limited'), true);
   assert.equal(Array.isArray(proposal.allowlistFiles), true);
   assert.equal(Array.isArray(proposal.fixtureRequirements), true);
+  assert.ok(proposal.fixtureRequirement);
   assert.match(proposal.healthCheckCommand, /collect-free-external-data/);
   assert.match(proposal.testCommand, /provider-adapter-patent-api/);
+  assert.equal(proposal.reviewGatedActivation, true);
   assert.equal(proposal.activationAllowed, false);
   assert.equal(proposal.safetyChecklist.providerActivationAllowed, false);
 });

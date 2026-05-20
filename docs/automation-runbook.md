@@ -145,11 +145,19 @@ Run bounded closure across the latest report artifacts:
 node scripts/run-evidence-contract-backfill-cycle.mjs --all-reports --apply --auto-report-source-query --market-validation --dashboard-summary --report-limit 5 --limit 40
 ```
 
+Run autonomous seed bias diagnosis and targeted backfill planning without a
+manual seed or subject:
+
+```bash
+node --import tsx scripts/run-seed-bias-backfill-orchestrator.mjs --dry-run --generate-seeds --source all --limit 25
+```
+
 Provider backfill is now ontology-aware:
 
 - `collect-free-external-data.mjs` resolves issuer symbols from explicit CLI symbols, `theme_entity_exposure`, `regime_conditional_impact`, `tracked_targets`, report backfill metadata, approval payloads, and recent provider runs.
 - Universal Evidence Contract route plans now carry `desiredEvidenceClass`, executable collectors, source-provider families, query variants, issuer universe, and negative-control intent from report tasks into approvals and private research bundles.
 - `run-evidence-contract-backfill-cycle.mjs` keeps a terminal-state file at `data/runtime/evidence-contract-backfill-cycle-state.json` in apply mode so exhausted class/query/provider combinations are not retried in a tight loop.
+- `run-evidence-contract-backfill-cycle.mjs` prints only a compact closure summary to stdout. Full child step payloads, source-query bundle arrays, provider result arrays, and regenerated report details are written under `data/runtime/evidence-contract-backfill-cycle-results/*.json`; daemon failure logs should reference that artifact path instead of inlining the full payload.
 - Cross-theme reports expose a separate evidence-state diagnostic so "not an investment call" is not confused with "bad investment." The states are `More evidence needed`, `Targeted backfill needed`, `Market validation pending`, `Search exhausted, not validated`, `Negative-control reject`, and `Decision review ready`.
 - Continue class-specific backfill only when the diagnostic is `More evidence needed`, `Targeted backfill needed`, or `Market validation pending`. Stop broad automated backfill when the diagnostic says `Search exhausted, not validated` or `Negative-control reject`; use manual expert research only for named unresolved classes.
 - `market_validation` is closed from local controlled market data first (`event_uplift`, matched controls, market returns/quotes). Source-query results can explain the mechanism, but they do not satisfy decision-grade market validation.
@@ -163,6 +171,64 @@ Provider backfill is now ontology-aware:
 - Report-created source-query evidence is attributed back to the requested data pack, but a critical ontology KPI is satisfied only when the evidence text matches that specific KPI. Pack presence alone does not clear investment-readiness blockers.
 - FMP/Polygon/SEC provider attempts write `external_provider_backfill_runs`. `deferred_provider` and `retry_wait` runs are throttled like successful runs so a rate limit does not create a tight retry loop.
 - For defense, official War.gov contract RSS fills contract awards, procurement funds, missile/air-defense demand, and shipyard-throughput evidence without a paid key. Issuer-level `book-to-bill` is only cleared by direct filing/transcript/provider wording such as `book to bill` or a ratio-style observation; generic `bookings` alone remains insufficient.
+
+Accumulator import/replay is a separate health lane from raw collection:
+
+- `data-accumulator.mjs` can keep writing Yahoo/FRED/GDELT raw files even when the local sidecar on `127.0.0.1:46123` is down. A raw file is not counted as replay coverage until sidecar import and replay succeed.
+- Sidecar import failures are stored in `data/historical/accumulator-state.json` under `pendingImports[]` with `filePath`, `datasetId`, `provider`, `attempts`, `lastError`, and `nextAttemptAt`. Each cycle drains a bounded slice before fetching new data.
+- Replay failures are stored as explicit `lastReplay.status` values such as `replay_skipped_sidecar_unreachable`, `replay_skipped_sidecar_busy_lock`, or `replay_skipped_no_run`; do not treat these as successful "no result" replays.
+- GDELT `200` responses with empty `articles` are normal no-hit windows. Network failures, 429/5xx, timeouts, and invalid JSON are retryable and stored in `gdeltRetryQueue[]`, then drained in bounded batches on later cycles.
+- `master-daemon.mjs` has a `sidecar-health` task. It reports `ok`, `unreachable`, `busy_lock`, or `bad_response` into daemon health. It starts the sidecar only when `DAEMON_START_SIDECAR=true`; the default is observation only to avoid desktop runtime collisions.
+
+Repair accumulator import/replay after a sidecar outage:
+
+```bash
+node --import tsx scripts/repair-accumulator-import-replay.mjs --dry-run --limit 50
+node --import tsx scripts/repair-accumulator-import-replay.mjs --apply --limit 25 --replay
+```
+
+Autonomous mechanism seed bias diagnosis is advisory and conservative:
+
+- The loop distinguishes data-limited class concentration from likely real
+  bottlenecks using provider ablations, source-coverage skew, holdout
+  confirmation, negative-control survival, issuer-bridge closure, and
+  class-diversity entropy.
+- If the verdict is `DATA_LIMITED_BIAS` or
+  `INCONCLUSIVE_NEEDS_BACKFILL`, the system raises class-specific source-query
+  and provider backfill plans for underrepresented classes such as
+  `technical_qualification`, `permitting_regulatory`, `material_input`,
+  `engineering_process`, `test_facility_capacity`, and `provider_data_gap`.
+- Raw collected evidence and accepted evidence are separate. Raw backfill
+  results are useful for audit and next-query generation, but only accepted
+  evidence can close the Evidence Contract Matrix or
+  `decisionDiagnostic.coveredEvidenceClasses`.
+- `--apply` for `run-seed-bias-backfill-orchestrator.mjs` writes only the
+  seed-bias run/task/raw-evidence/accepted-evidence/holdout/negative-control
+  ledger tables. It does not write approval queues, canonical graph rows,
+  source registry rows, provider activation state, or investment-report
+  promotion state.
+- Seed-bias task status is intentionally explicit: provider/source routes are
+  `queued`, operator-reviewed source-query drafts are `needs_operator_review`,
+  missing providers are `provider_gap_proposal_required`, and controlled market
+  checks are `queued_local_market_validation`.
+- Autonomous seed report-candidate review is blocked when accepted evidence is
+  missing, only raw evidence exists, holdout confirmation is missing,
+  negative-control survival is not `SURVIVED` or `CHECKED_NO_DIRECT`, issuer
+  bridge is missing, or local controlled market validation is missing.
+- Provider gaps create review-gated adapter proposals only. They do not
+  activate providers, write credentials, or change canonical/source registry
+  state.
+- Autonomous seeds cannot become report candidates only because the bias
+  diagnosis improved. The report-candidate gate still requires a complete
+  mechanism chain, evidence plan, negative-control query, non-manual
+  provenance, low known-narrative/similarity risk, enough evidence routes, and
+  either targeted backfill for data-limited bias or holdout/negative-control
+  support for likely real bottlenecks.
+- The dashboard endpoint `/api/research-seeds/bias-diagnostics` exposes
+  verdict, distribution, underrepresented classes, and recommended tasks. Raw
+  provider/query/evidence payloads remain in the audit drawer. `visualStatus`
+  and reconciled Evidence Contract Matrix coverage remain the operating source
+  of truth.
 
 Run the full coverage-closure loop:
 

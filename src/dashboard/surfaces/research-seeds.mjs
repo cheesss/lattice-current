@@ -11,6 +11,7 @@ import {
 
 let lastGapItems = [];
 let lastSeedItems = [];
+let lastBiasDiagnostics = null;
 
 function ensureSectionRoot(id, className, afterId = '') {
   let root = document.getElementById(id);
@@ -53,6 +54,10 @@ function ensureProviderGapRoot() {
   return ensureSectionRoot('operator-seed-provider-gap-review', 'modern-seed-provider-gap-review', 'modern-seed-review-section');
 }
 
+function ensureSeedBiasRoot() {
+  return ensureSectionRoot('operator-seed-bias-diagnostics', 'modern-seed-bias-diagnostics', 'modern-seed-provider-gap-review-section');
+}
+
 async function fetchSeedReview() {
   const response = await fetch('/api/research-seeds?statuses=review_ready,needs_evidence,evidence_running,report_candidate&limit=12', { cache: 'no-store' });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -78,6 +83,12 @@ async function postSeedAction(seedId, action, payload = {}) {
 
 async function fetchProviderGapReview() {
   const response = await fetch('/api/research-seeds/provider-gaps?statuses=review_ready&limit=8', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+async function fetchSeedBiasDiagnostics() {
+  const response = await fetch('/api/research-seeds/bias-diagnostics?limit=25', { cache: 'no-store' });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
@@ -314,6 +325,100 @@ function renderSeedReview(data = {}) {
   `;
 }
 
+function renderClassDistribution(distribution = {}) {
+  const entries = Object.entries(distribution.counts || {}).sort((left, right) => Number(right[1]) - Number(left[1]));
+  if (!entries.length) return '<div class="modern-empty">No seed class distribution available.</div>';
+  return `
+    <div class="modern-table-wrap">
+      <table class="modern-closure-table">
+        <thead><tr><th>Class</th><th>Count</th><th>Share</th></tr></thead>
+        <tbody>
+          ${entries.map(([klass, count]) => `
+            <tr>
+              <td>${escapeHtml(klass)}</td>
+              <td><span class="modern-mono">${escapeHtml(count)}</span></td>
+              <td><span class="modern-mono">${escapeHtml(Math.round(Number(distribution.shares?.[klass] || 0) * 1000) / 10)}%</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderRecommendedBackfillTasks(tasks = []) {
+  const rows = Array.isArray(tasks) ? tasks.slice(0, 10) : [];
+  if (!rows.length) return '<div class="modern-empty">No recommended backfill tasks.</div>';
+  return renderClosureMatrix(rows.map((task) => ({
+    evidenceClass: task.evidenceClass,
+    state: task.status || (task.adapterProposalRequired ? 'adapter proposal' : 'planned'),
+    provider: task.providers || task.providerRoute || [],
+    tier: task.evidenceClass === 'negative_control' ? 'negative_control_candidate' : 'supporting_context',
+    latestRun: task.providerBackfillTaskCreated ? 'provider task queued' : `${task.sourceQueryDraftCount || 0} source-query draft(s)`,
+    closureReason: task.adapterProposalRequired ? 'missing provider route' : '',
+    nextAction: task.adapterProposalRequired ? 'review adapter proposal' : 'run targeted backfill; acceptance gate still applies',
+  })));
+}
+
+function renderSeedBiasDiagnostics(data = {}) {
+  lastBiasDiagnostics = data;
+  const actions = `
+    <button type="button" class="modern-btn" data-seed-bias-refresh>Refresh</button>
+    <button type="button" class="modern-btn" data-seed-bias-audit>Audit</button>
+  `;
+  const metrics = data.metrics || {};
+  const under = (data.underrepresentedClasses || []).map((item) => item.evidenceClass).slice(0, 6).join(', ') || 'none';
+  const over = (data.overrepresentedClasses || []).map((item) => item.evidenceClass).slice(0, 6).join(', ') || 'none';
+  const queue = data.backfillQueueStatus || {};
+  const gate = data.reportCandidateGateResult || {};
+  return `
+    ${renderSurfaceHeader({
+      eyebrow: 'Research Seeds',
+      title: 'Seed bias diagnostics',
+      summary: 'Bias diagnosis is an audit signal only. visualStatus and accepted evidence matrix remain the readiness source of truth.',
+      meta: data.source || 'seed-bias-diagnostics-surface',
+      actions,
+    })}
+    <div class="modern-metric-grid">
+      ${renderMetricCell('Bias verdict', data.verdict || 'unknown', data.verdict === 'DATA_LIMITED_BIAS' ? 'blocked' : data.verdict === 'LIKELY_REAL_BOTTLENECK' ? 'complete' : 'pending')}
+      ${renderMetricCell('Entropy', String(metrics.classDiversityEntropy ?? '--'), 'info')}
+      ${renderMetricCell('Provider sensitivity', String(metrics.providerSensitivityScore ?? '--'), 'pending')}
+      ${renderMetricCell('Evidence scarcity', String(metrics.evidenceScarcityIndex ?? '--'), 'blocked')}
+    </div>
+    <div class="modern-metric-grid">
+      ${renderMetricCell('Backfill queue', `${queue.queued || 0} queued`, 'pending')}
+      ${renderMetricCell('Raw evidence', String(data.rawEvidenceCount ?? 0), 'info')}
+      ${renderMetricCell('Accepted evidence', String(data.acceptedEvidenceCount ?? 0), (data.acceptedEvidenceCount || 0) > 0 ? 'complete' : 'blocked')}
+      ${renderMetricCell('Gate blocked', String(gate.blockedCount ?? 0), (gate.blockedCount || 0) > 0 ? 'blocked' : 'complete')}
+    </div>
+    <div class="modern-detail-grid two">
+      <section class="modern-detail-section">
+        <div class="modern-surface-eyebrow">Class Distribution</div>
+        ${renderClassDistribution(data.classDistribution || {})}
+      </section>
+      <section class="modern-detail-section">
+        <div class="modern-surface-eyebrow">Coverage Gaps</div>
+        ${renderKeyValue('Underrepresented', under)}
+        ${renderKeyValue('Overrepresented', over)}
+        ${renderKeyValue('Adapter proposals', String(data.adapterProposalCount || 0))}
+        ${renderKeyValue('Negative control', data.negativeControlSurvivalStatus || 'unknown')}
+        ${renderKeyValue('Holdout', data.holdoutConfirmationStatus || 'unknown')}
+        ${renderKeyValue('Report blocker', data.finalInvestmentReportReadinessBlocker || 'none')}
+      </section>
+    </div>
+    <section class="modern-detail-section">
+      <div class="modern-surface-eyebrow">Recommended Backfill Tasks</div>
+      ${renderRecommendedBackfillTasks(data.recommendedBackfillTasks || [])}
+    </section>
+    ${(data.warnings || []).length ? `
+      <section class="modern-detail-section">
+        <div class="modern-surface-eyebrow">Bias Warnings</div>
+        ${listItems((data.warnings || []).map((item) => `${item.code}: ${item.message}`), 'No warnings')}
+      </section>
+    ` : ''}
+  `;
+}
+
 function renderSeedCard(item, index) {
   const title = item.title || item.seedId || 'operator seed';
   const theme = item.theme?.label || item.theme?.key || 'theme';
@@ -530,6 +635,41 @@ function bindProviderGapReview(root) {
   });
 }
 
+function bindSeedBiasDiagnostics(root) {
+  root.querySelector('[data-seed-bias-refresh]')?.addEventListener('click', () => renderSeedBiasDiagnosticsSurface());
+  root.querySelector('[data-seed-bias-audit]')?.addEventListener('click', () => {
+    openAuditDrawer('Seed bias diagnostics audit', lastBiasDiagnostics?.audit || lastBiasDiagnostics || {});
+  });
+}
+
+export async function renderSeedBiasDiagnosticsSurface() {
+  ensureModernSurfaceStylesheet();
+  const root = ensureSeedBiasRoot();
+  if (!root) return;
+  root.innerHTML = `
+    ${renderSurfaceHeader({
+      eyebrow: 'Research Seeds',
+      title: 'Seed bias diagnostics',
+      summary: 'Loading bias-aware seed diagnostics...',
+    })}
+    <div class="modern-empty">Loading seed bias diagnostics...</div>
+  `;
+  try {
+    const data = await fetchSeedBiasDiagnostics();
+    root.innerHTML = renderSeedBiasDiagnostics(data);
+    bindSeedBiasDiagnostics(root);
+  } catch (error) {
+    root.innerHTML = `
+      ${renderSurfaceHeader({
+        eyebrow: 'Research Seeds',
+        title: 'Seed bias diagnostics',
+        summary: 'The seed bias endpoint did not return usable data.',
+      })}
+      <div class="modern-error" role="alert">Failed to load seed bias diagnostics: ${escapeHtml(error?.message || error)}</div>
+    `;
+  }
+}
+
 export async function renderSeedReviewSurface() {
   ensureModernSurfaceStylesheet();
   const root = ensureSeedReviewRoot();
@@ -590,6 +730,8 @@ export function installResearchSeedsSurface() {
   ensureModernSurfaceStylesheet();
   window.loadSeedProviderGapReview = renderSeedProviderGapReview;
   window.loadOperatorSeedReview = renderSeedReviewSurface;
+  window.loadSeedBiasDiagnostics = renderSeedBiasDiagnosticsSurface;
   renderSeedReviewSurface();
   renderSeedProviderGapReview();
+  renderSeedBiasDiagnosticsSurface();
 }

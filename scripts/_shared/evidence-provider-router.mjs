@@ -195,6 +195,31 @@ function routeDefaultsForClass(evidenceClass, context = {}) {
         executableCollectors: unique([...(powerOrGrid ? ['public-planning-source'] : []), 'source-query', ...(defenseOrSpace ? ['dod-contracts'] : [])]),
         sourceProviders: ['official-company', 'company-technical-release', 'patents', 'papers', 'official-test-release', ...(powerOrGrid ? ['utility-standard', 'ferc', 'rto-iso', 'public-planning-source'] : []), ...(defenseOrSpace ? ['defense.gov'] : [])],
       };
+    case 'permitting_regulatory':
+      return {
+        executableCollectors: unique(['public-planning-source', ...(powerOrGrid ? ['eia'] : []), 'source-query']),
+        sourceProviders: ['iso-rto-data', 'utility-queue', 'government-permit-db', 'local-authority-records', 'ferc', 'rto-iso', 'interconnection-queue', 'public-planning-source', 'policy-source'],
+      };
+    case 'material_input':
+      return {
+        executableCollectors: unique(['fred', 'eia', 'sec', 'fmp', 'source-query']),
+        sourceProviders: ['trade-data', 'commodity-data', 'supplier-filings', 'import-export-data', 'official-company', 'trade-press', 'provider-fundamentals'],
+      };
+    case 'engineering_process':
+      return {
+        executableCollectors: unique(['sec', 'fmp', ...(powerOrGrid ? ['public-planning-source'] : []), 'source-query']),
+        sourceProviders: ['company-technical-release', 'patents', 'papers', 'official-company', 'technical-standard', 'trade-press', 'process-engineering-source'],
+      };
+    case 'test_facility_capacity':
+      return {
+        executableCollectors: unique([...(defenseOrSpace ? ['dod-contracts', 'usaspending'] : []), ...(powerOrGrid ? ['public-planning-source'] : []), 'source-query']),
+        sourceProviders: ['official-test-release', 'certification-docs', 'test-stand-records', 'government-facility-source', 'technical-paper', 'company-technical-release', ...(defenseOrSpace ? ['defense.gov', 'war.gov-contracts'] : [])],
+      };
+    case 'provider_data_gap':
+      return {
+        executableCollectors: [],
+        sourceProviders: ['adapter-proposal', 'provider-gap-review'],
+      };
     case 'substitution_limit':
       return {
         executableCollectors: unique([...(powerOrGrid ? ['public-planning-source'] : []), 'source-query', ...(defenseOrSpace ? ['dod-contracts', 'usaspending'] : [])]),
@@ -317,6 +342,35 @@ function providerQueriesForClass(evidenceClass, context = {}) {
         `${base} qualification certification test specification technical readiness`,
         `${base} official test release qualified supplier technical milestone`,
         `${base} patent paper qualification testing production readiness`,
+      ];
+    case 'permitting_regulatory':
+      return [
+        `${base} permit approval interconnection queue regulatory filing local authority`,
+        `${base} ISO RTO utility queue permit authority approval delay`,
+        `${base} government permit database regulatory approval project queue`,
+      ];
+    case 'material_input':
+      return [
+        `${base} material input commodity supplier filing import export bottleneck`,
+        `${base} feedstock input cost supplier capacity trade data shortage`,
+        `${base} commodity data supplier filing material availability constraint`,
+      ];
+    case 'engineering_process':
+      return [
+        `${base} engineering process production step yield tooling bottleneck`,
+        `${base} process qualification production readiness technical constraint`,
+        `${base} manufacturing process yield ramp tooling qualification evidence`,
+      ];
+    case 'test_facility_capacity':
+      return [
+        `${base} test facility capacity test stand qualification throughput queue`,
+        `${base} certification lab test range capacity official test release`,
+        `${base} qualification facility bottleneck test throughput lead time`,
+      ];
+    case 'provider_data_gap':
+      return [
+        `${base} provider gap adapter required source coverage missing data`,
+        `${base} missing official provider evidence class adapter proposal`,
       ];
     case 'substitution_limit':
       return [

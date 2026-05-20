@@ -24,6 +24,9 @@ import {
 import {
   filterIssuerSymbols,
 } from './theme-ontology.mjs';
+import {
+  evaluateAutonomousSeedReportCandidateGate,
+} from './seed-bias-diagnostics.mjs';
 
 export const OPERATOR_SEED_REPORT_CLOSURE_VERSION = 'operator-seed-report-closure-v1';
 
@@ -233,11 +236,24 @@ export function buildOperatorSeedReportClosurePlan(row = {}, options = {}) {
   const fatalFlags = fatalBiasFlags(row, seed);
   const providerGaps = providerGapsForRow(row, seed);
   const missingSources = missingSourcesForRow(row, seed);
+  const autonomousGate = evaluateAutonomousSeedReportCandidateGate(row, {
+    evidencePlan: plan,
+    closure,
+    biasDiagnosis: options.biasDiagnosis,
+    targetedBackfillRan: options.targetedBackfillRan,
+    rawEvidence: options.rawEvidence || plan.rawEvidence || row.raw_evidence || row.rawEvidence || [],
+    acceptedEvidence: options.acceptedEvidence || plan.acceptedEvidence || row.accepted_evidence || row.acceptedEvidence || [],
+    holdoutValidation: options.holdoutValidation || plan.holdoutValidation || row.holdout_validation || row.holdoutValidation || {},
+    negativeControlSurvival: options.negativeControlSurvival || plan.negativeControlSurvival || row.negative_control_survival || row.negativeControlSurvival || {},
+    issuerBridge: options.issuerBridge || plan.issuerBridge || row.issuer_bridge || row.issuerBridge || {},
+    marketValidation: options.marketValidation || plan.marketValidation || row.market_validation || row.marketValidation || {},
+  });
 
   if (!seedId) blockers.push('missing_seed_id');
   if (!reportAllowedStatus(row.status || seed.status, options)) {
     blockers.push('seed_not_marked_report_candidate');
   }
+  if (!autonomousGate.ok) blockers.push(...autonomousGate.blockers.map((blocker) => `gate_${blocker}`));
   if (!structure.ok) blockers.push(...structure.missing.map((field) => `missing_${field}`));
   if (!explicitPlan && directEvidenceCount <= 0 && supportingEvidenceCount <= 0) blockers.push('missing_explicit_evidence_plan');
   if (!counterEvidenceReady) blockers.push('missing_counter_evidence_query');
@@ -283,6 +299,7 @@ export function buildOperatorSeedReportClosurePlan(row = {}, options = {}) {
     providerGaps,
     missingSources,
     biasFlags,
+    reportCandidateGate: autonomousGate,
     nextAction: ready
       ? 'create universal research subject and generate operator-seed report artifact; then run evidence contract backfill cycle'
       : `fix Phase E blockers: ${blockers.join(', ')}`,

@@ -20,6 +20,11 @@ const EVIDENCE_CLASS_BY_BOTTLENECK = Object.freeze({
   power_constraint: ['power_constraint', 'capex_confirmation', 'supplier_capacity'],
   supplier_capacity: ['supplier_capacity', 'issuer_exposure', 'issuer_commentary'],
   technical_qualification: ['technical_qualification', 'supplier_capacity', 'substitution_limit'],
+  permitting_regulatory: ['permitting_regulatory', 'policy_funding', 'negative_control'],
+  material_input: ['material_input', 'commodity_input', 'supplier_capacity', 'substitution_limit'],
+  engineering_process: ['engineering_process', 'technical_qualification', 'mechanism_validation'],
+  test_facility_capacity: ['test_facility_capacity', 'technical_qualification', 'supplier_capacity'],
+  provider_data_gap: ['provider_data_gap'],
   procurement_trigger: ['procurement_trigger', 'policy_funding', 'mission_award'],
   substitution_limit: ['substitution_limit', 'technical_qualification', 'negative_control'],
   commodity_input: ['commodity_input', 'supplier_capacity', 'substitution_limit'],
@@ -133,6 +138,26 @@ const DOMAIN_TEMPLATES = Object.freeze([
     },
     supplierCategory: 'advanced packaging, substrate, memory, and semiconductor equipment suppliers',
   },
+]);
+
+const REPRESENTATIVE_TICKERS = new Set([
+  'NVDA',
+  'MSFT',
+  'GOOGL',
+  'GOOG',
+  'META',
+  'VRT',
+  'ETN',
+  'PWR',
+  'LMT',
+  'RTX',
+]);
+
+const KNOWN_NARRATIVE_PATTERNS = Object.freeze([
+  /\bAI\b.*\b(NVDA|GPU|data[-\s]?center|power)\b/i,
+  /\bdata[-\s]?center\b.*\b(power|grid|VRT|ETN|PWR)\b/i,
+  /\bdefen[cs]e\b.*\b(LMT|RTX|missile|budget)\b/i,
+  /\bsemiconductor\b.*\b(NVDA|TSM|ASML|AI)\b/i,
 ]);
 
 function readJson(filePath) {
@@ -367,7 +392,22 @@ function publicIssuerCandidatesFrom(input = {}, template = {}) {
     template.publicIssuerCandidates,
   ], 24)
     .map((value) => String(value || '').trim().toUpperCase())
-    .filter((value) => /^[A-Z][A-Z0-9.-]{0,9}$/.test(value));
+    .filter((value) => /^[A-Z][A-Z0-9.-]{0,9}$/.test(value))
+    .filter((value) => !REPRESENTATIVE_TICKERS.has(value));
+}
+
+function suppressedRepresentativeTickersFrom(input = {}, template = {}) {
+  return uniqueStrings([
+    input.issuerCandidates,
+    input.candidateIssuerUniverse,
+    input.issuerUniverse,
+    asArray(input.suppliers).map((supplier) => supplier.symbol),
+    asArray(input.metadata?.suppliers).map((supplier) => supplier.symbol),
+    asArray(input.metadata?.constraint?.suppliers).map((supplier) => supplier.symbol),
+    template.publicIssuerCandidates,
+  ], 24)
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter((value) => REPRESENTATIVE_TICKERS.has(value));
 }
 
 function additionalInputsFromInput(input = {}) {
@@ -471,6 +511,31 @@ function scoreCounterEvidenceRisk(seed = {}) {
   return clamp(risk);
 }
 
+function scoreKnownNarrative(seed = {}) {
+  const text = textBlob(seed.theme?.label, seed.growthDriver, seed.realActivity, seed.physicalProcess, seed.requiredInputs, seed.bottleneck?.label, seed.bottleneck?.mechanism, seed.supplierCategory?.publicIssuerCandidates, seed.evidenceQueries);
+  const narrativeHits = KNOWN_NARRATIVE_PATTERNS.filter((pattern) => pattern.test(text)).length;
+  const representativeTickerHits = asArray(seed.suppressedRepresentativeTickers).length
+    + asArray(seed.supplierCategory?.publicIssuerCandidates).filter((ticker) => REPRESENTATIVE_TICKERS.has(String(ticker || '').toUpperCase())).length;
+  const sourceFrequencyProxy = Math.min(1, asArray(seed.lineage?.sourceIds).length / 6);
+  const knownNarrativeScore = clamp(0.16 + narrativeHits * 0.22 + representativeTickerHits * 0.12 + sourceFrequencyProxy * 0.18);
+  const tickerObviousnessPenalty = clamp(representativeTickerHits * 0.12);
+  const knownNarrativePenalty = clamp(knownNarrativeScore * 0.18 + tickerObviousnessPenalty);
+  const seedSimilarityScore = clamp(seed.biasAudit?.seed_dependence_score ?? 0);
+  const priorReportOverlap = clamp(asArray(seed.lineage?.sourceIds).filter((id) => /report|rpt|adjacent-\d+/i.test(String(id || ''))).length / Math.max(1, asArray(seed.lineage?.sourceIds).length));
+  const sourceNoveltyScore = clamp(1 - seedSimilarityScore - priorReportOverlap * 0.25);
+  const nodeSpecificityScore = clamp((Number(seed.scores?.bottleneck_specificity ?? 0) || scoreBottleneckSpecificity(seed.bottleneck?.label || seed.seedTitle || '')));
+  return {
+    knownNarrativeScore,
+    knownNarrativePenalty,
+    representativeTickerSuppressionApplied: asArray(seed.suppressedRepresentativeTickers).length > 0,
+    seedSimilarityScore,
+    priorReportOverlap,
+    tickerObviousnessPenalty,
+    sourceNoveltyScore,
+    nodeSpecificityScore,
+  };
+}
+
 export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
   const physical_linkage = scorePhysicalLinkage(seed);
   const demand_elasticity = scoreDemandElasticity(seed);
@@ -489,6 +554,7 @@ export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
   const investability = scoreInvestability(seed);
   const operator_preference_score = scoreOperatorPreference(seed, prior);
   const counter_evidence_risk = scoreCounterEvidenceRisk(seed);
+  const narrative = scoreKnownNarrative(seed);
   const weights = prior.scoringWeights || {};
   const positive = (
     physical_linkage * Number(weights.physical_linkage ?? 0.18)
@@ -500,7 +566,11 @@ export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
     + investability * Number(weights.investability ?? 0.12)
     + operator_preference_score * Number(weights.operator_preference_score ?? 0.04)
   );
-  const composite_seed_score = clamp(positive - (counter_evidence_risk * Number(weights.counter_evidence_risk_penalty ?? 0.04)));
+  const composite_seed_score = clamp(
+    positive
+    - (counter_evidence_risk * Number(weights.counter_evidence_risk_penalty ?? 0.04))
+    - narrative.knownNarrativePenalty * 0.08,
+  );
   return {
     physical_linkage,
     demand_elasticity,
@@ -512,6 +582,7 @@ export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
     counter_evidence_risk,
     operator_preference_score,
     composite_seed_score,
+    ...narrative,
   };
 }
 
@@ -668,6 +739,8 @@ export function normalizeMechanismSeed(input = {}, options = {}) {
     biasAudit: {},
     providerGaps: [],
     rejectedReasons: [],
+    suppressedRepresentativeTickers: suppressedRepresentativeTickersFrom(input, template),
+    seedLockAudit: {},
     lineage: {
       source: input.source || 'direct',
       sourceIds: uniqueStrings(input.sourceIds || [input.id], 12),
@@ -685,6 +758,14 @@ export function normalizeMechanismSeed(input = {}, options = {}) {
   seed.biasAudit = auditSeedSourceCoverage(seed, { sourceRefs: input.sourceRefs }, prior);
   seed.providerGaps = seed.biasAudit.provider_gap_labels || [];
   seed.scores = scoreMechanismSeed(seed, prior);
+  seed.seedLockAudit = {
+    seedSimilarityScore: seed.scores.seedSimilarityScore,
+    seedDependenceScore: seed.biasAudit.seed_dependence_score,
+    priorReportOverlap: seed.scores.priorReportOverlap,
+    sourceNoveltyScore: seed.scores.sourceNoveltyScore,
+    representativeTickerSuppressionApplied: seed.scores.representativeTickerSuppressionApplied,
+    suppressedRepresentativeTickers: seed.suppressedRepresentativeTickers,
+  };
   seed.rejectedReasons = rejectedReasonsForSeed(seed, prior);
   if (seed.rejectedReasons.includes('generic_theme_narrative')) {
     seed.scores = {

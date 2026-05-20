@@ -8,8 +8,16 @@ const accumulatorSource = readFileSync(new URL('../scripts/data-accumulator.mjs'
 test('master daemon includes circuit breaker and pending outcome resolution', () => {
   assert.match(source, /CIRCUIT_BREAKER_FAILS/);
   assert.match(source, /computeCircuitBackoffMs/);
+  assert.match(source, /normalizeDaemonState/);
+  assert.match(source, /cleared stale serialization_failed circuit/);
   assert.match(source, /checkPendingOutcomes/);
   assert.match(source, /dashboard-health/);
+  assert.match(source, /sidecar-health/);
+  assert.match(source, /taskSidecarHealth/);
+  assert.match(source, /SIDECAR_HEALTH_URL/);
+  assert.match(source, /DAEMON_START_SIDECAR/);
+  assert.match(source, /src-tauri\/sidecar\/local-api-server\.mjs/);
+  assert.match(source, /windowsHide: true/);
   assert.match(source, /db-health/);
   assert.match(source, /daily-backup/);
   assert.match(source, /LEGACY_DUCKDB_SYNC_ENABLED/);
@@ -81,6 +89,7 @@ test('master daemon includes circuit breaker and pending outcome resolution', ()
   assert.match(source, /scripts\/run-evidence-contract-backfill-cycle\.mjs/);
   assert.match(source, /--auto-report-source-query/);
   assert.match(source, /--market-validation/);
+  assert.match(source, /artifactPath/);
   assert.match(source, /REPORT_BACKFILL_DRAIN_LIMIT/);
   assert.match(source, /review-gated source-query approvals/);
   assert.match(source, /generic-kpi-collection/);
@@ -97,8 +106,13 @@ test('continuous data accumulator refuses duplicate persistent instances', () =>
   assert.match(accumulatorSource, /listRunningAccumulatorPeers/);
   assert.ok(accumulatorSource.includes('data-accumulator\\\\.mjs'));
   assert.match(accumulatorSource, /refusing duplicate persistent daemon/);
-  assert.match(accumulatorSource, /if \(!runOnce\)/);
+  assert.match(accumulatorSource, /if \(isDirectRun && !runOnce\)/);
   assert.match(accumulatorSource, /markAccumulatorHeartbeat/);
   assert.match(accumulatorSource, /cycle-start/);
   assert.match(accumulatorSource, /cycle-complete/);
+  assert.match(accumulatorSource, /pendingImports/);
+  assert.match(accumulatorSource, /drainPendingImports/);
+  assert.match(accumulatorSource, /replay_skipped_sidecar_unreachable/);
+  assert.match(accumulatorSource, /gdeltRetryQueue/);
+  assert.match(accumulatorSource, /fetchWithRetry/);
 });

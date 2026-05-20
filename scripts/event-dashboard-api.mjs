@@ -83,6 +83,7 @@ import { sendAlert } from './_shared/alert-notifier.mjs';
 import { loadReportBackfillClosureSummaries } from './_shared/report-backfill-closure.mjs';
 import { loadAdjacentThemeCandidateSummaries } from './_shared/report-adjacent-expansion.mjs';
 import { runProviderGapReview } from './review-provider-gap-proposals.mjs';
+import { runSeedBiasBackfillOrchestrator } from './run-seed-bias-backfill-orchestrator.mjs';
 import {
   buildOperatorSeedReviewDetail,
   buildOperatorSeedReviewPayload,
@@ -1471,6 +1472,12 @@ const OPS_DAEMON_FRESH_MS = 30 * 60 * 1000;       // 2x the 15-minute daemon tic
 // ok/stale during normal operation.
 const OPS_ACCUMULATOR_FRESH_MS = 150 * 60 * 1000;
 const OPS_HTTP_PROBE_TIMEOUT_MS = 1500;
+const REPLAY_UNAVAILABLE_STATUSES = new Set([
+  'replay_skipped_sidecar_unreachable',
+  'replay_skipped_sidecar_busy_lock',
+  'replay_skipped_no_run',
+  'replay_failed',
+]);
 const OPS_RECENT_ISSUE_LIMIT = 10;
 const OPS_PYTHON_PROBE_TTL_MS = 5 * 60 * 1000;
 let cachedPythonRuntimeProbe = null;
@@ -1536,6 +1543,53 @@ async function probeMetaModelService() {
   }
 }
 
+async function readJsonFileSafe(filePath, fallback = null) {
+  try {
+    return JSON.parse(await readFile(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+async function loadLatestSeedBiasAcquisitionArtifact() {
+  const candidates = [
+    path.join('data', 'runtime', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-controlled-apply', 'seed-bias-evidence-acquisition.latest.json'),
+  ];
+  const payloads = (await Promise.all(candidates.map((candidate) => readJsonFileSafe(candidate, null))))
+    .filter((payload) => payload?.ok);
+  return payloads.sort((left, right) => new Date(right.generatedAt || 0) - new Date(left.generatedAt || 0))[0] || null;
+}
+
+function summarizeSidecarImportReplayHealth(daemonState, accumulatorState) {
+  const sidecar = daemonState?.health?.sidecar || null;
+  const pendingImports = Array.isArray(accumulatorState?.pendingImports) ? accumulatorState.pendingImports : [];
+  const gdeltRetries = Array.isArray(accumulatorState?.gdeltRetryQueue) ? accumulatorState.gdeltRetryQueue : [];
+  const lastReplay = accumulatorState?.lastReplay || null;
+  const replayUnavailable = REPLAY_UNAVAILABLE_STATUSES.has(lastReplay?.status);
+  const status = sidecar?.status && sidecar.status !== 'ok'
+    ? sidecar.status
+    : replayUnavailable
+      ? lastReplay.status
+      : pendingImports.length > 0
+        ? 'pending_imports'
+        : 'ok';
+  return {
+    status,
+    sidecarStatus: sidecar?.status || 'unknown',
+    sidecarCheckedAt: sidecar?.checkedAt || null,
+    pendingImportCount: pendingImports.length,
+    gdeltRetryCount: gdeltRetries.length,
+    lastReplayStatus: lastReplay?.status || null,
+    lastReplayAt: lastReplay?.at || accumulatorState?.lastReplayAt || null,
+    blocker: status === 'ok'
+      ? null
+      : status === 'pending_imports'
+        ? 'sidecar import backlog pending'
+        : 'sidecar import/replay unavailable',
+  };
+}
+
 async function loadRecentOpsAlerts(limit = OPS_RECENT_ISSUE_LIMIT) {
   try {
     const raw = await readFile(OPS_ALERTS_PATH, 'utf8');
@@ -1584,7 +1638,7 @@ async function buildOpsStatusPayload(pool) {
   const generatedAt = new Date().toISOString();
 
   // Run independent probes in parallel.
-  const [daemon, accumulator, metaModel, recentIssues, modelHealth] = await Promise.all([
+  const [daemon, accumulator, metaModel, recentIssues, modelHealth, daemonState, accumulatorState] = await Promise.all([
     probeFileService(OPS_DAEMON_STATE_PATH, OPS_DAEMON_FRESH_MS),
     probeFileService(OPS_ACCUMULATOR_STATE_PATH, OPS_ACCUMULATOR_FRESH_MS),
     probeMetaModelService(),
@@ -1600,6 +1654,8 @@ async function buildOpsStatusPayload(pool) {
         symbolCoverage: null,
       },
     })),
+    readJsonFileSafe(OPS_DAEMON_STATE_PATH, {}),
+    readJsonFileSafe(OPS_ACCUMULATOR_STATE_PATH, {}),
   ]);
 
   // buildMetaModelHealthPayload nests freshness/eval/activeModel/symbolCoverage
@@ -1635,10 +1691,19 @@ async function buildOpsStatusPayload(pool) {
     }
     : null;
 
-  const summaryLevel = rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness });
+  const sidecarImportReplay = summarizeSidecarImportReplayHealth(daemonState, accumulatorState);
+  const baseSummaryLevel = rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness });
+  const summaryLevel = baseSummaryLevel === 'critical'
+    ? 'critical'
+    : sidecarImportReplay.sidecarStatus === 'unreachable'
+      ? 'critical'
+      : sidecarImportReplay.status !== 'ok'
+        ? 'warning'
+        : baseSummaryLevel;
   const summaryNotes = [];
   if (daemon.status !== 'ok') summaryNotes.push(`master-daemon ${daemon.status} (${daemon.ageMinutes ?? '?'} min)`);
   if (accumulator.status !== 'ok') summaryNotes.push(`data-accumulator ${accumulator.status}`);
+  if (sidecarImportReplay.status !== 'ok') summaryNotes.push(`sidecar import/replay ${sidecarImportReplay.status}`);
   if (metaModel.status !== 'ok') summaryNotes.push(`meta-model server ${metaModel.status}`);
   if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) {
     summaryNotes.push(`event_features lag ${freshness.featureLagDays.toFixed(0)}d`);
@@ -1674,6 +1739,13 @@ async function buildOpsStatusPayload(pool) {
       severity: 'critical',
       condition: 'meta-model-server is unreachable',
       action: `Start a real Python runtime with torch/fastapi/uvicorn, then run: \`${metaModel.pythonRuntime?.bin || 'python'} scripts/meta-model-server.py\` and verify it binds 8100.${pythonReason}`,
+    });
+  }
+  if (sidecarImportReplay.status !== 'ok') {
+    actionableInstructions.push({
+      severity: sidecarImportReplay.sidecarStatus === 'unreachable' ? 'critical' : 'warning',
+      condition: sidecarImportReplay.blocker || `sidecar import/replay ${sidecarImportReplay.status}`,
+      action: 'Check sidecar health: `node scripts/master-daemon.mjs --task sidecar-health --once`; after it is reachable, run `node --import tsx scripts/repair-accumulator-import-replay.mjs --dry-run --limit 50` and then apply a bounded repair if the candidate list is expected.',
     });
   }
   if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
@@ -1726,6 +1798,7 @@ async function buildOpsStatusPayload(pool) {
       api: { status: 'ok', port: Number(process.env.PORT || 46200) },
       masterDaemon: daemon,
       dataAccumulator: accumulator,
+      sidecarImportReplay,
       metaModel,
     },
     freshness,
@@ -3053,6 +3126,106 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             ...summary,
             source: 'operator-seed-provider-gap-review',
             endpoint: '/api/research-seeds/provider-gaps',
+          });
+        }
+        if (method === 'GET' && segments[2] === 'bias-diagnostics') {
+          const summary = await runSeedBiasBackfillOrchestrator({
+            dryRun: true,
+            source: String(params.get('source') || 'all'),
+            limit: Number(params.get('limit') || 25),
+            seedArtifact: String(params.get('seedArtifact') || path.join('data', 'runtime', 'mechanism-seed-generation.latest.json')),
+            artifactRoot: path.join('data', 'runtime'),
+            generateSeeds: ['1', 'true', 'yes'].includes(String(params.get('generateSeeds') || '').toLowerCase()),
+            writeArtifacts: false,
+          });
+          const acquisition = String(params.get('includeStored') || 'true').toLowerCase() === 'false'
+            ? null
+            : await loadLatestSeedBiasAcquisitionArtifact();
+          const storedNegativeStatus = acquisition?.negativeControlStatus || null;
+          const storedHoldoutStatus = acquisition ? (acquisition.holdoutConfirmed ? 'confirmed' : 'missing') : null;
+          const storedGateResult = acquisition?.gateResult
+            ? {
+              allowedCount: acquisition.gateResult.gate === 'report_candidate_allowed' ? 1 : 0,
+              blockedCount: acquisition.gateResult.gate === 'report_candidate_allowed' ? 0 : 1,
+            }
+            : null;
+          const boundaries = summary.boundaries;
+          const recommendedBackfillTasks = summary.backfillPlan.tasks.map((task) => ({
+            taskId: task.taskId,
+            evidenceClass: task.evidenceClass,
+            providerRoute: task.providerRoute,
+            providers: task.providers,
+            status: task.status,
+            reviewRequired: task.reviewRequired,
+            sourceQueryDraftCount: task.sourceQueryDrafts?.length || 0,
+            providerBackfillTaskCreated: Boolean(task.providerBackfillTask),
+            adapterProposalRequired: Boolean(task.adapterProposalRequired),
+          }));
+          return buildJsonResponse({
+            ok: true,
+            source: 'seed-bias-diagnostics-surface',
+            endpoint: '/api/research-seeds/bias-diagnostics',
+            generatedAt: summary.generatedAt,
+            verdict: summary.diagnosis.verdict,
+            classDistribution: summary.diagnosis.classDistribution,
+            underrepresentedClasses: summary.diagnosis.underrepresentedClasses,
+            overrepresentedClasses: summary.diagnosis.overrepresentedClasses,
+            boundaries,
+            metrics: {
+              classDiversityEntropy: summary.diagnosis.classDiversityEntropy,
+              sourceCoverageSkew: summary.diagnosis.sourceCoverageSkew,
+              providerSensitivityScore: summary.diagnosis.providerSensitivityScore,
+              backfillElasticity: summary.diagnosis.backfillElasticity,
+              holdoutConfirmationRate: summary.diagnosis.holdoutConfirmationRate,
+              negativeControlSurvivalRate: summary.diagnosis.negativeControlSurvivalRate,
+              evidenceScarcityIndex: summary.diagnosis.evidenceScarcityIndex,
+            },
+            recommendedBackfillTasks,
+            backfillQueueStatus: {
+              queued: summary.backfillPlan.tasks.filter((task) => task.status === 'queued').length,
+              needsOperatorReview: summary.backfillPlan.tasks.filter((task) => task.status === 'needs_operator_review').length,
+              providerGapProposalRequired: summary.backfillPlan.tasks.filter((task) => task.status === 'provider_gap_proposal_required').length,
+              queuedLocalMarketValidation: summary.backfillPlan.tasks.filter((task) => task.status === 'queued_local_market_validation').length,
+            },
+            rawEvidenceCount: acquisition?.rawEvidenceCount ?? summary.backfillResults.rawEvidenceStoredCount,
+            acceptedEvidenceCount: acquisition?.acceptedEvidenceCount ?? summary.backfillResults.acceptedEvidenceStoredCount,
+            holdoutConfirmationStatus: storedHoldoutStatus || (summary.holdoutValidation.holdoutConfirmed ? 'confirmed' : 'missing'),
+            holdoutStatus: storedHoldoutStatus || (summary.holdoutValidation.holdoutConfirmed ? 'confirmed' : 'missing'),
+            negativeControlSurvivalStatus: storedNegativeStatus || (summary.negativeControlSurvival.items?.some((item) => ['SURVIVED', 'CHECKED_NO_DIRECT'].includes(item.survivalStatus)) ? 'closed' : 'inconclusive'),
+            negativeControlStatus: storedNegativeStatus || (summary.negativeControlSurvival.items?.some((item) => ['SURVIVED', 'CHECKED_NO_DIRECT'].includes(item.survivalStatus)) ? 'closed' : 'inconclusive'),
+            reportCandidateGateResult: storedGateResult || {
+              allowedCount: summary.gateResults.filter((item) => item.gate === 'report_candidate_allowed').length,
+              blockedCount: summary.gateResults.filter((item) => item.gate !== 'report_candidate_allowed').length,
+            },
+            gateResult: storedGateResult || {
+              allowedCount: summary.gateResults.filter((item) => item.gate === 'report_candidate_allowed').length,
+              blockedCount: summary.gateResults.filter((item) => item.gate !== 'report_candidate_allowed').length,
+            },
+            finalInvestmentReportReadinessBlocker: acquisition?.finalBlocker || summary.gateResults.find((item) => item.blockers?.length)?.blockers?.[0] || null,
+            finalBlocker: acquisition?.finalBlocker || summary.gateResults.find((item) => item.blockers?.length)?.blockers?.[0] || null,
+            adapterProposalLinks: summary.backfillPlan.adapterProposals.map((proposal) => ({
+              proposalId: proposal.proposalId,
+              providerName: proposal.providerName || proposal.provider,
+              fillsEvidenceClass: proposal.fillsEvidenceClass || proposal.evidenceClassesBlocked?.[0] || '',
+            })),
+            adapterProposalCount: summary.backfillPlan.adapterProposals.length,
+            gateResults: summary.gateResults.map((item) => ({
+              seedId: item.seedId,
+              gate: item.gate,
+              visualStatus: item.visualStatus,
+              blockers: item.blockers,
+            })),
+            warnings: summary.diagnosis.warnings,
+            audit: {
+              providerAblations: summary.providerAblations,
+              holdoutValidation: summary.holdoutValidation,
+              negativeControlSurvival: summary.negativeControlSurvival,
+              rawBackfillPlan: summary.backfillPlan,
+              rawBackfillResults: summary.backfillResults,
+              acceptedEvidence: summary.acceptedEvidence,
+              storedAcquisition: acquisition,
+              selfImprovement: summary.selfImprovement,
+            },
           });
         }
         if (method === 'GET' && !segments[2]) {
