@@ -62,6 +62,7 @@ export const FRONTIER_ROOT_NODE_TYPES = new Set([
   'process',
   'infrastructure',
   'technology',
+  'clinical_process',
   'engineering_process',
   'financial_risk_process',
   'input_material',
@@ -70,7 +71,9 @@ export const FRONTIER_ROOT_NODE_TYPES = new Set([
   'permitting_process',
   'physical_equipment',
   'protection_control_system',
+  'regulated_production_process',
   'specialist_labor',
+  'specialist_service',
   'supplier_qualification',
   'test_or_certification_process',
   'utility_process',
@@ -195,6 +198,57 @@ export function frontierParentMetadata(input = {}) {
     parentBroadPenalty: evaluation.parentBroadPenalty,
     parentHasNarrowCue: evaluation.parentHasNarrowCue,
   };
+}
+
+function normalizeDomainKey(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+export function buildDomainHistoryCounts(history = []) {
+  const counts = new Map();
+  const seenAt = new Map();
+  for (const entry of asArray(history)) {
+    const key = normalizeDomainKey(entry?.domain || entry?.primaryDomain || entry);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+    if (entry?.at) seenAt.set(key, entry.at);
+  }
+  return { counts, seenAt, totalRecorded: counts.size ? [...counts.values()].reduce((sum, n) => sum + n, 0) : 0 };
+}
+
+export function applyDomainHistoryPenalty(frontierParent = {}, primaryDomain = '', domainHistory = [], options = {}) {
+  const key = normalizeDomainKey(primaryDomain);
+  if (!key) {
+    return { ...frontierParent, parentPrimaryDomain: null, parentDomainConcentration: 0 };
+  }
+  const { counts, totalRecorded } = buildDomainHistoryCounts(domainHistory);
+  const recent = counts.get(key) || 0;
+  const total = totalRecorded || 0;
+  const concentration = total ? recent / total : 0;
+  const quotaCap = Number.isFinite(options.quotaCap) ? options.quotaCap : 3;
+  const concentrationFloor = Number.isFinite(options.concentrationFloor) ? options.concentrationFloor : 0.34;
+  const penaltyMagnitude = Math.max(0, Math.min(0.6, (concentration - concentrationFloor) * 2.5));
+  const adjustedScore = clamp((Number(frontierParent.frontierParentScore) || 0) - penaltyMagnitude * 0.22);
+  let next = {
+    ...frontierParent,
+    frontierParentScore: Math.round(adjustedScore * 1000) / 1000,
+    parentPrimaryDomain: key,
+    parentDomainConcentration: Math.round(concentration * 1000) / 1000,
+    parentDomainRecentCount: recent,
+  };
+  if (recent >= quotaCap && !frontierParent.parentHasNarrowCue) {
+    next = {
+      ...next,
+      frontierParentState: 'domain_quota_exhausted',
+      frontierParentReason: 'domain_recently_overselected_yield_to_other_domain',
+      frontierParentReportReady: false,
+    };
+  }
+  return next;
 }
 
 export function sortFrontierParentCandidates(candidates = []) {

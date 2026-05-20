@@ -188,6 +188,18 @@ body.modern-cockpit :is(button, a, select, input, summary):focus-visible {
   width: 100%;
 }
 
+.modern-seed-review-section,
+.modern-seed-provider-gap-review-section {
+  margin: 14px 0;
+}
+
+.modern-seed-review,
+.modern-seed-provider-gap-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .modern-filter-row,
 .modern-lane-strip {
   display: flex;
@@ -208,6 +220,46 @@ body.modern-cockpit :is(button, a, select, input, summary):focus-visible {
   background: linear-gradient(180deg, rgba(21, 24, 43, .82), rgba(8, 8, 26, .64));
   box-shadow: inset 0 1px 0 rgba(241, 245, 249, .026);
   overflow: hidden;
+}
+
+.modern-seed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.modern-seed-card .modern-report-head {
+  padding-bottom: 10px;
+}
+
+.modern-provider-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.modern-provider-pill {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 22px;
+  align-items: center;
+  border: 1px solid rgba(56, 189, 248, .18);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, .06);
+  color: var(--cockpit-text-base);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.1;
+  padding: 4px 7px;
+}
+
+.modern-seed-next-action {
+  border-top: 1px solid var(--cockpit-border-hairline);
+  color: var(--cockpit-text-base);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 10px 12px 12px;
 }
 
 .modern-report-head {
@@ -255,6 +307,61 @@ body.modern-cockpit :is(button, a, select, input, summary):focus-visible {
   color: var(--cockpit-accent);
 }
 
+.modern-btn:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.modern-link-btn {
+  display: inline;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cockpit-text-loud);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.modern-link-btn:hover {
+  color: var(--cockpit-accent);
+}
+
+.modern-action-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.modern-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.modern-seed-action-status {
+  border: 1px solid var(--cockpit-border-hairline);
+  border-radius: 10px;
+  color: var(--cockpit-text-base);
+  background: rgba(34, 211, 238, .07);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 9px 11px;
+}
+
+.modern-seed-action-status.tone-blocked {
+  color: var(--cockpit-warning);
+  background: rgba(251, 191, 36, .08);
+}
+
+.modern-seed-action-status.tone-complete {
+  color: var(--cockpit-success);
+  background: rgba(52, 211, 153, .08);
+}
+
 .modern-table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -266,6 +373,93 @@ body.modern-cockpit :is(button, a, select, input, summary):focus-visible {
   min-width: 920px;
   border-collapse: collapse;
   font-size: 11px;
+}
+
+.modern-seed-table {
+  min-width: 1380px;
+}
+
+.modern-seed-table td[data-label="Actions"] {
+  min-width: 210px;
+}
+
+.modern-seed-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modern-detail-section {
+  border: 1px solid var(--cockpit-border-hairline);
+  border-radius: 12px;
+  background: rgba(8, 8, 26, .30);
+  padding: 12px;
+}
+
+.modern-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.modern-detail-grid.two {
+  align-items: start;
+}
+
+.modern-kv {
+  border: 1px solid var(--cockpit-border-hairline);
+  border-radius: 10px;
+  background: rgba(21, 24, 43, .58);
+  padding: 9px;
+  min-width: 0;
+}
+
+.modern-kv span,
+.modern-detail-grid strong {
+  display: block;
+  color: var(--cockpit-text-soft);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.modern-kv strong {
+  margin-top: 4px;
+  color: var(--cockpit-text-base);
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.modern-compact-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--cockpit-text-base);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.modern-compact-list li + li {
+  margin-top: 4px;
+}
+
+.modern-audit-details {
+  border: 1px solid var(--cockpit-border-hairline);
+  border-radius: 12px;
+  background: rgba(13, 15, 31, .52);
+  padding: 10px 12px;
+}
+
+.modern-audit-details summary {
+  cursor: pointer;
+  color: var(--cockpit-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
 }
 
 .modern-closure-table th {
@@ -1007,6 +1201,14 @@ body.modern-cockpit .investigate-regime-card .regime-evidence-row {
 
   .modern-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modern-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modern-seed-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .modern-closure-table,

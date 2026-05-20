@@ -37,7 +37,13 @@ const { Client } = pg;
 const DEFAULT_REPORT_ROOT = path.join('data', 'reports');
 const RUNTIME_DIR = path.join(process.cwd(), 'data', 'runtime');
 const DEFAULT_STATE_PATH = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle-state.json');
+const STATE_SHARD_DIR = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle-state-shards');
 const STEP_LOG_PATH = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle.steps.jsonl');
+
+const DRAIN_STEP_DEFAULT_TIMEOUT_MS = 5 * 60_000;
+const PROVIDER_STEP_DEFAULT_TIMEOUT_MS = 10 * 60_000;
+const SOURCE_QUERY_STEP_DEFAULT_TIMEOUT_MS = 15 * 60_000;
+const REGENERATE_STEP_DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const MAX_BUFFER = Math.max(1_000_000, Number(process.env.EVIDENCE_BACKFILL_MAX_BUFFER_BYTES || 12_000_000));
 
 function optionalTimeoutMs(value, fallback = 0, min = 1, max = Number.MAX_SAFE_INTEGER) {
@@ -76,6 +82,20 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 160);
+}
+
+function stateShardPathForReport(reportId, reportDir) {
+  const basis = reportDir ? path.basename(reportDir) : '';
+  const slug = slugify(basis) || slugify(reportId) || 'report';
+  return path.join(STATE_SHARD_DIR, `${slug}.json`);
+}
+
+function resolveStatePathForCycle(options = {}, cyclePlan = {}) {
+  if (options.userStatePathProvided && options.statePath) return options.statePath;
+  if (cyclePlan?.reportId || cyclePlan?.reportDir) {
+    return stateShardPathForReport(cyclePlan.reportId, cyclePlan.reportDir);
+  }
+  return options.statePath || DEFAULT_STATE_PATH;
 }
 
 function unique(values = [], normalizer = (value) => compact(value)) {
@@ -151,7 +171,8 @@ export function parseEvidenceBackfillCycleArgs(argv = process.argv.slice(2)) {
       .map((provider) => provider.trim())
       .filter(Boolean),
     throttleHours: boundedInt(readArg(argv, 'throttle-hours'), 6, 0, 24 * 30),
-    statePath: readArg(argv, 'state-path') || DEFAULT_STATE_PATH,
+    statePath: readArg(argv, 'state-path') || null,
+    userStatePathProvided: Boolean(readArg(argv, 'state-path')),
     maxAttempts: boundedInt(readArg(argv, 'max-attempts'), 3, 1, 10),
   };
 }
@@ -485,15 +506,40 @@ export function extractEvidenceContractTasksFromArtifact(artifact = {}, options 
   }).slice(0, options.limit || 25);
 }
 
-async function loadDbBackfillTasks(client, options = {}) {
+const TERMINAL_CLOSURE_STATES_FOR_DB_PULL = [
+  'direct_provider_required',
+  'market_validation_pending',
+  'provider_no_hit',
+  'weak_noise_only',
+];
+
+export async function loadDbBackfillTasks(client, options = {}) {
+  const params = [options.limit || 25];
+  const filters = [];
+  const reportId = compact(options.reportId);
+  const subjectKey = compact(options.subjectKey);
+  if (reportId) {
+    params.push(reportId);
+    const placeholder = `$${params.length}`;
+    filters.push(`(report_id = ${placeholder} OR metadata->>'reportId' = ${placeholder} OR metadata->>'latestReportId' = ${placeholder})`);
+  }
+  if (subjectKey) {
+    params.push(subjectKey);
+    filters.push(`subject_key = $${params.length}`);
+  }
+  params.push(TERMINAL_CLOSURE_STATES_FOR_DB_PULL);
+  const terminalPlaceholder = `$${params.length}::text[]`;
+  filters.push(`(metadata->>'closureState' IS NULL OR NOT (metadata->>'closureState' = ANY(${terminalPlaceholder})))`);
+  const scopeClause = filters.length ? `       AND ${filters.join('\n       AND ')}` : '';
   const result = await client.query(`
     SELECT id, report_id, subject_key, pack_name, task_type, query, status, priority, metadata
       FROM report_backfill_tasks
      WHERE task_type = 'source_query'
        AND status IN ('pending', 'retry_wait', 'needs_fix', 'context_collected', 'negative_control_collected', 'weak_noise_collected')
+${scopeClause}
      ORDER BY priority DESC, COALESCE(updated_at, created_at, NOW()) DESC
      LIMIT $1
-  `, [options.limit || 25]).catch(() => ({ rows: [] }));
+  `, params).catch(() => ({ rows: [] }));
   return result.rows;
 }
 
@@ -653,9 +699,11 @@ async function supersedeStaleStrictBackfillTasks(client, cyclePlan = {}, options
 }
 
 export async function buildEvidenceBackfillCyclePlan(options = {}) {
-  const state = await readJsonIfExists(options.statePath || DEFAULT_STATE_PATH, { version: 1, routes: {} });
   const reportDir = await resolveReportDir(options);
   const artifact = await loadEvidenceReportArtifact(reportDir);
+  const reportId = artifact?.bundle?.reportId || artifact?.manifest?.reportId || artifact?.validation?.report?.id || null;
+  const resolvedStatePath = resolveStatePathForCycle(options, { reportId, reportDir });
+  const state = await readJsonIfExists(resolvedStatePath, { version: 1, routes: {} });
   const tasks = artifact
     ? extractEvidenceContractTasksFromArtifact(artifact, options)
     : [];
@@ -664,7 +712,7 @@ export async function buildEvidenceBackfillCyclePlan(options = {}) {
     ok: Boolean(artifact || tasks.length),
     dryRun: options.dryRun !== false,
     reportDir,
-    reportId: artifact?.bundle?.reportId || artifact?.manifest?.reportId || artifact?.validation?.report?.id || null,
+    reportId,
     subject: artifact ? bundleSubjectDisplay(artifact.bundle) : options.subject || null,
     taskCount: tasks.length,
     routeCount: plan.routes.length,
@@ -680,6 +728,7 @@ export async function buildEvidenceBackfillCyclePlan(options = {}) {
       route: routeSummary(item.route),
       stateKey: routeStateKey(item),
     })),
+    statePath: resolvedStatePath,
     artifact,
     tasks,
     state,
@@ -989,8 +1038,22 @@ async function enqueueArtifactTasks(client, cyclePlan, options = {}) {
   });
 }
 
-async function loadTasksFromDbIfNeeded(client, cyclePlan, options = {}) {
+export async function loadTasksFromDbIfNeeded(client, cyclePlan, options = {}) {
   if (cyclePlan.tasks.length || cyclePlan.artifact) return cyclePlan;
+  const strictScope = Boolean(options.reportDir || options.subject || options.latest || cyclePlan.reportId);
+  if (strictScope) {
+    return {
+      ...cyclePlan,
+      taskCount: 0,
+      routeCount: 0,
+      skippedTerminalCount: 0,
+      providers: [],
+      routes: [],
+      tasks: [],
+      routedItems: [],
+      strictScopeNoTasks: true,
+    };
+  }
   const tasks = await loadDbBackfillTasks(client, options);
   const plan = buildProviderRoutePlan(tasks, cyclePlan.state, options);
   return {
@@ -1031,6 +1094,7 @@ function reportRegenerationArgs(cyclePlan, options) {
     '--type', reportType,
     '--subject', subject,
     '--report-root', options.reportRoot,
+    '--no-enqueue-backfill',
   ];
 }
 
@@ -1058,15 +1122,14 @@ async function dashboardSummaryForOptions(options = {}) {
 
 async function runAllReportsEvidenceContractBackfillCycle(options = {}) {
   const reportDirs = await findLatestReportArtifactDirs(path.resolve(options.reportRoot || DEFAULT_REPORT_ROOT), options.reportLimit || 5);
-  const stateShardDir = path.join(RUNTIME_DIR, 'evidence-contract-backfill-cycle-state-shards');
   const results = await runLimited(reportDirs, options.reportConcurrency || 1, async (reportDir) => {
-    const shardName = `${slugify(path.basename(reportDir)) || 'report'}.json`;
     return runEvidenceContractBackfillCycle({
       ...options,
       allReports: false,
       latest: false,
       reportDir,
-      statePath: path.join(stateShardDir, shardName),
+      statePath: stateShardPathForReport(null, reportDir),
+      userStatePathProvided: true,
     });
   });
   const dashboardSummary = options.dashboardSummary
@@ -1127,7 +1190,7 @@ export async function runEvidenceContractBackfillCycle(options = {}) {
       '--limit', String(options.limit),
       '--max-attempts', String(options.maxAttempts),
       ...(cyclePlan.reportId ? [`--report-id=${cyclePlan.reportId}`] : []),
-    ], optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_DRAIN_STEP_TIMEOUT_MS, 0, 1_000, 24 * 60 * 60_000)));
+    ], optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_DRAIN_STEP_TIMEOUT_MS, DRAIN_STEP_DEFAULT_TIMEOUT_MS, 1_000, 24 * 60 * 60_000)));
 
     const parallelSteps = [];
     if (cyclePlan.providers.length) {
@@ -1140,7 +1203,7 @@ export async function runEvidenceContractBackfillCycle(options = {}) {
         '--provider-concurrency', String(options.providerConcurrency || 4),
         '--target-concurrency', String(options.providerConcurrency || 4),
         ...(cyclePlan.reportId ? [`--report-id=${cyclePlan.reportId}`, '--force'] : []),
-      ], optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_PROVIDER_STEP_TIMEOUT_MS, 0, 1_000, 24 * 60 * 60_000)));
+      ], optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_PROVIDER_STEP_TIMEOUT_MS, PROVIDER_STEP_DEFAULT_TIMEOUT_MS, 1_000, 24 * 60 * 60_000)));
     }
 
     if (options.autoApproveSourceQueries || options.autoReportSourceQuery) {
@@ -1154,7 +1217,7 @@ export async function runEvidenceContractBackfillCycle(options = {}) {
         '--reviewer=evidence-contract-backfill-cycle',
         ...(options.autoReportSourceQuery ? ['--report-created-only'] : []),
         ...(cyclePlan.reportId ? [`--report-id=${cyclePlan.reportId}`] : []),
-      ], optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_SOURCE_QUERY_STEP_TIMEOUT_MS, 0, 1_000, 24 * 60 * 60_000)));
+      ], optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_SOURCE_QUERY_STEP_TIMEOUT_MS, SOURCE_QUERY_STEP_DEFAULT_TIMEOUT_MS, 1_000, 24 * 60 * 60_000)));
     }
     if (parallelSteps.length) {
       steps.push(...await runLimited(parallelSteps, options.stepConcurrency || 2, (step) => step()));
@@ -1180,14 +1243,15 @@ export async function runEvidenceContractBackfillCycle(options = {}) {
 
   if (options.regenerate) {
     const args = reportRegenerationArgs(cyclePlan, options);
-    if (args) steps.push(runNodeStep('regenerate-report', args, optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_REGENERATE_STEP_TIMEOUT_MS, 0, 1_000, 24 * 60 * 60_000)));
+    if (args) steps.push(runNodeStep('regenerate-report', args, optionalTimeoutMs(process.env.EVIDENCE_BACKFILL_REGENERATE_STEP_TIMEOUT_MS, REGENERATE_STEP_DEFAULT_TIMEOUT_MS, 1_000, 24 * 60 * 60_000)));
     else steps.push({ name: 'regenerate-report', ok: true, skipped: true, reason: 'missing report type or subject' });
   }
 
   const routedItems = routeEvidenceBackfillTasks(cyclePlan.tasks, options)
     .filter((item) => !isRouteTerminal(cyclePlan.state, item));
   const nextState = updateStateForRoutes(cyclePlan.state, routedItems, steps, options);
-  await writeJson(options.statePath || DEFAULT_STATE_PATH, nextState);
+  const resolvedStatePath = cyclePlan.statePath || resolveStatePathForCycle(options, cyclePlan);
+  await writeJson(resolvedStatePath, nextState);
 
   const dashboardSummary = options.dashboardSummary
     ? await dashboardSummaryForOptions({ ...options, reportDir: cyclePlan.reportDir, withDbSummary: true })
@@ -1218,7 +1282,7 @@ export async function runEvidenceContractBackfillCycle(options = {}) {
     dryRun: false,
     apply: true,
     steps,
-    statePath: path.resolve(options.statePath || DEFAULT_STATE_PATH),
+    statePath: path.resolve(resolvedStatePath),
     dashboardSummary,
     initialUnblockPlan,
     unblockPlan,

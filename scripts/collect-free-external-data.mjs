@@ -3164,7 +3164,7 @@ async function collectForTarget(client, target, options) {
     { ...options, label: target.label || options.label, strictEndogenous: target.strictEndogenous },
   );
   const selectedProviders = selectProvidersForBackfillTarget(target, options, resolvedSymbols);
-  const activeCooldowns = options.force || Number(options.throttleHours || 0) === 0
+  const activeCooldowns = options.ignoreProviderRateLimitCooldown
     ? []
     : await loadActiveProviderCooldowns(client, target, selectedProviders);
   const cooledProviders = new Map(activeCooldowns.map((cooldown) => [cooldown.provider, cooldown]));
@@ -3378,7 +3378,10 @@ function officialProviderEvidenceUse(evidenceClass = '', provider = '', item = {
 
 async function upsertProviderBackfillQuestion(client, reportId, target = {}) {
   await ensureResearchOsSchema(client);
-  const deterministicId = `provider-backfill:${reportId}:${target.targetKey || target.theme || 'target'}`;
+  const operatorSeedId = String(target.operatorSeedId || '').trim();
+  const scopeId = reportId ? `report:${reportId}` : (operatorSeedId ? `operator-seed:${operatorSeedId}` : '');
+  if (!scopeId) return null;
+  const deterministicId = `provider-backfill:${scopeId}:${target.targetKey || target.theme || 'target'}`;
   const { rows } = await client.query(`
     INSERT INTO research_questions (
       deterministic_id, question_type, themes, seed_terms, prompt, trigger_reason,
@@ -3405,7 +3408,10 @@ async function upsertProviderBackfillQuestion(client, reportId, target = {}) {
     0.75,
     'new',
     jsonParam({
-      reportId,
+      reportId: reportId || null,
+      operatorSeedId: operatorSeedId || null,
+      operatorSeedTitle: target.operatorSeedTitle || null,
+      collectionKind: operatorSeedId ? 'operator_mechanism_seed_provider' : 'provider_backfill',
       targetKey: target.targetKey || null,
       source: 'collect-free-external-data',
       providerRoutePlans: target.providerRoutePlans || [],
@@ -3416,7 +3422,9 @@ async function upsertProviderBackfillQuestion(client, reportId, target = {}) {
 
 async function persistProviderRouteEvidenceBundles(client, target = {}, result = {}, options = {}) {
   const reportId = String(options.reportId || '').trim();
-  if (!reportId) return { persisted: 0, skipped: true };
+  const operatorSeedId = String(target.operatorSeedId || options.operatorSeedId || '').trim();
+  const scopeId = reportId ? `report:${reportId}` : (operatorSeedId ? `operator-seed:${operatorSeedId}` : '');
+  if (!scopeId) return { persisted: 0, skipped: true, reason: 'missing report or operator seed scope' };
   const desiredClasses = providerRouteEvidenceClasses(target);
   if (!desiredClasses.length) return { persisted: 0, skipped: true, reason: 'no desired evidence classes' };
   const bundles = [];
@@ -3455,7 +3463,7 @@ async function persistProviderRouteEvidenceBundles(client, target = {}, result =
           sourceType: item.sourceType || (providerResult.provider === 'usaspending' ? 'usaspending_contract_awards' : providerResult.provider === 'dod-contracts' ? 'dod_contract_awards' : providerResult.provider),
           sourceId: [
             'provider-route',
-            reportId,
+            scopeId,
             providerResult.provider,
             evidenceClass,
             item.awardId || item.evidenceRef || item.url || title,
@@ -3466,8 +3474,12 @@ async function persistProviderRouteEvidenceBundles(client, target = {}, result =
           publishedAt: item.publishedAt || null,
           relevanceScore: evidenceUse === 'promotion_candidate' ? 0.86 : 0.62,
           metadata: {
-            reportId,
-            latestReportId: reportId,
+            reportId: reportId || null,
+            latestReportId: reportId || null,
+            operatorSeedId: operatorSeedId || null,
+            operatorSeedTitle: target.operatorSeedTitle || null,
+            createdBy: operatorSeedId ? 'operator-mechanism-seed' : 'collect-free-external-data',
+            collectionKind: operatorSeedId ? 'operator_mechanism_seed_provider' : 'provider_backfill',
             desiredEvidenceClass: evidenceClass,
             evidenceClass,
             evidenceUse,
@@ -3514,7 +3526,16 @@ async function persistProviderRouteEvidenceBundles(client, target = {}, result =
   if (!questionId) return { persisted: 0, skipped: true, reason: 'provider backfill question unavailable' };
   for (const bundle of bundles) bundle.questionId = questionId;
   const persisted = await persistEvidenceBundles(client, bundles);
-  return { persisted: persisted.inserted || 0, skipped: false, bundleCount: bundles.length };
+  const classCounts = {};
+  const evidenceUseCounts = {};
+  for (const bundle of bundles) {
+    const cls = bundle.metadata?.desiredEvidenceClass || 'unknown';
+    const use = bundle.metadata?.evidenceUse || 'unknown';
+    classCounts[cls] = classCounts[cls] || {};
+    classCounts[cls][use] = (classCounts[cls][use] || 0) + 1;
+    evidenceUseCounts[use] = (evidenceUseCounts[use] || 0) + 1;
+  }
+  return { persisted: persisted.inserted || 0, skipped: false, bundleCount: bundles.length, classCounts, evidenceUseCounts };
 }
 
 async function runSingleTheme(client, options) {
@@ -3614,4 +3635,7 @@ export {
   providerRouteEvidenceClasses,
   providerCooldownsFromRuns,
   providerRunStatus,
+  collectForTarget,
+  persistProviderRouteEvidenceBundles,
+  ensureExternalProviderBackfillSchema,
 };

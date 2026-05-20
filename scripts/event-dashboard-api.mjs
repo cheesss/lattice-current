@@ -82,6 +82,21 @@ import { buildProductQualityPayload } from './_shared/product-quality-metrics.mj
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import { loadReportBackfillClosureSummaries } from './_shared/report-backfill-closure.mjs';
 import { loadAdjacentThemeCandidateSummaries } from './_shared/report-adjacent-expansion.mjs';
+import { runProviderGapReview } from './review-provider-gap-proposals.mjs';
+import {
+  buildOperatorSeedReviewDetail,
+  buildOperatorSeedReviewPayload,
+  buildSeedEvidenceActionPayload,
+} from './_shared/operator-seed-review-surface.mjs';
+import {
+  promoteOperatorSeedReportCandidates,
+} from './_shared/operator-seed-report-closure.mjs';
+import {
+  ensureOperatorResearchSeedSchema,
+  loadOperatorResearchSeeds,
+  reviewOperatorResearchSeed,
+} from './_shared/operator-research-seeds.mjs';
+import { enqueueSeedEvidenceSourceQueries } from './_shared/seed-evidence-plan.mjs';
 import {
   getPendingApprovals,
   loadApprovalById,
@@ -3005,6 +3020,252 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     }
 
     // ── /api/health ──
+    // --- /api/research-seeds ---------------------------------------------
+    // Operator mechanism seed review surfaces are read-only by default. This
+    // endpoint exposes provider/source coverage blockers without creating
+    // approvals, reports, evidence bundles, or provider activation state.
+    if (segments[0] === 'api' && segments[1] === 'research-seeds') {
+      try {
+        if (method === 'GET' && segments[2] === 'provider-gaps') {
+          let seedClient = null;
+          try {
+            seedClient = getPool();
+          } catch {
+            seedClient = null;
+          }
+          const statuses = String(params.get('statuses') || params.get('status') || 'review_ready')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+          const provider = String(params.get('provider') || '').trim();
+          const limit = Number(params.get('limit') || 25);
+          const includeComplete = ['1', 'true', 'yes'].includes(String(params.get('includeComplete') || '').toLowerCase());
+          const summary = await runProviderGapReview({
+            client: seedClient,
+            statuses,
+            provider,
+            limit,
+            includeComplete,
+            writeArtifact: false,
+            maxProviderAttempts: Number(params.get('maxProviderAttempts') || 1),
+          });
+          return buildJsonResponse({
+            ...summary,
+            source: 'operator-seed-provider-gap-review',
+            endpoint: '/api/research-seeds/provider-gaps',
+          });
+        }
+        if (method === 'GET' && !segments[2]) {
+          const client = getPool();
+          await ensureOperatorResearchSeedSchema(client);
+          const statuses = String(params.get('statuses') || params.get('status') || 'review_ready,needs_evidence,evidence_running,report_candidate')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+          const rows = await loadOperatorResearchSeeds(client, {
+            statuses,
+            themeKey: String(params.get('theme') || params.get('themeKey') || '').trim(),
+            providerGap: String(params.get('providerGap') || '').trim(),
+            minScore: params.get('minScore'),
+            limit: Number(params.get('limit') || 25),
+          });
+          return buildJsonResponse({
+            ...buildOperatorSeedReviewPayload(rows, {
+              maxProviderAttempts: Number(params.get('maxProviderAttempts') || 1),
+            }),
+            endpoint: '/api/research-seeds',
+          });
+        }
+        if (method === 'GET' && segments[2]) {
+          const seedId = decodeURIComponent(segments[2]);
+          const client = getPool();
+          await ensureOperatorResearchSeedSchema(client);
+          const rows = await loadOperatorResearchSeeds(client, { seedId, limit: 1 });
+          if (!rows.length) return buildJsonResponse({ ok: false, error: 'operator seed not found', seedId }, 404);
+          return buildJsonResponse({
+            ok: true,
+            source: 'operator-seed-review-surface',
+            endpoint: `/api/research-seeds/${seedId}`,
+            item: buildOperatorSeedReviewDetail(rows[0], {
+              maxProviderAttempts: Number(params.get('maxProviderAttempts') || 1),
+            }),
+          });
+        }
+        if (method === 'POST' && segments[2] && segments[3] === 'review') {
+          const seedId = decodeURIComponent(segments[2]);
+          const status = String(body.status || body.decision || '').trim();
+          const reason = String(body.reason || body.note || '').trim();
+          if (!status) return buildJsonResponse({ ok: false, error: 'status is required' }, 400);
+          const client = getPool();
+          await ensureOperatorResearchSeedSchema(client);
+          const reviewed = await reviewOperatorResearchSeed(client, {
+            seedId,
+            status,
+            reason,
+            reviewer: body.reviewer || 'dashboard',
+            metadata: {
+              source: 'event-dashboard',
+              phase: 'D',
+              action: 'seed-review',
+              canonicalWrites: 0,
+              sourceRegistryWrites: 0,
+              providerActivationWrites: 0,
+              ...(body.metadata || {}),
+            },
+          });
+          if (!reviewed.ok) return buildJsonResponse(reviewed, 404);
+          return buildJsonResponse({
+            ...reviewed,
+            mutationPolicy: {
+              operatorSeedWrites: 1,
+              approvalQueueWrites: 0,
+              reportBackfillWrites: 0,
+              researchEvidenceBundleWrites: 0,
+              canonicalWrites: 0,
+              sourceRegistryWrites: 0,
+              providerActivationWrites: 0,
+            },
+          });
+        }
+        if (method === 'POST' && segments[2] && segments[3] === 'evidence') {
+          const seedId = decodeURIComponent(segments[2]);
+          const client = getPool();
+          await ensureOperatorResearchSeedSchema(client);
+          const rows = await loadOperatorResearchSeeds(client, { seedId, limit: 1 });
+          if (!rows.length) return buildJsonResponse({ ok: false, error: 'operator seed not found', seedId }, 404);
+          if (!body.enqueue) {
+            return buildJsonResponse({
+              ...buildSeedEvidenceActionPayload(rows[0], {
+                maxProviderAttempts: Number(params.get('maxProviderAttempts') || body.maxProviderAttempts || 1),
+              }),
+              endpoint: `/api/research-seeds/${seedId}/evidence`,
+            });
+          }
+          if (body.confirm !== 'seed-scoped-source-query') {
+            return buildJsonResponse({
+              ok: false,
+              error: 'confirm must equal seed-scoped-source-query to enqueue evidence',
+              seedId,
+              mutationPolicy: {
+                approvalQueueWrites: 0,
+                reportBackfillWrites: 0,
+                researchEvidenceBundleWrites: 0,
+                canonicalWrites: 0,
+                sourceRegistryWrites: 0,
+                providerActivationWrites: 0,
+              },
+            }, 400);
+          }
+          const seed = {
+            ...(rows[0].seed_json || {}),
+            seedId: rows[0].seed_id,
+            evidencePlan: rows[0].evidence_plan || {},
+          };
+          const queued = await enqueueSeedEvidenceSourceQueries(client, [seed], {
+            limit: Number(body.limit || 50),
+            updateSeedStatus: body.updateSeedStatus !== false,
+          });
+          return buildJsonResponse({
+            ...queued,
+            seedId,
+            endpoint: `/api/research-seeds/${seedId}/evidence`,
+          });
+        }
+        if (method === 'POST' && segments[2] && segments[3] === 'report-candidate') {
+          const seedId = decodeURIComponent(segments[2]);
+          const client = getPool();
+          await ensureOperatorResearchSeedSchema(client);
+          const rows = await loadOperatorResearchSeeds(client, { seedId, limit: 1 });
+          if (!rows.length) return buildJsonResponse({ ok: false, error: 'operator seed not found', seedId }, 404);
+          const detail = buildOperatorSeedReviewDetail(rows[0], {
+            maxProviderAttempts: Number(params.get('maxProviderAttempts') || body.maxProviderAttempts || 1),
+          });
+          if (!detail.actionAvailability.canMarkReportCandidate) {
+            return buildJsonResponse({
+              ok: false,
+              seedId,
+              error: 'seed is not ready to mark as report_candidate',
+              phaseCStatus: detail.evidence.phaseCStatus,
+              status: detail.status,
+              nextAction: detail.nextAction,
+            }, 409);
+          }
+          const reviewed = await reviewOperatorResearchSeed(client, {
+            seedId,
+            status: 'report_candidate',
+            reason: body.reason || 'dashboard marked seed as report candidate',
+            reviewer: body.reviewer || 'dashboard',
+            metadata: {
+              source: 'event-dashboard',
+              phase: 'D',
+              action: 'report-candidate',
+              universalResearchSubjectWrites: 0,
+              reportBackfillWrites: 0,
+              canonicalWrites: 0,
+              sourceRegistryWrites: 0,
+              providerActivationWrites: 0,
+              ...(body.metadata || {}),
+            },
+          });
+          return buildJsonResponse({
+            ...reviewed,
+            mutationPolicy: {
+              operatorSeedWrites: 1,
+              approvalQueueWrites: 0,
+              reportBackfillWrites: 0,
+              universalResearchSubjectWrites: 0,
+              canonicalWrites: 0,
+              sourceRegistryWrites: 0,
+              providerActivationWrites: 0,
+            },
+          });
+        }
+        if (method === 'POST' && segments[2] && segments[3] === 'report-closure') {
+          const seedId = decodeURIComponent(segments[2]);
+          const apply = Boolean(body.apply);
+          const generateReport = Boolean(body.generateReport);
+          if (apply && body.confirm !== 'operator-seed-report-closure') {
+            return buildJsonResponse({
+              ok: false,
+              seedId,
+              error: 'confirm must equal operator-seed-report-closure to apply Phase E report closure',
+              mutationPolicy: {
+                operatorSeedWrites: 0,
+                universalResearchSubjectWrites: 0,
+                reportArtifactWrites: 0,
+                approvalQueueWrites: 0,
+                reportBackfillWrites: 0,
+                researchEvidenceBundleWrites: 0,
+                canonicalWrites: 0,
+                sourceRegistryWrites: 0,
+                providerActivationWrites: 0,
+              },
+            }, 400);
+          }
+          const client = getPool();
+          const result = await promoteOperatorSeedReportCandidates(client, {
+            seedId,
+            statuses: body.includeReviewReady ? ['report_candidate', 'review_ready'] : ['report_candidate'],
+            includeReviewReady: Boolean(body.includeReviewReady),
+            limit: 1,
+            apply,
+            generateReport,
+            reportRoot: path.join('data', 'reports'),
+            reviewer: body.reviewer || 'dashboard',
+            reason: body.reason || 'dashboard Phase E report closure',
+          });
+          return buildJsonResponse({
+            ...result,
+            endpoint: `/api/research-seeds/${seedId}/report-closure`,
+          }, result.blockedCount && apply ? 409 : 200);
+        }
+        return buildJsonResponse({ ok: false, error: 'unknown research-seeds route' }, 404);
+      } catch (err) {
+        logger.warn('research-seeds route failed', { error: String(err?.message || err) });
+        return buildJsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+      }
+    }
+
     // --- /api/reports -----------------------------------------------------
     // Artifact-first intelligence report generator. These routes only write
     // data/reports/<reportId> artifacts; canonical data remains review-gated.

@@ -338,3 +338,398 @@ Autonomous backfill execution contract:
 - `/api/approval-queue`
 
 If one of those is broken, observability is incomplete even if the server starts.
+
+## Mechanism seed generation Phase A/B/C
+
+`run-mechanism-seed-generation.mjs` is the read-only first slice of the
+mechanism-based research seed system. It converts existing Research OS,
+adjacent-lane, ontology, and report-artifact signals into structured seed
+objects shaped as:
+
+```text
+Theme -> Growth Driver -> Real Activity -> Physical Process -> Required Input
+-> Bottleneck -> Supplier Category -> Evidence Query -> Counter-Evidence Query
+```
+
+Phase A boundaries are strict:
+
+- default mode is dry-run
+- no `approval_queue` writes
+- no canonical graph, source registry, or provider activation writes
+- bias/source-gap audit is included from the first run
+- provider gap labels are diagnostic only; adapter generation is a later,
+  review-gated phase
+
+Phase B adds DB-backed seed storage and review lifecycle:
+
+- `--apply` writes only `operator_research_seeds` and
+  `operator_research_seed_runs`
+- repeated `--apply` runs dedupe by stable `seedId`
+- reviewed terminal statuses are preserved on generator re-runs
+- no evidence queue, report backfill task, universal research subject,
+  canonical graph, source registry, or provider activation writes
+- evidence enqueue remains a later explicit phase
+
+Phase C adds route-aware evidence planning:
+
+- `--plan-evidence` adds evidence class provider routes, source-query drafts,
+  negative-control drafts, market-validation plan, and blocked-route reasons to
+  the runtime artifact
+- stored `operator_research_seeds.evidence_plan` is route-aware by default
+- `--enqueue-evidence` requires `--apply` and writes only seed-scoped
+  `approval_queue` rows with `action_type='source-query'`
+- `--enqueue-evidence` never creates canonical proposals, `add-rss`,
+  `backfill-source`, report backfill tasks, universal research subjects, source
+  registry rows, or provider activation state
+- `market_validation` source-query drafts are context-only; controlled local
+  market data remains the promotion path
+- `negative_control` drafts are always non-promotion evidence
+
+Phase C.5 adds seed-scoped evidence execution closure:
+
+- `execute-source-query-approvals.mjs --operator-seed-created-only` approves
+  and executes only source-query approvals created by operator mechanism seeds
+- `--operator-seed-ids <csv>` narrows execution to specific seed ids
+- source-query execution appends class/tier/failure outcomes to
+  `operator_research_seeds.evidence_plan.outcomeLedger`
+- seed status is updated from execution outcome: collected promotion/context/
+  negative-control evidence moves the seed to `review_ready`; empty or failed
+  searches return it to `needs_evidence`
+- report-created approvals, canonical proposals, `add-rss`, `backfill-source`,
+  report backfill tasks, source registry, and provider activation state remain
+  out of scope
+
+Phase C.6 adds closure-aware provider escalation:
+
+- `negative_control` outcomes are classified as `invalidator`,
+  `supported_constraint`, `checked_no_direct`, or `unchecked`
+- negative-control evidence remains non-promotion even when it is useful
+- source-query weak/no-hit outcomes now point to direct provider backfill instead
+  of repeatedly widening broad search
+- `run-mechanism-seed-provider-backfill.mjs` plans and optionally runs only
+  seed-scoped official/provider collectors for open evidence classes
+- provider results are persisted as operator seed-scoped
+  `research_evidence_bundles` and appended to the seed outcome ledger
+- provider no-hit/deferred results are also recorded as class outcomes so the
+  same failure is visible and does not look like unattempted work
+- canonical graph, source registry, report backfill tasks, approval queue, and
+  provider activation state remain out of scope
+
+Phase C.7 adds provider/source coverage gap closure:
+
+- `provider_gap_*` labels become explicit review-gated provider gap proposals
+  with blocked evidence classes, example queries, and suggested adapter scope
+- no adapter is activated automatically; provider gap proposals are audit
+  metadata plus seed-scoped source-query drafts only
+- `run-mechanism-seed-gap-closure.mjs` creates reviewed `source-query`
+  approvals for provider/source gaps after dry-run review
+- terminal attempt state is written to
+  `data/runtime/operator-seed-gap-closure-state.json` so the same
+  seed/class/provider/query failure is not queued repeatedly
+- canonical graph, source registry, provider activation, report backfill tasks,
+  universal research subjects, and `research_evidence_bundles` remain out of
+  scope for this lane
+
+Phase C.8 adds direct-provider terminal closure:
+
+- operator seed provider backfill now reads the seed outcome ledger before
+  planning another direct provider run
+- class-level no-hit, weak-noise-only, or acceptance-failed provider outcomes
+  become `provider_backfill_exhausted` after `--max-provider-attempts`
+- retry-window/provider-rate-limit outcomes remain
+  `provider_backfill_deferred` and are kept separate from exhausted work
+- exhausted direct-provider routes are not rerun automatically; the next action
+  becomes provider gap proposal review or missing read-only adapter/source
+  coverage
+- routes with provider-collected promotion/context evidence are shown as
+  `provider_backfill_complete` instead of being confused with missing routes
+- this does not relax promotion gates: weak/no-hit provider rows do not become
+  promotion evidence
+
+Phase C.9 adds provider gap review visibility:
+
+- `review-provider-gap-proposals.mjs` reads stored operator seeds and builds a
+  compact review artifact for seeds whose direct provider backfill is exhausted
+- the artifact groups provider gaps, blocked evidence classes, exhausted direct
+  routes, proposed read-only adapter/source scopes, and sample reviewed queries
+- default output is
+  `data/runtime/operator-seed-provider-gap-review.latest.json`
+- the command is read-only except for that runtime artifact: it does not create
+  approval queue rows, report backfill tasks, evidence bundles, canonical graph
+  rows, source registry rows, or provider activation state
+- this review step should run before any adapter factory or dashboard seed inbox
+  work, because it distinguishes "rerun provider backfill" from "missing source
+  coverage or adapter required"
+
+Phase C.10 exposes provider gap review in the dashboard/API:
+
+- `/api/research-seeds/provider-gaps` returns the same read-only provider gap
+  review summary for dashboard consumers
+- query parameters: `statuses`, `provider`, `limit`, `includeComplete`,
+  `maxProviderAttempts`
+- the endpoint calls the review builder with `writeArtifact=false`, so it does
+  not write approval queue rows, report backfill tasks, evidence bundles,
+  canonical graph/source registry rows, or provider activation state
+- `src/dashboard/surfaces/research-seeds.mjs` renders a compact provider gap
+  review section on the Investigate surface
+- raw proposals and sample queries stay behind `Audit details`; the card view
+  shows only status, provider gaps, blocked classes, and next action
+- `src/dashboard/surfaces/status-vocabulary.mjs` owns the Korean labels for
+  these statuses, avoiding mojibake in user-facing chips
+
+Phase C.11 adds a Phase C completeness audit before Phase D:
+
+- `audit-mechanism-seed-phase-c.mjs` reads stored operator seeds and validates
+  that each seed has a route-aware evidence plan, class routes, source-query
+  drafts, negative-control separation, market-validation source-query
+  boundaries, issuer-universe blocking, provider gap review readiness, and
+  closed mutation boundaries
+- default output is
+  `data/runtime/operator-seed-phase-c-audit.latest.json`
+- the command is read-only except for that runtime artifact: it does not create
+  approval queue rows, report backfill tasks, evidence bundles, canonical graph
+  rows, source registry rows, or provider activation state
+- use `--fail-on-incomplete` in CI or before Phase D work to make incomplete
+  Phase C contracts fail the command
+
+Phase D completes the dashboard seed review lifecycle:
+
+- `/api/research-seeds` returns a dashboard-safe seed candidate list with
+  mechanism chain, score, evidence state, Phase C status, provider/negative
+  closure status, next action, and mutation guardrails
+- `/api/research-seeds/<seedId>` returns the detail payload; raw evidence plan,
+  source-query drafts, and provider route internals stay in the audit payload
+  rather than the list view
+- `/api/research-seeds/<seedId>/review` updates only
+  `operator_research_seeds.status` and `review_state`
+- `/api/research-seeds/<seedId>/evidence` defaults to review-only evidence
+  plan inspection; approval queue writes require `enqueue=true` and
+  `confirm='seed-scoped-source-query'`
+- `/api/research-seeds/<seedId>/report-candidate` marks a complete
+  `review_ready` seed as `report_candidate` without creating universal
+  research subjects or report backfill tasks
+- `src/dashboard/surfaces/research-seeds.mjs` renders the Seed Candidates
+  lifecycle table plus the existing Provider Gap Review section on the
+  Investigate surface; the list includes Seed, Mechanism, Bottleneck,
+  Supplier, State, Score, Bias, Evidence, Next action, and guarded Actions
+- the detail drawer renders a structured mechanism/evidence/bias review view;
+  raw route/query internals are only available inside the audit payload
+- dashboard actions support review-only evidence plan inspection, guarded
+  seed-scoped source-query enqueue, `needs_evidence`, `rejected`, and
+  `report_candidate` transitions
+- Korean chip labels are owned by
+  `src/dashboard/surfaces/status-vocabulary.mjs`
+- canonical graph, source registry, provider activation, report backfill task,
+  and research evidence bundle writes remain closed in Phase D
+
+Phase E adds seed-to-report closure:
+
+- `run-mechanism-seed-report-closure.mjs` converts reviewed operator
+  mechanism seeds into report closure candidates
+- default mode is dry-run; it writes only
+  `data/runtime/mechanism-seed-report-closure.latest.json`
+- `--apply` writes only `universal_research_subjects` and
+  `operator_research_seeds` report-closure metadata
+- `--generate-report` requires `--apply` and writes local report artifacts
+  under `data/reports`
+- generated report bundles carry `operatorSeedId`, `mechanismSeed`,
+  `seedScores`, `biasAudit`, `providerGaps`, `seedEvidencePlan`, and
+  `seedReportClosure` metadata
+- report display titles are compacted from the bottleneck label so seed
+  scaffolding does not create repeated client memo phrases
+- seed quality remains separate from investment readiness: generated reports
+  are research subjects until Evidence Contract Closure validates issuer
+  exposure, market validation, and negative controls
+- `/api/research-seeds/<seedId>/report-closure` previews Phase E closure by
+  default; apply requires `confirm='operator-seed-report-closure'`
+- Phase E still does not write approval queue rows, report backfill tasks,
+  research evidence bundles, canonical graph rows, source registry rows, or
+  provider activation state
+
+Run:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-generation.mjs --dry-run --limit 50
+node --import tsx scripts/run-mechanism-seed-generation.mjs --dry-run --source ontology --plan-evidence --limit 50
+```
+
+Persist generated seeds after review of dry-run output:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-generation.mjs --apply --source ontology --limit 50
+```
+
+Opt-in seed-scoped evidence queueing:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-generation.mjs --apply --source ontology --limit 25 --plan-evidence --enqueue-evidence --source-query-limit 100
+```
+
+Approve and execute only operator-seed source-query approvals:
+
+```powershell
+node --import tsx scripts/execute-source-query-approvals.mjs --approve-pending --operator-seed-created-only --limit 12 --per-query-limit 5
+```
+
+Plan official/provider backfill for seeds that still need evidence:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-provider-backfill.mjs --dry-run --statuses needs_evidence --limit 5
+```
+
+Run that provider backfill after reviewing the dry-run target list:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-provider-backfill.mjs --apply --statuses needs_evidence --limit 2 --providers sec,fmp,usaspending,eia,public-planning-source --max-provider-attempts 1
+```
+
+Plan provider/source coverage gap closure after provider no-hit results:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-gap-closure.mjs --dry-run --statuses needs_evidence --limit 5
+```
+
+Queue reviewed provider-gap source-query approvals only:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-gap-closure.mjs --apply --statuses needs_evidence --limit 5 --query-limit-per-seed 6
+```
+
+Then execute only operator seed-created source-query approvals:
+
+```powershell
+node --import tsx scripts/execute-source-query-approvals.mjs --approve-pending --operator-seed-created-only --limit 12 --per-query-limit 5
+```
+
+Review exhausted direct-provider coverage gaps:
+
+```powershell
+node --import tsx scripts/review-provider-gap-proposals.mjs --statuses review_ready --limit 25
+node --import tsx scripts/review-provider-gap-proposals.mjs --provider patent_api --limit 25
+```
+
+Check the dashboard API version of the same review:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:46200/api/research-seeds/provider-gaps?statuses=review_ready&limit=8" |
+  ConvertTo-Json -Depth 8
+```
+
+Check the dashboard API seed lifecycle surface:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:46200/api/research-seeds?statuses=review_ready&limit=8" |
+  ConvertTo-Json -Depth 8
+Invoke-RestMethod "http://127.0.0.1:46200/api/research-seeds/<seed-id>" |
+  ConvertTo-Json -Depth 8
+```
+
+Audit whether stored seeds are ready for the Phase D review surface:
+
+```powershell
+node --import tsx scripts/audit-mechanism-seed-phase-c.mjs --statuses review_ready --limit 25
+node --import tsx scripts/audit-mechanism-seed-phase-c.mjs --statuses review_ready --limit 25 --fail-on-incomplete
+```
+
+Preview Phase E seed-to-report closure:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-report-closure.mjs --dry-run --include-review-ready --limit 10
+```
+
+Promote a reviewed seed into a universal research subject:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-report-closure.mjs --apply --seed-id <seed-id>
+```
+
+Promote and generate the local report artifact:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-report-closure.mjs --apply --seed-id <seed-id> --generate-report
+```
+
+Then connect the generated report to the evidence contract backfill cycle:
+
+```powershell
+node --import tsx scripts/run-evidence-contract-backfill-cycle.mjs --report-dir <data/reports/RPT-...> --passes 1 --limit 10
+```
+
+Review Phase F provider adapter proposals from repeated provider/source gaps:
+
+```powershell
+node --import tsx scripts/propose-provider-adapter.mjs --limit 25
+node --import tsx scripts/propose-provider-adapter.mjs --provider patent_api --limit 25
+```
+
+Write review-only adapter proposal rows after explicit confirmation:
+
+```powershell
+node --import tsx scripts/propose-provider-adapter.mjs --apply --confirm provider-adapter-proposal --limit 25
+```
+
+`--apply` writes `codex_proposals` rows with `proposal_type='provider-gap'`
+and a non-executable review status. It does not create `approval_queue`
+rows, source-query approvals, source registry rows, canonical graph rows,
+provider credentials, or provider activation state. Adapter scaffolding still
+requires a branch, allowlist files, fixtures, health check command, tests, and
+human review.
+
+Run Phase G advisory self-improvement detection:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-self-improvement.mjs --limit 100
+```
+
+Run the bounded mechanism seed daemon cycle once:
+
+```powershell
+node --import tsx scripts/run-mechanism-seed-daemon-cycle.mjs --limit 25
+node --import tsx scripts/run-mechanism-seed-daemon-cycle.mjs --skip-storage --limit 25
+```
+
+The daemon cycle performs seed generation, Phase C audit, provider gap review,
+provider adapter proposal generation, and self-improvement proposal generation.
+It uses a lock file and terminal step state and keeps evidence enqueue off.
+`master-daemon.mjs` registers this as `mechanism-seed-generation` on a bounded
+6-hour cadence; set `MECHANISM_SEED_DAEMON_SKIP_STORAGE=true` to keep the
+recurring cycle artifact-only.
+
+Review stored seeds:
+
+```powershell
+node --import tsx scripts/review-mechanism-seed.mjs --list --statuses needs_evidence
+node --import tsx scripts/review-mechanism-seed.mjs --seed-id <seed-id> --status review_ready --reason "direct evidence checked"
+```
+
+Outputs:
+
+- `data/runtime/mechanism-seed-generation.latest.json`
+- `data/runtime/operator-seed-phase-c-audit.latest.json`
+- `data/runtime/mechanism-seed-report-closure.latest.json`
+- `data/runtime/provider-adapter-proposals.latest.json`
+- `data/runtime/mechanism-seed-self-improvement.latest.json`
+- `data/runtime/mechanism-seed-generation-daemon-state.json`
+- `data/runtime/mechanism-seed-generation.steps.jsonl`
+- optional `data/operator-seeds/generated-seeds.jsonl` only when
+  `--write-jsonl` is passed
+
+Focused tests:
+
+```powershell
+node --import tsx --test tests/mechanism-seed-generator.test.mjs tests/operator-seed-prior.test.mjs tests/seed-source-bias-audit.test.mjs
+node --import tsx --test tests/operator-research-seeds.test.mjs
+node --import tsx --test tests/seed-evidence-plan.test.mjs
+node --import tsx --test tests/seed-evidence-execution.test.mjs
+node --import tsx --test tests/operator-seed-closure.test.mjs
+node --import tsx --test tests/provider-gap-proposals.test.mjs
+node --import tsx --test tests/provider-gap-review.test.mjs
+node --import tsx --test tests/operator-seed-phase-c-audit.test.mjs
+node --import tsx --test tests/operator-seed-review-surface.test.mjs
+node --import tsx --test tests/operator-seed-report-closure.test.mjs
+node --import tsx --test tests/provider-adapter-factory.test.mjs
+node --import tsx --test tests/operator-seed-self-improvement.test.mjs
+node --import tsx --test tests/mechanism-seed-daemon-cycle.test.mjs
+node --import tsx --test tests/event-dashboard-automation.test.mjs
+node --import tsx --test tests/master-daemon-guardrails.test.mjs
+```

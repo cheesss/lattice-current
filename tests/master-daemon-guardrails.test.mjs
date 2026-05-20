@@ -86,6 +86,11 @@ test('master daemon includes circuit breaker and pending outcome resolution', ()
   assert.match(source, /generic-kpi-collection/);
   assert.match(source, /scripts\/run-generic-kpi-collection\.mjs/);
   assert.match(source, /GENERIC_KPI_COLLECTION_LIMIT/);
+  assert.match(source, /mechanism-seed-generation/);
+  assert.match(source, /scripts\/run-mechanism-seed-daemon-cycle\.mjs/);
+  assert.match(source, /MECHANISM_SEED_GENERATION_LIMIT/);
+  assert.match(source, /MECHANISM_SEED_DAEMON_SKIP_STORAGE/);
+  assert.match(source, /no evidence enqueue/);
 });
 
 test('continuous data accumulator refuses duplicate persistent instances', () => {
