@@ -59,6 +59,11 @@ test('dashboard exposes report backfill closure summary without approval executi
   assert.match(dashboardApiSource, /artifactSchemaWarning/);
   assert.match(dashboardApiSource, /productTierLabel/);
   assert.match(dashboardApiSource, /productTierPrimary/);
+  assert.match(dashboardApiSource, /summarizeSidecarImportReplayHealth/);
+  assert.match(dashboardApiSource, /sidecarImportReplay/);
+  assert.match(dashboardApiSource, /replay_skipped_sidecar_unreachable/);
+  assert.match(dashboardApiSource, /futureArticleCount/);
+  assert.match(dashboardApiSource, /published_at <= NOW\(\) \+ INTERVAL '1 hour'/);
   assert.match(dashboardApiSource, /adjacent-theme-candidates/);
   assert.match(dashboardApiSource, /loadAdjacentThemeCandidateSummaries/);
   assert.match(dashboardApiSource, /generatedLane/);
@@ -104,6 +109,139 @@ test('dashboard exposes operator seed provider gap review without mutation contr
   assert.match(seedSurface, /Audit details/);
   assert.match(seedSurface, /mutationPolicy/);
   assert.match(modernSurfaceIndexSource, /installResearchSeedsSurface/);
+});
+
+test('dashboard exposes seed bias diagnostics as audit-only surface', () => {
+  const routeStart = dashboardApiSource.indexOf("segments[2] === 'bias-diagnostics'");
+  const routeBlock = dashboardApiSource.slice(routeStart, routeStart + 2200);
+  assert.notEqual(routeStart, -1);
+  assert.match(dashboardApiSource, /runSeedBiasBackfillOrchestrator/);
+  assert.match(routeBlock, /writeArtifacts:\s*false/);
+  assert.match(routeBlock, /recommendedBackfillTasks/);
+  assert.match(routeBlock, /boundaries/);
+  assert.match(dashboardApiSource, /selectedChildSeed/);
+  assert.match(dashboardApiSource, /companyIrCollectorStatus/);
+  assert.match(dashboardApiSource, /blockType/);
+  assert.match(dashboardApiSource, /routeMismatchDetected/);
+  assert.match(dashboardApiSource, /splitTracks/);
+  assert.match(dashboardApiSource, /acceptedEvidenceCountByTrack/);
+  assert.match(dashboardApiSource, /providerGapRequired/);
+  assert.match(dashboardApiSource, /affectedIssuers/);
+  assert.match(dashboardApiSource, /positivePathCandidateSeed/);
+  assert.match(dashboardApiSource, /acceptedPromotionEvidenceCount/);
+  assert.match(dashboardApiSource, /issuerBridgeStatus/);
+  assert.match(dashboardApiSource, /negativeControlScope/);
+  assert.match(dashboardApiSource, /issuerRoleClasses/);
+  assert.match(dashboardApiSource, /providerGapProposalLinks/);
+
+  const seedSurface = readFileSync(new URL('../src/dashboard/surfaces/research-seeds.mjs', import.meta.url), 'utf8');
+  assert.match(seedSurface, /Seed bias diagnostics/);
+  assert.match(seedSurface, /\/api\/research-seeds\/bias-diagnostics/);
+  assert.match(seedSurface, /data-seed-bias-audit/);
+  assert.match(seedSurface, /Selected child/);
+  assert.match(seedSurface, /Company IR/);
+  assert.match(seedSurface, /Block type/);
+  assert.match(seedSurface, /Route mismatch/);
+  assert.match(seedSurface, /Track A/);
+  assert.match(seedSurface, /Track B/);
+  assert.match(seedSurface, /Provider gaps/);
+  assert.match(seedSurface, /Affected issuers/);
+  assert.match(seedSurface, /Positive candidate/);
+  assert.match(seedSurface, /Promotion evidence/);
+  assert.match(seedSurface, /Negative scope/);
+  assert.match(seedSurface, /Issuer roles/);
+  assert.match(seedSurface, /visualStatus and accepted evidence matrix remain the readiness source of truth/);
+});
+
+test('dashboard exposes autonomous repair loop latest artifact without execution controls', () => {
+  const routeStart = dashboardApiSource.indexOf("segments[2] === 'repair-loop'");
+  const routeBlock = dashboardApiSource.slice(routeStart, routeStart + 2200);
+  assert.notEqual(routeStart, -1);
+  assert.match(dashboardApiSource, /loadLatestAutonomousRepairLoopArtifact/);
+  assert.match(dashboardApiSource, /buildAutonomousRepairLoopSurfacePayload/);
+  assert.match(dashboardApiSource, /auditDrawer/);
+  assert.match(dashboardApiSource, /rawRepairLoopArtifact/);
+  assert.match(dashboardApiSource, /selectedAction/);
+  assert.match(dashboardApiSource, /currentBlocker/);
+  assert.match(dashboardApiSource, /mutationBoundaries/);
+  assert.match(dashboardApiSource, /trackBIssuerBridgeStatus/);
+  assert.match(dashboardApiSource, /trackBAcceptedIssuerEvidenceCount/);
+  assert.match(dashboardApiSource, /trackBMatchedExposureTerms/);
+  assert.match(dashboardApiSource, /trackBMatchedOperatingTerms/);
+  assert.match(dashboardApiSource, /trackBNegativeControlStatus/);
+  assert.match(dashboardApiSource, /trackBCheckedIssuerCount/);
+  assert.match(dashboardApiSource, /trackBDirectInvalidatorFound/);
+  assert.match(dashboardApiSource, /trackBHoldoutStatus/);
+  assert.match(dashboardApiSource, /trackBHoldoutConfirmed/);
+  assert.match(dashboardApiSource, /trackBHoldoutMatchedExposureTerms/);
+  assert.match(dashboardApiSource, /trackBHoldoutMatchedDemandTerms/);
+  assert.match(dashboardApiSource, /marketValidationWindowResults/);
+  assert.match(dashboardApiSource, /marketValidationBenchmarkUsed/);
+  assert.match(dashboardApiSource, /marketValidationControlUsed/);
+  assert.match(dashboardApiSource, /reportCandidateAllowedDiagnostic/);
+  assert.match(dashboardApiSource, /evidenceContractClosureStatus/);
+  assert.match(dashboardApiSource, /evidenceContractMatrixSummary/);
+  assert.match(dashboardApiSource, /reportSubjectDryRun/);
+  assert.match(dashboardApiSource, /contradictionWarnings/);
+  assert.match(dashboardApiSource, /thesisValidationMemoDryRunStatus/);
+  assert.match(dashboardApiSource, /memoDecisionUse/);
+  assert.match(dashboardApiSource, /clientMemoPath/);
+  assert.match(dashboardApiSource, /auditAppendixPath/);
+  assert.match(dashboardApiSource, /valuationExpectationBridgeDryRunStatus/);
+  assert.match(dashboardApiSource, /valuationBridgeStatus/);
+  assert.match(dashboardApiSource, /issuerValuationBridgeTable/);
+  assert.match(dashboardApiSource, /missingValuationFields/);
+  assert.match(dashboardApiSource, /valuationMetricCoverage/);
+  assert.match(dashboardApiSource, /consensusMetricCoverage/);
+  assert.match(dashboardApiSource, /peerMetricCoverage/);
+  assert.match(dashboardApiSource, /pricedInRisk/);
+  assert.match(dashboardApiSource, /marketValidationRegimeStatus/);
+  assert.match(dashboardApiSource, /regimeCoverageScore/);
+  assert.match(dashboardApiSource, /eventCountByRegime/);
+  assert.match(dashboardApiSource, /marketValidationDecisionUseAllowed/);
+  assert.match(dashboardApiSource, /investmentMemoReadinessDiagnostic/);
+  assert.match(dashboardApiSource, /hardcodingAuditStatus/);
+  assert.match(dashboardApiSource, /finalInvestmentReportDryRunStatus/);
+  assert.match(dashboardApiSource, /validatorStatus/);
+  assert.match(dashboardApiSource, /finalStopReason/);
+  assert.match(dashboardApiSource, /finalInvestmentReportAuditAppendixPath/);
+  assert.doesNotMatch(routeBlock, /execute-safe|POST|providerActivationWrites:\s*1|reportCandidateWrites:\s*1/);
+
+  const seedSurface = readFileSync(new URL('../src/dashboard/surfaces/research-seeds.mjs', import.meta.url), 'utf8');
+  assert.match(seedSurface, /Autonomous repair loop/);
+  assert.match(seedSurface, /\/api\/research-seeds\/repair-loop/);
+  assert.match(seedSurface, /Track B issuer bridge/);
+  assert.match(seedSurface, /Track B promotion evidence/);
+  assert.match(seedSurface, /Track B exposure terms/);
+  assert.match(seedSurface, /Track B negative scope/);
+  assert.match(seedSurface, /Checked query families/);
+  assert.match(seedSurface, /Track B holdout/);
+  assert.match(seedSurface, /Holdout source groups/);
+  assert.match(seedSurface, /Market benchmark/);
+  assert.match(seedSurface, /Market control/);
+  assert.match(seedSurface, /Report candidate diagnostic/);
+  assert.match(seedSurface, /Contract closure/);
+  assert.match(seedSurface, /Report subject dry-run/);
+  assert.match(seedSurface, /Thesis memo dry-run/);
+  assert.match(seedSurface, /Valuation bridge dry-run/);
+  assert.match(seedSurface, /Issuer valuation rows/);
+  assert.match(seedSurface, /Valuation cache rows/);
+  assert.match(seedSurface, /Peer coverage/);
+  assert.match(seedSurface, /Priced-in risk/);
+  assert.match(seedSurface, /Market regime/);
+  assert.match(seedSurface, /Regime coverage/);
+  assert.match(seedSurface, /Market decision use/);
+  assert.match(seedSurface, /Investment memo diagnostic/);
+  assert.match(seedSurface, /Hardcoding audit/);
+  assert.match(seedSurface, /Final report dry-run/);
+  assert.match(seedSurface, /Final decision use/);
+  assert.match(seedSurface, /Validator/);
+  assert.match(seedSurface, /Final stop/);
+  assert.match(seedSurface, /Final audit appendix/);
+  assert.match(seedSurface, /Not decision-ready/);
+  assert.match(seedSurface, /Memo blockers/);
+  assert.match(seedSurface, /data-seed-repair-audit/);
+  assert.match(seedSurface, /auditDrawer/);
 });
 
 test('dashboard exposes operator seed lifecycle review routes with guarded mutations', () => {
@@ -295,6 +433,13 @@ function createOperatorSeedDashboardRow(overrides = {}) {
     promotionEligible: false,
     query: 'solid rocket motor no shortage substitute supplier',
   };
+  const mechanismDraft = {
+    operatorSeedId: 'msd-dashboard-seed',
+    desiredEvidenceClass: 'mechanism_validation',
+    evidenceUse: 'supporting_context',
+    promotionEligible: false,
+    query: 'official solid rocket motor capacity expansion',
+  };
   return {
     seed_id: 'msd-dashboard-seed',
     seed_key: 'msd-dashboard-seed',
@@ -316,13 +461,40 @@ function createOperatorSeedDashboardRow(overrides = {}) {
         { evidenceClass: 'negative_control', promotionEligible: false, negativeControlIntent: true, executableCollectors: ['source-query'], queryVariants: ['solid rocket motor no shortage substitute supplier'] },
       ],
       sourceQueryDrafts: [
+        mechanismDraft,
         negativeDraft,
         { operatorSeedId: 'msd-dashboard-seed', desiredEvidenceClass: 'market_validation', evidenceUse: 'supporting_context', promotionEligible: false, query: 'LHX SRM market reaction' },
       ],
       negativeControlDrafts: [negativeDraft],
       marketValidationPlan: { evidenceClass: 'market_validation', promotionFromSourceQueryAllowed: false, status: 'planned' },
+      acceptedEvidence: [{
+        seedId: 'msd-dashboard-seed',
+        evidenceClass: 'issuer_exposure',
+        source: 'official-company',
+        evidenceUse: 'promotion_candidate',
+        coveredEvidenceClasses: ['issuer_exposure'],
+      }, {
+        seedId: 'msd-dashboard-seed',
+        evidenceClass: 'mechanism_validation',
+        source: 'government-official',
+        evidenceUse: 'promotion_candidate',
+        coveredEvidenceClasses: ['mechanism_validation'],
+      }],
+      holdoutValidation: {
+        items: [{ seedId: 'msd-dashboard-seed', holdoutConfirmed: true, confirmationCount: 1, contradictionCount: 0 }],
+      },
+      negativeControlSurvival: {
+        items: [{ seedId: 'msd-dashboard-seed', survivalStatus: 'CHECKED_NO_DIRECT' }],
+      },
+      issuerBridge: { status: 'closed' },
+      marketValidation: { localControlledMarketData: true, tier: 'screening_grade' },
       blockedRoutes: [],
       providerGapLabels: ['provider_gap_patent_api'],
+      outcomeLedger: [{
+        evidenceClass: 'negative_control',
+        outcomeTier: 'negative_control_candidate',
+        negativeControlClosure: 'checked_no_direct',
+      }],
       enqueueDefault: false,
       enqueueAllowed: true,
     },

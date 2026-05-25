@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import pg from 'pg';
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync, execSync, spawn } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { loadOptionalEnvFile, resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 import { createLogger } from './_shared/structured-logger.mjs';
@@ -46,17 +46,44 @@ const TASK_ONLY = process.argv.includes('--task')
   : null;
 const ONCE = process.argv.includes('--once') || Boolean(TASK_ONLY);
 
+function argValue(name) {
+  const equals = process.argv.find((arg) => arg.startsWith(`${name}=`));
+  if (equals) return equals.slice(name.length + 1);
+  const index = process.argv.indexOf(name);
+  if (index >= 0) return process.argv[index + 1] || '';
+  return '';
+}
+
+function csvSet(value = '') {
+  return new Set(String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean));
+}
+
+const TASK_ALLOWLIST = csvSet(argValue('--task-allowlist') || process.env.DAEMON_TASK_ALLOWLIST || '');
+const TASK_BLOCKLIST = csvSet(argValue('--task-blocklist') || process.env.DAEMON_TASK_BLOCKLIST || '');
+
 const CIRCUIT_BREAKER_FAILS = Number(process.env.DAEMON_CIRCUIT_BREAKER_FAILS || 3);
 const CIRCUIT_BREAKER_COOLDOWN_MS = Number(process.env.DAEMON_CIRCUIT_BREAKER_COOLDOWN_MS || (30 * 60 * 1000));
 const DASHBOARD_HEALTH_URL = String(process.env.EVENT_DASHBOARD_API_URL || 'http://127.0.0.1:46200/api/health').trim();
 const DASHBOARD_HEALTH_TIMEOUT_MS = Number(process.env.DASHBOARD_HEALTH_TIMEOUT_MS || 60_000);
 const DASHBOARD_RESTART_CMD = String(process.env.EVENT_DASHBOARD_RESTART_CMD || '').trim();
+const SIDECAR_PORT = Number(process.env.SIDECAR_PORT || 46123);
+const SIDECAR_HEALTH_URL = String(process.env.SIDECAR_HEALTH_URL || `http://127.0.0.1:${SIDECAR_PORT}/api/local-runtime-observability`).trim();
+const SIDECAR_HEALTH_TIMEOUT_MS = Number(process.env.SIDECAR_HEALTH_TIMEOUT_MS || 10_000);
+const DAEMON_START_SIDECAR = process.env.DAEMON_START_SIDECAR === 'true';
+const DAEMON_START_ACCUMULATOR = process.env.DAEMON_START_ACCUMULATOR === 'true';
+const ACCUMULATOR_STATE_PATH = 'data/historical/accumulator-state.json';
+const ACCUMULATOR_FRESH_MS = Number(process.env.ACCUMULATOR_FRESH_MS || (150 * 60 * 1000));
 const DB_RESTART_CMD = String(process.env.DB_RESTART_CMD || '').trim();
 const DUCKDB_SYNC_TIMEOUT_MS = Number(process.env.DUCKDB_SYNC_TIMEOUT_MS || (2 * HOUR_1_MS));
 const LEGACY_DUCKDB_SYNC_ENABLED = process.env.ENABLE_LEGACY_DUCKDB_SYNC === 'true';
 const RUN_MAX_BUFFER_BYTES = Math.max(1024 * 1024, Number(process.env.DAEMON_RUN_MAX_BUFFER_BYTES || 64 * 1024 * 1024));
 const STATE_PATH = 'data/daemon-state.json';
 const logger = createLogger('master-daemon');
+let persistentHeartbeatTimer = null;
+let persistentMainLoopTimer = null;
 
 function optionalTimeoutMs(value, fallback = 0, min = 1, max = Number.MAX_SAFE_INTEGER) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -100,18 +127,44 @@ function ensureDataDir() {
 function loadState() {
   try {
     if (existsSync(STATE_PATH)) {
-      return JSON.parse(readFileSync(STATE_PATH, 'utf-8'));
+      return normalizeDaemonState(JSON.parse(readFileSync(STATE_PATH, 'utf-8')));
     }
   } catch {
     // corrupted state: start fresh
   }
 
-  return {
+  return normalizeDaemonState({
     lastRun: {},
     taskResults: {},
     failures: {},
     health: {},
+  });
+}
+
+function normalizeDaemonState(state) {
+  const next = {
+    lastRun: {},
+    taskResults: {},
+    failures: {},
+    health: {},
+    ...(state || {}),
   };
+  const reportClosureFailure = next.failures?.['report-closure'];
+  if (
+    reportClosureFailure?.disabledUntil
+    && /Invalid string length/i.test(String(reportClosureFailure.lastError || ''))
+  ) {
+    next.failures['report-closure'] = { consecutive: 0, disabledUntil: 0, lastError: '' };
+    next.lastRun['report-closure'] = 0;
+    next.taskResults['report-closure'] = {
+      ok: true,
+      at: new Date().toISOString(),
+      error: '',
+      consecutiveFailures: 0,
+      note: 'cleared stale serialization_failed circuit after compact report-closure stdout patch',
+    };
+  }
+  return next;
 }
 
 function saveState(state) {
@@ -129,8 +182,20 @@ function markHeartbeat(state, phase = 'idle') {
     masterDaemonAt: new Date().toISOString(),
     phase,
     pid: process.pid,
+    mode: ONCE ? 'once' : 'persistent',
+    taskAllowlist: Array.from(TASK_ALLOWLIST),
+    taskOnly: TASK_ONLY || null,
   };
   saveState(state);
+}
+
+function readJsonFileSafe(filePath, fallback = null) {
+  try {
+    if (!existsSync(filePath)) return fallback;
+    return JSON.parse(readFileSync(filePath, 'utf-8'));
+  } catch {
+    return fallback;
+  }
 }
 
 function runningHeartbeatPhase(fallback = 'idle') {
@@ -198,15 +263,27 @@ function runNodeScript(scriptPath, args = [], timeoutMs = 300_000) {
     const durationMs = Date.now() - started;
     const stderr = error?.stderr?.toString?.() || '';
     const stdout = error?.stdout?.toString?.() || '';
-    const message = String(stderr || stdout || error?.message || error).replace(/\s+/g, ' ').slice(0, 400);
+    let artifactPath = '';
+    let compactChildError = '';
+    try {
+      const parsed = JSON.parse(String(stdout || stderr || '').trim());
+      artifactPath = parsed?.artifactPath || '';
+      compactChildError = parsed?.error || parsed?.errorSummary || '';
+    } catch {
+      // child output was not compact JSON
+    }
+    const message = String(compactChildError || stderr || stdout || error?.message || error)
+      .replace(/\s+/g, ' ')
+      .slice(0, 400);
     logger.warn('node script failed', {
       scriptPath,
       timeoutMs: timeoutLabel(normalizedTimeoutMs),
       durationMs,
       error: message,
+      artifactPath: artifactPath || undefined,
     });
     logger.metric('shell.error_count', 1);
-    return { ok: false, error: message, durationMs };
+    return { ok: false, error: artifactPath ? `${message} artifactPath=${artifactPath}` : message, durationMs, artifactPath };
   }
 }
 
@@ -258,10 +335,37 @@ function listRunningNodeProcesses(scriptFragment) {
   }
 }
 
+function isPidAlive(pid) {
+  const normalizedPid = Number(pid || 0);
+  if (!Number.isInteger(normalizedPid) || normalizedPid <= 0 || normalizedPid === process.pid) return false;
+  try {
+    process.kill(normalizedPid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function heartbeatPeer() {
+  const state = readJsonFileSafe(STATE_PATH, null);
+  const heartbeat = state?.heartbeat || null;
+  if (!heartbeat || heartbeat.mode !== 'persistent') return null;
+  const pid = Number(heartbeat.pid || 0);
+  if (!isPidAlive(pid)) return null;
+  return {
+    pid,
+    commandLine: '',
+    source: 'daemon-heartbeat',
+  };
+}
+
 function findPersistentMasterDaemonPeers() {
-  return listRunningNodeProcesses('master-daemon\\.mjs')
+  const peers = listRunningNodeProcesses('master-daemon\\.mjs')
     .filter((row) => !/(^|\s)--task(\s|=|$)/.test(row.commandLine))
     .filter((row) => !/(^|\s)--once(\s|$)/.test(row.commandLine));
+  if (peers.length > 0) return peers;
+  const fallback = heartbeatPeer();
+  return fallback ? [fallback] : [];
 }
 
 function shouldRun(taskName, intervalMs, state) {
@@ -289,8 +393,25 @@ function computeCircuitBackoffMs(intervalMs, consecutiveFailures) {
   );
 }
 
-async function markDone(taskName, intervalMs, state, ok, error = '') {
+function zeroMutationBoundary(extra = {}) {
+  return {
+    providerActivationWrites: 0,
+    sourceRegistryWrites: 0,
+    canonicalWrites: 0,
+    readinessPromotionWrites: 0,
+    reportCandidateWrites: 0,
+    portfolioActionWrites: 0,
+    ...(extra || {}),
+  };
+}
+
+async function markDone(taskName, intervalMs, state, ok, error = '', result = {}) {
   state.lastRun[taskName] = Date.now();
+  state.nextAttempt = state.nextAttempt || {};
+  state.cooldown = state.cooldown || {};
+  state.lockOwner = state.lockOwner || {};
+  state.budgetUsed = state.budgetUsed || {};
+  state.mutationBoundary = state.mutationBoundary || {};
   const previous = state.failures?.[taskName] || { consecutive: 0, disabledUntil: 0, lastError: '' };
   const nextConsecutive = ok ? 0 : previous.consecutive + 1;
   const backoffMs = ok ? 0 : computeCircuitBackoffMs(intervalMs, nextConsecutive);
@@ -305,11 +426,31 @@ async function markDone(taskName, intervalMs, state, ok, error = '') {
     };
 
   state.failures[taskName] = nextFailure;
+  const nextAttemptAt = nextFailure.disabledUntil || (Date.now() + intervalMs);
+  state.nextAttempt[taskName] = nextAttemptAt;
+  state.cooldown[taskName] = backoffMs > 0 ? backoffMs : intervalMs;
+  state.lockOwner[taskName] = result?.lockOwner || `master-daemon:${process.pid}`;
+  state.budgetUsed[taskName] = result?.budgetUsed || {
+    timeoutMs: result?.timeoutMs || null,
+    durationMs: result?.durationMs || null,
+  };
+  state.mutationBoundary[taskName] = zeroMutationBoundary(
+    result?.mutationBoundary
+    || result?.mutationBoundaries
+    || result?.boundaries
+    || {},
+  );
   state.taskResults[taskName] = {
     ok,
     at: new Date().toISOString(),
     error,
     consecutiveFailures: nextFailure.consecutive,
+    nextAttempt: new Date(nextAttemptAt).toISOString(),
+    cooldown: state.cooldown[taskName],
+    lockOwner: state.lockOwner[taskName],
+    budgetUsed: state.budgetUsed[taskName],
+    mutationBoundary: state.mutationBoundary[taskName],
+    taskResult: result?.summary || null,
   };
   saveState(state);
 
@@ -330,10 +471,12 @@ async function runTask(state, taskName, intervalMs, handler) {
   markHeartbeat(state, runningHeartbeatPhase());
   let ok = false;
   let errorMessage = '';
+  let handlerResult = null;
   const startedAt = Date.now();
 
   try {
     const result = await handler();
+    handlerResult = result || {};
     ok = result?.ok !== false;
     errorMessage = result?.error || '';
   } catch (error) {
@@ -350,7 +493,11 @@ async function runTask(state, taskName, intervalMs, handler) {
       durationMs,
       error: errorMessage || null,
     });
-    await markDone(taskName, intervalMs, state, ok, errorMessage);
+    await markDone(taskName, intervalMs, state, ok, errorMessage, {
+      ...(handlerResult || {}),
+      durationMs,
+      lockOwner: `master-daemon:${process.pid}`,
+    });
     runningTasks.delete(taskName);
     markHeartbeat(state, runningHeartbeatPhase());
   }
@@ -665,6 +812,132 @@ async function taskDashboardHealth(state) {
 
     return { ok: false, error: message };
   }
+}
+
+function maybeStartSidecar() {
+  if (!DAEMON_START_SIDECAR) {
+    return { started: false, reason: 'DAEMON_START_SIDECAR is not true' };
+  }
+  const existing = listRunningNodeProcesses('src-tauri[\\\\/]sidecar[\\\\/]local-api-server\\.mjs')
+    .concat(listRunningNodeProcesses('local-api-server\\.mjs'));
+  if (existing.length) {
+    return { started: false, reason: 'already_running', pid: existing[0].pid };
+  }
+  const child = spawn(process.execPath, ['src-tauri/sidecar/local-api-server.mjs'], {
+    cwd: process.cwd(),
+    env: { ...process.env },
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  child.unref();
+  return { started: true, pid: child.pid };
+}
+
+function maybeStartAccumulator() {
+  if (!DAEMON_START_ACCUMULATOR) {
+    return { started: false, reason: 'DAEMON_START_ACCUMULATOR is not true' };
+  }
+  const existing = listRunningNodeProcesses('data-accumulator\\.mjs')
+    .filter((row) => !/(^|\s)--once(\s|$)/.test(row.commandLine));
+  if (existing.length) {
+    return { started: false, reason: 'already_running', pid: existing[0].pid };
+  }
+  const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/data-accumulator.mjs'], {
+    cwd: process.cwd(),
+    env: { ...process.env },
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  child.unref();
+  return { started: true, pid: child.pid };
+}
+
+async function taskSidecarHealth(state) {
+  log(`>> sidecar-health: checking ${SIDECAR_HEALTH_URL}`);
+  const checkedAt = new Date().toISOString();
+  try {
+    const response = await fetch(SIDECAR_HEALTH_URL, { signal: AbortSignal.timeout(SIDECAR_HEALTH_TIMEOUT_MS) });
+    const bodyText = await response.text();
+    let payload = null;
+    try {
+      payload = bodyText ? JSON.parse(bodyText) : null;
+    } catch {
+      payload = null;
+    }
+    const status = response.status === 423
+      ? 'busy_lock'
+      : response.ok && payload
+        ? 'ok'
+        : response.ok
+          ? 'bad_response'
+          : `http_${response.status}`;
+    state.health.sidecar = {
+      ok: status === 'ok',
+      status,
+      checkedAt,
+      port: SIDECAR_PORT,
+      autoStartEnabled: DAEMON_START_SIDECAR,
+      payload: status === 'ok' ? payload : null,
+      bodyPreview: status === 'ok' ? undefined : bodyText.slice(0, 300),
+    };
+    saveState(state);
+    logger.metric('sidecar.healthy', status === 'ok' ? 1 : 0);
+    return { ok: true, status };
+  } catch (error) {
+    const startResult = maybeStartSidecar();
+    const message = String(error?.message || error || 'sidecar unreachable');
+    state.health.sidecar = {
+      ok: false,
+      status: 'unreachable',
+      checkedAt,
+      port: SIDECAR_PORT,
+      autoStartEnabled: DAEMON_START_SIDECAR,
+      error: message,
+      startResult,
+    };
+    saveState(state);
+    logger.metric('sidecar.healthy', 0);
+    return { ok: true, status: 'unreachable', error: message, startResult };
+  }
+}
+
+async function taskDataAccumulatorHealth(state) {
+  log(`>> data-accumulator-health: checking ${ACCUMULATOR_STATE_PATH}`);
+  const checkedAt = new Date().toISOString();
+  const running = listRunningNodeProcesses('data-accumulator\\.mjs')
+    .filter((row) => !/(^|\s)--once(\s|$)/.test(row.commandLine));
+  const accumulatorState = readJsonFileSafe(ACCUMULATOR_STATE_PATH, {});
+  const latestAt = accumulatorState?.heartbeat?.accumulatorAt || accumulatorState?.lastRun || null;
+  const ageMs = latestAt ? Date.now() - Date.parse(latestAt) : Number.POSITIVE_INFINITY;
+  const stale = !latestAt || !Number.isFinite(ageMs) || ageMs > ACCUMULATOR_FRESH_MS;
+  const pendingImports = Array.isArray(accumulatorState?.pendingImports) ? accumulatorState.pendingImports.length : 0;
+  const gdeltRetries = Array.isArray(accumulatorState?.gdeltRetryQueue) ? accumulatorState.gdeltRetryQueue.length : 0;
+  const status = running.length === 0
+    ? 'not_running'
+    : stale
+      ? 'stale'
+      : 'ok';
+  const startResult = running.length === 0 ? maybeStartAccumulator() : { started: false, reason: 'already_running', pid: running[0]?.pid || null };
+  state.health.accumulator = {
+    ok: status === 'ok',
+    status,
+    checkedAt,
+    latestAt,
+    ageMinutes: Number.isFinite(ageMs) ? Math.round(ageMs / 60000) : null,
+    stale,
+    pid: running[0]?.pid || startResult.pid || null,
+    autoStartEnabled: DAEMON_START_ACCUMULATOR,
+    startResult,
+    pendingImportCount: pendingImports,
+    gdeltRetryCount: gdeltRetries,
+    lastReplayStatus: accumulatorState?.lastReplay?.status || null,
+    lastReplayAt: accumulatorState?.lastReplay?.at || accumulatorState?.lastReplayAt || null,
+  };
+  saveState(state);
+  logger.metric('data_accumulator.healthy', status === 'ok' ? 1 : 0);
+  return { ok: true, status, startResult };
 }
 
 async function taskDbHealth(state) {
@@ -1182,6 +1455,46 @@ async function taskMechanismSeedGeneration() {
   return { ok: result.ok, error: result.error };
 }
 
+async function taskAutonomousResearchRepairLoopPlan() {
+  log('>> autonomous-research-repair-loop-plan: selecting the next safe repair action in plan mode only');
+  const timeoutMs = optionalTimeoutMs(process.env.AUTONOMOUS_REPAIR_LOOP_TIMEOUT_MS, 300_000, 60_000, HOUR_6_MS);
+  const result = runNodeScript('scripts/run-autonomous-research-repair-loop.mjs', [
+    '--mode', 'plan',
+    '--max-iterations', Number(process.env.AUTONOMOUS_REPAIR_LOOP_MAX_ITERATIONS || 5),
+    '--max-seeds', 1,
+    '--max-tracks', 1,
+  ], timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskAutonomousResearchRepairLoopExecuteSafe() {
+  log('>> autonomous-research-repair-loop-execute-safe: executing bounded safe repair actions with mutation boundaries');
+  const timeoutMs = optionalTimeoutMs(process.env.AUTONOMOUS_REPAIR_LOOP_EXECUTE_SAFE_TIMEOUT_MS, 900_000, 60_000, 24 * HOUR_1_MS);
+  const maxIterations = Math.max(1, Math.min(20, Number(process.env.AUTONOMOUS_REPAIR_LOOP_MAX_ITERATIONS || 5)));
+  const result = runNodeScript('scripts/run-autonomous-research-repair-loop.mjs', [
+    '--mode', 'execute-safe',
+    '--continue-safe', 'true',
+    '--max-iterations', maxIterations,
+    '--max-seeds', 1,
+    '--max-tracks', 1,
+  ], timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
+async function taskAutonomousAutomationCycle() {
+  log('>> autonomous-automation-cycle: refreshing source/provider lifecycle, backfill queue, quarantine, and runtime console artifacts');
+  const timeoutMs = optionalTimeoutMs(process.env.AUTONOMOUS_AUTOMATION_CYCLE_TIMEOUT_MS, 300_000, 60_000, HOUR_6_MS);
+  const stagedProviderMaxTargets = Math.max(1, Math.min(25, Number(process.env.AUTONOMOUS_STAGED_PROVIDER_MAX_TARGETS || 3)));
+  const stagedProviderTimeoutMs = Math.max(1_000, Math.min(120_000, Number(process.env.AUTONOMOUS_STAGED_PROVIDER_TIMEOUT_MS || 5_000)));
+  const result = runNodeScript('scripts/run-autonomous-automation-cycle.mjs', [
+    '--apply',
+    '--limit', Number(process.env.AUTONOMOUS_AUTOMATION_CYCLE_LIMIT || 25),
+    '--staged-provider-max-targets', stagedProviderMaxTargets,
+    '--staged-provider-timeout-ms', stagedProviderTimeoutMs,
+  ], timeoutMs);
+  return { ok: result.ok, error: result.error };
+}
+
 async function taskSourceSelfHeal() {
   log('>> source-self-heal: validating and activating approved healing candidates');
   const result = run('node --import tsx scripts/self-heal-sources.mjs --limit 1', 300_000);
@@ -1374,6 +1687,8 @@ const TASKS = {
   'article-check': { interval: MIN_30_MS, fn: taskArticleCheck },
   'dynamic-rss-backfill': { interval: HOUR_1_MS, fn: taskDynamicRssBackfill },
   'dashboard-health': { interval: MIN_30_MS, fn: taskDashboardHealth },
+  'sidecar-health': { interval: MIN_30_MS, fn: taskSidecarHealth },
+  'data-accumulator-health': { interval: MIN_30_MS, fn: taskDataAccumulatorHealth },
   'db-health': { interval: MIN_15_MS, fn: taskDbHealth },
   'embedding-refresh': { interval: HOUR_1_MS, fn: taskGenerateEmbeddings },
   'auto-pipeline-labels': { interval: HOUR_2_MS, fn: taskAutoPipelineLabels },
@@ -1412,7 +1727,7 @@ const TASKS = {
   'generate-weekly-digest': { interval: DAY_1_MS, fn: taskGenerateWeeklyDigest },
   'schedule-intelligence-reports': { interval: HOUR_6_MS, fn: taskScheduleIntelligenceReports },
   'report-backfill-drain': { interval: HOUR_2_MS, fn: taskReportBackfillDrain },
-  'report-closure': { interval: HOUR_6_MS, fn: taskReportClosure },
+  'report-closure': { interval: HOUR_2_MS, fn: taskReportClosure },
   'external-provider-backfill': { interval: HOUR_2_MS, fn: taskExternalProviderBackfill },
   'generic-kpi-collection': { interval: HOUR_6_MS, fn: taskGenericKpiCollection },
   'universal-research-orchestrator': { interval: HOUR_6_MS, fn: taskUniversalResearchOrchestrator },
@@ -1428,13 +1743,18 @@ const TASKS = {
   'promote-trusted-graph': { interval: DAY_1_MS, fn: taskPromoteTrustedGraph },
   'adjacency-autoresearch': { interval: DAY_1_MS, fn: taskAdjacencyAutoresearch },
   'research-os-policy-advisor': { interval: DAY_1_MS, fn: taskResearchOsPolicyAdvisor },
-  'mechanism-seed-generation': { interval: HOUR_6_MS, fn: taskMechanismSeedGeneration },
+  'mechanism-seed-generation': { interval: HOUR_2_MS, fn: taskMechanismSeedGeneration },
+  'autonomous-research-repair-loop-plan': { interval: HOUR_2_MS, fn: taskAutonomousResearchRepairLoopPlan },
+  'autonomous-research-repair-loop-execute-safe': { interval: HOUR_2_MS, fn: taskAutonomousResearchRepairLoopExecuteSafe },
+  'autonomous-automation-cycle': { interval: HOUR_1_MS, fn: taskAutonomousAutomationCycle },
   'auto-curate': { interval: WEEK_1_MS, fn: taskAutoCurate },
 };
 
 async function runAllTasks(state) {
   for (const [taskName, task] of Object.entries(TASKS)) {
     if (TASK_ONLY && TASK_ONLY !== taskName) continue;
+    if (!TASK_ONLY && TASK_ALLOWLIST.size && !TASK_ALLOWLIST.has(taskName)) continue;
+    if (TASK_BLOCKLIST.has(taskName)) continue;
     await runTask(state, taskName, task.interval, () => task.fn(state));
   }
 }
@@ -1445,14 +1765,19 @@ async function main() {
     process.stderr.write('  [disabled] rates-nowcast (NOWCAST_RATES_ENABLED != true) — see NOWCAST_HANDOFF §5.2\n');
   }
   process.stderr.write('  15min: market quote refresh (core + auto-theme symbols), db health\n');
-  process.stderr.write('  30min: article check, dashboard health, meta-model-infer-burst (adaptive — only when stale predictions ≥ 1000)\n');
+  process.stderr.write('  30min: article check, dashboard health, sidecar import/replay health, data-accumulator health, meta-model-infer-burst (adaptive — only when stale predictions ≥ 1000)\n');
   process.stderr.write('  1h:    dynamic RSS backfill, embedding refresh, event-engine-incremental, auto-pipeline-sensitivity, sensitivity refresh\n');
   process.stderr.write('  2h:    meta-model-infer, auto-pipeline-labels, refresh-event-market-transmission, report-backfill-drain, external provider/keyword backfill\n');
   process.stderr.write('  4h:    repair-stale-features (dedicated event_features stale detector + repair)\n');
   process.stderr.write('  daily: bootstrap-market-quote-history, event-engine-full-controls (matched_controls + event_uplift grading)\n');
   process.stderr.write('  6h:    signal refresh, master-pipeline, executor, data quality, arxiv, hackernews, discovery, report schedule, report closure, self-heal, generic KPI collection, universal research coverage-closure\n');
     process.stderr.write('  3-12h: Research OS foundation/evidence/relation/candidate refresh with approval-gated source expansion\n');
-    process.stderr.write('  6h:    mechanism seed generation/audit/provider adapter proposal/self-improvement cycle (no evidence enqueue)\n');
+    process.stderr.write('  <=2h:  mechanism seed generation/audit/provider adapter proposal/self-improvement cycle (no evidence enqueue), report closure, automation cycle, and repair loop under research OS allowlist\n');
+    process.stderr.write('  2h:    autonomous research repair loop plan-only next-action artifact (no execute-safe automation)\n');
+    process.stderr.write('  1-2h:  autonomous automation cycle + execute-safe repair loop when task allowlist enables research OS automation\n');
+    if (TASK_ALLOWLIST.size) {
+      process.stderr.write(`  allowlist: ${Array.from(TASK_ALLOWLIST).join(', ')}\n`);
+    }
     process.stderr.write('  opt-in: duckdb-sync only when ENABLE_LEGACY_DUCKDB_SYNC=true\n');
   process.stderr.write('  2h:    source repair closed loop (failed source proposals -> repaired feed -> backfill)\n');
     process.stderr.write('  daily: FRED backfill, pending check, full rebuild, daily backup, daily report, taxonomy migration, trend aggregates,\n');
@@ -1484,6 +1809,11 @@ async function main() {
     process.stderr.write(`Unknown task: ${TASK_ONLY}\nAvailable: ${Object.keys(TASKS).join(', ')}\n`);
     process.exit(1);
   }
+  const unknownAllowlistedTasks = Array.from(TASK_ALLOWLIST).filter((taskName) => !TASKS[taskName]);
+  if (!TASK_ONLY && unknownAllowlistedTasks.length) {
+    process.stderr.write(`Unknown task(s) in --task-allowlist/DAEMON_TASK_ALLOWLIST: ${unknownAllowlistedTasks.join(', ')}\nAvailable: ${Object.keys(TASKS).join(', ')}\n`);
+    process.exit(1);
+  }
 
   if (!ONCE) {
     const peers = findPersistentMasterDaemonPeers();
@@ -1495,18 +1825,18 @@ async function main() {
 
   markHeartbeat(state, 'starting');
   if (!ONCE) {
-    const heartbeatTimer = setInterval(() => {
+    persistentHeartbeatTimer = setInterval(() => {
       const currentState = loadState();
       markHeartbeat(currentState, runningHeartbeatPhase());
     }, 60_000);
-    heartbeatTimer.unref?.();
+    persistentHeartbeatTimer.unref?.();
   }
 
   await runAllTasks(state);
   markHeartbeat(state, 'idle');
   if (ONCE) return;
 
-  setInterval(async () => {
+  persistentMainLoopTimer = setInterval(async () => {
     const currentState = loadState();
     markHeartbeat(currentState, 'tick');
     await runAllTasks(currentState);

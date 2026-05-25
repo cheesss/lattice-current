@@ -613,9 +613,16 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
     FROM theme_structural_alerts
     WHERE status = $${index++}
       AND period_type = $${index++}
+  `;
+  values.push(status, periodType);
+  if (themes.length) {
+    sql += ` AND theme = ANY($${index++})`;
+    values.push(themes);
+  }
+  sql += `
       AND COALESCE(updated_at, last_seen_at, first_seen_at, snapshot_date::timestamptz) >= NOW() - ($${index++}::double precision * INTERVAL '1 hour')
   `;
-  values.push(status, periodType, maxAgeHours);
+  values.push(maxAgeHours);
   if (!includeLowConfidence) {
     sql += `
       AND NOT (
@@ -648,10 +655,6 @@ export async function buildStructuralAlertsPayload(safeQuery, params = new URLSe
       )
     `;
     values.push(minCoolingArticleCount);
-  }
-  if (themes.length) {
-    sql += ` AND theme = ANY($${index++})`;
-    values.push(themes);
   }
   sql += `
     ORDER BY

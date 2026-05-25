@@ -10,6 +10,8 @@ export const DAEMON_TASK_INTERVALS_MS = Object.freeze({
   'signal-refresh': MIN_15_MS,
   'article-check': MIN_30_MS,
   'dashboard-health': MIN_30_MS,
+  'sidecar-health': MIN_30_MS,
+  'data-accumulator-health': MIN_30_MS,
   'auto-pipeline-labels': HOUR_2_MS,
   'auto-pipeline-sensitivity': HOUR_1_MS,
   'sensitivity-refresh': HOUR_1_MS,
@@ -31,7 +33,12 @@ export const DAEMON_TASK_INTERVALS_MS = Object.freeze({
   'generate-followed-theme-briefings': DAY_1_MS,
   'auto-curate': WEEK_1_MS,
   'coverage-gap-analysis': DAY_1_MS,
-  'mechanism-seed-generation': HOUR_6_MS,
+  'mechanism-seed-generation': HOUR_2_MS,
+  'autonomous-research-repair-loop-plan': HOUR_2_MS,
+  'autonomous-research-repair-loop-execute-safe': HOUR_2_MS,
+  'autonomous-automation-cycle': HOUR_1_MS,
+  'report-backfill-drain': HOUR_2_MS,
+  'report-closure': HOUR_2_MS,
 });
 
 export function getDaemonTaskIntervalMs(taskName) {

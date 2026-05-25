@@ -35,8 +35,8 @@ export const KPI_SIGNAL_CHANNELS = new Set([
 // healthy (e.g., FRED daily series typically publish 2-5 days after observation).
 export const SIGNAL_STALE_THRESHOLD_HOURS = Object.freeze({
   vix: 36,                  // Yahoo intraday — fast
-  yieldSpread: 120,         // FRED DGS10/DGS2 lag 3-5d
-  hy_credit_spread: 120,    // FRED BAMLH0A0HYM2 lag 3-5d
+  yieldSpread: 72,          // FRED daily spread series: allow one long weekend, not a full week
+  hy_credit_spread: 72,     // FRED daily spread series: allow one long weekend, not a full week
   ig_credit_spread: 120,    // FRED BAMLC0A0CM lag 3-5d
   treasury10y: 120,         // FRED DGS10 lag 3-5d
   fedFundsRate: 240,        // monthly publish (~10d cadence)

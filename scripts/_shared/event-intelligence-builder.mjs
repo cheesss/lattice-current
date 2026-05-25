@@ -36,7 +36,7 @@ const HOT_EVENTS_LOOKBACK_DAYS = 7;
 // gate, 25,260 of those E2 events become validated and surface in Hot
 // Events; statistical strength is preserved (3+ matched controls + a
 // significant t-stat is a meaningful promotion gate).
-export const HOT_EVENTS_MIN_PROMOTION_CONTROLS = 3;
+export const HOT_EVENTS_MIN_PROMOTION_CONTROLS = 8;
 const EXPLAIN_EVENT_ARTICLE_LIMIT = 12;
 const EXPLAIN_EVENT_SYMBOL_LIMIT = 10;
 const SOURCE_DIVERSITY_WINDOW_HOURS = 24;

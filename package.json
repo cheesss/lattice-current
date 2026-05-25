@@ -87,6 +87,8 @@
     "daemon": "node scripts/master-daemon.mjs",
     "daemon:once": "node scripts/master-daemon.mjs --once",
     "daemon:task": "node scripts/master-daemon.mjs --task",
+    "daemon:research-os": "node scripts/start-autonomous-research-daemons.mjs",
+    "daemon:research-os:once": "node scripts/start-autonomous-research-daemons.mjs --once",
     "daemon:accumulator": "node --import tsx scripts/data-accumulator.mjs",
     "daemon:accumulator:once": "node --import tsx scripts/data-accumulator.mjs --once",
     "daemon:meta-model": "python scripts/meta-model-server.py",

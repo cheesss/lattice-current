@@ -82,7 +82,9 @@ import { buildProductQualityPayload } from './_shared/product-quality-metrics.mj
 import { sendAlert } from './_shared/alert-notifier.mjs';
 import { loadReportBackfillClosureSummaries } from './_shared/report-backfill-closure.mjs';
 import { loadAdjacentThemeCandidateSummaries } from './_shared/report-adjacent-expansion.mjs';
+import { loadAutomationConsolePayload } from './_shared/automation-console-surface.mjs';
 import { runProviderGapReview } from './review-provider-gap-proposals.mjs';
+import { runSeedBiasBackfillOrchestrator } from './run-seed-bias-backfill-orchestrator.mjs';
 import {
   buildOperatorSeedReviewDetail,
   buildOperatorSeedReviewPayload,
@@ -942,7 +944,10 @@ async function buildLiveStatus() {
       WHERE status IN ('pending', 'waiting')
     `),
     safeQuery(`
-      SELECT COUNT(*)::int AS count, MAX(published_at) AS latest_published_at
+      SELECT
+        COUNT(*) FILTER (WHERE published_at <= NOW() + INTERVAL '1 hour')::int AS count,
+        MAX(published_at) FILTER (WHERE published_at <= NOW() + INTERVAL '1 hour') AS latest_published_at,
+        COUNT(*) FILTER (WHERE published_at > NOW() + INTERVAL '1 hour')::int AS future_count
       FROM articles
       WHERE published_at >= NOW() - INTERVAL '24 hours'
     `),
@@ -960,6 +965,7 @@ async function buildLiveStatus() {
         FROM auto_article_themes t
         JOIN articles a ON a.id = t.article_id
         WHERE a.published_at >= NOW() - INTERVAL '7 days'
+          AND a.published_at <= NOW() + INTERVAL '1 hour'
       )
       SELECT theme, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at
       FROM recent_theme_rows
@@ -1006,6 +1012,7 @@ async function buildLiveStatus() {
     };
   });
   const articleCount24h = Number(articlesR.rows[0]?.count || 0);
+  const futureArticleCount24h = Number(articlesR.rows[0]?.future_count || 0);
   const latestArticlePublishedAt = toIsoTimestamp(articlesR.rows[0]?.latest_published_at);
   const articleAgeHours = latestArticlePublishedAt ? ageHoursFrom(latestArticlePublishedAt, now) : null;
   const articlesStale = !latestArticlePublishedAt || Number(articleAgeHours) > ARTICLE_LIVE_MAX_AGE_HOURS;
@@ -1024,6 +1031,7 @@ async function buildLiveStatus() {
       ageHours: Number.isFinite(articleAgeHours) ? Math.round(articleAgeHours * 10) / 10 : null,
       stale: articlesStale,
       count24h: articleCount24h,
+      futureCount24h: futureArticleCount24h,
       maxAgeHours: ARTICLE_LIVE_MAX_AGE_HOURS,
     },
     temperatureSource,
@@ -1388,8 +1396,12 @@ async function computeSystemHealth() {
   const [articlesFreshnessR, signalsFreshnessR, pendingR] = dbHealthy
     ? await Promise.all([
       safeQuery(`
-        SELECT EXTRACT(EPOCH FROM (NOW() - MAX(published_at))) * 1000 AS age_ms,
-               COUNT(*)::int AS count
+        SELECT
+          EXTRACT(EPOCH FROM (
+            NOW() - MAX(published_at) FILTER (WHERE published_at <= NOW() + INTERVAL '1 hour')
+          )) * 1000 AS age_ms,
+          COUNT(*) FILTER (WHERE published_at <= NOW() + INTERVAL '1 hour')::int AS count,
+          COUNT(*) FILTER (WHERE published_at > NOW() + INTERVAL '1 hour')::int AS future_count
         FROM articles
       `),
       safeQuery(`
@@ -1408,6 +1420,7 @@ async function computeSystemHealth() {
   const articleAgeMs = Number(articlesFreshnessR.rows[0]?.age_ms);
   const signalAgeMs = Number(signalsFreshnessR.rows[0]?.age_ms);
   const articleCount = Number(articlesFreshnessR.rows[0]?.count || 0);
+  const futureArticleCount = Number(articlesFreshnessR.rows[0]?.future_count || 0);
   const signalCount = Number(signalsFreshnessR.rows[0]?.count || 0);
   const pendingCount = Number(pendingR.rows[0]?.count || 0);
 
@@ -1445,6 +1458,7 @@ async function computeSystemHealth() {
     pending: pendingCount,
     articleAgeMs: Number.isFinite(articleAgeMs) ? Math.round(articleAgeMs) : null,
     signalAgeMs: Number.isFinite(signalAgeMs) ? Math.round(signalAgeMs) : null,
+    futureArticleCount,
     timestamp: new Date().toISOString(),
   };
 }
@@ -1471,6 +1485,12 @@ const OPS_DAEMON_FRESH_MS = 30 * 60 * 1000;       // 2x the 15-minute daemon tic
 // ok/stale during normal operation.
 const OPS_ACCUMULATOR_FRESH_MS = 150 * 60 * 1000;
 const OPS_HTTP_PROBE_TIMEOUT_MS = 1500;
+const REPLAY_UNAVAILABLE_STATUSES = new Set([
+  'replay_skipped_sidecar_unreachable',
+  'replay_skipped_sidecar_busy_lock',
+  'replay_skipped_no_run',
+  'replay_failed',
+]);
 const OPS_RECENT_ISSUE_LIMIT = 10;
 const OPS_PYTHON_PROBE_TTL_MS = 5 * 60 * 1000;
 let cachedPythonRuntimeProbe = null;
@@ -1536,6 +1556,60 @@ async function probeMetaModelService() {
   }
 }
 
+async function readJsonFileSafe(filePath, fallback = null) {
+  try {
+    return JSON.parse(await readFile(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+async function loadLatestSeedBiasAcquisitionArtifact() {
+  const candidates = [
+    path.join('data', 'runtime', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-positive-path-interconnection-dry-run', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-selected-child-provider-blocked', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-selected-child-company-ir-multilingual', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-selected-child-company-ir-ranked', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-selected-child-company-ir-docs', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-selected-child-company-ir', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-selected-child', 'seed-bias-evidence-acquisition.latest.json'),
+    path.join('data', 'runtime', 'seed-bias-controlled-apply', 'seed-bias-evidence-acquisition.latest.json'),
+  ];
+  const payloads = (await Promise.all(candidates.map((candidate) => readJsonFileSafe(candidate, null))))
+    .filter((payload) => payload?.ok);
+  return payloads.sort((left, right) => new Date(right.generatedAt || 0) - new Date(left.generatedAt || 0))[0] || null;
+}
+
+function summarizeSidecarImportReplayHealth(daemonState, accumulatorState) {
+  const sidecar = daemonState?.health?.sidecar || null;
+  const pendingImports = Array.isArray(accumulatorState?.pendingImports) ? accumulatorState.pendingImports : [];
+  const gdeltRetries = Array.isArray(accumulatorState?.gdeltRetryQueue) ? accumulatorState.gdeltRetryQueue : [];
+  const lastReplay = accumulatorState?.lastReplay || null;
+  const replayUnavailable = REPLAY_UNAVAILABLE_STATUSES.has(lastReplay?.status);
+  const status = sidecar?.status && sidecar.status !== 'ok'
+    ? sidecar.status
+    : replayUnavailable
+      ? lastReplay.status
+      : pendingImports.length > 0
+        ? 'pending_imports'
+        : 'ok';
+  return {
+    status,
+    sidecarStatus: sidecar?.status || 'unknown',
+    sidecarCheckedAt: sidecar?.checkedAt || null,
+    pendingImportCount: pendingImports.length,
+    gdeltRetryCount: gdeltRetries.length,
+    lastReplayStatus: lastReplay?.status || null,
+    lastReplayAt: lastReplay?.at || accumulatorState?.lastReplayAt || null,
+    blocker: status === 'ok'
+      ? null
+      : status === 'pending_imports'
+        ? 'sidecar import backlog pending'
+        : 'sidecar import/replay unavailable',
+  };
+}
+
 async function loadRecentOpsAlerts(limit = OPS_RECENT_ISSUE_LIMIT) {
   try {
     const raw = await readFile(OPS_ALERTS_PATH, 'utf8');
@@ -1584,7 +1658,7 @@ async function buildOpsStatusPayload(pool) {
   const generatedAt = new Date().toISOString();
 
   // Run independent probes in parallel.
-  const [daemon, accumulator, metaModel, recentIssues, modelHealth] = await Promise.all([
+  const [daemon, accumulator, metaModel, recentIssues, modelHealth, daemonState, accumulatorState] = await Promise.all([
     probeFileService(OPS_DAEMON_STATE_PATH, OPS_DAEMON_FRESH_MS),
     probeFileService(OPS_ACCUMULATOR_STATE_PATH, OPS_ACCUMULATOR_FRESH_MS),
     probeMetaModelService(),
@@ -1600,6 +1674,8 @@ async function buildOpsStatusPayload(pool) {
         symbolCoverage: null,
       },
     })),
+    readJsonFileSafe(OPS_DAEMON_STATE_PATH, {}),
+    readJsonFileSafe(OPS_ACCUMULATOR_STATE_PATH, {}),
   ]);
 
   // buildMetaModelHealthPayload nests freshness/eval/activeModel/symbolCoverage
@@ -1635,10 +1711,19 @@ async function buildOpsStatusPayload(pool) {
     }
     : null;
 
-  const summaryLevel = rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness });
+  const sidecarImportReplay = summarizeSidecarImportReplayHealth(daemonState, accumulatorState);
+  const baseSummaryLevel = rollUpOpsLevel({ daemon, accumulator, metaModel, modelLevel, freshness });
+  const summaryLevel = baseSummaryLevel === 'critical'
+    ? 'critical'
+    : sidecarImportReplay.sidecarStatus === 'unreachable'
+      ? 'critical'
+      : sidecarImportReplay.status !== 'ok'
+        ? 'warning'
+        : baseSummaryLevel;
   const summaryNotes = [];
   if (daemon.status !== 'ok') summaryNotes.push(`master-daemon ${daemon.status} (${daemon.ageMinutes ?? '?'} min)`);
   if (accumulator.status !== 'ok') summaryNotes.push(`data-accumulator ${accumulator.status}`);
+  if (sidecarImportReplay.status !== 'ok') summaryNotes.push(`sidecar import/replay ${sidecarImportReplay.status}`);
   if (metaModel.status !== 'ok') summaryNotes.push(`meta-model server ${metaModel.status}`);
   if (Number.isFinite(freshness?.featureLagDays) && freshness.featureLagDays >= 1) {
     summaryNotes.push(`event_features lag ${freshness.featureLagDays.toFixed(0)}d`);
@@ -1674,6 +1759,13 @@ async function buildOpsStatusPayload(pool) {
       severity: 'critical',
       condition: 'meta-model-server is unreachable',
       action: `Start a real Python runtime with torch/fastapi/uvicorn, then run: \`${metaModel.pythonRuntime?.bin || 'python'} scripts/meta-model-server.py\` and verify it binds 8100.${pythonReason}`,
+    });
+  }
+  if (sidecarImportReplay.status !== 'ok') {
+    actionableInstructions.push({
+      severity: sidecarImportReplay.sidecarStatus === 'unreachable' ? 'critical' : 'warning',
+      condition: sidecarImportReplay.blocker || `sidecar import/replay ${sidecarImportReplay.status}`,
+      action: 'Check sidecar health: `node scripts/master-daemon.mjs --task sidecar-health --once`; after it is reachable, run `node --import tsx scripts/repair-accumulator-import-replay.mjs --dry-run --limit 50` and then apply a bounded repair if the candidate list is expected.',
     });
   }
   if (Number.isFinite(freshness?.featureStaleEventCount) && freshness.featureStaleEventCount > 0) {
@@ -1726,6 +1818,7 @@ async function buildOpsStatusPayload(pool) {
       api: { status: 'ok', port: Number(process.env.PORT || 46200) },
       masterDaemon: daemon,
       dataAccumulator: accumulator,
+      sidecarImportReplay,
       metaModel,
     },
     freshness,
@@ -2513,6 +2606,203 @@ function coerceReviewDecision(value) {
   return null;
 }
 
+async function loadLatestAutonomousRepairLoopArtifact() {
+  const filePath = path.join('data', 'runtime', 'autonomous-research-repair-loop.latest.json');
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(await readFile(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function buildAutonomousRepairLoopSurfacePayload(artifact = null) {
+  if (!artifact) {
+    return {
+      ok: true,
+      source: 'autonomous-research-repair-loop-surface',
+      endpoint: '/api/research-seeds/repair-loop',
+      available: false,
+      currentBlocker: 'no_artifact',
+      selectedAction: 'operator_review_required',
+      actionReason: 'No autonomous repair-loop artifact exists yet.',
+      stopReason: 'no_artifact',
+      operatorReviewRequired: true,
+      audit: {},
+    };
+  }
+  const latestIteration = Array.isArray(artifact.iterations) ? artifact.iterations.at(-1) : null;
+  const actionResult = latestIteration?.actionResult || {};
+  const latestTrackAIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'run_limited_grid_mechanism_validation')
+    : null;
+  const trackAActionResult = latestTrackAIteration?.actionResult || {};
+  const latestTrackBIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'run_limited_issuer_bridge_track' || iteration?.selectedAction === 'run_limited_official_route')
+    : null;
+  const trackBActionResult = latestTrackBIteration?.actionResult || {};
+  const latestHoldoutIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'run_limited_holdout_validation')
+    : null;
+  const holdoutActionResult = latestHoldoutIteration?.actionResult || {};
+  const latestNegativeIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'run_limited_negative_control')
+    : null;
+  const negativeActionResult = latestNegativeIteration?.actionResult || {};
+  const latestMarketIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'run_limited_controlled_market_validation')
+    : null;
+  const marketActionResult = latestMarketIteration?.actionResult || {};
+  const latestThesisMemoIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'thesis_validation_memo_dry_run')
+    : null;
+  const thesisMemoActionResult = latestThesisMemoIteration?.actionResult || {};
+  const latestValuationBridgeIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'valuation_expectation_bridge_dry_run')
+    : null;
+  const valuationBridgeActionResult = latestValuationBridgeIteration?.actionResult || {};
+  const latestFinalReportIteration = Array.isArray(artifact.iterations)
+    ? [...artifact.iterations].reverse().find((iteration) => iteration?.selectedAction === 'final_investment_report_dry_run')
+    : null;
+  const finalReportActionResult = latestFinalReportIteration?.actionResult || {};
+  const acquisition = artifact.inputState?.acquisition || {};
+  const splitTracks = acquisition.splitTracks || artifact.inputState?.selectedSeed?.splitTracks || null;
+  return {
+    ok: true,
+    source: 'autonomous-research-repair-loop-surface',
+    endpoint: '/api/research-seeds/repair-loop',
+    available: true,
+    runId: artifact.runId || null,
+    mode: artifact.mode || 'plan',
+    generatedAt: artifact.generatedAt || null,
+    currentBlocker: artifact.blockerBefore || latestIteration?.blockerBefore || 'operator_review_required',
+    selectedAction: artifact.selectedAction || latestIteration?.selectedAction || 'operator_review_required',
+    actionReason: artifact.actionReason || latestIteration?.actionReason || '',
+    trackAStatus: artifact.trackAStatus || artifact.trackStatus?.mechanismValidationTrack || acquisition.trackStatus?.mechanismValidationTrack || splitTracks?.mechanismValidationTrack?.status || null,
+    trackBStatus: artifact.trackBStatus || artifact.trackStatus?.issuerBridgeTrack || acquisition.trackStatus?.issuerBridgeTrack || splitTracks?.issuerBridgeTrack?.status || null,
+    trackAMechanismValidationStatus: trackAActionResult.mechanismValidationStatus || null,
+    trackAAcceptedEvidenceClasses: Array.isArray(trackAActionResult.acceptedEvidence)
+      ? [...new Set(trackAActionResult.acceptedEvidence.flatMap((row) => row.coveredEvidenceClasses || row.evidenceClass || []))]
+      : [],
+    trackASourceGroupsUsed: trackAActionResult.sourceGroupsUsed || [],
+    trackASourceFamiliesUsed: trackAActionResult.sourceFamiliesUsed || [],
+    trackAMatchedBottleneckTerms: Array.isArray(trackAActionResult.acceptedEvidence)
+      ? [...new Set(trackAActionResult.acceptedEvidence.flatMap((row) => row.matchedBottleneckTerms || row.payload?.matchedBottleneckTerms || []))]
+      : [],
+    trackAMatchedOperatingTerms: Array.isArray(trackAActionResult.acceptedEvidence)
+      ? [...new Set(trackAActionResult.acceptedEvidence.flatMap((row) => row.matchedOperatingTerms || row.payload?.matchedOperatingTerms || []))]
+      : [],
+    trackANextRecommendedAction: latestTrackAIteration?.nextAction || latestTrackAIteration?.nextRecommendedAction || null,
+    trackBIssuerBridgeStatus: trackBActionResult.issuerBridgeStatus || acquisition.trackBIssuerBridgeStatus || acquisition.issuerBridgeStatus || null,
+    trackBAcceptedIssuerEvidenceCount: Number(trackBActionResult.acceptedIssuerEvidenceCount ?? acquisition.trackBAcceptedIssuerEvidenceCount ?? 0),
+    trackBAcceptedPromotionEvidenceCount: Number(trackBActionResult.acceptedPromotionEvidenceCount ?? acquisition.trackBAcceptedPromotionEvidenceCount ?? 0),
+    trackBIssuerCandidates: trackBActionResult.issuerCandidates || acquisition.trackBIssuerCandidates || [],
+    trackBIssuerRoleClasses: trackBActionResult.issuerRoleClasses || acquisition.trackBIssuerRoleClasses || [],
+    trackBSourceGroupsUsed: trackBActionResult.sourceGroupsUsed || [],
+    trackBSourceFamiliesUsed: trackBActionResult.sourceFamiliesUsed || [],
+    trackBMatchedExposureTerms: Array.isArray(trackBActionResult.acceptedEvidence)
+      ? [...new Set(trackBActionResult.acceptedEvidence.flatMap((row) => row.matchedBottleneckTerms || row.payload?.matchedExposureTerms || []))]
+      : acquisition.trackBMatchedExposureTerms || [],
+    trackBMatchedOperatingTerms: Array.isArray(trackBActionResult.acceptedEvidence)
+      ? [...new Set(trackBActionResult.acceptedEvidence.flatMap((row) => row.matchedOperatingTerms || row.payload?.matchedOperatingTerms || []))]
+      : acquisition.trackBMatchedOperatingTerms || [],
+    trackBNextRecommendedAction: latestTrackBIteration?.nextAction || latestTrackBIteration?.nextRecommendedAction || null,
+    trackBNegativeControlStatus: negativeActionResult.negativeControlStatus || artifact.negativeControlAfter || acquisition.trackBNegativeControlStatus || acquisition.negativeControlStatus || null,
+    trackBNegativeControlScope: negativeActionResult.negativeControlScope || acquisition.trackBNegativeControlScope || acquisition.negativeControlScope || null,
+    trackBCheckedIssuerCount: Number(negativeActionResult.checkedIssuerCount ?? acquisition.trackBCheckedIssuerCount ?? 0),
+    trackBCheckedSourceGroupCount: Number(negativeActionResult.checkedSourceGroupCount ?? acquisition.trackBCheckedSourceGroupCount ?? 0),
+    trackBCheckedQueryFamilyCount: Number(negativeActionResult.checkedQueryFamilyCount ?? acquisition.trackBCheckedQueryFamilyCount ?? 0),
+    trackBDirectInvalidatorFound: Boolean(negativeActionResult.directInvalidatorFound ?? acquisition.trackBDirectInvalidatorFound),
+    trackBWeakRiskSignalCount: Number(negativeActionResult.weakRiskSignalCount ?? acquisition.trackBWeakRiskSignalCount ?? 0),
+    trackBHoldoutStatus: holdoutActionResult.holdoutStatus || acquisition.trackBHoldoutStatus || null,
+    trackBHoldoutConfirmed: Boolean(holdoutActionResult.holdoutConfirmed ?? acquisition.trackBHoldoutConfirmed ?? acquisition.holdoutConfirmed),
+    trackBHoldoutSourceGroups: holdoutActionResult.sourceGroupsUsed || acquisition.trackBHoldoutSourceGroups || [],
+    trackBHoldoutSourceFamilies: holdoutActionResult.sourceFamiliesUsed || acquisition.trackBHoldoutSourceFamilies || [],
+    trackBHoldoutMatchedExposureTerms: holdoutActionResult.matchedExposureTerms || acquisition.trackBHoldoutMatchedExposureTerms || [],
+    trackBHoldoutMatchedDemandTerms: holdoutActionResult.matchedDemandTerms || acquisition.trackBHoldoutMatchedDemandTerms || [],
+    trackBHoldoutContradictionFound: Boolean(holdoutActionResult.contradictionFound ?? acquisition.trackBHoldoutContradictionFound),
+    trackBAcceptedHoldoutEvidenceCount: Number(holdoutActionResult.acceptedHoldoutEvidenceCount ?? acquisition.trackBAcceptedHoldoutEvidenceCount ?? 0),
+    rawEvidenceCount: artifact.rawEvidenceAfter ?? artifact.evidenceCountsAfter?.rawEvidenceCount ?? 0,
+    acceptedEvidenceCount: artifact.acceptedEvidenceAfter ?? artifact.evidenceCountsAfter?.acceptedEvidenceCount ?? 0,
+    acceptedPromotionEvidenceCount: artifact.acceptedPromotionEvidenceAfter ?? artifact.evidenceCountsAfter?.acceptedPromotionEvidenceCount ?? 0,
+    negativeControlStatus: artifact.negativeControlAfter || actionResult.negativeControlStatus || null,
+    holdoutStatus: holdoutActionResult.holdoutStatus || (artifact.holdoutAfter === true || actionResult.holdoutConfirmed === true ? 'confirmed' : 'missing'),
+    issuerBridgeStatus: artifact.issuerBridgeAfter || actionResult.issuerBridgeStatus || null,
+    marketValidationStatus: marketActionResult.marketValidationStatus || artifact.marketValidationAfter || actionResult.marketValidationStatus || acquisition.marketValidationStatus || null,
+    marketValidationWindowResults: marketActionResult.marketValidationWindowResults || acquisition.marketValidationWindowResults || [],
+    marketValidationBenchmarkUsed: marketActionResult.marketValidationBenchmarkUsed || acquisition.marketValidationBenchmarkUsed || null,
+    marketValidationControlUsed: Boolean(marketActionResult.marketValidationControlUsed ?? acquisition.marketValidationControlUsed),
+    marketValidationSampleSize: Number(marketActionResult.marketValidationSampleSize ?? acquisition.marketValidationSampleSize ?? 0),
+    marketValidationDirection: marketActionResult.marketValidationDirection || acquisition.marketValidationDirection || null,
+    marketValidationCaveats: marketActionResult.marketValidationCaveats || acquisition.marketValidationCaveats || [],
+    marketValidationWarnings: marketActionResult.marketValidationWarnings || acquisition.marketValidationWarnings || [],
+    marketValidationEventAnchorCount: Number(marketActionResult.eventAnchorCount ?? acquisition.marketValidationEventAnchorCount ?? 0),
+    reportCandidateAllowedDiagnostic: Boolean(marketActionResult.reportCandidateAllowedDiagnostic ?? artifact.reportCandidateAllowedDiagnostic ?? acquisition.reportCandidateAllowedDiagnostic),
+    evidenceContractClosureStatus: artifact.evidenceContractClosureStatus || actionResult.closureStatus || acquisition.evidenceContractClosureStatus || null,
+    evidenceContractMatrixSummary: actionResult.evidenceContractMatrixSummary || artifact.evidenceContractMatrixSummary || acquisition.evidenceContractMatrixSummary || [],
+    reportSubjectDryRun: actionResult.dryRunReportSubject || artifact.dryRunReportSubject || acquisition.dryRunReportSubject || null,
+    closureCaveats: actionResult.caveats || artifact.closureCaveats || acquisition.closureCaveats || [],
+    contradictionWarnings: actionResult.contradictionWarnings || artifact.contradictionWarnings || acquisition.closureContradictionWarnings || [],
+    thesisValidationMemoDryRunStatus: thesisMemoActionResult.thesisValidationMemoDryRunStatus || artifact.thesisValidationMemoDryRunStatus || acquisition.thesisValidationMemoDryRunStatus || null,
+    memoType: finalReportActionResult.memoType || thesisMemoActionResult.memoType || artifact.memoType || acquisition.memoType || null,
+    memoDecisionUse: finalReportActionResult.memoDecisionUse || thesisMemoActionResult.memoDecisionUse || artifact.memoDecisionUse || acquisition.memoDecisionUse || null,
+    notDecisionReady: finalReportActionResult.notDecisionReady ?? thesisMemoActionResult.notDecisionReady ?? artifact.notDecisionReady ?? acquisition.notDecisionReady ?? null,
+    investmentMemoReady: finalReportActionResult.investmentMemoReady ?? thesisMemoActionResult.investmentMemoReady ?? artifact.investmentMemoReady ?? acquisition.investmentMemoReady ?? false,
+    decisionReady: finalReportActionResult.decisionReady ?? thesisMemoActionResult.decisionReady ?? artifact.decisionReady ?? acquisition.decisionReady ?? false,
+    portfolioActionAllowed: finalReportActionResult.portfolioActionAllowed ?? artifact.portfolioActionAllowed ?? acquisition.portfolioActionAllowed ?? false,
+    clientMemoPath: finalReportActionResult.clientMemoPath || thesisMemoActionResult.clientMemoPath || artifact.clientMemoPath || acquisition.clientMemoPath || null,
+    auditAppendixPath: finalReportActionResult.auditAppendixPath || thesisMemoActionResult.auditAppendixPath || artifact.auditAppendixPath || acquisition.auditAppendixPath || null,
+    thesisValidationMemoCaveats: thesisMemoActionResult.caveats || artifact.thesisValidationMemoCaveats || acquisition.thesisValidationMemoCaveats || [],
+    thesisValidationMemoRemainingBlockers: thesisMemoActionResult.remainingBlockers || artifact.thesisValidationMemoRemainingBlockers || acquisition.thesisValidationMemoRemainingBlockers || [],
+    valuationExpectationBridgeDryRunStatus: valuationBridgeActionResult.valuationExpectationBridgeDryRunStatus || artifact.valuationExpectationBridgeDryRunStatus || acquisition.valuationExpectationBridgeDryRunStatus || null,
+    valuationBridgeStatus: valuationBridgeActionResult.valuationBridgeStatus || artifact.valuationBridgeStatus || acquisition.valuationBridgeStatus || null,
+    expectationBridgeStatus: valuationBridgeActionResult.expectationBridgeStatus || artifact.expectationBridgeStatus || acquisition.expectationBridgeStatus || null,
+    issuerValuationBridgeTable: valuationBridgeActionResult.issuerValuationBridgeTable || artifact.issuerValuationBridgeTable || acquisition.issuerValuationBridgeTable || [],
+    valuationMetricCoverage: (valuationBridgeActionResult.issuerValuationBridgeTable || artifact.issuerValuationBridgeTable || acquisition.issuerValuationBridgeTable || []).map((row) => ({ issuer: row.issuer, coverage: row.valuationMetricCoverage })),
+    consensusMetricCoverage: (valuationBridgeActionResult.issuerValuationBridgeTable || artifact.issuerValuationBridgeTable || acquisition.issuerValuationBridgeTable || []).map((row) => ({ issuer: row.issuer, coverage: row.consensusMetricCoverage })),
+    peerMetricCoverage: (valuationBridgeActionResult.issuerValuationBridgeTable || artifact.issuerValuationBridgeTable || acquisition.issuerValuationBridgeTable || []).map((row) => ({ issuer: row.issuer, coverage: row.peerMetricCoverage })),
+    pricedInRisk: Boolean((valuationBridgeActionResult.issuerValuationBridgeTable || artifact.issuerValuationBridgeTable || acquisition.issuerValuationBridgeTable || []).some((row) => row.pricedInRisk)),
+    missingValuationFields: valuationBridgeActionResult.missingValuationFields || artifact.missingValuationFields || acquisition.missingValuationFields || [],
+    remainingCaveats: valuationBridgeActionResult.caveats || artifact.remainingCaveats || acquisition.remainingCaveats || [],
+    localValuationCacheRowCount: Number(valuationBridgeActionResult.localValuationCacheRowCount ?? artifact.localValuationCacheRowCount ?? acquisition.localValuationCacheRowCount ?? 0),
+    localValuationCacheMissingIssuers: valuationBridgeActionResult.localValuationCacheMissingIssuers || artifact.localValuationCacheMissingIssuers || acquisition.localValuationCacheMissingIssuers || [],
+    marketValidationRegimeStatus: valuationBridgeActionResult.marketValidationRegimeStatus || artifact.marketValidationRegimeStatus || acquisition.marketValidationRegimeStatus || null,
+    regimeConsistencyScore: Number(valuationBridgeActionResult.regimeConsistencyScore ?? artifact.regimeConsistencyScore ?? acquisition.regimeConsistencyScore ?? 0),
+    regimeCoverageScore: valuationBridgeActionResult.regimeCoverageScore ?? artifact.regimeCoverageScore ?? acquisition.regimeCoverageScore ?? null,
+    eventCountByRegime: valuationBridgeActionResult.eventCountByRegime || artifact.eventCountByRegime || acquisition.eventCountByRegime || null,
+    directionSupportByRegime: valuationBridgeActionResult.directionSupportByRegime || artifact.directionSupportByRegime || acquisition.directionSupportByRegime || null,
+    unknownRegimeShare: valuationBridgeActionResult.unknownRegimeShare ?? artifact.unknownRegimeShare ?? acquisition.unknownRegimeShare ?? null,
+    extremeTstatWarning: Boolean(valuationBridgeActionResult.extremeTstatWarning ?? artifact.extremeTstatWarning ?? acquisition.extremeTstatWarning),
+    tstatSanityStatus: valuationBridgeActionResult.tstatSanityStatus || artifact.tstatSanityStatus || acquisition.tstatSanityStatus || null,
+    marketValidationResearchUseAllowed: valuationBridgeActionResult.marketValidationResearchUseAllowed ?? artifact.marketValidationResearchUseAllowed ?? acquisition.marketValidationResearchUseAllowed ?? null,
+    marketValidationInvestmentUseAllowed: valuationBridgeActionResult.marketValidationInvestmentUseAllowed ?? artifact.marketValidationInvestmentUseAllowed ?? acquisition.marketValidationInvestmentUseAllowed ?? null,
+    marketValidationDecisionUseAllowed: false,
+    hardcodingAuditStatus: artifact.hardcodingAuditStatus || acquisition.hardcodingAuditStatus || null,
+    finalInvestmentReportDryRunStatus: finalReportActionResult.finalInvestmentReportDryRunStatus || artifact.finalInvestmentReportDryRunStatus || acquisition.finalInvestmentReportDryRunStatus || null,
+    validatorStatus: finalReportActionResult.validatorStatus || artifact.validatorStatus || acquisition.validatorStatus || artifact.finalInvestmentReportValidation?.status || null,
+    finalStopReason: finalReportActionResult.finalStopReason || artifact.finalStopReason || acquisition.finalStopReason || null,
+    decisionUse: finalReportActionResult.decisionUse || artifact.decisionUse || artifact.memoDecisionUse || acquisition.decisionUse || acquisition.memoDecisionUse || null,
+    finalInvestmentReportDryRunPath: finalReportActionResult.clientMemoPath || artifact.finalInvestmentReportDryRunPath || acquisition.finalInvestmentReportDryRunPath || null,
+    finalInvestmentReportHtmlPath: finalReportActionResult.clientMemoHtmlPath || artifact.finalInvestmentReportHtmlPath || acquisition.finalInvestmentReportHtmlPath || null,
+    finalInvestmentReportAuditAppendixPath: finalReportActionResult.auditAppendixPath || artifact.finalInvestmentReportAuditAppendixPath || acquisition.finalInvestmentReportAuditAppendixPath || null,
+    investmentMemoReadinessDiagnostic: valuationBridgeActionResult.investmentMemoReadinessDiagnostic || artifact.investmentMemoReadinessDiagnostic || acquisition.investmentMemoReadinessDiagnostic || null,
+    readyForHumanInvestmentMemoReview: Boolean(valuationBridgeActionResult.readyForHumanInvestmentMemoReview ?? artifact.readyForHumanInvestmentMemoReview ?? acquisition.readyForHumanInvestmentMemoReview),
+    valuationBridgePath: valuationBridgeActionResult.valuationBridgePath || artifact.valuationBridgePath || acquisition.valuationBridgePath || null,
+    marketRegimeSupportPath: valuationBridgeActionResult.marketRegimeSupportPath || artifact.marketRegimeSupportPath || acquisition.marketRegimeSupportPath || null,
+    visualStatus: artifact.visualStatusAfter || artifact.readinessAfter?.visualStatus || null,
+    reportCandidateAllowed: Boolean(artifact.reportCandidateAllowedAfter || artifact.readinessAfter?.reportCandidateAllowed),
+    providerBlockedStatus: artifact.blockerBefore === 'provider_blocked' || artifact.blockerAfter === 'provider_gap_review_required',
+    providerGapRequired: artifact.providerGapRequired || acquisition.providerGapRequired || actionResult.proposals?.map((item) => item.providerName) || [],
+    nextRecommendedAction: artifact.nextRecommendedAction || latestIteration?.nextRecommendedAction || 'operator_review_required',
+    stopReason: artifact.stopReason || 'unknown',
+    operatorReviewRequired: /operator_review|required|provider_gap|fixture|credentials/i.test(String(artifact.stopReason || '')),
+    mutationBoundaries: artifact.mutationBoundaries || artifact.boundaries || {},
+    auditDrawer: {
+      rawRepairLoopArtifact: artifact,
+    },
+  };
+}
+
 function normalizeProposalReviewStatus(status) {
   const normalized = String(status || '').trim().toLowerCase();
   if (!normalized) return 'pending';
@@ -3026,6 +3316,11 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
     // approvals, reports, evidence bundles, or provider activation state.
     if (segments[0] === 'api' && segments[1] === 'research-seeds') {
       try {
+        if (method === 'GET' && segments[2] === 'automation-console') {
+          return buildJsonResponse(await loadAutomationConsolePayload({
+            runtimeRoot: path.join('data', 'runtime'),
+          }));
+        }
         if (method === 'GET' && segments[2] === 'provider-gaps') {
           let seedClient = null;
           try {
@@ -3053,6 +3348,151 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             ...summary,
             source: 'operator-seed-provider-gap-review',
             endpoint: '/api/research-seeds/provider-gaps',
+          });
+        }
+        if (method === 'GET' && segments[2] === 'repair-loop') {
+          const artifact = await loadLatestAutonomousRepairLoopArtifact();
+          return buildJsonResponse(buildAutonomousRepairLoopSurfacePayload(artifact));
+        }
+        if (method === 'GET' && segments[2] === 'bias-diagnostics') {
+          const summary = await runSeedBiasBackfillOrchestrator({
+            dryRun: true,
+            source: String(params.get('source') || 'all'),
+            limit: Number(params.get('limit') || 25),
+            seedArtifact: String(params.get('seedArtifact') || path.join('data', 'runtime', 'mechanism-seed-generation.latest.json')),
+            artifactRoot: path.join('data', 'runtime'),
+            generateSeeds: ['1', 'true', 'yes'].includes(String(params.get('generateSeeds') || '').toLowerCase()),
+            writeArtifacts: false,
+          });
+          const acquisition = String(params.get('includeStored') || 'true').toLowerCase() === 'false'
+            ? null
+            : await loadLatestSeedBiasAcquisitionArtifact();
+          const storedNegativeStatus = acquisition?.negativeControlStatus || null;
+          const storedNegativeScope = acquisition?.negativeControlScope || null;
+          const companyIrStatus = acquisition?.companyIrCollectorStatus || acquisition?.execution?.companyIrCollectorStatus || null;
+          const storedHoldoutStatus = acquisition ? (acquisition.holdoutConfirmed ? 'confirmed' : 'missing') : null;
+          const storedGateResult = acquisition?.gateResult
+            ? {
+              allowedCount: acquisition.gateResult.gate === 'report_candidate_allowed' ? 1 : 0,
+              blockedCount: acquisition.gateResult.gate === 'report_candidate_allowed' ? 0 : 1,
+            }
+            : null;
+          const boundaries = summary.boundaries;
+          const recommendedBackfillTasks = summary.backfillPlan.tasks.map((task) => ({
+            taskId: task.taskId,
+            evidenceClass: task.evidenceClass,
+            providerRoute: task.providerRoute,
+            providers: task.providers,
+            status: task.status,
+            reviewRequired: task.reviewRequired,
+            sourceQueryDraftCount: task.sourceQueryDrafts?.length || 0,
+            providerBackfillTaskCreated: Boolean(task.providerBackfillTask),
+            adapterProposalRequired: Boolean(task.adapterProposalRequired),
+          }));
+          return buildJsonResponse({
+            ok: true,
+            source: 'seed-bias-diagnostics-surface',
+            endpoint: '/api/research-seeds/bias-diagnostics',
+            generatedAt: summary.generatedAt,
+            verdict: summary.diagnosis.verdict,
+            classDistribution: summary.diagnosis.classDistribution,
+            underrepresentedClasses: summary.diagnosis.underrepresentedClasses,
+            overrepresentedClasses: summary.diagnosis.overrepresentedClasses,
+            boundaries,
+            metrics: {
+              classDiversityEntropy: summary.diagnosis.classDiversityEntropy,
+              sourceCoverageSkew: summary.diagnosis.sourceCoverageSkew,
+              providerSensitivityScore: summary.diagnosis.providerSensitivityScore,
+              backfillElasticity: summary.diagnosis.backfillElasticity,
+              holdoutConfirmationRate: summary.diagnosis.holdoutConfirmationRate,
+              negativeControlSurvivalRate: summary.diagnosis.negativeControlSurvivalRate,
+              evidenceScarcityIndex: summary.diagnosis.evidenceScarcityIndex,
+            },
+            recommendedBackfillTasks,
+            backfillQueueStatus: {
+              queued: summary.backfillPlan.tasks.filter((task) => task.status === 'queued').length,
+              needsOperatorReview: summary.backfillPlan.tasks.filter((task) => task.status === 'needs_operator_review').length,
+              providerGapProposalRequired: summary.backfillPlan.tasks.filter((task) => task.status === 'provider_gap_proposal_required').length,
+              queuedLocalMarketValidation: summary.backfillPlan.tasks.filter((task) => task.status === 'queued_local_market_validation').length,
+            },
+            selectedChildSeed: acquisition?.selectedChildSeed || null,
+            companyIrCollectorStatus: companyIrStatus,
+            issuerDocumentCoverage: companyIrStatus?.issuerDocumentCoverage || [],
+            missingIssuerDocuments: companyIrStatus?.missingIssuerDocuments || [],
+            issuerCoverageSkew: acquisition?.issuerCoverageSkew === true || companyIrStatus?.issuerCoverageSkew === true,
+            selectedIssuerCoverage: acquisition?.selectedIssuerCoverage || companyIrStatus?.issuerDocumentCoverage || [],
+            issuerSpecificProviderGap: companyIrStatus?.issuerSpecificProviderGap || [],
+            blockType: acquisition?.blockType || null,
+            routeMismatchDetected: acquisition?.routeMismatchDetected === true,
+            routeMismatchClassification: acquisition?.routeMismatchClassification || null,
+            splitTracks: acquisition?.splitTracks || null,
+            splitTrackResults: acquisition?.splitTrackResults || [],
+            trackStatus: acquisition?.trackStatus || null,
+            acceptedEvidenceCountByTrack: acquisition?.acceptedEvidenceCountByTrack || null,
+            finalBlockerByTrack: acquisition?.finalBlockerByTrack || null,
+            providerGapRequired: acquisition?.providerGapRequired || [],
+            providerGapArtifacts: acquisition?.providerGapArtifacts || [],
+            affectedIssuers: acquisition?.affectedIssuers || [],
+            directCompanyIrPdfAllowlistProposal: acquisition?.directCompanyIrPdfAllowlistProposal || null,
+            positivePathCandidateSeed: acquisition?.positivePathCandidateSeed || null,
+            multilingualTermMatches: companyIrStatus?.multilingualTermMatches || [],
+            proximityMatchCount: companyIrStatus?.proximityMatches?.length || 0,
+            issuerRoleClasses: acquisition?.issuerRoleClasses || acquisition?.selectedChildSeed?.issuerRoleClasses || [],
+            issuerRoleCandidates: (acquisition?.selectedChildSeed?.issuerRoleCandidates || []).map((item) => ({
+              symbol: item.symbol || null,
+              issuerName: item.issuerName || item.name || item.symbol || '',
+              roleClass: item.roleClass || 'unclear',
+              routeProviders: item.routeProviders || [],
+              representativeTicker: Boolean(item.representativeTicker),
+            })),
+            rawEvidenceCount: acquisition?.rawEvidenceCount ?? summary.backfillResults.rawEvidenceStoredCount,
+            acceptedEvidenceCount: acquisition?.acceptedEvidenceCount ?? summary.backfillResults.acceptedEvidenceStoredCount,
+            acceptedPromotionEvidenceCount: (acquisition?.childResults || [])
+              .flatMap((item) => item.acquisition?.acceptedEvidence || [])
+              .filter((item) => item.promotionEligible === true).length,
+            issuerBridgeStatus: acquisition?.issuerBridgeStatus
+              || acquisition?.childResults?.find((item) => item.issuerBridgeStatus)?.issuerBridgeStatus
+              || 'missing',
+            failureClassification: acquisition?.acquisition?.failureClassification || acquisition?.failureClassification || null,
+            holdoutConfirmationStatus: storedHoldoutStatus || (summary.holdoutValidation.holdoutConfirmed ? 'confirmed' : 'missing'),
+            holdoutStatus: storedHoldoutStatus || (summary.holdoutValidation.holdoutConfirmed ? 'confirmed' : 'missing'),
+            negativeControlSurvivalStatus: storedNegativeStatus || (summary.negativeControlSurvival.items?.some((item) => ['SURVIVED', 'CHECKED_NO_DIRECT'].includes(item.survivalStatus)) ? 'closed' : 'inconclusive'),
+            negativeControlStatus: storedNegativeStatus || (summary.negativeControlSurvival.items?.some((item) => ['SURVIVED', 'CHECKED_NO_DIRECT'].includes(item.survivalStatus)) ? 'closed' : 'inconclusive'),
+            negativeControlScope: storedNegativeScope || summary.negativeControlSurvival.items?.[0]?.negativeControlScope || 'insufficient',
+            reportCandidateGateResult: storedGateResult || {
+              allowedCount: summary.gateResults.filter((item) => item.gate === 'report_candidate_allowed').length,
+              blockedCount: summary.gateResults.filter((item) => item.gate !== 'report_candidate_allowed').length,
+            },
+            gateResult: storedGateResult || {
+              allowedCount: summary.gateResults.filter((item) => item.gate === 'report_candidate_allowed').length,
+              blockedCount: summary.gateResults.filter((item) => item.gate !== 'report_candidate_allowed').length,
+            },
+            finalInvestmentReportReadinessBlocker: acquisition?.finalBlocker || summary.gateResults.find((item) => item.blockers?.length)?.blockers?.[0] || null,
+            finalBlocker: acquisition?.finalBlocker || summary.gateResults.find((item) => item.blockers?.length)?.blockers?.[0] || null,
+            adapterProposalLinks: summary.backfillPlan.adapterProposals.map((proposal) => ({
+              proposalId: proposal.proposalId,
+              providerName: proposal.providerName || proposal.provider,
+              fillsEvidenceClass: proposal.fillsEvidenceClass || proposal.evidenceClassesBlocked?.[0] || '',
+            })),
+            providerGapProposalLinks: acquisition?.providerGapProposalLinks || [],
+            adapterProposalCount: summary.backfillPlan.adapterProposals.length,
+            gateResults: summary.gateResults.map((item) => ({
+              seedId: item.seedId,
+              gate: item.gate,
+              visualStatus: item.visualStatus,
+              blockers: item.blockers,
+            })),
+            warnings: summary.diagnosis.warnings,
+            audit: {
+              providerAblations: summary.providerAblations,
+              holdoutValidation: summary.holdoutValidation,
+              negativeControlSurvival: summary.negativeControlSurvival,
+              rawBackfillPlan: summary.backfillPlan,
+              rawBackfillResults: summary.backfillResults,
+              acceptedEvidence: summary.acceptedEvidence,
+              storedAcquisition: acquisition,
+              selfImprovement: summary.selfImprovement,
+            },
           });
         }
         if (method === 'GET' && !segments[2]) {
@@ -3425,7 +3865,10 @@ export async function resolveEventDashboardResponse(rawUrl, requestMeta = {}) {
             pdfError: exports.pdfError,
           }, exports.pdfError ? 207 : 200);
         }
-        if (method === 'GET' && segments.length >= 3) {
+        if (method === 'GET' && segments.length === 3) {
+          return buildJsonResponse(await buildReportDetail(decodeURIComponent(segments[2])));
+        }
+        if (method === 'GET' && segments.length >= 4) {
           const reportId = segments[2];
           const artifactName = segments[3] === 'html' || segments[3] === 'report.html'
             ? 'report.html'

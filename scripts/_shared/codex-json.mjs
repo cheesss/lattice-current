@@ -36,6 +36,19 @@ export async function resolveCodexCommand() {
     path.join(appData, 'npm', 'codex.cmd'),
     path.join(appData, 'npm', 'codex'),
   ];
+  const bundledCodexBinRoot = path.join(localAppData, 'OpenAI', 'Codex', 'bin');
+  if (existsSync(bundledCodexBinRoot)) {
+    try {
+      const entries = await readdir(bundledCodexBinRoot, { withFileTypes: true });
+      for (const entry of entries
+        .filter((item) => item.isDirectory())
+        .sort((left, right) => right.name.localeCompare(left.name))) {
+        candidates.unshift(path.join(bundledCodexBinRoot, entry.name, 'codex.exe'));
+      }
+    } catch {
+      // Ignore bundled desktop CLI discovery failures.
+    }
+  }
   const vscodeExtRoot = path.join(userHome, '.vscode', 'extensions');
   if (existsSync(vscodeExtRoot)) {
     try {

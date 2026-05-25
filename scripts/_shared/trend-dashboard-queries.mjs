@@ -5068,6 +5068,7 @@ function fmtSignedPercent(value) {
 
 function formatThemeBriefMarkdown(payload) {
   const sections = payload?.sections || {};
+  const titleLabel = String(payload?.label || humanizeTheme(payload?.theme || 'Theme')).replace(/\s*\/\s*/g, ' ');
   const relatedEntities = asArray(sections.relatedEntities?.entities)
     .slice(0, 6)
     .map((item) => `${item.companyName || item.entityKey || item.ticker || 'Entity'} (${item.relationType || 'related'}; confidence ${item.confidence ?? '--'})`);
@@ -5081,7 +5082,7 @@ function formatThemeBriefMarkdown(payload) {
     .slice(0, 8)
     .map((item) => `${item.label || item.detail || item.type || 'reference'} [${item.evidenceClass || item.sourceType || 'derived'}]`);
   return [
-    `# ${payload?.label || humanizeTheme(payload?.theme || 'Theme')} Theme Brief`,
+    `# ${titleLabel} Theme Brief`,
     '',
     `- Theme: ${payload?.theme || 'unknown'}`,
     `- Period: ${payload?.periodType || DEFAULT_PERIOD}`,

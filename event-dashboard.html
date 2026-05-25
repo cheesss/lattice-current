@@ -1992,6 +1992,7 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
 <script type="module" src="/src/dashboard/v3/index.mjs"></script>
 </head>
 <body data-surface="home">
+  <!-- The theme shell is now the primary product surface. -->
 <!-- Language Toggle -->
 <div class="lang-toggle" id="lang-toggle">
   <button class="active" data-lang="en">EN</button>
@@ -2206,7 +2207,7 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
       <span class="meta-line" style="opacity:.55;font-size:11px">loading...</span>
     </div>
     <details class="tracking-add-details">
-      <summary class="tracking-add-summary"><span class="tracking-add-plus">+</span> Add tracking target <span class="meta-line" style="font-size:10.5px;opacity:.6">— keyword, symbol, company, or theme candidate</span></summary>
+      <summary class="tracking-add-summary"><span class="tracking-add-plus">+</span> Track Keyword / Symbol <span class="meta-line" style="font-size:10.5px;opacity:.6">— keyword, symbol, company, or theme candidate</span></summary>
     <div class="grid2">
       <div class="card tint-teal">
         <div class="card-title">Add Tracking Target <span class="badge">private</span></div>
@@ -2317,6 +2318,10 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
       <div class="card tint-profit">
         <div class="card-title">Investment <span class="badge" id="investment-snapshot-badge">Ideas</span></div>
         <div id="investment-snapshot" class="loading" data-skeleton="card">loading investment</div>
+      </div>
+      <div class="card tint-cyan">
+        <div class="card-title">Source Ops <span class="badge" id="source-ops-snapshot-badge">Sources</span></div>
+        <div id="source-ops-snapshot" class="loading" data-skeleton="card">loading source ops</div>
       </div>
     </div>
   </section>
