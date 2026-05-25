@@ -66,8 +66,22 @@ This folder is the operational toolbox for the project.
   - `--auto-report-source-query` only approves report-created `source-query` work; canonical cross-theme proposals, RSS/source registration, and generic backfill approvals remain review-gated
   - `--market-validation` computes report-scoped `market_validation` from local controlled market data (`event_uplift`, matched controls, market returns/quotes) and stores the resulting tier as private report evidence
   - provider wrapper timeouts are disabled by default for long closure runs; set `EVIDENCE_BACKFILL_PROVIDER_STEP_TIMEOUT_MS` to a positive millisecond value to re-enable a cap. Step start/finish entries are written to `data/runtime/evidence-contract-backfill-cycle.steps.jsonl`
+  - direct CLI stdout is compact by design: full child step JSON, provider rows, source-query bundles, and regenerated artifact details are stored under `data/runtime/evidence-contract-backfill-cycle-results/*.json`, while stdout keeps only counts, status, artifact path, and unblock deltas
   - `--all-reports --dashboard-summary` builds the report closure ledger used by the dashboard `Report Backfill` panel
   - cross-theme regenerated reports include an evidence-state diagnostic that separates insufficient validation from a negative-control rejection; keep collecting only for `More evidence needed`, `Targeted backfill needed`, or `Market validation pending`, and stop broad automation for `Search exhausted, not validated` or `Negative-control reject`
+- `data-accumulator.mjs`
+  - continuous Yahoo/FRED/GDELT raw collection daemon. Raw files can be written while the local sidecar is down, but import/replay coverage is counted only after sidecar import and replay succeed
+  - records sidecar import failures in `data/historical/accumulator-state.json` as `pendingImports[]`, drains a bounded slice at the start of each cycle, and writes explicit replay statuses such as `replay_skipped_sidecar_unreachable` instead of ambiguous `no result`
+  - stores retryable GDELT fetch failures in `gdeltRetryQueue[]`; `200` responses with empty `articles` remain normal no-hit windows and are not retried
+  - deletes imported raw JSON only after NAS PostgreSQL sync was requested and confirmed by `postgresSyncResult`; cleanup writes an audit row to `data/historical/import-cleanup-ledger.jsonl`
+- `repair-accumulator-import-replay.mjs`
+  - dry-run-first catch-up tool for raw files whose sidecar import/replay was missed during a sidecar outage
+  - `--apply` imports bounded candidates through the sidecar API only; `--replay` triggers one replay after import. It does not write NAS/canonical graph directly
+  - use `--postgres-sync --cleanup-imported-raw` to import to NAS and delete only confirmed local raw files; use `--keep-imported-raw` to retain payloads for importer debugging
+- `run-seed-bias-backfill-orchestrator.mjs`
+  - diagnoses autonomous mechanism seed class concentration, provider/source sensitivity, holdout confirmation, negative-control survival, and evidence scarcity before any report promotion
+  - default mode is dry-run and writes runtime artifacts only; raw collected evidence remains separate from accepted evidence and does not satisfy report readiness unless the Evidence Contract Matrix accepts it
+  - creates class-specific backfill plans and review-gated adapter proposals for missing provider routes; it never activates providers or writes canonical graph/source registry state
 - `run-universal-research-orchestrator.mjs`
   - generic research collection loop that plans subject-specific data needs across themes, symbols, sources, policies, research, and industry indicators
   - scans recent report artifacts for no-seed adjacent theme candidates before subject selection; Space/SRM/Defense reports can create evidence-seeking lanes such as launch fueling/cryogenic infrastructure, range operations/ground systems support, propulsion input materials, and qualification testing without a user-provided company or keyword seed
@@ -183,6 +197,12 @@ Important shared modules:
   - derives decision/screening/weak/missing market-validation tiers from local controlled event/uplift rows and persists report-scoped market evidence without creating canonical promotion rows. It now resolves a report-scoped issuer universe before querying controlled market rows and records missing reasons such as `no_issuer_universe`, `no_event_candidates`, `no_event_uplift_rows`, `weak_controls`, and `below_tstat`.
 - `report-issuer-universe.mjs`
   - resolves the issuer universe for report closure from artifact symbols, ontology supplier symbols, report pack rows, source-query evidence metadata, and legacy issuer aliases such as `AJRD -> LHX`; issuer-only providers are blocked with `blocked_missing_issuer_universe` instead of falling back to broad source-query when no investable issuer can be resolved.
+- `seed-bias-diagnostics.mjs`
+  - computes class distribution, provider ablation sensitivity, backfill elasticity, holdout confirmation, negative-control survival, known-narrative overlap, and diversity warnings for autonomous mechanism seed batches. Its verdict is advisory; `visualStatus` plus accepted Evidence Contract Matrix coverage remains the readiness source of truth.
+- `operator-seed-bias-storage.mjs`
+  - idempotently creates the seed-bias run/task/raw-evidence/accepted-evidence/holdout/negative-control ledger tables. It is the only storage path used by `run-seed-bias-backfill-orchestrator.mjs --apply`; it does not touch approvals, canonical graph, source registry, provider activation, or report promotion state.
+- `seed-evidence-acceptance.mjs`
+  - evaluates raw seed-bias evidence against source independence, class relevance, acceptance criteria, duplicate/stale checks, target-theme compatibility, negative-control separation, and local controlled market-validation rules. Raw evidence never changes readiness until this lane produces accepted evidence.
 
 ## Design intent
 
@@ -545,6 +565,36 @@ Phase E adds seed-to-report closure:
   research evidence bundles, canonical graph rows, source registry rows, or
   provider activation state
 
+Bias-aware backfill orchestration adds an advisory loop on top of Phase C-E:
+
+- `run-seed-bias-backfill-orchestrator.mjs` loads the latest autonomous seed
+  batch, runs provider/source ablations, diagnoses whether class concentration
+  is more consistent with `DATA_LIMITED_BIAS`, `LIKELY_REAL_BOTTLENECK`,
+  `INCONCLUSIVE_NEEDS_BACKFILL`, or `KNOWN_NARRATIVE_OVERFIT`, and writes
+  runtime artifacts under `data/runtime`
+- diversity targets are batch-level generation/backfill priorities, not
+  promotion quotas; underrepresented classes are backfilled, not forced into
+  `review_ready`
+- targeted backfill plans cover `technical_qualification`,
+  `permitting_regulatory`, `material_input`, `engineering_process`,
+  `test_facility_capacity`, `provider_data_gap`, `negative_control`,
+  `issuer_exposure`, and `market_validation`
+- raw backfill results stay in the raw result lane. Accepted evidence is stored
+  separately and only accepted evidence can affect
+  `decisionDiagnostic.coveredEvidenceClasses`
+- negative-control survival can block or support continued research, but it
+  remains non-promotion evidence
+- provider gaps create review-gated adapter proposals with auth, rate-limit,
+  fixture, parser-output, health-check, test-command, failure-mode, and
+  allowlist metadata. Provider activation remains manual/review-gated
+- adjacent-lane seeds are re-normalized to the target theme so incompatible
+  evidence classes such as defense `mission_award` on an AI/grid target are
+  removed and recorded as contamination warnings
+- `/api/research-seeds/bias-diagnostics` and the Research Seeds dashboard show
+  only summary metrics, verdict, class distribution, underrepresented classes,
+  and recommended tasks. Raw ablation, query, provider, and evidence payloads
+  stay inside the audit drawer
+
 Run:
 
 ```powershell
@@ -654,6 +704,20 @@ Then connect the generated report to the evidence contract backfill cycle:
 node --import tsx scripts/run-evidence-contract-backfill-cycle.mjs --report-dir <data/reports/RPT-...> --passes 1 --limit 10
 ```
 
+Run bias-aware seed diagnosis and targeted backfill planning without a manual
+subject:
+
+```powershell
+node --import tsx scripts/run-seed-bias-backfill-orchestrator.mjs --dry-run --generate-seeds --source all --limit 25
+```
+
+Inspect the dashboard API surface:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:46200/api/research-seeds/bias-diagnostics?generateSeeds=true&limit=25" |
+  ConvertTo-Json -Depth 8
+```
+
 Review Phase F provider adapter proposals from repeated provider/source gaps:
 
 ```powershell
@@ -704,6 +768,10 @@ node --import tsx scripts/review-mechanism-seed.mjs --seed-id <seed-id> --status
 Outputs:
 
 - `data/runtime/mechanism-seed-generation.latest.json`
+- `data/runtime/seed-bias-diagnostics.latest.json`
+- `data/runtime/seed-bias-backfill-plan.latest.json`
+- `data/runtime/seed-bias-backfill-results.latest.json`
+- `data/runtime/seed-bias-self-improvement.latest.json`
 - `data/runtime/operator-seed-phase-c-audit.latest.json`
 - `data/runtime/mechanism-seed-report-closure.latest.json`
 - `data/runtime/provider-adapter-proposals.latest.json`
@@ -727,6 +795,7 @@ node --import tsx --test tests/operator-seed-phase-c-audit.test.mjs
 node --import tsx --test tests/operator-seed-review-surface.test.mjs
 node --import tsx --test tests/operator-seed-report-closure.test.mjs
 node --import tsx --test tests/provider-adapter-factory.test.mjs
+node --import tsx --test tests/seed-bias-diagnostics.test.mjs tests/seed-provider-ablation.test.mjs tests/seed-backfill-elasticity.test.mjs tests/seed-holdout-validation.test.mjs tests/seed-negative-control-survival.test.mjs tests/adjacent-lane-contamination.test.mjs tests/autonomous-seed-report-candidate-gate.test.mjs tests/bias-aware-backfill-orchestrator.test.mjs
 node --import tsx --test tests/operator-seed-self-improvement.test.mjs
 node --import tsx --test tests/mechanism-seed-daemon-cycle.test.mjs
 node --import tsx --test tests/event-dashboard-automation.test.mjs
