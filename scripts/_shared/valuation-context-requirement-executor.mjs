@@ -296,6 +296,54 @@ function buildFundamentalContextRows({ fundamentalRows = [], issuers = [] } = {}
   }).filter(Boolean);
 }
 
+function peerGroupFromSnapshot(value) {
+  if (Array.isArray(value)) return uniqueStrings(value, 20);
+  const text = compact(value);
+  if (!text) return [];
+  return uniqueStrings(text.split(/[,;|]/g), 20).map((peer) => peer.toUpperCase());
+}
+
+function buildValuationSnapshotContextRows({ valuationRows = [], issuers = [] } = {}) {
+  const rows = asArray(valuationRows);
+  return uniqueStrings(issuers, 100).map((issuer) => {
+    const upper = issuer.toUpperCase();
+    const issuerRows = rows
+      .filter((row) => compact(row.symbol || row.issuer || row.ticker).toUpperCase() === upper)
+      .sort((left, right) => Date.parse(right.observed_at || right.created_at || 0) - Date.parse(left.observed_at || left.created_at || 0));
+    if (!issuerRows.length) return null;
+    const latestDate = issuerRows.find((row) => row.observed_at || row.created_at);
+    const sourceTypes = uniqueStrings(issuerRows.map((row) => row.source_type || row.sourceProvenance), 20);
+    const peerGroup = uniqueStrings(issuerRows.flatMap((row) => peerGroupFromSnapshot(row.peer_group || row.peerGroup)), 20);
+    const context = {
+      issuer: upper,
+      sourceProvenance: sourceTypes.some((source) => /trusted|local|cache/i.test(source))
+        ? 'trusted_local_valuation_snapshots_cache'
+        : 'trusted_local_valuation_snapshot_cache',
+      asOfDate: isoDate(latestDate?.observed_at || latestDate?.created_at),
+      forwardPE: metricValue(issuerRows, /forward.*p\/?e|forward.*pe|fwd.*p\/?e/i),
+      evToEbitda: metricValue(issuerRows, /ev.*ebitda|enterprise.*ebitda/i),
+      evToSales: metricValue(issuerRows, /ev.*sales|enterprise.*sales|ev\/sales/i),
+      priceToSales: metricValue(issuerRows, /price.*sales|p\/s/i),
+      fcfYield: metricValue(issuerRows, /fcf.*yield|free.*cash.*flow.*yield/i),
+      marketCap: metricValue(issuerRows, /market.*cap|market.*capitalization/i),
+      peerMedianForwardPE: metricValue(issuerRows, /peer.*median.*forward.*p\/?e|peer.*median.*pe/i),
+      peerMedianEVEBITDA: metricValue(issuerRows, /peer.*median.*ev.*ebitda/i),
+      peerRelativeMultiple: metricText(issuerRows, /peer.*relative|premium|discount/i),
+      premiumDiscountToPeer: metricValue(issuerRows, /premium.*discount|discount.*premium|premium.*peer|discount.*peer/i),
+      peerGroup,
+      peerContext: {
+        peerGroup,
+        peerMedianForwardPE: metricValue(issuerRows, /peer.*median.*forward.*p\/?e|peer.*median.*pe/i),
+        peerMedianEVEBITDA: metricValue(issuerRows, /peer.*median.*ev.*ebitda/i),
+        peerRelativeMultiple: metricText(issuerRows, /peer.*relative|premium|discount/i),
+      },
+      expectationContextCaveat: 'derived from local valuation_snapshots; missing fields are not estimated; human review required',
+      sourceUrls: uniqueStrings(issuerRows.map((row) => row.metadata?.sourceUrl || row.metadata?.source_url || row.source_url).filter(Boolean), 20),
+    };
+    return hasFundamentalsContext(context) ? context : null;
+  }).filter(Boolean);
+}
+
 function mergeContextRows(rows = []) {
   const byIssuer = new Map();
   for (const row of asArray(rows).flatMap(asArray)) {
@@ -381,6 +429,18 @@ async function readDbCompanyFundamentalRows(client, symbols = []) {
   `, [unique]);
 }
 
+async function readDbValuationSnapshotRows(client, symbols = []) {
+  const unique = uniqueStrings(symbols, 100).map((symbol) => symbol.toUpperCase());
+  if (!unique.length) return [];
+  return safeQuery(client, `
+    SELECT symbol, observed_at, metric_name, value_num, peer_group, source_type, metadata, created_at
+      FROM valuation_snapshots
+     WHERE symbol = ANY($1::text[])
+     ORDER BY symbol, observed_at DESC NULLS LAST, created_at DESC NULLS LAST
+     LIMIT 500
+  `, [unique]);
+}
+
 export async function readTrustedLocalDbValuationContextRows({
   issuers = [],
   historicalAnalogueBridge = {},
@@ -401,9 +461,10 @@ export async function readTrustedLocalDbValuationContextRows({
   const client = dbClient || await createDbClient(pgConfig);
   if (!client) return { rows: [], source: 'postgres', dbReadStatus: 'db_unavailable' };
   try {
-    const [quoteRows, fundamentalRows] = await Promise.all([
+    const [quoteRows, fundamentalRows, valuationSnapshotRows] = await Promise.all([
       readDbMarketQuoteRows(client, symbols, now),
       readDbCompanyFundamentalRows(client, issuerUniverse),
+      readDbValuationSnapshotRows(client, issuerUniverse),
     ]);
     const marketRows = buildMarketQuoteContextRows({
       quoteRows,
@@ -416,13 +477,18 @@ export async function readTrustedLocalDbValuationContextRows({
       fundamentalRows,
       issuers: issuerUniverse,
     });
-    const rows = mergeContextRows([...marketRows, ...fundamentalsRows]);
+    const valuationRows = buildValuationSnapshotContextRows({
+      valuationRows: valuationSnapshotRows,
+      issuers: issuerUniverse,
+    });
+    const rows = mergeContextRows([...marketRows, ...fundamentalsRows, ...valuationRows]);
     return {
       rows,
       source: 'postgres',
       dbReadStatus: rows.length ? 'context_rows_loaded' : 'no_context_rows',
       marketQuoteRowCount: quoteRows.length,
       companyFundamentalRowCount: fundamentalRows.length,
+      valuationSnapshotRowCount: valuationSnapshotRows.length,
     };
   } finally {
     if (ownsClient && typeof client.end === 'function') await client.end().catch(() => {});
@@ -493,6 +559,8 @@ function buildValuationRowFromRequirement({
     forwardPE: numberOrNull(priceContext.forwardPE),
     evToEbitda: numberOrNull(priceContext.evToEbitda),
     evToSales: numberOrNull(priceContext.evToSales),
+    priceToSales: numberOrNull(priceContext.priceToSales),
+    fcfYield: numberOrNull(priceContext.fcfYield),
     marketCap: numberOrNull(priceContext.marketCap),
     revenue: numberOrNull(priceContext.revenue),
     consensusRevenueGrowth: numberOrNull(priceContext.consensusRevenueGrowth),
@@ -528,6 +596,35 @@ function taskForRequirement(requirement = {}, seedContext = {}) {
     evidenceClass: 'valuation_or_expectation_bridge',
     status: 'pending',
     sourcePolicy: 'trusted_local_market_or_valuation_cache_only',
+    mutationBoundary: zeroBoundary(),
+  };
+}
+
+function targetedProviderBackfillTaskFrom(task = {}, generatedAt = new Date().toISOString()) {
+  return {
+    taskId: `valuation-provider-backfill-${stableHash(`${task.seedId}:${task.trackId}:${task.issuer}`)}`,
+    seedId: task.seedId,
+    trackId: task.trackId,
+    issuer: task.issuer,
+    evidenceClass: 'valuation_or_expectation_bridge',
+    providerRoute: 'collect-free-external-data',
+    providers: ['fmp', 'polygon'],
+    status: 'queued_targeted_provider_backfill',
+    command: [
+      'node',
+      '--import',
+      'tsx',
+      'scripts/collect-free-external-data.mjs',
+      '--providers',
+      'fmp,polygon',
+      '--symbols',
+      task.issuer,
+      '--limit',
+      '1',
+    ],
+    sourcePolicy: 'existing_readonly_or_credential_gated_provider_backfill_only',
+    reviewBoundary: 'artifact_task_only_no_provider_activation_no_readiness_promotion',
+    createdAt: generatedAt,
     mutationBoundary: zeroBoundary(),
   };
 }
@@ -667,12 +764,17 @@ export async function runValuationContextRequirementExecutor({
         ? 'wait_for_trusted_local_valuation_context_or_new_seed'
         : 're_evaluate_gate_consolidation',
     trustedLocalPriceContextSourceFiles: priceRowsPayload.sourceFiles,
+    targetedProviderBackfillTasks: missingIssuerFundamentalsAfterExecution.map((issuer) => (
+      targetedProviderBackfillTaskFrom(taskResults.find((task) => task.issuer === issuer) || { issuer }, generatedAt)
+    )),
+    targetedProviderBackfillTaskCount: missingIssuerFundamentalsAfterExecution.length,
     dbContextRead: {
       enabled: readDbContext === true,
       source: dbRowsPayload.source,
       status: dbRowsPayload.dbReadStatus,
       marketQuoteRowCount: dbRowsPayload.marketQuoteRowCount || 0,
       companyFundamentalRowCount: dbRowsPayload.companyFundamentalRowCount || 0,
+      valuationSnapshotRowCount: dbRowsPayload.valuationSnapshotRowCount || 0,
     },
     mutationBoundary: zeroBoundary({
       valuationContextRequirementArtifactWrites: writeArtifact ? 1 : 0,

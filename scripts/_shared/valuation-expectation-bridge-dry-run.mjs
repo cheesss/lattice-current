@@ -659,7 +659,12 @@ export function buildValuationExpectationBridgeDryRun(input = {}) {
     requireHistoricalAnalogueBridge,
   });
   const expectationBridgeStatus = aggregateExpectationStatus(issuerValuationBridgeTable);
-  const marketRegimeSupport = buildMarketValidationRegimeSupport(input);
+  const marketRegimeSupport = input.marketRegimeSupport?.marketValidationRegimeStatus
+    ? {
+      ...input.marketRegimeSupport,
+      caveats: uniqueStrings([input.marketRegimeSupport.caveats, input.marketRegimeSupportCaveats], 60),
+    }
+    : buildMarketValidationRegimeSupport(input);
   const investmentMemoReadinessDiagnostic = diagnosticFor({
     valuationBridgeStatus,
     expectationBridgeStatus,
