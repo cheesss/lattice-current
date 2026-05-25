@@ -929,7 +929,9 @@ function renderQualityRibbon(validation = {}) {
   const researchPriorityLabel = researchUtility?.label
     || (researchUtility?.grade ? `Research Priority ${researchUtility.grade}` : 'Research priority tracked');
   const investmentActionabilityLabel = isCrossThemeDiscovery
-    ? (decisionDiagnostic?.status === 'decision_ready_review' && crossThemeActionability?.tier === 'analyst_action_review_ready'
+    ? (decisionDiagnostic?.status === 'human_review_required'
+      ? 'Human-review investment memo candidate; Not decision-ready'
+      : decisionDiagnostic?.status === 'decision_ready_review' && crossThemeActionability?.tier === 'analyst_action_review_ready'
       ? 'Analyst review ready'
       : crossThemeActionability?.tier === 'analyst_action_review_ready' || crossThemeActionability?.tier === 'issuer_follow_up_ready'
         ? 'Thesis validation candidate; Not investment-ready'
@@ -938,7 +940,7 @@ function renderQualityRibbon(validation = {}) {
   const evidenceClosureLabel = decisionDiagnostic?.label || (quality.publishable === false ? 'Evidence repair needed' : 'Audit linked');
   const crossThemeClosureBlocked = isCrossThemeDiscovery
     && decisionDiagnostic
-    && decisionDiagnostic.status !== 'decision_ready_review';
+    && !['decision_ready_review', 'human_review_required'].includes(decisionDiagnostic.status);
   const conviction = isCrossThemeDiscovery
     ? (crossThemeClosureBlocked ? 'Evidence-limited; closure blocked' : bottleneckLabel)
     : primaryBlocker ? 'Evidence-limited' : (isMemoCandidate || isThesisValidation) ? 'Review-ready, not decision-ready' : 'Evidence-bound';
@@ -952,7 +954,7 @@ function renderQualityRibbon(validation = {}) {
       ? `<div class="publishability publishability-blocked"><strong>${escapeHtml(researchPriorityLabel)}; not an investment memo.</strong><p>${escapeHtml(decisionDiagnostic?.nextAction || researchUtility?.nextAction || clientReasons || 'Use this as a research-priority memo until issuer exposure, procurement/substitution evidence, and closure gaps are resolved.')}</p></div>`
       : `<div class="publishability publishability-blocked"><strong>Research memo still needs evidence repair.</strong><p>${escapeHtml(clientReasons) || 'Unresolved evidence-depth or trust gaps remain.'}</p></div>`
     : isCrossThemeDiscovery
-      ? `<div class="publishability publishability-ready"><strong>${escapeHtml(bottleneckLabel)}; investment readiness is a separate gate.</strong><p>${escapeHtml(decisionDiagnostic?.nextAction || 'Use this memo to validate a non-obvious cross-theme bottleneck candidate. Investment readiness remains a separate gate.')}</p></div>`
+      ? `<div class="publishability publishability-ready"><strong>${escapeHtml(decisionDiagnostic?.status === 'human_review_required' ? 'Human-review investment memo candidate; not decision-ready' : `${bottleneckLabel}; investment readiness is a separate gate.`)}</strong><p>${escapeHtml(decisionDiagnostic?.nextAction || 'Use this memo to validate a non-obvious cross-theme bottleneck candidate. Investment readiness remains a separate gate.')}</p></div>`
       : productTier === 'signal_triage'
       ? `<div class="publishability publishability-ready"><strong>Research-prioritization memo.</strong><p>Use this memo to decide what to monitor, what to collect, and whether the theme should remain in discovery or move toward active watchlist status.</p></div>`
       : isMemoCandidate

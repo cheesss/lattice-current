@@ -1,0 +1,12 @@
+{
+  "fixtureType": "local_market_regime_support_missing",
+  "fixtureUse": "test_only_not_live_evidence",
+  "marketValidationStatus": "controlled_ready",
+  "marketValidationControlUsed": false,
+  "marketValidationBenchmarkUsed": null,
+  "marketValidationSampleSize": 0,
+  "marketValidationEventAnchorCount": 0,
+  "marketValidationWarnings": [],
+  "marketValidationCaveats": [],
+  "marketValidationWindowResults": []
+}

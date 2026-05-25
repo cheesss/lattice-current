@@ -1,0 +1,71 @@
+{
+  "version": "historical-analogue-library-v1",
+  "cases": [
+    {
+      "analogueId": "solid_rocket_motor_capacity_2022",
+      "title": "Solid rocket motor capacity shortage and propulsion backlog repricing",
+      "period": "2022-2024",
+      "bottleneckClass": "supplier_capacity",
+      "bottleneckNode": "solid rocket motor capacity and propulsion component manufacturing",
+      "issuerRolePattern": ["solid_rocket_motor_supplier_exposure", "propulsion_structure_supplier", "defense_prime_backlog"],
+      "evidenceClasses": ["issuer_exposure", "issuer_commentary", "backlog", "capacity", "negative_control", "holdout_validation"],
+      "catalystTypes": ["contract award", "backlog conversion", "capacity expansion", "procurement acceleration"],
+      "issuerBasket": ["LHX", "NOC", "RTX"],
+      "peerBasket": ["LMT", "GD", "HII"],
+      "eventDates": ["2022-03-01", "2023-07-31"],
+      "marketOutcome": {
+        "return30dExcess": 0.06,
+        "return90dExcess": 0.14,
+        "maxDrawdownBeforeMove": -0.05,
+        "multipleChange": 0.08,
+        "estimateRevisionDirection": "positive"
+      },
+      "invalidators": ["management denies capacity constraint", "orders decline", "contract award cancellation"],
+      "sourceProvenance": "trusted_local_analogue_library"
+    },
+    {
+      "analogueId": "defense_composite_motor_case_capacity_2023",
+      "title": "Composite motor case and qualified defense material capacity bottleneck",
+      "period": "2023-2025",
+      "bottleneckClass": "technical_qualification",
+      "bottleneckNode": "rocket motor casing composite capacity and qualification throughput",
+      "issuerRolePattern": ["propulsion_structure_supplier", "qualified_material_supplier", "defense_prime_backlog"],
+      "evidenceClasses": ["technical_qualification", "issuer_exposure", "backlog", "capacity", "holdout_validation"],
+      "catalystTypes": ["qualification cycle", "program backlog", "supplier readiness", "capacity expansion"],
+      "issuerBasket": ["NOC", "LHX"],
+      "peerBasket": ["LMT", "RTX"],
+      "eventDates": ["2023-11-15", "2024-08-15"],
+      "marketOutcome": {
+        "return30dExcess": 0.04,
+        "return90dExcess": 0.11,
+        "maxDrawdownBeforeMove": -0.03,
+        "multipleChange": 0.05,
+        "estimateRevisionDirection": "stable_to_positive"
+      },
+      "invalidators": ["supplier redundancy", "no qualification delay", "capacity normalized"],
+      "sourceProvenance": "trusted_local_analogue_library"
+    },
+    {
+      "analogueId": "shipyard_submarine_capacity_backlog_2020",
+      "title": "Shipyard capacity backlog and defense program execution repricing",
+      "period": "2020-2022",
+      "bottleneckClass": "test_facility_capacity",
+      "bottleneckNode": "qualified defense production and test facility capacity",
+      "issuerRolePattern": ["defense_prime_backlog", "qualified_supplier_capacity"],
+      "evidenceClasses": ["issuer_exposure", "backlog", "guidance", "negative_control", "holdout_validation"],
+      "catalystTypes": ["procurement acceleration", "program backlog", "production-rate constraint"],
+      "issuerBasket": ["HII", "GD"],
+      "peerBasket": ["LMT", "NOC"],
+      "eventDates": ["2020-06-01", "2021-03-01"],
+      "marketOutcome": {
+        "return30dExcess": 0.03,
+        "return90dExcess": 0.09,
+        "maxDrawdownBeforeMove": -0.08,
+        "multipleChange": 0.04,
+        "estimateRevisionDirection": "positive"
+      },
+      "invalidators": ["budget cancellation", "yard delays worsen margins", "backlog declines"],
+      "sourceProvenance": "trusted_local_analogue_library"
+    }
+  ]
+}

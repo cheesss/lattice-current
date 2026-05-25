@@ -1,6 +1,9 @@
 import { auditOperatorSeedPhaseCRow } from './operator-seed-phase-c-audit.mjs';
 import { summarizeOperatorSeedClosure } from './operator-seed-closure.mjs';
 import { buildProviderGapReviewItem } from './provider-gap-proposals.mjs';
+import {
+  evaluateAutonomousSeedReportCandidateGate,
+} from './seed-bias-diagnostics.mjs';
 
 export const OPERATOR_SEED_REVIEW_SURFACE_VERSION = 'operator-seed-review-surface-v1';
 
@@ -106,12 +109,45 @@ function biasSummary(row = {}, seed = {}) {
   };
 }
 
+function shouldEnforceAutonomousGate(row = {}, seed = {}, options = {}) {
+  if (options.enforceAutonomousGate === true) return true;
+  if (options.enforceAutonomousGate === false) return false;
+  const source = compact(seed.lineage?.source || row.lineage?.source || row.source || '');
+  if (!source) return false;
+  return !/manual|user|prompt|direct/i.test(source);
+}
+
+function bypassedAutonomousGate() {
+  return {
+    ok: true,
+    gate: 'manual_or_reviewed_seed_boundary',
+    blockers: [],
+    warnings: [],
+    visualStatus: 'review-ready',
+    reason: 'autonomous-only report-candidate gate not applied to direct/manual reviewed seed',
+  };
+}
+
 export function buildOperatorSeedReviewItem(row = {}, options = {}) {
   const seed = seedFromRow(row);
   const plan = evidencePlanFromRow(row);
   const closure = summarizeOperatorSeedClosure(row, options);
   const phaseCAudit = auditOperatorSeedPhaseCRow(row, options);
   const providerGapReview = buildProviderGapReviewItem(row, options);
+  const reportCandidateGate = shouldEnforceAutonomousGate(row, seed, options)
+    ? evaluateAutonomousSeedReportCandidateGate(row, {
+      evidencePlan: plan,
+      closure,
+      biasDiagnosis: options.biasDiagnosis,
+      targetedBackfillRan: options.targetedBackfillRan,
+      rawEvidence: options.rawEvidence || plan.rawEvidence || row.raw_evidence || row.rawEvidence || [],
+      acceptedEvidence: options.acceptedEvidence || plan.acceptedEvidence || row.accepted_evidence || row.acceptedEvidence || [],
+      holdoutValidation: options.holdoutValidation || plan.holdoutValidation || row.holdout_validation || row.holdoutValidation || {},
+      negativeControlSurvival: options.negativeControlSurvival || plan.negativeControlSurvival || row.negative_control_survival || row.negativeControlSurvival || {},
+      issuerBridge: options.issuerBridge || plan.issuerBridge || row.issuer_bridge || row.issuerBridge || {},
+      marketValidation: options.marketValidation || plan.marketValidation || row.market_validation || row.marketValidation || {},
+    })
+    : bypassedAutonomousGate();
   const status = row.status || seed.status || 'draft';
   const score = numberScore(row.scores?.composite_seed_score ?? row.scores?.operator_preference_score ?? seed.scores?.composite_seed_score);
   const visualStatus = statusVisual(status, phaseCAudit, closure);
@@ -169,12 +205,13 @@ export function buildOperatorSeedReviewItem(row = {}, options = {}) {
     review: {
       latest: row.review_state?.latest || row.reviewState?.latest || null,
       latestEvidenceOutcome: row.review_state?.latestEvidenceOutcome || row.reviewState?.latestEvidenceOutcome || null,
+      reportCandidateGate,
     },
     updatedAt: row.updated_at || row.updatedAt || null,
     actionAvailability: {
       canReview: !['promoted', 'report_generated'].includes(status),
       canRequestEvidence: !['rejected', 'promoted', 'report_candidate', 'report_generated', 'exhausted'].includes(status),
-      canMarkReportCandidate: status === 'review_ready' && phaseCAudit.complete,
+      canMarkReportCandidate: status === 'review_ready' && phaseCAudit.complete && reportCandidateGate.ok,
       canReject: !['rejected', 'promoted', 'report_generated'].includes(status),
     },
     mutationPolicy: {

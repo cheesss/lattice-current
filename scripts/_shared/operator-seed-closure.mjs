@@ -216,7 +216,7 @@ export function buildOperatorSeedProviderBackfillPlan(row = {}, options = {}) {
 
   for (const route of asArray(plan.providerRoutePlans)) {
     const evidenceClass = compact(route.evidenceClass);
-    if (!evidenceClass || route.blocked) continue;
+    if (!evidenceClass) continue;
     if (evidenceClass === 'negative_control' || evidenceClass === 'market_validation') continue;
     const outcome = outcomeByClass.get(evidenceClass);
     if (outcome && STRONG_OUTCOME_TIERS.has(outcome.tier)) {
@@ -230,6 +230,34 @@ export function buildOperatorSeedProviderBackfillPlan(row = {}, options = {}) {
       continue;
     }
     const attemptSummary = providerBackfillAttemptSummary(row, evidenceClass, options);
+    if (route.blocked) {
+      const routeSummary = {
+        evidenceClass,
+        providerRoute: route.providerRoute || null,
+        providers: [],
+        sourceProviders: uniqueStrings(route.sourceProviders || [], 12),
+        issuerUniverse: uniqueStrings(route.issuerUniverse || route.collectionUniverse || [], 20),
+        candidateIssuerUniverse: uniqueStrings(route.candidateIssuerUniverse || [], 20),
+        queryVariants: uniqueStrings(route.queryVariants || [], 6),
+        blockedReason: route.blockedReason || 'blocked',
+        providerAttempts: attemptSummary,
+      };
+      if (attemptSummary.exhausted) {
+        exhaustedRoutes.push({
+          ...routeSummary,
+          nextAction: `adapter/source coverage required for ${evidenceClass}; direct providers exhausted after ${attemptSummary.terminalAttemptCount}/${attemptSummary.maxAttempts} terminal attempt(s)`,
+        });
+        continue;
+      }
+      if (attemptSummary.deferred) {
+        deferredRoutes.push({
+          ...routeSummary,
+          nextAction: `wait for provider retry window or resolve ${route.blockedReason || 'blocked route'} for ${evidenceClass}`,
+        });
+        continue;
+      }
+      continue;
+    }
     const providers = uniqueStrings(asArray(route.executableCollectors)
       .filter((provider) => provider !== 'source-query')
       .filter((provider) => DIRECT_PROVIDER_SET.has(provider))

@@ -1,0 +1,49 @@
+{
+  "version": "historical-analogue-library-v1",
+  "cases": [
+    {
+      "analogueId": "large_transformer_lead_time_grid_2023",
+      "title": "Large transformer lead-time bottleneck and grid equipment repricing",
+      "period": "2022-2024",
+      "bottleneckClass": "supplier_capacity",
+      "bottleneckNode": "large transformer and substation equipment lead time",
+      "issuerRolePattern": ["power_delivery_epc_capacity_owner", "grid_equipment_capacity_owner"],
+      "evidenceClasses": ["issuer_exposure", "backlog", "guidance", "capacity", "negative_control", "holdout_validation"],
+      "catalystTypes": ["utility capex", "lead time extension", "backlog conversion", "capacity allocation"],
+      "issuerBasket": ["PWR", "ETN", "HUBB"],
+      "peerBasket": ["ACM", "J", "VRT"],
+      "eventDates": ["2023-02-01", "2024-05-01"],
+      "marketOutcome": {
+        "return30dExcess": 0.09,
+        "return90dExcess": 0.22,
+        "maxDrawdownBeforeMove": -0.06,
+        "multipleChange": 0.16,
+        "estimateRevisionDirection": "positive"
+      },
+      "invalidators": ["lead time improving", "utility capex slowdown", "backlog declining"],
+      "sourceProvenance": "trusted_local_analogue_library"
+    },
+    {
+      "analogueId": "semicap_test_capacity_ai_2023",
+      "title": "Semiconductor test capacity and accelerator demand repricing",
+      "period": "2023-2024",
+      "bottleneckClass": "test_facility_capacity",
+      "bottleneckNode": "probe card and test socket capacity for accelerators",
+      "issuerRolePattern": ["test_equipment_capacity_owner", "qualified_supplier_capacity"],
+      "evidenceClasses": ["technical_qualification", "issuer_exposure", "capacity", "customer_demand", "negative_control"],
+      "catalystTypes": ["customer demand shock", "qualification bottleneck", "capacity expansion"],
+      "issuerBasket": ["TER", "A", "FORM"],
+      "peerBasket": ["KLAC", "AMAT", "ASML"],
+      "eventDates": ["2023-06-01", "2024-02-01"],
+      "marketOutcome": {
+        "return30dExcess": 0.07,
+        "return90dExcess": 0.18,
+        "maxDrawdownBeforeMove": -0.04,
+        "multipleChange": 0.13,
+        "estimateRevisionDirection": "positive"
+      },
+      "invalidators": ["capacity normalized", "customer demand slowdown", "alternative suppliers"],
+      "sourceProvenance": "trusted_local_analogue_library"
+    }
+  ]
+}

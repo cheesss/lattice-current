@@ -1,0 +1,34 @@
+{
+  "version": "local-valuation-fundamentals-cache-fixture-v1",
+  "rows": [
+    {
+      "issuer": "PWR",
+      "ticker": "PWR",
+      "companyName": "Quanta Services",
+      "roleClass": "power_delivery_epc_capacity_owner",
+      "sourceProvenance": "trusted_local_fundamentals_fixture",
+      "asOfDate": "2026-05-15",
+      "backlog": 34100000000,
+      "guidanceRevenue": 26000000000,
+      "powerDeliveryExposure": "Power delivery backlog tied to utility transmission and substation work.",
+      "backlogToRevenueCommentary": "Backlog conversion is already embedded in the local expectation scenario.",
+      "marketCap": 44500000000,
+      "enterpriseValue": 47500000000,
+      "forwardPE": 36.0,
+      "evToEbitda": 24.0,
+      "evToSales": 2.6,
+      "peerGroup": ["ACM", "J"],
+      "peerMedianForwardPE": 20.0,
+      "peerMedianEVEBITDA": 12.0,
+      "peerMedianEVSales": 1.2,
+      "premiumDiscountToPeer": 0.8,
+      "consensusRevenueGrowth": 0.18,
+      "consensusEPSGrowth": 0.22,
+      "consensusRevisionDirection": "positive",
+      "analystExpectationSummary": "Local consensus cache already includes elevated growth expectations.",
+      "estimateRevisionEvidence": "trusted local consensus fixture row",
+      "pricedInRisk": true,
+      "pricedInRiskEvidence": "trusted local valuation fixture marks elevated premium and already-reflected growth expectations"
+    }
+  ]
+}

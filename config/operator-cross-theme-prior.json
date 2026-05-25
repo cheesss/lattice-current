@@ -1,0 +1,118 @@
+{
+  "version": "user-cross-theme-prior-v1",
+  "role": "exploration_prior_only",
+  "promotionPolicy": {
+    "canRaiseSeedGenerationPriority": true,
+    "canRaiseReportReadiness": false,
+    "canRaiseInvestmentReadiness": false
+  },
+  "themePairPriors": [
+    {
+      "id": "defense_space_propulsion",
+      "themes": ["defense-industrial", "space"],
+      "connectorClasses": ["supplier_capacity", "technical_qualification", "test_facility_capacity"],
+      "preferredNodes": [
+        "solid rocket motor capacity",
+        "energetic-material qualified supplier capacity",
+        "rocket motor test and qualification facility capacity",
+        "ammonium perchlorate or energetic binder supply",
+        "carbon composite motor case capacity"
+      ],
+      "avoidNarratives": ["defense spending is rising", "space launch demand is rising"],
+      "evidenceClasses": ["supplier_capacity", "technical_qualification", "procurement_trigger", "substitution_limit", "issuer_exposure", "negative_control"]
+    },
+    {
+      "id": "ai_grid_cloud_infrastructure",
+      "themes": ["ai-ml", "cloud-infrastructure", "climate-change"],
+      "connectorClasses": ["engineering_process", "permitting_regulatory", "power_constraint", "supplier_capacity"],
+      "preferredNodes": [
+        "interconnection study capacity",
+        "substation equipment lead time",
+        "protection relay and substation automation capacity",
+        "grid permitting queue processing capacity",
+        "large transformer and switchgear allocation"
+      ],
+      "avoidNarratives": ["AI uses more electricity", "data centers need more power"],
+      "evidenceClasses": ["grid_interconnection", "power_constraint", "supplier_capacity", "issuer_exposure", "negative_control", "market_validation"]
+    },
+    {
+      "id": "ai_semiconductor_material_process",
+      "themes": ["ai-ml", "semiconductor", "materials-science"],
+      "connectorClasses": ["material_input", "technical_qualification", "test_facility_capacity", "engineering_process"],
+      "preferredNodes": [
+        "underfill and mold compound supply for advanced packaging",
+        "ABF resin or build-up film capacity",
+        "probe card and test socket capacity for HBM and accelerators",
+        "temporary bonding and debonding throughput",
+        "silicon interposer inspection and metrology bottleneck",
+        "substrate warpage control process bottleneck"
+      ],
+      "avoidNarratives": ["CoWoS is constrained", "advanced packaging is a bottleneck", "HBM demand is rising"],
+      "evidenceClasses": ["technical_qualification", "supplier_capacity", "substitution_limit", "issuer_exposure", "negative_control"]
+    },
+    {
+      "id": "space_fusion_quantum_cryogenic",
+      "themes": ["space", "fusion", "quantum-computing"],
+      "connectorClasses": ["supplier_capacity", "material_input", "technical_qualification"],
+      "preferredNodes": [
+        "helium supply and recovery capacity",
+        "cryogenic valve and pump qualification",
+        "vacuum chamber and high-vacuum equipment lead time",
+        "superconducting magnet wire or cryostat supplier capacity",
+        "LOX/LH2 ground-support capacity"
+      ],
+      "avoidNarratives": ["fusion is promising", "space launch demand is rising", "quantum computing needs cooling"],
+      "evidenceClasses": ["supplier_capacity", "technical_qualification", "substitution_limit", "issuer_exposure", "negative_control"]
+    },
+    {
+      "id": "glp1_manufacturing_logistics",
+      "themes": ["biotech", "healthcare", "logistics"],
+      "connectorClasses": ["supplier_capacity", "technical_qualification", "cold_chain"],
+      "preferredNodes": [
+        "peptide synthesis capacity",
+        "sterile fill-finish line capacity",
+        "autoinjector component supply",
+        "glass cartridge or pen injector assembly capacity",
+        "cold-chain capacity for injectable drugs"
+      ],
+      "avoidNarratives": ["GLP-1 demand is rising", "obesity drugs are popular"],
+      "evidenceClasses": ["supplier_capacity", "technical_qualification", "issuer_exposure", "negative_control"]
+    },
+    {
+      "id": "geopolitics_minerals_semicap_defense",
+      "themes": ["geopolitics", "materials-science", "semiconductor", "defense-industrial"],
+      "connectorClasses": ["material_input", "procurement_trigger", "substitution_limit"],
+      "preferredNodes": [
+        "tungsten supply for defense and semiconductor tooling",
+        "tantalum and capacitor supply exposure",
+        "uranium or HALEU fuel-cycle bottleneck",
+        "cobalt refining and non-China supply chain",
+        "rare gas supply for semiconductor lithography"
+      ],
+      "avoidNarratives": ["Africa has critical minerals", "commodity prices may rise"],
+      "evidenceClasses": ["material_input", "policy_funding", "procurement_trigger", "substitution_limit", "issuer_exposure", "negative_control"]
+    }
+  ],
+  "scoring": {
+    "userPriorFitWeightMax": 0.15,
+    "knownNarrativePenaltyWeight": 0.25,
+    "representativeTickerPenaltyWeight": 0.20,
+    "underrepresentedClassBonus": 0.15,
+    "narrowNodeBonus": 0.20
+  },
+  "selectionPolicy": {
+    "disableTopOneParentSelection": true,
+    "parentPoolSize": 10,
+    "selectionMethod": "mmr_stratified",
+    "knownNarrativeParentsBecomeDecompositionOnly": true,
+    "mmrLambda": 0.35,
+    "reportCandidateLimit": 2,
+    "bucketTargets": {
+      "high_evidenceability": 3,
+      "high_novelty_low_prior_overlap": 2,
+      "underrepresented_bottleneck_class": 3,
+      "weird_low_frequency_connector": 1,
+      "failed_report_provider_gap_derived": 1
+    }
+  }
+}

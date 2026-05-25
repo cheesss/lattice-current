@@ -10,6 +10,11 @@ import {
   scoreScarcitySignals,
   scoreSurprise,
 } from './non-obvious-bottleneck-discovery.mjs';
+import {
+  loadOperatorCrossThemePrior,
+  scoreUserCrossThemePriorFit,
+  selectDiversifiedParentSeedPool,
+} from './operator-cross-theme-prior.mjs';
 
 export const DEFAULT_OPERATOR_SEED_PRIOR_PATH = path.join(process.cwd(), 'config', 'operator-seed-prior.json');
 export const LOCAL_OPERATOR_SEED_PRIOR_PATH = path.join(process.cwd(), 'config', 'operator-seed-prior.local.json');
@@ -20,6 +25,11 @@ const EVIDENCE_CLASS_BY_BOTTLENECK = Object.freeze({
   power_constraint: ['power_constraint', 'capex_confirmation', 'supplier_capacity'],
   supplier_capacity: ['supplier_capacity', 'issuer_exposure', 'issuer_commentary'],
   technical_qualification: ['technical_qualification', 'supplier_capacity', 'substitution_limit'],
+  permitting_regulatory: ['permitting_regulatory', 'policy_funding', 'negative_control'],
+  material_input: ['material_input', 'commodity_input', 'supplier_capacity', 'substitution_limit'],
+  engineering_process: ['engineering_process', 'technical_qualification', 'mechanism_validation'],
+  test_facility_capacity: ['test_facility_capacity', 'technical_qualification', 'supplier_capacity'],
+  provider_data_gap: ['provider_data_gap'],
   procurement_trigger: ['procurement_trigger', 'policy_funding', 'mission_award'],
   substitution_limit: ['substitution_limit', 'technical_qualification', 'negative_control'],
   commodity_input: ['commodity_input', 'supplier_capacity', 'substitution_limit'],
@@ -133,6 +143,29 @@ const DOMAIN_TEMPLATES = Object.freeze([
     },
     supplierCategory: 'advanced packaging, substrate, memory, and semiconductor equipment suppliers',
   },
+]);
+
+const REPRESENTATIVE_TICKERS = new Set([
+  'NVDA',
+  'MSFT',
+  'GOOGL',
+  'GOOG',
+  'META',
+  'VRT',
+  'ETN',
+  'PWR',
+  'LMT',
+  'RTX',
+  'TSM',
+  'ASML',
+  'AMD',
+]);
+
+const KNOWN_NARRATIVE_PATTERNS = Object.freeze([
+  /\bAI\b.*\b(NVDA|GPU|data[-\s]?center|power)\b/i,
+  /\bdata[-\s]?center\b.*\b(power|grid|VRT|ETN|PWR)\b/i,
+  /\bdefen[cs]e\b.*\b(LMT|RTX|missile|budget)\b/i,
+  /\bsemiconductor\b.*\b(NVDA|TSM|ASML|AI)\b/i,
 ]);
 
 function readJson(filePath) {
@@ -367,7 +400,22 @@ function publicIssuerCandidatesFrom(input = {}, template = {}) {
     template.publicIssuerCandidates,
   ], 24)
     .map((value) => String(value || '').trim().toUpperCase())
-    .filter((value) => /^[A-Z][A-Z0-9.-]{0,9}$/.test(value));
+    .filter((value) => /^[A-Z][A-Z0-9.-]{0,9}$/.test(value))
+    .filter((value) => !REPRESENTATIVE_TICKERS.has(value));
+}
+
+function suppressedRepresentativeTickersFrom(input = {}, template = {}) {
+  return uniqueStrings([
+    input.issuerCandidates,
+    input.candidateIssuerUniverse,
+    input.issuerUniverse,
+    asArray(input.suppliers).map((supplier) => supplier.symbol),
+    asArray(input.metadata?.suppliers).map((supplier) => supplier.symbol),
+    asArray(input.metadata?.constraint?.suppliers).map((supplier) => supplier.symbol),
+    template.publicIssuerCandidates,
+  ], 24)
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter((value) => REPRESENTATIVE_TICKERS.has(value));
 }
 
 function additionalInputsFromInput(input = {}) {
@@ -471,7 +519,33 @@ function scoreCounterEvidenceRisk(seed = {}) {
   return clamp(risk);
 }
 
+function scoreKnownNarrative(seed = {}) {
+  const text = textBlob(seed.theme?.label, seed.growthDriver, seed.realActivity, seed.physicalProcess, seed.requiredInputs, seed.bottleneck?.label, seed.bottleneck?.mechanism, seed.supplierCategory?.publicIssuerCandidates, seed.evidenceQueries);
+  const narrativeHits = KNOWN_NARRATIVE_PATTERNS.filter((pattern) => pattern.test(text)).length;
+  const representativeTickerHits = asArray(seed.suppressedRepresentativeTickers).length
+    + asArray(seed.supplierCategory?.publicIssuerCandidates).filter((ticker) => REPRESENTATIVE_TICKERS.has(String(ticker || '').toUpperCase())).length;
+  const sourceFrequencyProxy = Math.min(1, asArray(seed.lineage?.sourceIds).length / 6);
+  const knownNarrativeScore = clamp(0.16 + narrativeHits * 0.22 + representativeTickerHits * 0.12 + sourceFrequencyProxy * 0.18);
+  const tickerObviousnessPenalty = clamp(representativeTickerHits * 0.12);
+  const knownNarrativePenalty = clamp(knownNarrativeScore * 0.18 + tickerObviousnessPenalty);
+  const seedSimilarityScore = clamp(seed.biasAudit?.seed_dependence_score ?? 0);
+  const priorReportOverlap = clamp(asArray(seed.lineage?.sourceIds).filter((id) => /report|rpt|adjacent-\d+/i.test(String(id || ''))).length / Math.max(1, asArray(seed.lineage?.sourceIds).length));
+  const sourceNoveltyScore = clamp(1 - seedSimilarityScore - priorReportOverlap * 0.25);
+  const nodeSpecificityScore = clamp((Number(seed.scores?.bottleneck_specificity ?? 0) || scoreBottleneckSpecificity(seed.bottleneck?.label || seed.seedTitle || '')));
+  return {
+    knownNarrativeScore,
+    knownNarrativePenalty,
+    representativeTickerSuppressionApplied: asArray(seed.suppressedRepresentativeTickers).length > 0,
+    seedSimilarityScore,
+    priorReportOverlap,
+    tickerObviousnessPenalty,
+    sourceNoveltyScore,
+    nodeSpecificityScore,
+  };
+}
+
 export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
+  const crossThemePrior = prior.crossThemePrior || loadOperatorCrossThemePrior();
   const physical_linkage = scorePhysicalLinkage(seed);
   const demand_elasticity = scoreDemandElasticity(seed);
   const bottleneck_specificity = clamp(scoreBottleneckSpecificity(seed.bottleneck?.label || seed.seedTitle || '', {
@@ -489,6 +563,11 @@ export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
   const investability = scoreInvestability(seed);
   const operator_preference_score = scoreOperatorPreference(seed, prior);
   const counter_evidence_risk = scoreCounterEvidenceRisk(seed);
+  const narrative = scoreKnownNarrative(seed);
+  const userPrior = scoreUserCrossThemePriorFit({
+    ...seed,
+    scores: { ...(seed.scores || {}), ...narrative },
+  }, crossThemePrior);
   const weights = prior.scoringWeights || {};
   const positive = (
     physical_linkage * Number(weights.physical_linkage ?? 0.18)
@@ -499,8 +578,13 @@ export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
     + evidenceability * Number(weights.evidenceability ?? 0.16)
     + investability * Number(weights.investability ?? 0.12)
     + operator_preference_score * Number(weights.operator_preference_score ?? 0.04)
+    + userPrior.userCrossThemePriorFit * Number(crossThemePrior.scoring?.userPriorFitWeightMax ?? 0.15)
   );
-  const composite_seed_score = clamp(positive - (counter_evidence_risk * Number(weights.counter_evidence_risk_penalty ?? 0.04)));
+  const composite_seed_score = clamp(
+    positive
+    - (counter_evidence_risk * Number(weights.counter_evidence_risk_penalty ?? 0.04))
+    - narrative.knownNarrativePenalty * 0.08,
+  );
   return {
     physical_linkage,
     demand_elasticity,
@@ -512,6 +596,8 @@ export function scoreMechanismSeed(seed = {}, prior = loadOperatorSeedPrior()) {
     counter_evidence_risk,
     operator_preference_score,
     composite_seed_score,
+    ...narrative,
+    ...userPrior,
   };
 }
 
@@ -643,7 +729,9 @@ export function normalizeMechanismSeed(input = {}, options = {}) {
     ...(typeof input.bottleneck === 'object' ? input.bottleneck : {}),
   };
   if (!bottleneck.label) bottleneck.label = input.label || asArray(input.seedTerms)[0] || compactText(input.prompt, 80);
-  if (!bottleneck.class) bottleneck.class = input.bottleneckClass || asArray(input.evidenceClasses)[0] || 'mechanism_validation';
+  const inputClass = input.bottleneckClass || asArray(input.evidenceClasses).find((klass) => EVIDENCE_CLASS_BY_BOTTLENECK[klass]);
+  if (inputClass) bottleneck.class = inputClass;
+  if (!bottleneck.class) bottleneck.class = 'mechanism_validation';
   if (!bottleneck.mechanism) bottleneck.mechanism = input.mechanism || template.bottleneck?.mechanism || input.prompt || '';
   const supplierCategory = {
     label: supplierCategoryFrom(input, template),
@@ -668,6 +756,8 @@ export function normalizeMechanismSeed(input = {}, options = {}) {
     biasAudit: {},
     providerGaps: [],
     rejectedReasons: [],
+    suppressedRepresentativeTickers: suppressedRepresentativeTickersFrom(input, template),
+    seedLockAudit: {},
     lineage: {
       source: input.source || 'direct',
       sourceIds: uniqueStrings(input.sourceIds || [input.id], 12),
@@ -685,6 +775,34 @@ export function normalizeMechanismSeed(input = {}, options = {}) {
   seed.biasAudit = auditSeedSourceCoverage(seed, { sourceRefs: input.sourceRefs }, prior);
   seed.providerGaps = seed.biasAudit.provider_gap_labels || [];
   seed.scores = scoreMechanismSeed(seed, prior);
+  seed.seedLockAudit = {
+    seedSimilarityScore: seed.scores.seedSimilarityScore,
+    seedDependenceScore: seed.biasAudit.seed_dependence_score,
+    priorReportOverlap: seed.scores.priorReportOverlap,
+    sourceNoveltyScore: seed.scores.sourceNoveltyScore,
+    representativeTickerSuppressionApplied: seed.scores.representativeTickerSuppressionApplied,
+    suppressedRepresentativeTickers: seed.suppressedRepresentativeTickers,
+    userCrossThemePriorFit: seed.scores.userCrossThemePriorFit,
+    matchedUserPriorIds: seed.scores.matchedUserPriorIds,
+    matchedDistantThemes: seed.scores.matchedDistantThemes,
+    parentOnlyDueToKnownNarrative: seed.scores.parentOnlyDueToKnownNarrative,
+  };
+  seed.metadata = {
+    ...(seed.metadata || {}),
+    userCrossThemePrior: {
+      role: 'exploration_prior_only',
+      userCrossThemePriorFit: seed.scores.userCrossThemePriorFit,
+      matchedUserPriorIds: seed.scores.matchedUserPriorIds,
+      matchedDistantThemes: seed.scores.matchedDistantThemes,
+      connectorClassFit: seed.scores.connectorClassFit,
+      preferredNodeMatch: seed.scores.preferredNodeMatch,
+      avoidNarrativeHit: seed.scores.avoidNarrativeHit,
+      parentOnlyDueToKnownNarrative: seed.scores.parentOnlyDueToKnownNarrative,
+      canRaiseReportReadiness: false,
+      canRaiseInvestmentReadiness: false,
+    },
+    parentOnlyDueToKnownNarrative: seed.scores.parentOnlyDueToKnownNarrative,
+  };
   seed.rejectedReasons = rejectedReasonsForSeed(seed, prior);
   if (seed.rejectedReasons.includes('generic_theme_narrative')) {
     seed.scores = {
@@ -713,6 +831,8 @@ function sortSeeds(left, right) {
 
 export function generateMechanismSeeds(inputs = {}, options = {}) {
   const prior = options.prior || loadOperatorSeedPrior(options);
+  const crossThemePrior = options.crossThemePrior || loadOperatorCrossThemePrior(options);
+  prior.crossThemePrior = crossThemePrior;
   const generatedAt = options.generatedAt || new Date().toISOString();
   const minScore = options.minScore === undefined ? null : Number(options.minScore);
   const includeRejected = Boolean(options.includeRejected);
@@ -742,7 +862,20 @@ export function generateMechanismSeeds(inputs = {}, options = {}) {
     }
     byId.set(seed.seedId, seed);
   }
-  const seeds = [...byId.values()].sort(sortSeeds).slice(0, limit || undefined);
+  const eligibleSeeds = [...byId.values()].sort(sortSeeds);
+  const rejectedSeeds = eligibleSeeds.filter((seed) => seed.status === 'rejected');
+  const selectableSeeds = eligibleSeeds.filter((seed) => seed.status !== 'rejected');
+  const parentSelection = crossThemePrior.selectionPolicy?.disableTopOneParentSelection !== false
+    ? selectDiversifiedParentSeedPool(selectableSeeds, {
+      crossThemePrior,
+      parentPoolSize: Math.min(Math.max(Number(options.parentPoolSize || crossThemePrior.selectionPolicy?.parentPoolSize || 10), 8), 12),
+    })
+    : { ok: true, topOneSelectionDisabled: false, selected: selectableSeeds };
+  const selectedSeeds = crossThemePrior.selectionPolicy?.disableTopOneParentSelection !== false
+    ? parentSelection.selected
+    : selectableSeeds;
+  const outputSeeds = includeRejected ? [...selectedSeeds, ...rejectedSeeds] : selectedSeeds;
+  const seeds = outputSeeds.slice(0, limit || undefined);
   const statusCounts = seeds.reduce((acc, seed) => {
     acc[seed.status] = (acc[seed.status] || 0) + 1;
     return acc;
@@ -761,6 +894,12 @@ export function generateMechanismSeeds(inputs = {}, options = {}) {
       statusCounts,
       providerGapCounts,
       diagnostics,
+      parentSelection: {
+        topOneSelectionDisabled: parentSelection.topOneSelectionDisabled,
+        parentPoolSize: parentSelection.parentPoolSize || seeds.length,
+        selectionMethod: parentSelection.selectionMethod || 'composite_score',
+        bucketDistribution: parentSelection.bucketDistribution || {},
+      },
       readOnly: true,
       dbWrites: 0,
       approvalQueueWrites: 0,

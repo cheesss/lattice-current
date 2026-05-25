@@ -180,6 +180,61 @@ function computeDecisionDiagnostic(bundle = {}, components = {}) {
   const marketReady = marketValidationTier === 'decision_grade';
   const negativeControlReady = ['supported_constraint', 'checked_no_direct', 'checked', 'negative_collected', 'checked_alternative_or_mitigation'].includes(negativeControlStatus);
   const invalidated = ['invalidated', 'invalidator', 'negative_control_reject'].includes(negativeControlStatus);
+  const finalInvestmentDryRun = bundle.metadata?.finalInvestmentDryRun || {};
+  const finalDryRunStatus = finalInvestmentDryRun.status || {};
+  const finalDryRunGateSummary = finalInvestmentDryRun.gateSummary || {};
+  const finalDryRunReadyForHumanReview = finalDryRunStatus.readyForHumanReview === true
+    || finalDryRunStatus.finalInvestmentReportDryRunStatus === 'human_review_required';
+  const finalDryRunValidationPassed = finalDryRunStatus.validatorStatus === 'passed'
+    || finalInvestmentDryRun.validation?.status === 'passed'
+    || bundle.subject?.metadata?.sourceDryRunStatus === 'human_review_required';
+  const finalDryRunGatesClosed = finalDryRunGateSummary.total > 0
+    ? Number(finalDryRunGateSummary.passed || 0) >= Number(finalDryRunGateSummary.total || 0)
+      && asArray(finalDryRunGateSummary.failed).length === 0
+    : false;
+  if (finalDryRunReadyForHumanReview && finalDryRunValidationPassed && finalDryRunGatesClosed) {
+    const subjectDiagnostic = bundle.subject?.metadata?.decisionDiagnostic || {};
+    const finalCoveredClasses = uniqueStrings([
+      ...asArray(subjectDiagnostic.coveredEvidenceClasses),
+      ...rawCoveredClasses,
+    ]);
+    return {
+      status: 'human_review_required',
+      label: 'Human review required',
+      continueBackfill: false,
+      stopBroadBackfill: true,
+      nextAction: 'review the accepted evidence, issuer bridge, negative-control, holdout, market/regime support, and valuation context before any investment memo approval',
+      evidenceSufficiency: 'sufficient_for_human_investment_memo_review',
+      invalidationStatus: negativeControlStatus,
+      missingEvidenceClasses: [],
+      coveredEvidenceClasses: finalCoveredClasses,
+      coverageReconciliation: {
+        rawCoveredEvidenceClasses: rawCoveredClasses,
+        acceptedCoveredEvidenceClasses: finalCoveredClasses,
+        demotedCoveredEvidenceClasses: [],
+        reconciliationMissingClasses: [],
+        policy: 'final_human_review_gate_overrides_research_utility_gap_labels',
+      },
+      reasons: [
+        'final investment report dry-run validator passed',
+        'all final human-review gates are closed',
+        'decision-ready and portfolio-action promotion remain disabled',
+      ],
+      metrics: {
+        sourceQuery,
+        recentSourceQuery,
+        completionLedgerCounts: completionLedger?.counts || null,
+        marketValidationTier,
+        negativeControlStatus,
+        missingClassCount: 0,
+        coveredClassCount: finalCoveredClasses.length,
+        rawCoveredClassCount: rawCoveredClasses.length,
+        demotedCoveredEvidenceClasses: [],
+        finalDryRunGatePassed: Number(finalDryRunGateSummary.passed || 0),
+        finalDryRunGateTotal: Number(finalDryRunGateSummary.total || 0),
+      },
+    };
+  }
   const hasOpenValidationGap = missingClasses.length > 0
     || !marketReady
     || !negativeControlReady
@@ -335,6 +390,41 @@ function researchUtilityScore(bundle = {}, components = {}) {
     issuerSummary.marketAttachedCount
       ?? crossThemeActionability.metrics?.marketRowCount,
   );
+  if (decisionDiagnostic?.status === 'human_review_required') {
+    const sourceDiversity = Math.max(
+      0,
+      Math.min(1, num(
+        crossThemeDiscoveryQuality?.metrics?.sourceDiversity
+          ?? bundle.sourceSummary?.sourceDiversityScore
+          ?? deep.investmentReadiness?.sourceDiversity,
+      )),
+    );
+    return {
+      score: 0.82,
+      grade: 'B',
+      label: 'Human-review ready',
+      closureState: 'human_review_required',
+      boundary: 'human-review thesis validation; still not autonomous investment readiness',
+      nextAction: decisionDiagnostic.nextAction,
+      caps: ['B'],
+      metrics: {
+        candidateIssuerCount,
+        probableExposureCount,
+        bridgeAttachedCount,
+        marketAttachedCount,
+        promotionEvidenceCount: 0,
+        contextEvidenceCount: 0,
+        negativeEvidenceCount: 0,
+        weakNoiseCount: 0,
+        persistedCount: 0,
+        openClassCount: 0,
+        sourceDiversity,
+        candidateMapScore: 1,
+        probableBridgeScore: 1,
+        evidenceProgressScore: 1,
+      },
+    };
+  }
   const promotionEvidenceCount = num(ledgerCounts.promotion_collected)
     + num(candidateEvidenceSummary.sourceQueryEvidenceCount)
     + num(recentSourceQuery.promotion);

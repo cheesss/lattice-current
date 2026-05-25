@@ -1,0 +1,69 @@
+{
+  "fixtureType": "local_market_regime_support_contradictory",
+  "fixtureUse": "test_only_not_live_evidence",
+  "marketValidationStatus": "controlled_ready",
+  "marketValidationControlUsed": true,
+  "marketValidationBenchmarkUsed": "SPY",
+  "marketValidationSampleSize": 48,
+  "marketValidationEventAnchorCount": 4,
+  "marketValidationWarnings": [],
+  "marketValidationCaveats": [],
+  "marketValidationWindowResults": [
+    {
+      "eventId": "grid-regime-contradictory-1",
+      "issuer": "PWR",
+      "sourceGroup": "local_controlled_market",
+      "window": "0_5d",
+      "abnormalReturn": -0.031,
+      "eventMinusControl": -0.031,
+      "controlSampleSize": 12,
+      "tStat": -2.4,
+      "volatilityRegime": "low_vol",
+      "rateRegime": "rising_rate",
+      "sectorRegime": "industrial_outperforming",
+      "marketRegime": "risk_on"
+    },
+    {
+      "eventId": "grid-regime-contradictory-2",
+      "issuer": "ACM",
+      "sourceGroup": "local_controlled_market",
+      "window": "0_5d",
+      "abnormalReturn": -0.026,
+      "eventMinusControl": -0.026,
+      "controlSampleSize": 12,
+      "tStat": -2.1,
+      "volatilityRegime": "normal_vol",
+      "rateRegime": "stable_rate",
+      "sectorRegime": "industrial_neutral",
+      "marketRegime": "neutral"
+    },
+    {
+      "eventId": "grid-regime-contradictory-3",
+      "issuer": "J",
+      "sourceGroup": "local_controlled_market",
+      "window": "0_5d",
+      "abnormalReturn": -0.022,
+      "eventMinusControl": -0.022,
+      "controlSampleSize": 12,
+      "tStat": -2.0,
+      "volatilityRegime": "high_vol",
+      "rateRegime": "falling_rate",
+      "sectorRegime": "industrial_underperforming",
+      "marketRegime": "risk_off"
+    },
+    {
+      "eventId": "grid-regime-contradictory-4",
+      "issuer": "PWR",
+      "sourceGroup": "local_controlled_market",
+      "window": "6_20d",
+      "abnormalReturn": -0.019,
+      "eventMinusControl": -0.019,
+      "controlSampleSize": 12,
+      "tStat": -2.2,
+      "volatilityRegime": "normal_vol",
+      "rateRegime": "rising_rate",
+      "sectorRegime": "industrial_outperforming",
+      "marketRegime": "risk_on"
+    }
+  ]
+}

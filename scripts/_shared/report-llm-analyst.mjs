@@ -189,7 +189,11 @@ function proseSafeTitle(value) {
   if (!title) return 'attached evidence item';
   /* Numeric validators treat fresh numbers in prose as generated claims. Keep
    * titles readable, but avoid letting headline numerals look like memo facts. */
-  return title.replace(/[-+]?\d+(?:\.\d+)?%?/g, 'reported figure');
+  return title
+    .replace(/\bbuy(?:ing|s)?\b/gi, 'acquire')
+    .replace(/\bsell(?:ing|s)?\b/gi, 'divest')
+    .replace(/\bprice target\b/gi, 'valuation target')
+    .replace(/[-+]?\d+(?:\.\d+)?%?/g, 'reported figure');
 }
 
 function proseSafeCaveat(value) {

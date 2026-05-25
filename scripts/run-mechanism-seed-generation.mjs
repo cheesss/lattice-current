@@ -13,6 +13,10 @@ import {
   loadOperatorSeedPrior,
 } from './_shared/mechanism-seed-generator.mjs';
 import {
+  crossThemePriorToSeedInputs,
+  loadOperatorCrossThemePrior,
+} from './_shared/operator-cross-theme-prior.mjs';
+import {
   ensureOperatorResearchSeedSchema,
   upsertOperatorResearchSeeds,
 } from './_shared/operator-research-seeds.mjs';
@@ -56,6 +60,7 @@ export function parseMechanismSeedGenerationArgs(argv = process.argv.slice(2)) {
     dryRun: true,
     source: 'all',
     themes: [],
+    excludeThemes: [],
     limit: 50,
     minScore: null,
     writeJsonl: false,
@@ -64,6 +69,9 @@ export function parseMechanismSeedGenerationArgs(argv = process.argv.slice(2)) {
     enqueueEvidence: false,
     sourceQueryLimit: 100,
     queryLimitPerClass: 2,
+    excludeOperatorPrior: false,
+    excludeOntology: false,
+    excludeOntologySnapshotQuestions: false,
     artifactOut: DEFAULT_ARTIFACT_OUT,
     jsonlOut: DEFAULT_JSONL_OUT,
     reportRoot: DEFAULT_REPORT_ROOT,
@@ -75,6 +83,7 @@ export function parseMechanismSeedGenerationArgs(argv = process.argv.slice(2)) {
     else if (arg === '--apply') out.apply = true;
     else if (arg === '--source') out.source = next() || out.source;
     else if (arg === '--themes') out.themes = parseCsv(next());
+    else if (arg === '--exclude-themes') out.excludeThemes = parseCsv(next());
     else if (arg === '--limit') out.limit = Number(next() || out.limit);
     else if (arg === '--min-score') out.minScore = Number(next());
     else if (arg === '--write-jsonl') out.writeJsonl = true;
@@ -83,12 +92,16 @@ export function parseMechanismSeedGenerationArgs(argv = process.argv.slice(2)) {
     else if (arg === '--enqueue-evidence') out.enqueueEvidence = true;
     else if (arg === '--source-query-limit') out.sourceQueryLimit = Number(next() || out.sourceQueryLimit);
     else if (arg === '--query-limit-per-class') out.queryLimitPerClass = Number(next() || out.queryLimitPerClass);
+    else if (arg === '--exclude-operator-prior') out.excludeOperatorPrior = true;
+    else if (arg === '--exclude-ontology') out.excludeOntology = true;
+    else if (arg === '--exclude-ontology-snapshot-questions') out.excludeOntologySnapshotQuestions = true;
     else if (arg === '--artifact-out') out.artifactOut = path.resolve(next() || out.artifactOut);
     else if (arg === '--jsonl-out') out.jsonlOut = path.resolve(next() || out.jsonlOut);
     else if (arg === '--report-root') out.reportRoot = path.resolve(next() || out.reportRoot);
     else if (arg === '--help' || arg === '-h') out.help = true;
     else if (arg.startsWith('--source=')) out.source = arg.slice('--source='.length);
     else if (arg.startsWith('--themes=')) out.themes = parseCsv(arg.slice('--themes='.length));
+    else if (arg.startsWith('--exclude-themes=')) out.excludeThemes = parseCsv(arg.slice('--exclude-themes='.length));
     else if (arg.startsWith('--limit=')) out.limit = Number(arg.slice('--limit='.length));
     else if (arg.startsWith('--min-score=')) out.minScore = Number(arg.slice('--min-score='.length));
     else if (arg.startsWith('--source-query-limit=')) out.sourceQueryLimit = Number(arg.slice('--source-query-limit='.length));
@@ -113,8 +126,9 @@ universal_research_subjects, canonical graph, source registry, or provider
 activation state.
 
 Options:
-  --source <research-questions|adjacent|reports|ontology|all>
+  --source <research-questions|adjacent|reports|ontology|cross-theme-prior|all>
   --themes <csv>
+  --exclude-themes <csv>
   --limit <n>
   --min-score <number>
   --write-jsonl
@@ -123,6 +137,9 @@ Options:
   --enqueue-evidence       Requires --apply. Queues seed-scoped source-query approvals only.
   --source-query-limit <n>
   --query-limit-per-class <n>
+  --exclude-operator-prior
+  --exclude-ontology
+  --exclude-ontology-snapshot-questions
   --artifact-out <path>
   --jsonl-out <path>
   --report-root <path>
@@ -182,7 +199,7 @@ function uniqueById(values = [], preferredKey = 'id') {
 }
 
 async function loadThemeOntology() {
-  return readJsonIfExists(path.join(process.cwd(), 'config', 'theme-ontology.defaults.json')) || {};
+  return (await readJsonIfExists(path.join(process.cwd(), 'config', 'theme-ontology.defaults.json'))) || {};
 }
 
 async function loadRecentReportArtifacts(reportRoot = DEFAULT_REPORT_ROOT, limit = 20) {
@@ -225,14 +242,34 @@ function filterInputsByThemes(inputs = {}, themes = []) {
   };
 }
 
+function excludeInputsByThemes(inputs = {}, themes = []) {
+  const filters = uniqueStrings(themes.map((theme) => theme.toLowerCase()), 20);
+  if (!filters.length) return inputs;
+  const hit = (value = {}) => {
+    const text = JSON.stringify(value).toLowerCase();
+    return filters.some((theme) => text.includes(theme));
+  };
+  return {
+    ...inputs,
+    researchQuestions: asArray(inputs.researchQuestions).filter((item) => !hit(item)),
+    adjacentCandidates: asArray(inputs.adjacentCandidates).filter((item) => !hit(item)),
+    reportArtifacts: asArray(inputs.reportArtifacts).filter((item) => !hit(item)),
+    inputs: asArray(inputs.inputs).filter((item) => !hit(item)),
+    ontology: {
+      ...(inputs.ontology || {}),
+      archetypes: asArray(inputs.ontology?.archetypes).filter((item) => !hit(item)),
+    },
+  };
+}
+
 async function buildSeedInputs(options = {}) {
   const source = String(options.source || 'all').toLowerCase();
   const include = (name) => source === 'all' || source === name;
   const runtime = await loadRuntimeInputs();
-  const ontology = include('ontology') ? await loadThemeOntology() : {};
+  const ontology = include('ontology') && !options.excludeOntology ? await loadThemeOntology() : {};
   const reportArtifacts = include('reports') ? await loadRecentReportArtifacts(options.reportRoot, Math.max(10, Number(options.limit || 50))) : [];
   const snapshotQuestions = [];
-  if (include('research-questions') || source === 'all') {
+  if ((include('research-questions') || source === 'all') && !options.excludeOntologySnapshotQuestions) {
     const generated = generateResearchQuestions({
       themes: asArray(ontology.archetypes).map((item) => ({
         key: asArray(item.themeIds)[0] || item.key,
@@ -252,7 +289,11 @@ async function buildSeedInputs(options = {}) {
     reportArtifacts,
     ontology,
   };
-  return filterInputsByThemes(inputs, options.themes || []);
+  if (!options.excludeOperatorPrior && (source === 'all' || source === 'cross-theme-prior' || source === 'operator-cross-theme-prior')) {
+    const crossThemePrior = loadOperatorCrossThemePrior();
+    inputs.inputs = crossThemePriorToSeedInputs(crossThemePrior, { limitPerPrior: 8 });
+  }
+  return excludeInputsByThemes(filterInputsByThemes(inputs, options.themes || []), options.excludeThemes || []);
 }
 
 async function writeJson(filePath, payload) {
@@ -294,8 +335,14 @@ export async function runMechanismSeedGeneration(options = {}) {
     mode: options.apply ? 'apply' : 'dry-run',
     source: options.source || 'all',
     themes: options.themes || [],
+    excludeThemes: options.excludeThemes || [],
     artifactPath: options.artifactOut,
     jsonlPath: options.writeJsonl ? options.jsonlOut : null,
+    exclusions: {
+      operatorPrior: Boolean(options.excludeOperatorPrior),
+      ontology: Boolean(options.excludeOntology),
+      ontologySnapshotQuestions: Boolean(options.excludeOntologySnapshotQuestions),
+    },
     boundaries: {
       dbWrites: 0,
       approvalQueueWrites: 0,
@@ -325,6 +372,7 @@ export async function runMechanismSeedGeneration(options = {}) {
         options: {
           source: options.source || 'all',
           themes: options.themes || [],
+          excludeThemes: options.excludeThemes || [],
           limit: options.limit,
           minScore: options.minScore,
           includeRejected: Boolean(options.includeRejected),

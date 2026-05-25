@@ -31,6 +31,11 @@ function unique(values = []) {
   return [...new Set(asArray(values).map(compactText).filter(Boolean))];
 }
 
+function flattenValues(value) {
+  if (Array.isArray(value)) return value.flatMap((item) => flattenValues(item));
+  return value === undefined || value === null || value === '' ? [] : [value];
+}
+
 export const DISCOVERY_EVIDENCE_CLASSES = [
   'supplier_capacity',
   'technical_qualification',
@@ -666,6 +671,59 @@ function promotionEvidenceClassesForBundle(bundle = {}) {
   return evidenceClassListFromContract(bundle).filter((item) => item !== 'negative_control');
 }
 
+function finalDryRunEvidenceMatrixRows(bundle = {}) {
+  const finalDryRun = Boolean(
+    bundle.subject?.metadata?.finalInvestmentDryRun
+      || bundle.subject?.metadata?.validatedCrossThemeExport
+      || bundle.metadata?.finalInvestmentDryRun,
+  );
+  if (!finalDryRun) return [];
+  const deep = bundle.metadata?.deepResearch || {};
+  return [
+    ...asArray(deep.evidenceClassMatrix),
+    ...asArray(deep.crossThemeActionBridge?.evidenceMatrix),
+    ...asArray(deep.packs?.crossThemeActionBridge?.evidenceMatrix),
+  ];
+}
+
+function finalDryRunAcceptedMatrixRows(bundle = {}) {
+  return finalDryRunEvidenceMatrixRows(bundle).filter((row) => {
+    const acceptedCount = num(row.directCount ?? row.acceptedCount ?? row.contextCount, 0);
+    const status = normalize(row.status || row.state || row.latestRunResult || '');
+    if (acceptedCount <= 0) return false;
+    if (/\b(missing|blocked|rejected|inconclusive|raw_only|weak_noise)\b/i.test(status)) return false;
+    return true;
+  });
+}
+
+function finalDryRunAcceptedClasses(bundle = {}, promotionClasses = []) {
+  const allowed = new Set(asArray(promotionClasses).map(compactText));
+  return unique(finalDryRunAcceptedMatrixRows(bundle)
+    .map((row) => compactText(row.evidenceClass))
+    .filter((klass) => allowed.has(klass)));
+}
+
+function finalDryRunAcceptedSourceGroups(bundle = {}) {
+  return unique(finalDryRunAcceptedMatrixRows(bundle)
+    .flatMap((row) => flattenValues(row.sourceGroups || row.sourceGroup || row.publisher || row.sourceType))
+    .filter((group) => !/^\s*(accepted evidence source|source-evidence)\s*$/i.test(String(group || ''))));
+}
+
+function metricValue(bundle = {}, metricId = '') {
+  const row = asArray(bundle.metrics).find((item) => item.metricId === metricId);
+  return num(row?.value, 0);
+}
+
+function finalDryRunAcceptedSourceBreadth(bundle = {}) {
+  const sourceBreadthRows = finalDryRunAcceptedMatrixRows(bundle)
+    .filter((row) => compactText(row.evidenceClass) === 'source_breadth');
+  const matrixBreadth = Math.max(
+    0,
+    ...sourceBreadthRows.map((row) => num(row.independentSourceBreadth ?? row.directCount ?? row.acceptedCount, 0)),
+  );
+  return Math.max(matrixBreadth, metricValue(bundle, 'MET-FINAL-SOURCE-BREADTH'));
+}
+
 export function scoreCrossThemeAnchorFit(anchor = {}, bundle = {}) {
   const text = evidenceText(anchor);
   const strictEndogenous = isStrictEndogenousBundle(bundle);
@@ -934,13 +992,28 @@ export function computeCrossThemeDiscoveryQuality(bundle = {}) {
   const highFit = promotionEvidence.filter((row) => row.crossThemeFit?.label === 'high');
   const mediumFit = promotionEvidence.filter((row) => row.crossThemeFit?.label === 'medium');
   const directHigh = highFit.filter((row) => row.direct).length;
-  const sourceGroups = unique(promotionEvidence
+  const promotionSourceGroups = unique(promotionEvidence
     .map((row) => row.sourceGroup)
     .filter((group) => group && !['lattice-research-os', 'market-research', 'source-evidence'].includes(group)));
-  const bodySourceDiversity = sourceGroups.length ? clamp(sourceGroups.length / 5) : 0;
-  const coveredClasses = unique(promotionEvidence
+  const acceptedMatrixSourceGroups = finalDryRunAcceptedSourceGroups(bundle);
+  const acceptedMatrixSourceBreadth = finalDryRunAcceptedSourceBreadth(bundle);
+  const sourceGroupCount = Math.max(
+    promotionSourceGroups.length,
+    acceptedMatrixSourceGroups.length,
+    acceptedMatrixSourceBreadth,
+  );
+  const sourceGroups = unique([
+    ...promotionSourceGroups,
+    ...acceptedMatrixSourceGroups,
+  ]);
+  const bodySourceDiversity = sourceGroupCount ? clamp(sourceGroupCount / 5) : 0;
+  const acceptedMatrixCoveredClasses = finalDryRunAcceptedClasses(bundle, promotionClasses);
+  const coveredClasses = unique([
+    ...promotionEvidence
     .map((row) => row.desiredEvidenceClass)
-    .filter((klass) => promotionClasses.includes(klass)));
+      .filter((klass) => promotionClasses.includes(klass)),
+    ...acceptedMatrixCoveredClasses,
+  ]);
   const missingEvidenceClasses = promotionClasses
     .filter((klass) => !coveredClasses.includes(klass));
   const evidenceClassCoverage = clamp(coveredClasses.length / Math.max(1, promotionClasses.length));
@@ -998,7 +1071,7 @@ export function computeCrossThemeDiscoveryQuality(bundle = {}) {
     ? highFit.length / promotionEvidence.length
     : 0;
   const noiseRatio = appendixEvidence.length / Math.max(1, bodyEvidence.length + appendixEvidence.length);
-  const negativeControlPass = (negativeControlSupport || negativeControlChecked) && sourceGroups.length >= 2 && directHigh >= 1 ? 1 : 0;
+  const negativeControlPass = (negativeControlSupport || negativeControlChecked) && sourceGroupCount >= 2 && directHigh >= 1 ? 1 : 0;
   const evidenceBacked = Math.min(1, promotionEvidence.length / 4);
   const score = Math.round((
     0.18 * novelty
@@ -1026,8 +1099,9 @@ export function computeCrossThemeDiscoveryQuality(bundle = {}) {
     requiredEvidenceClasses: discoveryClasses,
     evidenceClassesCovered: coveredClasses,
     missingEvidenceClasses,
-    independentSourceGroupCount: sourceGroups.length,
+    independentSourceGroupCount: sourceGroupCount,
     independentSourceGroups: sourceGroups,
+    acceptedMatrixSourceBreadth,
     highFitAnchorCount: highFit.length,
     mediumFitAnchorCount: mediumFit.length,
     directHighFitAnchorCount: directHigh,
