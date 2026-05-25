@@ -17,7 +17,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { loadEnvFile } from './_seed-utils.mjs';
+import { resolveNasPgConfig } from './_shared/nas-runtime.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -26,9 +28,24 @@ const GDELT_RATE_LIMIT_MS = Number(process.env.GDELT_RATE_LIMIT_MS) || 6000;
 const YAHOO_BATCH_SIZE = Number(process.env.YAHOO_BATCH_SIZE) || 30; // raised from 10 — at 5 syms/2h the warm store fell 24+ days behind
 const SIDECAR_PORT = Number(process.env.SIDECAR_PORT) || 46123;
 const MAX_BACKFILL_DAYS = Number(process.env.MAX_BACKFILL_DAYS) || 365;
+const SIDECAR_REQUEST_TIMEOUT_MS = Number(process.env.SIDECAR_REQUEST_TIMEOUT_MS) || 30_000;
+const PENDING_IMPORT_DRAIN_LIMIT = Number(process.env.DATA_ACCUMULATOR_PENDING_IMPORT_LIMIT) || 25;
+const GDELT_RETRY_DRAIN_LIMIT = Number(process.env.GDELT_RETRY_DRAIN_LIMIT) || 12;
+const GDELT_FETCH_RETRIES = Number(process.env.GDELT_FETCH_RETRIES) || 2;
+const GDELT_FETCH_TIMEOUT_MS = Number(process.env.GDELT_FETCH_TIMEOUT_MS) || 30_000;
+const REPLAY_MAX_FRAMES = Math.max(24, Number(process.env.DATA_ACCUMULATOR_REPLAY_MAX_FRAMES) || 120);
+const REPLAY_REQUEST_TIMEOUT_MS = Number(process.env.DATA_ACCUMULATOR_REPLAY_REQUEST_TIMEOUT_MS) || 180_000;
+const REPLAY_JOB_TIMEOUT_MS = Number(process.env.DATA_ACCUMULATOR_REPLAY_JOB_TIMEOUT_MS) || 180_000;
 
 const runOnce = process.argv.includes('--once');
 const backfillAll = process.argv.includes('--backfill-all');
+const isDirectRun = (() => {
+  try {
+    return Boolean(process.argv[1]) && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
 
 function listRunningAccumulatorPeers() {
   try {
@@ -64,7 +81,7 @@ function listRunningAccumulatorPeers() {
   }
 }
 
-if (!runOnce) {
+if (isDirectRun && !runOnce) {
   const peers = listRunningAccumulatorPeers();
   if (peers.length > 0) {
     process.stderr.write(`[data-accumulator] already running (pid ${peers[0].pid}); refusing duplicate persistent daemon\n`);
@@ -73,7 +90,7 @@ if (!runOnce) {
 }
 
 // Global safety timeout — kill the process if it hangs (10 min for --once, 0 for daemon)
-if (runOnce) {
+if (isDirectRun && runOnce) {
   const TIMEOUT_MS = Number(process.env.SCRIPT_TIMEOUT_MS || 10 * 60 * 1000);
   setTimeout(() => {
     process.stderr.write('[data-accumulator] global timeout reached, forcing exit\n');
@@ -91,6 +108,8 @@ const projectRoot = path.resolve(scriptDir, '..');
 
 // State file to track backfill progress across restarts
 const stateFile = path.join(projectRoot, 'data', 'historical', 'accumulator-state.json');
+const automationArtifactRoot = path.join(projectRoot, 'data', 'historical', 'automation');
+const rawFileCleanupLedgerPath = path.join(projectRoot, 'data', 'historical', 'import-cleanup-ledger.jsonl');
 
 // ---------------------------------------------------------------------------
 // State persistence
@@ -114,6 +133,12 @@ function loadState() {
     retiredQueries: [],
     validationLog: [],
     codexHistory: [],
+    pendingImports: [],
+    gdeltRetryQueue: [],
+    lastReplay: null,
+    lastImportDrain: null,
+    lastGdeltRetryDrain: null,
+    lastRawFileCleanup: null,
     limits: { maxQueries: 20, maxSymbols: 100, retireAfterDaysNoArticles: 30, codexEveryNCycles: 5 },
   };
   try {
@@ -155,47 +180,401 @@ function safeFilename(str) {
   return str.replace(/[:.]/g, '-');
 }
 
-/**
- * POST JSON to the sidecar and return parsed response.
- */
-function sidecarPost(urlPath, payload) {
+function recentImportedDatasetIds(state, sinceIso, limit = 50) {
+  const sinceMs = Date.parse(sinceIso || '');
+  const rows = Array.isArray(state?.lastSuccessfulImports) ? state.lastSuccessfulImports : [];
+  return [...new Set(rows
+    .filter((row) => !Number.isFinite(sinceMs) || Date.parse(row.importedAt || '') >= sinceMs)
+    .map((row) => String(row.datasetId || '').trim())
+    .filter(Boolean))]
+    .slice(0, Math.max(1, Number(limit) || 50));
+}
+
+export function classifySidecarFailure({ statusCode = 0, error = '', bodyPreview = '' } = {}) {
+  const normalizedError = String(error || '').toLowerCase();
+  const preview = String(bodyPreview || '').toLowerCase();
+  const combined = `${normalizedError} ${preview}`;
+  if (/postgres config required|missing postgresql password|missing postgres/i.test(combined)) {
+    return { code: 'postgres_config_missing', retryable: false };
+  }
+  if (statusCode === 423
+    || /duckdb path is locked|manual backtest job is already running|already running or finalizing|file is already open|lock busy|busy lock|database is locked/i.test(combined)) {
+    return { code: 'busy_lock', retryable: true };
+  }
+  if (statusCode === 502) return { code: 'bad_gateway', retryable: true };
+  if (statusCode >= 500) return { code: 'server_error', retryable: true };
+  if (normalizedError.includes('timeout')) return { code: 'timeout', retryable: true };
+  if (normalizedError.includes('econnrefused') || normalizedError.includes('fetch failed') || normalizedError.includes('connect')) {
+    return { code: 'sidecar_unreachable', retryable: true };
+  }
+  if (normalizedError.includes('invalid json')) return { code: 'invalid_json', retryable: true };
+  return { code: error || 'sidecar_error', retryable: statusCode === 0 || statusCode >= 500 };
+}
+
+function envFlag(name) {
+  return ['1', 'true', 'yes', 'on'].includes(String(process.env[name] || '').trim().toLowerCase());
+}
+
+function shouldRequestPostgresSync(options = {}) {
+  if (options.postgresSync === true || options.postgresSync === false) return options.postgresSync;
+  return envFlag('DATA_ACCUMULATOR_POSTGRES_SYNC')
+    || envFlag('LOCAL_INTELLIGENCE_AUTO_PG_SYNC')
+    || envFlag('BACKTEST_NAS_AUTO_SYNC');
+}
+
+function shouldCleanupImportedRaw(options = {}) {
+  if (options.cleanupImportedRaw === true || options.cleanupImportedRaw === false) return options.cleanupImportedRaw;
+  if (envFlag('DATA_ACCUMULATOR_KEEP_IMPORTED_RAW')) return false;
+  return true;
+}
+
+function postgresSyncPayload(options = {}) {
+  const postgresSync = shouldRequestPostgresSync(options);
+  if (!postgresSync) return {};
+  if (options.pgConfig) return { postgresSync: true, pgConfig: options.pgConfig };
+  try {
+    return { postgresSync: true, pgConfig: resolveNasPgConfig(options.pg || {}) };
+  } catch {
+    return { postgresSync: true };
+  }
+}
+
+function postgresSyncSucceeded(result) {
+  const sync = result?.postgresSyncResult;
+  if (!sync) return false;
+  if (sync.ok === true) return true;
+  if (sync.result?.ok === true) return true;
+  if (Number(sync.result?.rowCount || sync.rowCount || sync.upserted || sync.inserted || 0) > 0) return true;
+  return false;
+}
+
+function isInsideDir(filePath, rootDir) {
+  const relative = path.relative(path.resolve(rootDir), path.resolve(filePath));
+  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function cleanupRootDir(options = {}) {
+  return path.resolve(options.cleanupRootDir || automationArtifactRoot);
+}
+
+function writeCleanupLedger(row, options = {}) {
+  const ledgerPath = path.resolve(options.cleanupLedgerPath || rawFileCleanupLedgerPath);
+  fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+  fs.appendFileSync(ledgerPath, `${JSON.stringify(row)}\n`, 'utf8');
+}
+
+export function cleanupImportedRawFile({
+  filePath,
+  datasetId,
+  provider,
+  result,
+  postgresSync = false,
+  state = null,
+  options = {},
+} = {}) {
+  const resolved = path.resolve(String(filePath || ''));
+  const rootDir = cleanupRootDir(options);
+  const base = {
+    datasetId: String(datasetId || ''),
+    provider: String(provider || ''),
+    filePath: resolved,
+    at: new Date().toISOString(),
+  };
+  if (!shouldCleanupImportedRaw(options)) return { ...base, ok: false, skipped: true, reason: 'cleanup_disabled' };
+  if (!postgresSync) return { ...base, ok: false, skipped: true, reason: 'postgres_sync_not_requested' };
+  if (!postgresSyncSucceeded(result)) return { ...base, ok: false, skipped: true, reason: 'postgres_sync_not_confirmed' };
+  if (!resolved.endsWith('.json')) return { ...base, ok: false, skipped: true, reason: 'not_json_file' };
+  if (!isInsideDir(resolved, rootDir)) return { ...base, ok: false, skipped: true, reason: 'outside_cleanup_root' };
+  if (!fs.existsSync(resolved)) return { ...base, ok: true, skipped: true, reason: 'already_missing' };
+
+  const stat = fs.statSync(resolved);
+  fs.unlinkSync(resolved);
+  const cleanup = {
+    ...base,
+    ok: true,
+    deleted: true,
+    bytes: stat.size,
+    rawRecordCount: Number(result?.result?.rawRecordCount || 0),
+    frameCount: Number(result?.result?.frameCount || 0),
+    postgresSyncResult: {
+      ok: result?.postgresSyncResult?.ok ?? result?.postgresSyncResult?.result?.ok ?? true,
+      rowCount: result?.postgresSyncResult?.result?.rowCount
+        ?? result?.postgresSyncResult?.rowCount
+        ?? result?.postgresSyncResult?.upserted
+        ?? null,
+    },
+  };
+  writeCleanupLedger(cleanup, options);
+  if (state) {
+    state.lastRawFileCleanup = cleanup;
+    state.rawFileCleanupCount = Number(state.rawFileCleanupCount || 0) + 1;
+  }
+  return cleanup;
+}
+
+function recordSuccessfulImport(state, { datasetId, provider, filePath, result, postgresSync, cleanup = null }) {
+  if (!state) return;
+  if (cleanup?.deleted) {
+    state.lastRawFileCleanup = cleanup;
+    state.rawFileCleanupCount = Number(state.rawFileCleanupCount || 0) + 1;
+  }
+  state.lastSuccessfulImports = Array.isArray(state.lastSuccessfulImports) ? state.lastSuccessfulImports : [];
+  state.lastSuccessfulImports.unshift({
+    datasetId,
+    provider,
+    filePath: path.resolve(filePath),
+    importedAt: new Date().toISOString(),
+    rawRecordCount: Number(result?.result?.rawRecordCount || 0),
+    frameCount: Number(result?.result?.frameCount || 0),
+    postgresSyncRequested: postgresSync,
+    postgresSyncResult: result?.postgresSyncResult || null,
+    cleanup,
+  });
+  state.lastSuccessfulImports = state.lastSuccessfulImports.slice(0, 100);
+}
+
+export function cleanupSuccessfulImportFiles(state, options = {}) {
+  const rows = Array.isArray(state?.lastSuccessfulImports) ? state.lastSuccessfulImports : [];
+  const pendingPaths = new Set((Array.isArray(state?.pendingImports) ? state.pendingImports : [])
+    .map((row) => path.resolve(String(row.filePath || '')))
+    .filter(Boolean));
+  const limit = Math.max(1, Number(options.limit || 100));
+  const summary = { ok: true, attempted: 0, deleted: 0, skipped: 0, failed: 0, bytes: 0, results: [] };
+  for (const row of rows.slice(0, limit)) {
+    const filePath = path.resolve(String(row.filePath || ''));
+    if (!filePath || pendingPaths.has(filePath)) {
+      summary.skipped += 1;
+      continue;
+    }
+    summary.attempted += 1;
+    try {
+      const result = {
+        result: {
+          rawRecordCount: row.rawRecordCount,
+          frameCount: row.frameCount,
+        },
+        postgresSyncResult: row.postgresSyncResult,
+      };
+      const cleanup = cleanupImportedRawFile({
+        filePath,
+        datasetId: row.datasetId,
+        provider: row.provider,
+        result,
+        postgresSync: row.postgresSyncRequested,
+        state,
+        options,
+      });
+      if (cleanup.deleted) {
+        summary.deleted += 1;
+        summary.bytes += Number(cleanup.bytes || 0);
+      } else {
+        summary.skipped += 1;
+      }
+      summary.results.push(cleanup);
+    } catch (error) {
+      summary.ok = false;
+      summary.failed += 1;
+      summary.results.push({
+        filePath,
+        datasetId: row.datasetId,
+        ok: false,
+        error: String(error?.message || error),
+      });
+    }
+  }
+  state.lastRawFileCleanupDrain = { ...summary, at: new Date().toISOString(), results: summary.results.slice(0, 20) };
+  return summary;
+}
+
+function sidecarRequest(method, urlPath, payload = null, options = {}) {
   return new Promise((resolve) => {
-    const data = JSON.stringify(payload);
+    const hasBody = method !== 'GET' && method !== 'HEAD';
+    const data = hasBody ? JSON.stringify(payload || {}) : '';
+    const headers = hasBody
+      ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+      : {};
     const req = http.request(
       {
         hostname: '127.0.0.1',
-        port: SIDECAR_PORT,
+        port: Number(options.port || SIDECAR_PORT),
         path: urlPath,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+        method,
+        headers,
       },
       (res) => {
         let body = '';
-        res.on('data', (c) => (body += c));
+        res.on('data', (c) => {
+          body += c;
+          if (body.length > 2_000_000) body = body.slice(-2_000_000);
+        });
         res.on('end', () => {
+          const statusCode = Number(res.statusCode || 0);
+          const bodyPreview = body.slice(0, 1_000);
+          let parsed = null;
           try {
-            resolve(JSON.parse(body));
+            parsed = body ? JSON.parse(body) : null;
           } catch {
-            resolve(null);
+            const failure = classifySidecarFailure({ statusCode, error: 'invalid_json', bodyPreview });
+            resolve({ ok: false, statusCode, error: failure.code, retryable: failure.retryable, bodyPreview, parsed: null });
+            return;
           }
+          if (statusCode >= 200 && statusCode < 300 && parsed?.ok !== false) {
+            resolve({ ok: true, statusCode, error: null, retryable: false, bodyPreview, parsed });
+            return;
+          }
+          const failure = classifySidecarFailure({
+            statusCode,
+            error: parsed?.error || parsed?.message || `HTTP ${statusCode}`,
+            bodyPreview,
+          });
+          resolve({ ok: false, statusCode, error: failure.code, retryable: failure.retryable, bodyPreview, parsed });
         });
       },
     );
-    req.on('error', () => resolve(null));
-    req.write(data);
+    req.setTimeout(Number(options.timeoutMs || SIDECAR_REQUEST_TIMEOUT_MS), () => {
+      req.destroy(new Error('timeout'));
+    });
+    req.on('error', (error) => {
+      const failure = classifySidecarFailure({ statusCode: 0, error: error?.message || error });
+      resolve({ ok: false, statusCode: 0, error: failure.code, retryable: failure.retryable, bodyPreview: '', parsed: null });
+    });
+    if (hasBody) req.write(data);
     req.end();
   });
 }
 
-async function importToSidecar(filePath, datasetId, provider) {
-  const result = await sidecarPost('/api/local-intelligence-import', {
+/**
+ * POST JSON to the sidecar and return a structured response.
+ */
+export function sidecarPost(urlPath, payload, options = {}) {
+  return sidecarRequest('POST', urlPath, payload, options);
+}
+
+export function sidecarGet(urlPath, options = {}) {
+  return sidecarRequest('GET', urlPath, null, options);
+}
+
+function retryDelayMs(attempts = 0) {
+  const base = 5 * 60_000;
+  return Math.min(6 * 60 * 60_000, base * Math.max(1, 2 ** Math.min(6, attempts)));
+}
+
+export function recordPendingImport(state, item = {}) {
+  if (!state) return null;
+  state.pendingImports = Array.isArray(state.pendingImports) ? state.pendingImports : [];
+  const filePath = path.resolve(String(item.filePath || ''));
+  const datasetId = String(item.datasetId || '').trim();
+  const provider = String(item.provider || '').trim();
+  if (!filePath || !datasetId || !provider) return null;
+  const key = `${datasetId}|${filePath}`;
+  const existing = state.pendingImports.find((row) => row.key === key);
+  const attempts = Number(existing?.attempts || item.attempts || 0);
+  const next = {
+    ...(existing || {}),
+    key,
+    filePath,
+    datasetId,
+    provider,
+    attempts,
+    lastError: String(item.lastError || existing?.lastError || 'sidecar_unreachable'),
+    lastAttemptAt: item.lastAttemptAt || existing?.lastAttemptAt || null,
+    nextAttemptAt: item.nextAttemptAt || new Date(Date.now() + retryDelayMs(attempts)).toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  if (existing) Object.assign(existing, next);
+  else state.pendingImports.push(next);
+  if (isDirectRun) saveState(state);
+  return next;
+}
+
+export async function importToSidecar(filePath, datasetId, provider, state = null, options = {}) {
+  const postgresSync = shouldRequestPostgresSync(options);
+  const response = await sidecarPost('/api/local-intelligence-import', {
     filePath: path.resolve(filePath),
     options: { datasetId, provider, bucketHours: 6, warmupFrameCount: 10 },
-  });
-  if (result?.result?.frameCount > 0) {
+    ...postgresSyncPayload(options),
+  }, options);
+  const result = response.parsed;
+  if (response.ok && result?.result?.frameCount > 0) {
     console.log(`  imported ${datasetId}: ${result.result.rawRecordCount} raw -> ${result.result.frameCount} frames`);
   }
-  return result;
+  let cleanup = null;
+  if (response.ok) {
+    cleanup = cleanupImportedRawFile({
+      filePath,
+      datasetId,
+      provider,
+      result,
+      postgresSync,
+      state,
+      options,
+    });
+    response.cleanup = cleanup;
+  }
+  if (response.ok && state) {
+    recordSuccessfulImport(state, {
+      datasetId,
+      provider,
+      filePath,
+      result,
+      postgresSync,
+      cleanup,
+    });
+  }
+  if (!response.ok && state) {
+    recordPendingImport(state, {
+      filePath,
+      datasetId,
+      provider,
+      lastError: response.error,
+      lastAttemptAt: new Date().toISOString(),
+    });
+  }
+  return response;
+}
+
+export async function drainPendingImports(state, options = {}) {
+  if (!state) return { ok: true, attempted: 0, imported: 0, remaining: 0, skipped: true };
+  state.pendingImports = Array.isArray(state.pendingImports) ? state.pendingImports : [];
+  const now = Date.now();
+  const due = state.pendingImports
+    .filter((row) => !row.nextAttemptAt || Date.parse(row.nextAttemptAt) <= now)
+    .slice(0, Math.max(1, Number(options.limit || PENDING_IMPORT_DRAIN_LIMIT)));
+  const summary = { ok: true, attempted: 0, imported: 0, failed: 0, remaining: state.pendingImports.length, lastError: null, importedDatasetIds: [] };
+  if (!due.length) {
+    state.lastImportDrain = { ...summary, skipped: true, reason: 'no_due_pending_imports', at: new Date().toISOString() };
+    return state.lastImportDrain;
+  }
+  for (const item of due) {
+    summary.attempted += 1;
+    const response = await importToSidecar(item.filePath, item.datasetId, item.provider, null, options);
+    if (response.ok) {
+      summary.imported += 1;
+      if (item.datasetId) summary.importedDatasetIds.push(item.datasetId);
+      recordSuccessfulImport(state, {
+        datasetId: item.datasetId,
+        provider: item.provider,
+        filePath: item.filePath,
+        result: response.parsed,
+        postgresSync: shouldRequestPostgresSync(options),
+        cleanup: response.cleanup || null,
+      });
+      state.pendingImports = state.pendingImports.filter((row) => row.key !== item.key);
+      continue;
+    }
+    summary.failed += 1;
+    summary.ok = false;
+    summary.lastError = response.error;
+    item.attempts = Number(item.attempts || 0) + 1;
+    item.lastError = response.error;
+    item.lastAttemptAt = new Date().toISOString();
+    item.nextAttemptAt = new Date(Date.now() + retryDelayMs(item.attempts)).toISOString();
+    if (response.error === 'sidecar_unreachable') break;
+  }
+  summary.remaining = state.pendingImports.length;
+  state.lastImportDrain = { ...summary, at: new Date().toISOString() };
+  if (isDirectRun) saveState(state);
+  return state.lastImportDrain;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +626,7 @@ async function fetchYahooPrices(symbols, state) {
         }),
       );
 
-      await importToSidecar(outPath, `yahoo-${sym}`, 'yahoo-chart');
+      await importToSidecar(outPath, `yahoo-${sym}`, 'yahoo-chart', state);
       fetched++;
     } catch {
       // skip individual symbol failures
@@ -260,7 +639,184 @@ async function fetchYahooPrices(symbols, state) {
 // GDELT backfill
 // ---------------------------------------------------------------------------
 
-async function fetchGdeltBackfill(state) {
+function gdeltRetryKey(item = {}) {
+  return [
+    item.queryName || item.name || 'query',
+    item.start || '',
+    item.end || '',
+    item.q || '',
+  ].join('|');
+}
+
+function buildGdeltUrl({ q, start, end, maxrecords = '250' }) {
+  const params = new URLSearchParams({
+    query: `${q} sourcelang:english`,
+    mode: 'ArtList',
+    format: 'json',
+    maxrecords: String(maxrecords),
+    startdatetime: formatGdeltDate(new Date(start)),
+    enddatetime: formatGdeltDate(new Date(end)),
+  });
+  return `http://api.gdeltproject.org/api/v2/doc/doc?${params}`;
+}
+
+function isRetryableFetchStatus(statusCode) {
+  return statusCode === 429 || statusCode === 408 || statusCode >= 500;
+}
+
+export async function fetchWithRetry(url, options = {}) {
+  const fetchImpl = options.fetchImpl || fetch;
+  const retries = Math.max(0, Number(options.retries ?? GDELT_FETCH_RETRIES));
+  const timeoutMs = Math.max(1_000, Number(options.timeoutMs || GDELT_FETCH_TIMEOUT_MS));
+  let last = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
+      const text = await response.text();
+      if (response.ok) {
+        return { ok: true, statusCode: response.status, text, attempts: attempt + 1, bodyPreview: text.slice(0, 500) };
+      }
+      last = {
+        ok: false,
+        statusCode: response.status,
+        error: `HTTP ${response.status}`,
+        retryable: isRetryableFetchStatus(response.status),
+        text: '',
+        bodyPreview: text.slice(0, 500),
+        attempts: attempt + 1,
+      };
+      if (!last.retryable) break;
+    } catch (error) {
+      last = {
+        ok: false,
+        statusCode: 0,
+        error: String(error?.name === 'TimeoutError' ? 'timeout' : error?.message || error),
+        retryable: true,
+        text: '',
+        bodyPreview: '',
+        attempts: attempt + 1,
+      };
+    }
+    if (attempt < retries) await sleep(Math.min(30_000, 1_000 * (attempt + 1)));
+  }
+  return last || { ok: false, statusCode: 0, error: 'fetch_failed', retryable: true, text: '', bodyPreview: '', attempts: 0 };
+}
+
+export async function fetchGdeltArticles(window, options = {}) {
+  const url = buildGdeltUrl(window);
+  const result = await fetchWithRetry(url, options);
+  if (!result.ok) {
+    return { ...result, queryName: window.name || window.queryName, q: window.q, start: window.start, end: window.end, articles: [] };
+  }
+  try {
+    const articles = JSON.parse(result.text)?.articles || [];
+    return {
+      ok: true,
+      statusCode: result.statusCode,
+      attempts: result.attempts,
+      queryName: window.name || window.queryName,
+      q: window.q,
+      start: window.start,
+      end: window.end,
+      articles,
+      noHit: articles.length === 0,
+    };
+  } catch {
+    return {
+      ok: false,
+      statusCode: result.statusCode,
+      error: 'invalid_json',
+      retryable: true,
+      bodyPreview: result.bodyPreview,
+      attempts: result.attempts,
+      queryName: window.name || window.queryName,
+      q: window.q,
+      start: window.start,
+      end: window.end,
+      articles: [],
+    };
+  }
+}
+
+export function recordGdeltRetry(state, item = {}) {
+  if (!state) return null;
+  state.gdeltRetryQueue = Array.isArray(state.gdeltRetryQueue) ? state.gdeltRetryQueue : [];
+  const key = gdeltRetryKey(item);
+  const existing = state.gdeltRetryQueue.find((row) => row.key === key);
+  const attempts = Number(existing?.attempts || 0) + 1;
+  const next = {
+    ...(existing || {}),
+    key,
+    queryName: item.queryName || item.name || existing?.queryName || 'query',
+    q: item.q || existing?.q || '',
+    start: item.start || existing?.start || null,
+    end: item.end || existing?.end || null,
+    attempts,
+    lastError: String(item.lastError || item.error || existing?.lastError || 'fetch_failed'),
+    lastAttemptAt: new Date().toISOString(),
+    nextAttemptAt: new Date(Date.now() + retryDelayMs(attempts)).toISOString(),
+    retryable: item.retryable !== false,
+  };
+  if (existing) Object.assign(existing, next);
+  else state.gdeltRetryQueue.push(next);
+  if (isDirectRun) saveState(state);
+  return next;
+}
+
+async function persistGdeltArticles(state, { name, start, end, articles }) {
+  const dir = path.join(projectRoot, 'data', 'historical', 'automation', `gdelt-backfill-${name}`);
+  fs.mkdirSync(dir, { recursive: true });
+  const outPath = path.join(dir, `${formatGdeltDate(new Date(start))}.json`);
+  fs.writeFileSync(
+    outPath,
+    JSON.stringify({
+      fetchedAt: new Date().toISOString(),
+      provider: 'gdelt-doc',
+      envelope: { provider: 'gdelt-doc', data: { articles } },
+    }),
+  );
+  await importToSidecar(outPath, `gdelt-backfill-${name}`, 'gdelt-doc', state);
+  return outPath;
+}
+
+export async function drainGdeltRetryQueue(state, options = {}) {
+  if (!state) return { ok: true, attempted: 0, resolved: 0, remaining: 0, skipped: true };
+  state.gdeltRetryQueue = Array.isArray(state.gdeltRetryQueue) ? state.gdeltRetryQueue : [];
+  const now = Date.now();
+  const due = state.gdeltRetryQueue
+    .filter((row) => !row.nextAttemptAt || Date.parse(row.nextAttemptAt) <= now)
+    .slice(0, Math.max(1, Number(options.limit || GDELT_RETRY_DRAIN_LIMIT)));
+  const summary = { ok: true, attempted: 0, resolved: 0, noHit: 0, failed: 0, remaining: state.gdeltRetryQueue.length, lastError: null };
+  if (!due.length) {
+    state.lastGdeltRetryDrain = { ...summary, skipped: true, reason: 'no_due_gdelt_retries', at: new Date().toISOString() };
+    return state.lastGdeltRetryDrain;
+  }
+  for (const item of due) {
+    await sleep(GDELT_RATE_LIMIT_MS);
+    summary.attempted += 1;
+    const result = await fetchGdeltArticles(item, options);
+    if (result.ok) {
+      if (result.articles.length > 0) {
+        await persistGdeltArticles(state, { name: item.queryName, start: item.start, end: item.end, articles: result.articles });
+        summary.resolved += 1;
+      } else {
+        summary.noHit += 1;
+      }
+      state.gdeltRetryQueue = state.gdeltRetryQueue.filter((row) => row.key !== item.key);
+      continue;
+    }
+    summary.ok = false;
+    summary.failed += 1;
+    summary.lastError = result.error;
+    recordGdeltRetry(state, { ...item, lastError: result.error, retryable: result.retryable });
+  }
+  summary.remaining = state.gdeltRetryQueue.length;
+  state.lastGdeltRetryDrain = { ...summary, at: new Date().toISOString() };
+  if (isDirectRun) saveState(state);
+  return state.lastGdeltRetryDrain;
+}
+
+export async function fetchGdeltBackfill(state, options = {}) {
   console.log(`[accumulator] GDELT backfill from -${state.backfillDayOffset} days...`);
 
   const queries = [
@@ -283,50 +839,53 @@ async function fetchGdeltBackfill(state) {
 
   for (const { name, q } of allQueries) {
     await sleep(GDELT_RATE_LIMIT_MS); // respect rate limits
+    const result = await fetchGdeltArticles({
+      name,
+      q,
+      start: backfillStart.toISOString(),
+      end: backfillEnd.toISOString(),
+    }, options);
     try {
-      const params = new URLSearchParams({
-        query: q + ' sourcelang:english',
-        mode: 'ArtList',
-        format: 'json',
-        maxrecords: '250',
-        startdatetime: formatGdeltDate(backfillStart),
-        enddatetime: formatGdeltDate(backfillEnd),
-      });
-      const res = await fetch(`http://api.gdeltproject.org/api/v2/doc/doc?${params}`);
-      const text = await res.text();
-      let articles = [];
-      try {
-        articles = JSON.parse(text)?.articles || [];
-      } catch {
-        // GDELT sometimes returns non-JSON; skip
-      }
-
-      if (articles.length > 0) {
-        const dir = path.join(projectRoot, 'data', 'historical', 'automation', `gdelt-backfill-${name}`);
-        fs.mkdirSync(dir, { recursive: true });
-        const outPath = path.join(dir, `${formatGdeltDate(backfillStart)}.json`);
-        fs.writeFileSync(
-          outPath,
-          JSON.stringify({
-            fetchedAt: new Date().toISOString(),
-            provider: 'gdelt-doc',
-            envelope: { provider: 'gdelt-doc', data: { articles } },
-          }),
-        );
-
-        await importToSidecar(outPath, `gdelt-backfill-${name}`, 'gdelt-doc');
+      if (result.ok && result.articles.length > 0) {
+        const articles = result.articles;
+        await persistGdeltArticles(state, {
+          name,
+          start: backfillStart.toISOString(),
+          end: backfillEnd.toISOString(),
+          articles,
+        });
         console.log(`  ${name}: ${articles.length} articles (${formatGdeltDate(backfillStart)} -> ${formatGdeltDate(backfillEnd)})`);
 
         // Track article counts for Codex query lifecycle management
         const cq = (state.codexQueries || []).find(cq => cq.name === name);
         if (cq) cq.lastArticleCount = articles.length;
-      } else {
+      } else if (result.ok && result.noHit) {
         console.log(`  ${name}: no articles for window`);
         const cq = (state.codexQueries || []).find(cq => cq.name === name);
         if (cq) cq.lastArticleCount = 0;
+      } else {
+        console.log(`  ${name}: fetch failed - ${result.error || 'unknown'} (retryable=${result.retryable !== false})`);
+        if (result.retryable !== false) {
+          recordGdeltRetry(state, {
+            queryName: name,
+            q,
+            start: backfillStart.toISOString(),
+            end: backfillEnd.toISOString(),
+            lastError: result.error || 'fetch_failed',
+            retryable: true,
+          });
+        }
       }
     } catch (e) {
       console.log(`  ${name}: error - ${e.message}`);
+      recordGdeltRetry(state, {
+        queryName: name,
+        q,
+        start: backfillStart.toISOString(),
+        end: backfillEnd.toISOString(),
+        lastError: e.message || 'fetch_failed',
+        retryable: true,
+      });
     }
   }
 
@@ -342,13 +901,53 @@ async function fetchGdeltBackfill(state) {
 // Replay trigger
 // ---------------------------------------------------------------------------
 
-async function triggerReplay() {
+export async function triggerReplay(state = null, options = {}) {
   console.log('[accumulator] triggering replay...');
-  const result = await sidecarPost('/api/local-intelligence-replay', {
-    frameLoadOptions: { includeWarmup: true },
-    options: { label: 'auto-accumulation' },
+  const datasetIds = Array.isArray(options.datasetIds)
+    ? [...new Set(options.datasetIds.map((value) => String(value || '').trim()).filter(Boolean))]
+    : [];
+  const postgresSync = shouldRequestPostgresSync(options);
+  const replayPayload = {
+    frameLoadOptions: {
+      includeWarmup: true,
+      latestFirst: true,
+      maxFrames: Math.max(24, Number(options.maxFrames || REPLAY_MAX_FRAMES)),
+      ...(datasetIds.length ? { datasetIds } : {}),
+      ...(options.frameLoadOptions || {}),
+    },
+    options: {
+      label: 'auto-accumulation',
+      retainLearningState: false,
+      recordAdaptation: false,
+      ...(options.replayOptions || {}),
+    },
+    timeoutMs: Number(options.jobTimeoutMs || REPLAY_JOB_TIMEOUT_MS),
+    ...postgresSyncPayload(options),
+  };
+  const response = await sidecarPost('/api/local-intelligence-replay', replayPayload, {
+    ...options,
+    timeoutMs: Number(options.timeoutMs || REPLAY_REQUEST_TIMEOUT_MS),
   });
 
+  if (!response.ok) {
+    const status = response.error === 'busy_lock'
+      ? 'replay_skipped_sidecar_busy_lock'
+      : response.error === 'sidecar_unreachable'
+        ? 'replay_skipped_sidecar_unreachable'
+        : 'replay_failed';
+    const replayState = {
+      ok: false,
+      status,
+      error: response.error,
+      statusCode: response.statusCode,
+      at: new Date().toISOString(),
+    };
+    if (state) state.lastReplay = replayState;
+    console.log(`  replay: skipped (${status})`);
+    return replayState;
+  }
+
+  const result = response.parsed;
   if (result?.run) {
     const r = result.run;
     console.log(`  replay: ${r.ideaRuns?.length || 0} ideas, ${r.forwardReturns?.length || 0} returns`);
@@ -356,8 +955,31 @@ async function triggerReplay() {
     if (pa) {
       console.log(`  portfolio: ${pa.totalReturnPct}% return, Sharpe ${pa.sharpeRatio}`);
     }
+    const replayState = {
+      ok: true,
+      status: 'replay_completed',
+      at: new Date().toISOString(),
+      ideaRuns: r.ideaRuns?.length || 0,
+      forwardReturns: r.forwardReturns?.length || 0,
+      frameLoadOptions: replayPayload.frameLoadOptions,
+      postgresSyncRequested: postgresSync,
+      postgresSyncResult: result?.postgresSyncResult || r.postgresSyncResult || null,
+    };
+    if (state) {
+      state.lastReplay = replayState;
+      state.lastReplayAt = replayState.at;
+    }
+    return replayState;
   } else {
-    console.log('  replay: no result (sidecar may be unavailable or DB locked)');
+    const replayState = {
+      ok: false,
+      status: 'replay_skipped_no_run',
+      error: 'sidecar returned no replay run',
+      at: new Date().toISOString(),
+    };
+    if (state) state.lastReplay = replayState;
+    console.log('  replay: skipped (replay_skipped_no_run)');
+    return replayState;
   }
 }
 
@@ -647,6 +1269,18 @@ async function runCycle() {
   console.log(`\n========== Accumulation Cycle #${state.cycleCount} ==========`);
   console.log(`Time: ${state.lastRun}`);
 
+  markAccumulatorHeartbeat(state, 'pending-import-drain');
+  const importDrain = await drainPendingImports(state);
+  if (importDrain.attempted || importDrain.remaining) {
+    console.log(`  pending imports: attempted=${importDrain.attempted || 0}, imported=${importDrain.imported || 0}, remaining=${importDrain.remaining || 0}, status=${importDrain.ok ? 'ok' : importDrain.lastError}`);
+  }
+
+  markAccumulatorHeartbeat(state, 'gdelt-retry-drain');
+  const retryDrain = await drainGdeltRetryQueue(state);
+  if (retryDrain.attempted || retryDrain.remaining) {
+    console.log(`  GDELT retries: attempted=${retryDrain.attempted || 0}, resolved=${retryDrain.resolved || 0}, noHit=${retryDrain.noHit || 0}, remaining=${retryDrain.remaining || 0}, status=${retryDrain.ok ? 'ok' : retryDrain.lastError}`);
+  }
+
   // Load symbols dynamically from the project constants
   let symbols = [];
   try {
@@ -700,7 +1334,7 @@ async function runCycle() {
               fetchedAt: new Date().toISOString(), provider: 'fred',
               envelope: { provider: 'fred', data: { items, observations } },
             }));
-            await importToSidecar(outPath, `fred-${seriesId.toLowerCase()}`, 'fred');
+            await importToSidecar(outPath, `fred-${seriesId.toLowerCase()}`, 'fred', state);
           }
         } catch {}
       }
@@ -710,7 +1344,12 @@ async function runCycle() {
 
   // Step 4: Replay so accumulated data feeds back into the system
   markAccumulatorHeartbeat(state, 'replay');
-  await triggerReplay();
+  await triggerReplay(state, {
+    datasetIds: [
+      ...(Array.isArray(importDrain?.importedDatasetIds) ? importDrain.importedDatasetIds : []),
+      ...recentImportedDatasetIds(state, state.lastRun),
+    ],
+  });
 
   // Step 5: Codex coverage analysis (every 5 cycles)
   markAccumulatorHeartbeat(state, 'codex-analysis');
@@ -776,7 +1415,7 @@ async function main() {
           provider: 'yahoo-chart',
           envelope: { provider: 'yahoo-chart', data: { items } },
         }));
-        await importToSidecar(outPath, `yahoo-${sym}`, 'yahoo-chart');
+        await importToSidecar(outPath, `yahoo-${sym}`, 'yahoo-chart', state);
         if ((i + 1) % 10 === 0) console.log(`  ${i + 1}/${symbols.length} symbols done`);
       } catch {}
     }
@@ -823,7 +1462,7 @@ async function main() {
               provider: 'gdelt-doc',
               envelope: { provider: 'gdelt-doc', data: { articles } },
             }));
-            await importToSidecar(path.join(dir, `${windowLabel}.json`), `gdelt-backfill-${name}`, 'gdelt-doc');
+            await importToSidecar(path.join(dir, `${windowLabel}.json`), `gdelt-backfill-${name}`, 'gdelt-doc', state);
             totalArticles += articles.length;
           }
         } catch {}
@@ -873,7 +1512,7 @@ async function main() {
               provider: 'fred',
               envelope: { provider: 'fred', data: { items, observations } },
             }));
-            await importToSidecar(outPath, `fred-${series.id.toLowerCase()}`, 'fred');
+            await importToSidecar(outPath, `fred-${series.id.toLowerCase()}`, 'fred', state);
             console.log(`  ${series.name} (${series.id}): ${items.length} observations`);
           }
         } catch (e) {
@@ -887,7 +1526,9 @@ async function main() {
     console.log(`\n[backfill] complete: ${totalArticles} GDELT articles + ${symbols.length} Yahoo symbols + ${fredApiKey ? fredSeries.length : 0} FRED series`);
 
     // Run replay once at the end
-    await triggerReplay();
+    await triggerReplay(state, {
+      datasetIds: recentImportedDatasetIds(state, state.lastRun),
+    });
 
     // After GDELT + FRED backfill, run one Codex analysis
     state.cycleCount = 5; // Force Codex to run (every 5 cycles check)
@@ -911,7 +1552,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('Fatal:', e);
-  process.exit(1);
-});
+if (isDirectRun) {
+  main().catch((e) => {
+    console.error('Fatal:', e);
+    process.exit(1);
+  });
+}

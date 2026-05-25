@@ -96,8 +96,11 @@ export function summarizeDataQualityRows(input) {
 export async function computeDataQualityMetrics(queryable) {
   const [articleFreshness, signalFreshness, outcomeCompleteness, integrity] = await Promise.all([
     queryable.query(`
-      SELECT MAX(published_at) AS last_at,
-             EXTRACT(EPOCH FROM (NOW() - MAX(published_at))) * 1000 AS age_ms
+      SELECT
+             MAX(published_at) FILTER (WHERE published_at <= NOW() + INTERVAL '1 hour') AS last_at,
+             EXTRACT(EPOCH FROM (
+               NOW() - MAX(published_at) FILTER (WHERE published_at <= NOW() + INTERVAL '1 hour')
+             )) * 1000 AS age_ms
       FROM articles
     `),
     queryable.query(`

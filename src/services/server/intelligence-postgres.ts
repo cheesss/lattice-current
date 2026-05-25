@@ -1,4 +1,4 @@
-import { Pool, type PoolConfig } from 'pg';
+import { Pool, type PoolClient, type PoolConfig } from 'pg';
 import type {
   HistoricalDatasetSummary,
   HistoricalRawReplayRecord,
@@ -108,6 +108,27 @@ async function unwrapJsonEnvelope<T>(source: string, payload: unknown): Promise<
   if (payload == null) return null;
   const decoded = await decodeStorageValue<T>(payload, { source });
   return decoded.data;
+}
+
+async function loadTableColumnSet(client: PoolClient, schema: string, table: string): Promise<Set<string>> {
+  const result = await client.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = $1 AND table_name = $2
+  `,
+    [schema, table],
+  );
+  return new Set(result.rows.map((row) => String(row.column_name)));
+}
+
+function replayRunColumn(columns: Set<string>): string {
+  return columns.has('backtest_run_id') ? 'backtest_run_id' : 'run_id';
+}
+
+function rowIdColumn(columns: Set<string>, preferred: string): string {
+  if (columns.has(preferred)) return preferred;
+  return columns.has('id') ? 'id' : preferred;
 }
 
 export async function initIntelligencePostgresSchema(
@@ -393,8 +414,15 @@ export async function upsertHistoricalReplayRunToPostgres(
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`DELETE FROM ${s}.forward_returns WHERE backtest_run_id = $1`, [run.id]);
-      await client.query(`DELETE FROM ${s}.idea_runs WHERE backtest_run_id = $1`, [run.id]);
+      const ideaColumns = await loadTableColumnSet(client, schema, 'idea_runs');
+      const forwardColumns = await loadTableColumnSet(client, schema, 'forward_returns');
+      const ideaRunKey = replayRunColumn(ideaColumns);
+      const forwardRunKey = replayRunColumn(forwardColumns);
+      const ideaIdKey = rowIdColumn(ideaColumns, 'idea_run_id');
+      const forwardIdKey = rowIdColumn(forwardColumns, 'forward_return_id');
+
+      await client.query(`DELETE FROM ${s}.forward_returns WHERE ${qident(forwardRunKey)} = $1`, [run.id]);
+      await client.query(`DELETE FROM ${s}.idea_runs WHERE ${qident(ideaRunKey)} = $1`, [run.id]);
       await client.query(`DELETE FROM ${s}.backtest_runs WHERE backtest_run_id = $1`, [run.id]);
 
       await client.query(
@@ -426,35 +454,48 @@ export async function upsertHistoricalReplayRunToPostgres(
       );
 
       for (const idea of run.ideaRuns) {
+        const columns = [
+          ideaIdKey,
+          ideaRunKey,
+          'frame_id',
+          'generated_at',
+          'title',
+          'theme_id',
+          ...(ideaColumns.has('region') ? ['region'] : []),
+          'direction',
+          'conviction',
+          'false_positive_risk',
+          'size_pct',
+          'properties',
+        ];
+        const values = [
+          idea.id,
+          run.id,
+          idea.frameId,
+          idea.generatedAt,
+          idea.title,
+          idea.themeId,
+          ...(ideaColumns.has('region') ? [idea.region] : []),
+          idea.direction,
+          idea.conviction,
+          idea.falsePositiveRisk,
+          idea.sizePct,
+          JSON.stringify({
+            thesis: idea.thesis,
+            evidence: idea.evidence,
+            triggers: idea.triggers,
+            invalidation: idea.invalidation,
+            transmissionPath: idea.transmissionPath,
+            analogRefs: idea.analogRefs,
+            symbols: idea.symbols,
+          }),
+        ];
         await client.query(
           `
-          INSERT INTO ${s}.idea_runs (
-            idea_run_id, backtest_run_id, frame_id, generated_at, title, theme_id,
-            region, direction, conviction, false_positive_risk, size_pct, properties
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          INSERT INTO ${s}.idea_runs (${columns.map(qident).join(', ')})
+          VALUES (${values.map((_, i) => `$${i + 1}`).join(', ')})
         `,
-          [
-            idea.id,
-            run.id,
-            idea.frameId,
-            idea.generatedAt,
-            idea.title,
-            idea.themeId,
-            idea.region,
-            idea.direction,
-            idea.conviction,
-            idea.falsePositiveRisk,
-            idea.sizePct,
-            JSON.stringify({
-              thesis: idea.thesis,
-              evidence: idea.evidence,
-              triggers: idea.triggers,
-              invalidation: idea.invalidation,
-              transmissionPath: idea.transmissionPath,
-              analogRefs: idea.analogRefs,
-              symbols: idea.symbols,
-            }),
-          ],
+          values,
         );
       }
 
@@ -464,6 +505,20 @@ export async function upsertHistoricalReplayRunToPostgres(
           const chunk = run.forwardReturns.slice(c, c + CHUNK);
           const values: unknown[] = [];
           const placeholders: string[] = [];
+          const columns = [
+            forwardIdKey,
+            forwardRunKey,
+            'idea_run_id',
+            'symbol',
+            'direction',
+            'horizon_hours',
+            'entry_timestamp',
+            'exit_timestamp',
+            'entry_price',
+            'exit_price',
+            'raw_return_pct',
+            'signed_return_pct',
+          ];
           let idx = 1;
           for (const result of chunk) {
             placeholders.push(
@@ -477,11 +532,7 @@ export async function upsertHistoricalReplayRunToPostgres(
             idx += 12;
           }
           await client.query(
-            `INSERT INTO ${s}.forward_returns (
-              forward_return_id, backtest_run_id, idea_run_id, symbol, direction,
-              horizon_hours, entry_timestamp, exit_timestamp, entry_price, exit_price,
-              raw_return_pct, signed_return_pct
-            ) VALUES ${placeholders.join(',')}`,
+            `INSERT INTO ${s}.forward_returns (${columns.map(qident).join(', ')}) VALUES ${placeholders.join(',')}`,
             values,
           );
         }
