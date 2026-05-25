@@ -1,0 +1,92 @@
+{
+  "version": "evidence-executor-registry-v1",
+  "executors": [
+    {
+      "evidenceClass": "issuer_exposure",
+      "routes": ["sec_filing", "company_ir", "earnings_transcript", "official_release"],
+      "executionMode": "bounded_official_issuer_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "mechanism_validation",
+      "routes": ["grid_official_readonly", "official_government", "official_research_dataset", "utility_planning"],
+      "executionMode": "bounded_mechanism_validation_route",
+      "promotionEvidenceAllowed": false,
+      "acceptedUseAllowed": ["supporting_context"],
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "negative_control",
+      "routes": ["bounded_source_query", "official_issuer_document", "trusted_trade_source"],
+      "executionMode": "bounded_negative_control_route",
+      "promotionEvidenceAllowed": false,
+      "acceptedUseAllowed": ["negative_control_candidate", "supporting_context"],
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "holdout_validation",
+      "routes": ["official_independent_source", "government_or_operator_source", "trusted_trade_source"],
+      "executionMode": "bounded_holdout_route",
+      "promotionEvidenceAllowed": false,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "market_validation",
+      "routes": ["local_controlled_market_data"],
+      "executionMode": "local_controlled_market_validation_only",
+      "promotionEvidenceAllowed": true,
+      "requiresLocalControlledData": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "technical_qualification",
+      "routes": ["standards_source", "patent_api_proposal", "technical_paper_query", "certification_docs"],
+      "executionMode": "bounded_technical_qualification_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "test_facility_capacity",
+      "routes": ["facility_lane", "official_company_docs", "technical_qualification_source"],
+      "executionMode": "bounded_test_facility_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "supplier_capacity",
+      "routes": ["supplier_filing", "official_capacity_announcement", "contract_or_order_disclosure"],
+      "executionMode": "bounded_supplier_capacity_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "material_input",
+      "routes": ["trade_data_proposal", "commodity_data_proposal", "supplier_filing", "import_export_data_proposal"],
+      "executionMode": "bounded_material_input_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "engineering_process",
+      "routes": ["sec_ir_transcript", "contractor_filing", "planning_document"],
+      "executionMode": "bounded_engineering_process_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "permitting_regulatory",
+      "routes": ["iso_rto_data", "utility_queue", "government_permit_db", "local_authority_records"],
+      "executionMode": "bounded_permitting_route",
+      "promotionEvidenceAllowed": true,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    },
+    {
+      "evidenceClass": "provider_data_gap",
+      "routes": ["adapter_proposal_only"],
+      "executionMode": "provider_gap_proposal_only",
+      "promotionEvidenceAllowed": false,
+      "terminalFailureTaxonomy": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"]
+    }
+  ]
+}

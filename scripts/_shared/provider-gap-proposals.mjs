@@ -37,6 +37,18 @@ const GAP_PROVIDER_MAP = Object.freeze({
     adapterScope: 'read-only Japan TDnet timely disclosure evidence collector',
     sourceType: 'non_us_official_disclosure',
   },
+  provider_gap_taiwan_mops: {
+    provider: 'taiwan_mops',
+    evidenceClasses: ['issuer_exposure', 'issuer_commentary', 'primary_filing', 'supplier_capacity', 'capex_confirmation'],
+    adapterScope: 'read-only Taiwan MOPS issuer filing and material information evidence collector',
+    sourceType: 'non_us_official_filing',
+  },
+  provider_gap_company_ir_direct_pdf: {
+    provider: 'company_ir_direct_pdf',
+    evidenceClasses: ['issuer_exposure', 'issuer_commentary', 'holdout_validation', 'supplier_capacity'],
+    adapterScope: 'read-only allowlisted company IR direct PDF evidence collector',
+    sourceType: 'official_company_ir',
+  },
   provider_gap_eu_ted: {
     provider: 'eu_ted',
     evidenceClasses: ['procurement_trigger', 'policy_funding', 'mission_award', 'supplier_capacity'],
@@ -67,6 +79,8 @@ const PROVIDER_QUERY_SUFFIXES = Object.freeze({
   dart: ['annual report capacity backlog supplier exposure', 'business report segment revenue capacity constraint'],
   edinet: ['annual securities report capacity supplier exposure backlog', 'management discussion capacity expansion supplier risk'],
   tdnet: ['timely disclosure capacity expansion supplier backlog', 'company disclosure production capacity lead time'],
+  taiwan_mops: ['annual report capacity expansion customer demand', 'material information substrate capacity backlog'],
+  company_ir_direct_pdf: ['official investor presentation capacity backlog customer demand', 'annual report operating bridge bottleneck capacity'],
   eu_ted: ['contract award procurement capacity supplier funding', 'public tender award production capacity infrastructure'],
   patent_api: ['patent qualification technical process supplier capacity', 'patent process equipment qualification bottleneck'],
   trade_media: ['trade press capacity lead time backlog suppliers', 'industry source shortage capacity expansion qualification'],

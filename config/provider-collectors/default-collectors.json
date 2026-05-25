@@ -1,0 +1,126 @@
+{
+  "version": "provider-collector-registry-v1",
+  "collectors": [
+    {
+      "collectorId": "company_ir_direct_pdf.document_extraction",
+      "providerName": "company_ir_direct_pdf",
+      "collectorKind": "company_ir_document_extraction",
+      "targetMode": "grouped_seed_tasks",
+      "evidenceClasses": ["issuer_exposure", "holdout_validation", "negative_control"],
+      "sourceGroups": ["official_company_ir", "official_company_filing"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 5,
+      "maxDocumentsPerIssuer": 2,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "testCommand": "node --import tsx --test tests/company-ir-readonly.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/source-provider-fixture-probes.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "negativeControlCanPromote": false,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    },
+    {
+      "collectorId": "grid_official_readonly.mechanism_validation",
+      "providerName": "grid_official_readonly",
+      "collectorKind": "grid_mechanism_validation",
+      "targetMode": "single_task",
+      "evidenceClasses": ["mechanism_validation", "engineering_process", "permitting_regulatory"],
+      "sourceGroups": ["official_grid_operator", "official_government", "official_research_dataset", "utility_planning"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 4,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "testCommand": "node --import tsx --test tests/grid-official-readonly.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/source-provider-fixture-probes.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "mechanismEvidenceDirectInvestmentReadiness": false,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    },
+    {
+      "collectorId": "grid_issuer_bridge_readonly.issuer_bridge",
+      "providerName": "grid_issuer_bridge_readonly",
+      "collectorKind": "grid_issuer_bridge",
+      "targetMode": "single_task",
+      "evidenceClasses": ["issuer_exposure", "holdout_validation"],
+      "sourceGroups": ["official_company_filing", "issuer_ir_transcript", "official_utility_or_customer"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 3,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "testCommand": "node --import tsx --test tests/grid-issuer-bridge-readonly.test.mjs tests/grid-issuer-holdout-readonly.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/source-provider-fixture-probes.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "tickerOnlyEvidenceRejected": true,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    },
+    {
+      "collectorId": "defense_propulsion_readonly.official_issuer_holdout_negative",
+      "providerName": "defense_propulsion_readonly",
+      "collectorKind": "defense_propulsion_official",
+      "targetMode": "single_task",
+      "evidenceClasses": ["issuer_exposure", "holdout_validation", "negative_control", "test_facility_capacity", "technical_qualification"],
+      "sourceGroups": ["official_defense_source", "official_issuer_source", "official_contract_source"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 4,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "testCommand": "node --import tsx --test tests/autonomous-research-repair-loop.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/source-provider-fixture-probes.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "negativeControlCanPromote": false,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    }
+  ]
+}

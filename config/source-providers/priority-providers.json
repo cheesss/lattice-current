@@ -1,0 +1,140 @@
+{
+  "version": "source-provider-manifest-registry-v1",
+  "providers": [
+    {
+      "providerName": "company_ir_direct_pdf",
+      "fillsEvidenceClasses": ["issuer_exposure", "holdout_validation"],
+      "sourceType": "official_company_ir",
+      "providerRoute": "company_ir_direct_pdf",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "issuer allowlist PDF fixture with positive operating-bridge, no-result, timeout/source-unavailable, ticker-only, and raw metadata-only rejection cases for issuer exposure and holdout validation",
+      "parserOutputSchema": {
+        "type": "company_ir_document_evidence",
+        "requiredFields": ["providerName", "evidenceClass", "sourceUrl", "documentTitle", "sourceGroup", "rawTextSnippet", "failureClassification", "desiredEvidenceClass"],
+        "acceptedEvidenceAdditionalRequired": ["matchedSubjectTerms", "matchedOperatingTerms", "operatingBridgeSnippet", "sourceIndependence"]
+      },
+      "allowlist": ["issuer_ir_index_page", "official_company_pdf", "annual_report", "ir_presentation", "earnings_presentation"],
+      "healthCheckCommand": "node --import tsx --test tests/company-ir-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "testCommand": "node --import tsx --test tests/company-ir-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    },
+    {
+      "providerName": "taiwan_mops",
+      "fillsEvidenceClasses": ["issuer_exposure", "holdout_validation", "primary_filing"],
+      "sourceType": "non_us_official_filing",
+      "providerRoute": "taiwan_mops",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "Taiwan MOPS annual report / material information fixture with issuer identifier mapping and no-result case",
+      "parserOutputSchema": {
+        "type": "taiwan_mops_issuer_exposure_evidence",
+        "requiredFields": ["providerName", "evidenceClass", "sourceUrl", "documentTitle", "sourceGroup", "rawTextSnippet", "failureClassification", "desiredEvidenceClass"],
+        "acceptedEvidenceAdditionalRequired": ["matchedSubjectTerms", "matchedOperatingTerms", "operatingBridgeSnippet", "sourceIndependence"]
+      },
+      "allowlist": ["mops.twse.com.tw", "mopsov.twse.com.tw"],
+      "healthCheckCommand": "node --import tsx --test tests/taiwan-mops-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "testCommand": "node --import tsx --test tests/taiwan-mops-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "identifier_mapping_missing", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    },
+    {
+      "providerName": "edinet",
+      "fillsEvidenceClasses": ["issuer_exposure", "issuer_commentary", "primary_filing", "supplier_capacity"],
+      "sourceType": "non_us_official_filing",
+      "providerRoute": "edinet",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "EDINET annual securities report fixture with Japanese issuer identifier mapping and rate-limit case",
+      "parserOutputSchema": {
+        "type": "edinet_issuer_exposure_evidence",
+        "requiredFields": ["providerName", "evidenceClass", "sourceUrl", "documentTitle", "sourceGroup", "rawTextSnippet", "failureClassification", "desiredEvidenceClass"],
+        "acceptedEvidenceAdditionalRequired": ["matchedSubjectTerms", "matchedOperatingTerms", "operatingBridgeSnippet", "sourceIndependence"]
+      },
+      "allowlist": ["disclosure2.edinet-fsa.go.jp"],
+      "healthCheckCommand": "node --import tsx scripts/collect-free-external-data.mjs --providers edinet --limit 1 --dry-run",
+      "testCommand": "node --import tsx --test tests/edinet-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "identifier_mapping_missing", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    },
+    {
+      "providerName": "tdnet",
+      "fillsEvidenceClasses": ["issuer_exposure", "issuer_commentary", "primary_filing", "supplier_capacity"],
+      "sourceType": "non_us_official_disclosure",
+      "providerRoute": "tdnet",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "TDnet timely disclosure listing/PDF fixture with issuer mapping and no-match case",
+      "parserOutputSchema": {
+        "type": "tdnet_issuer_exposure_evidence",
+        "requiredFields": ["providerName", "evidenceClass", "sourceUrl", "documentTitle", "sourceGroup", "rawTextSnippet", "failureClassification", "desiredEvidenceClass"],
+        "acceptedEvidenceAdditionalRequired": ["matchedSubjectTerms", "matchedOperatingTerms", "operatingBridgeSnippet", "sourceIndependence"]
+      },
+      "allowlist": ["tdnet-pdf.kabutan.jp", "www.release.tdnet.info"],
+      "healthCheckCommand": "node --import tsx --test tests/tdnet-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "testCommand": "node --import tsx --test tests/tdnet-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "identifier_mapping_missing", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    },
+    {
+      "providerName": "dart",
+      "fillsEvidenceClasses": ["issuer_exposure", "issuer_commentary", "primary_filing", "supplier_capacity"],
+      "sourceType": "non_us_official_filing",
+      "providerRoute": "dart",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "Korea DART business report fixture with issuer code mapping and no-result case",
+      "parserOutputSchema": {
+        "type": "dart_issuer_exposure_evidence",
+        "requiredFields": ["providerName", "evidenceClass", "sourceUrl", "documentTitle", "sourceGroup", "rawTextSnippet", "failureClassification", "desiredEvidenceClass"],
+        "acceptedEvidenceAdditionalRequired": ["matchedSubjectTerms", "matchedOperatingTerms", "operatingBridgeSnippet", "sourceIndependence"]
+      },
+      "allowlist": ["dart.fss.or.kr", "opendart.fss.or.kr"],
+      "healthCheckCommand": "node --import tsx scripts/collect-free-external-data.mjs --providers dart --limit 1 --dry-run",
+      "testCommand": "node --import tsx --test tests/dart-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "identifier_mapping_missing", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    }
+  ]
+}

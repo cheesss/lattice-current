@@ -1,0 +1,37 @@
+{
+  "version": "provider-collector-registry-v1",
+  "collectors": [
+    {
+      "collectorId": "taiwan_mops.issuer_exposure_readonly",
+      "providerName": "taiwan_mops",
+      "collectorKind": "taiwan_mops_issuer_exposure",
+      "targetMode": "single_task",
+      "evidenceClasses": ["issuer_exposure"],
+      "sourceGroups": ["official_taiwan_mops_filing", "non_us_official_filing"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 3,
+      "maxDocumentsPerIssuer": 1,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "testCommand": "node --import tsx --test tests/taiwan-mops-readonly.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/taiwan-mops-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "negativeControlCanPromote": false,
+        "tickerOnlyEvidenceRejected": true,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    }
+  ]
+}

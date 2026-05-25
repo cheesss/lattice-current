@@ -1,0 +1,33 @@
+{
+  "version": "source-provider-manifest-registry-v1",
+  "providers": [
+    {
+      "providerName": "ferc_interconnection_reform",
+      "priorityProvider": false,
+      "fillsEvidenceClasses": ["engineering_process", "permitting_regulatory"],
+      "sourceType": "official_government",
+      "providerRoute": "ferc_interconnection_reform",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "FERC interconnection reform rulemaking fixture with positive engineering-process or permitting-regulatory operating bridge, no-result, timeout/source-unavailable, ticker-only, and raw metadata-only rejection cases",
+      "parserOutputSchema": {
+        "type": "ferc_interconnection_reform_readonly_evidence",
+        "requiredFields": ["providerName", "evidenceClass", "sourceUrl", "documentTitle", "sourceGroup", "rawTextSnippet", "failureClassification", "desiredEvidenceClass"],
+        "acceptedEvidenceAdditionalRequired": ["matchedSubjectTerms", "matchedOperatingTerms", "operatingBridgeSnippet", "sourceIndependence"]
+      },
+      "allowlist": ["ferc.gov", "www.ferc.gov"],
+      "healthCheckCommand": "node --import tsx --test tests/ferc-interconnection-reform-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "testCommand": "node --import tsx --test tests/ferc-interconnection-reform-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    }
+  ]
+}

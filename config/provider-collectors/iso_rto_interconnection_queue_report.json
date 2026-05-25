@@ -1,0 +1,39 @@
+{
+  "version": "provider-collector-registry-v1",
+  "collectors": [
+    {
+      "collectorId": "iso_rto_interconnection_queue_report.engineering_process_readonly",
+      "providerName": "iso_rto_interconnection_queue_report",
+      "collectorKind": "iso_rto_interconnection_queue_report_engineering_process",
+      "targetMode": "single_task",
+      "evidenceClasses": ["engineering_process"],
+      "sourceGroups": ["official_grid_operator", "official_iso_rto_report"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 3,
+      "maxDocumentsPerIssuer": 1,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "sourceProviderManifestRequired": false,
+      "testCommand": "node --import tsx --test tests/iso-rto-interconnection-queue-report-readonly.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/iso-rto-interconnection-queue-report-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "negativeControlCanPromote": false,
+        "tickerOnlyEvidenceRejected": true,
+        "mechanismEvidenceDirectInvestmentReadiness": false,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    }
+  ]
+}

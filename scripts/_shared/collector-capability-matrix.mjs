@@ -124,9 +124,13 @@ export const COLLECTOR_CAPABILITY_MATRIX = Object.freeze({
       promotionRequiresPlaybook: true,
       notes: 'Official/public planning, FERC, RTO/ISO, utility, and national-lab planning evidence lane.',
     }),
+    capability(['permitting_regulatory', 'engineering_process', 'test_facility_capacity'], 'promotion_candidate', {
+      promotionRequiresPlaybook: true,
+      notes: 'Public planning and utility filings can validate permitting, process, and facility queue constraints.',
+    }),
   ],
   fred: [
-    capability(['operating_kpi', 'market_validation', 'commodity_input', 'capacity_addition'], 'supporting_context'),
+    capability(['operating_kpi', 'market_validation', 'commodity_input', 'material_input', 'capacity_addition'], 'supporting_context'),
   ],
   'source-query': [
     capability(['negative_control'], 'negative_control_candidate', {
@@ -171,6 +175,11 @@ export const COLLECTOR_CAPABILITY_MATRIX = Object.freeze({
       'developer_ecosystem',
       'operating_kpi',
       'primary_filing',
+      'permitting_regulatory',
+      'material_input',
+      'engineering_process',
+      'test_facility_capacity',
+      'provider_data_gap',
     ], 'promotion_candidate', {
       promotionRequiresPlaybook: true,
       notes: 'Source-query is primarily context/specialist discovery; promotion requires playbook facts and an acceptable source boundary.',

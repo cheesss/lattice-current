@@ -1,0 +1,86 @@
+{
+  "version": "source-provider-manifest-registry-v1",
+  "providers": [
+    {
+      "providerName": "grid_official_readonly",
+      "priorityProvider": false,
+      "fillsEvidenceClasses": ["mechanism_validation", "engineering_process", "permitting_regulatory"],
+      "sourceType": "official_grid_operator",
+      "providerRoute": "grid_official_readonly",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "FERC/LBNL/ISO-RTO/utility planning fixture with queue delay, processing capacity, and no-result cases",
+      "parserOutputSchema": {
+        "type": "grid_mechanism_evidence",
+        "requiredFields": ["provider", "sourceUrl", "title", "publishedAt", "desiredEvidenceClass", "evidenceUse", "metadata"]
+      },
+      "allowlist": ["emp.lbl.gov", "ferc.gov", "pjm.com", "misoenergy.org", "caiso.com", "ercot.com", "spp.org"],
+      "healthCheckCommand": "node --import tsx --test tests/grid-official-readonly.test.mjs",
+      "testCommand": "node --import tsx --test tests/grid-official-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    },
+    {
+      "providerName": "grid_issuer_bridge_readonly",
+      "priorityProvider": false,
+      "fillsEvidenceClasses": ["issuer_exposure", "holdout_validation"],
+      "sourceType": "official_issuer_grid_source",
+      "providerRoute": "grid_issuer_bridge_readonly",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "SEC/IR/transcript fixture with power delivery, transmission, substation, backlog, revenue, guidance, and ticker-only rejection cases",
+      "parserOutputSchema": {
+        "type": "grid_issuer_bridge_evidence",
+        "requiredFields": ["provider", "issuer", "sourceUrl", "title", "publishedAt", "desiredEvidenceClass", "evidenceUse", "metadata"]
+      },
+      "allowlist": ["sec.gov", "investor.quantaservices.com", "investors.aecom.com", "invest.jacobs.com"],
+      "healthCheckCommand": "node --import tsx --test tests/grid-issuer-bridge-readonly.test.mjs",
+      "testCommand": "node --import tsx --test tests/grid-issuer-bridge-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    },
+    {
+      "providerName": "defense_propulsion_readonly",
+      "priorityProvider": false,
+      "fillsEvidenceClasses": ["issuer_exposure", "holdout_validation", "negative_control", "test_facility_capacity"],
+      "sourceType": "official_defense_and_issuer_source",
+      "providerRoute": "defense_propulsion_readonly",
+      "authRequired": false,
+      "apiKeyRequired": false,
+      "fixtureRequired": true,
+      "fixtureRequirement": "DoD/company official release fixture with solid rocket motor, capacity, modernization, holdout, and negative-control cases",
+      "parserOutputSchema": {
+        "type": "defense_propulsion_evidence",
+        "requiredFields": ["provider", "issuer", "sourceUrl", "title", "publishedAt", "desiredEvidenceClass", "evidenceUse", "metadata"]
+      },
+      "allowlist": ["defense.gov", "l3harris.com", "lockheedmartin.com", "rtx.com", "northropgrumman.com"],
+      "healthCheckCommand": "node --import tsx --test tests/defense-propulsion-readonly.test.mjs",
+      "testCommand": "node --import tsx --test tests/defense-propulsion-readonly.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "provider_rate_limited", "parser_error"],
+      "activationPolicy": {
+        "reviewGatedActivation": true,
+        "allowedAutomaticStatuses": ["staged", "active_limited"],
+        "activeUseRequiresProbe": true,
+        "canonicalWritesAllowed": false,
+        "readinessPromotionAllowed": false,
+        "portfolioActionAllowed": false
+      }
+    }
+  ]
+}

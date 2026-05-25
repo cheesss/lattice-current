@@ -1,0 +1,38 @@
+{
+  "version": "provider-collector-registry-v1",
+  "collectors": [
+    {
+      "collectorId": "ferc_interconnection_reform.engineering_process_readonly",
+      "providerName": "ferc_interconnection_reform",
+      "collectorKind": "ferc_interconnection_reform_engineering_process",
+      "targetMode": "single_task",
+      "evidenceClasses": ["engineering_process", "permitting_regulatory"],
+      "sourceGroups": ["official_government", "official_ferc_rulemaking"],
+      "boundedExecution": true,
+      "reviewGatedActivation": true,
+      "maxTargetsPerRun": 3,
+      "maxDocumentsPerIssuer": 1,
+      "requiresCredentials": false,
+      "requiresFixture": true,
+      "testCommand": "node --import tsx --test tests/ferc-interconnection-reform-readonly.test.mjs tests/staged-provider-live-executor.test.mjs",
+      "healthCheckCommand": "node --import tsx --test tests/ferc-interconnection-reform-readonly.test.mjs tests/provider-collector-registry.test.mjs",
+      "failureModes": ["SOURCE_UNAVAILABLE", "TIMEOUT", "WEAK_EVIDENCE", "TICKER_ONLY", "NO_RESULT", "ACCEPTED", "CONTRADICTORY"],
+      "readinessPolicy": {
+        "rawEvidenceCanPromoteReadiness": false,
+        "acceptedEvidenceRequired": true,
+        "negativeControlCanPromote": false,
+        "tickerOnlyEvidenceRejected": true,
+        "mechanismEvidenceDirectInvestmentReadiness": false,
+        "marketValidationRequiresLocalControlledData": true
+      },
+      "mutationBoundary": {
+        "providerActivationWrites": 0,
+        "sourceRegistryWrites": 0,
+        "canonicalWrites": 0,
+        "readinessPromotionWrites": 0,
+        "reportCandidateWrites": 0,
+        "portfolioActionWrites": 0
+      }
+    }
+  ]
+}

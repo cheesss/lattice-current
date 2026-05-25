@@ -1,0 +1,176 @@
+{
+  "version": "sector-pack-registry-v1",
+  "sectors": [
+    {
+      "sectorId": "defense_space",
+      "themes": ["defense-industrial", "space"],
+      "childSeed": {
+        "childSeedId": "sector-fixture-defense-space-test-facility",
+        "bottleneckNode": "solid rocket motor qualification test facility capacity",
+        "childClass": "test_facility_capacity",
+        "mechanism": "qualification test stands and range schedules can bottleneck propulsion production ramps"
+      },
+      "issuerUniverse": [
+        { "symbol": "LMT", "roleClass": "prime_or_program_owner" },
+        { "symbol": "RTX", "roleClass": "prime_or_program_owner" },
+        { "symbol": "NOC", "roleClass": "propulsion_supplier_or_integrator" },
+        { "symbol": "TXT", "roleClass": "range_support_or_test_operator" }
+      ],
+      "officialRoutes": ["SEC 10-K / 10-Q", "earnings transcript", "official contract award", "DoD budget/procurement document"],
+      "negativeControlQueries": ["test facility capacity improving", "qualification delays resolved", "supplier redundancy sufficient"],
+      "holdoutRoutes": ["official_government_contract", "issuer_ir_transcript"],
+      "controlledMarketValidationFixture": "local defense/space event window with peer/ETF controls",
+      "requiredEvidenceClasses": ["issuer_exposure", "technical_qualification", "test_facility_capacity", "negative_control", "holdout_validation", "market_validation"],
+      "realEvidenceRoute": {
+        "routeType": "official_defense_and_issuer_source",
+        "allowedSources": ["SEC 10-K / 10-Q", "issuer earnings transcript", "DoD contract award", "DoD budget/procurement document"],
+        "dryRunCommand": "node --import tsx scripts/run-autonomous-research-repair-loop.mjs --mode execute-safe --max-seeds 1 --max-tracks 1 --sector defense_space",
+        "acceptanceBoundary": "official defense/issuer source only; fixture rows are regression-only and cannot set production readiness"
+      },
+      "validationFixtureOnly": true,
+      "productionReadinessEvidence": false
+    },
+    {
+      "sectorId": "semiconductor_advanced_packaging",
+      "themes": ["semiconductor", "materials-science"],
+      "childSeed": {
+        "childSeedId": "sector-fixture-semiconductor-probe-test",
+        "bottleneckNode": "probe card and test socket capacity for HBM and accelerators",
+        "childClass": "test_facility_capacity",
+        "mechanism": "test hardware qualification and burn-in throughput can bottleneck advanced package ramps"
+      },
+      "issuerUniverse": [
+        { "symbol": "FORM", "roleClass": "probe_card_capacity_owner" },
+        { "symbol": "TER", "roleClass": "test_equipment_supplier" },
+        { "symbol": "A", "roleClass": "test_measurement_supplier" },
+        { "symbol": "NVMI", "roleClass": "inspection_metrology_supplier" }
+      ],
+      "officialRoutes": ["SEC 10-K / 10-Q", "company IR presentation", "earnings transcript", "official capacity announcement"],
+      "negativeControlQueries": ["probe card capacity expansion completed", "test socket supply improving", "alternative suppliers sufficient"],
+      "holdoutRoutes": ["issuer_ir_transcript", "specialist_trade_media", "official_customer_release"],
+      "controlledMarketValidationFixture": "local semicap/test equipment event window with SOXX/peer controls",
+      "requiredEvidenceClasses": ["issuer_exposure", "technical_qualification", "supplier_capacity", "negative_control", "holdout_validation", "market_validation"],
+      "realEvidenceRoute": {
+        "routeType": "official_semicap_issuer_source",
+        "allowedSources": ["SEC 10-K / 10-Q", "company IR presentation", "earnings transcript", "official capacity announcement"],
+        "dryRunCommand": "node --import tsx scripts/run-autonomous-research-repair-loop.mjs --mode execute-safe --max-seeds 1 --max-tracks 1 --sector semiconductor_advanced_packaging",
+        "acceptanceBoundary": "official issuer/trusted source with direct bottleneck and operating bridge snippet"
+      },
+      "validationFixtureOnly": true,
+      "productionReadinessEvidence": false
+    },
+    {
+      "sectorId": "grid_utility_infrastructure",
+      "themes": ["cloud-infrastructure", "climate-change", "utilities"],
+      "childSeed": {
+        "childSeedId": "sector-fixture-grid-epc-backlog",
+        "bottleneckNode": "transmission and substation EPC backlog",
+        "childClass": "engineering_process",
+        "mechanism": "grid EPC project execution capacity can bottleneck utility and large-load infrastructure delivery"
+      },
+      "issuerUniverse": [
+        { "symbol": "PWR", "roleClass": "grid_epc_capacity_owner" },
+        { "symbol": "ACM", "roleClass": "utility_infrastructure_engineering" },
+        { "symbol": "J", "roleClass": "utility_infrastructure_engineering" }
+      ],
+      "officialRoutes": ["SEC 10-K / 10-Q", "earnings transcript", "IR presentation", "official utility contract announcement"],
+      "negativeControlQueries": ["utility capex slowdown", "backlog declining", "project delays hurting margin", "management denies grid bottleneck"],
+      "holdoutRoutes": ["utility_capex_plan", "official_grid_operator_planning"],
+      "controlledMarketValidationFixture": "local grid EPC event window with industrial/utilities controls",
+      "requiredEvidenceClasses": ["issuer_exposure", "issuer_commentary", "backlog", "negative_control", "holdout_validation", "market_validation"],
+      "realEvidenceRoute": {
+        "routeType": "sec_ir_plus_utility_planning_source",
+        "allowedSources": ["SEC 10-K / 10-Q", "earnings transcript", "IR presentation", "utility capex plan", "official grid operator planning"],
+        "dryRunCommand": "node --import tsx scripts/run-autonomous-research-repair-loop.mjs --mode execute-safe --max-seeds 1 --max-tracks 1 --sector grid_utility_infrastructure",
+        "acceptanceBoundary": "Track B issuer bridge requires SEC/IR evidence; Track A mechanism evidence cannot raise investment readiness alone"
+      },
+      "validationFixtureOnly": true,
+      "productionReadinessEvidence": false
+    },
+    {
+      "sectorId": "healthcare_glp1_manufacturing",
+      "themes": ["biotech", "healthcare", "logistics"],
+      "childSeed": {
+        "childSeedId": "sector-fixture-healthcare-fill-finish",
+        "bottleneckNode": "sterile fill-finish line capacity for injectable GLP-1 drugs",
+        "childClass": "supplier_capacity",
+        "mechanism": "sterile fill-finish and device assembly lines can bottleneck injectable drug supply"
+      },
+      "issuerUniverse": [
+        { "symbol": "NVO", "roleClass": "drug_sponsor_capacity_owner" },
+        { "symbol": "LLY", "roleClass": "drug_sponsor_capacity_owner" },
+        { "symbol": "CTLT", "roleClass": "fill_finish_cdmo" },
+        { "symbol": "WST", "roleClass": "injectable_component_supplier" }
+      ],
+      "officialRoutes": ["SEC 10-K / 10-Q", "annual report", "company IR presentation", "official manufacturing capacity announcement"],
+      "negativeControlQueries": ["fill finish supply normalized", "autoinjector supply improving", "demand slowdown obesity drugs"],
+      "holdoutRoutes": ["issuer_ir_transcript", "FDA/official manufacturing notice", "trusted pharma trade source"],
+      "controlledMarketValidationFixture": "local GLP-1 manufacturing event window with pharma/CDMO controls",
+      "requiredEvidenceClasses": ["issuer_exposure", "supplier_capacity", "technical_qualification", "negative_control", "holdout_validation", "market_validation"],
+      "realEvidenceRoute": {
+        "routeType": "official_healthcare_capacity_source",
+        "allowedSources": ["SEC 10-K / 10-Q", "annual report", "company IR presentation", "official manufacturing capacity announcement"],
+        "dryRunCommand": "node --import tsx scripts/run-autonomous-research-repair-loop.mjs --mode execute-safe --max-seeds 1 --max-tracks 1 --sector healthcare_glp1_manufacturing",
+        "acceptanceBoundary": "official sponsor/CDMO/component source with manufacturing capacity bridge"
+      },
+      "validationFixtureOnly": true,
+      "productionReadinessEvidence": false
+    },
+    {
+      "sectorId": "materials_critical_minerals",
+      "themes": ["geopolitics", "materials-science", "semiconductor", "defense-industrial"],
+      "childSeed": {
+        "childSeedId": "sector-fixture-critical-minerals-tungsten",
+        "bottleneckNode": "non-China tungsten supply for defense and semiconductor tooling",
+        "childClass": "material_input",
+        "mechanism": "qualified non-China tungsten supply can bottleneck defense tooling and semiconductor hard-metal applications"
+      },
+      "issuerUniverse": [
+        { "symbol": "ALB", "roleClass": "critical_material_supplier" },
+        { "symbol": "MP", "roleClass": "non_china_mineral_supplier" },
+        { "symbol": "HAYN", "roleClass": "specialty_material_supplier" }
+      ],
+      "officialRoutes": ["SEC 10-K / 10-Q", "government critical minerals document", "company IR presentation", "official supply agreement"],
+      "negativeControlQueries": ["tungsten supply improving", "substitute materials sufficient", "inventory surplus critical minerals"],
+      "holdoutRoutes": ["official_government_dataset", "issuer_filing", "specialist_trade_media"],
+      "controlledMarketValidationFixture": "local critical-minerals event window with metals/industrial controls",
+      "requiredEvidenceClasses": ["issuer_exposure", "material_input", "substitution_limit", "negative_control", "holdout_validation", "market_validation"],
+      "realEvidenceRoute": {
+        "routeType": "official_government_minerals_plus_issuer_filing",
+        "allowedSources": ["government critical minerals document", "SEC 10-K / 10-Q", "company IR presentation", "official supply agreement"],
+        "dryRunCommand": "node --import tsx scripts/run-autonomous-research-repair-loop.mjs --mode execute-safe --max-seeds 1 --max-tracks 1 --sector materials_critical_minerals",
+        "acceptanceBoundary": "official government/minerals source plus issuer filing bridge required"
+      },
+      "validationFixtureOnly": true,
+      "productionReadinessEvidence": false
+    },
+    {
+      "sectorId": "industrial_test_equipment",
+      "themes": ["industrial", "semiconductor", "grid"],
+      "childSeed": {
+        "childSeedId": "sector-fixture-industrial-test-equipment",
+        "bottleneckNode": "high-voltage and advanced electronics test equipment capacity",
+        "childClass": "test_facility_capacity",
+        "mechanism": "specialized test equipment and calibration throughput can delay qualification of grid, aerospace, and advanced electronics projects"
+      },
+      "issuerUniverse": [
+        { "symbol": "KEYS", "roleClass": "test_measurement_supplier" },
+        { "symbol": "TER", "roleClass": "semiconductor_test_supplier" },
+        { "symbol": "AME", "roleClass": "industrial_instrumentation_supplier" }
+      ],
+      "officialRoutes": ["SEC 10-K / 10-Q", "company IR presentation", "earnings transcript", "official product/customer announcement"],
+      "negativeControlQueries": ["test equipment supply improving", "qualification capacity sufficient", "customer capex slowdown"],
+      "holdoutRoutes": ["issuer_ir_transcript", "official_customer_release", "specialist_trade_media"],
+      "controlledMarketValidationFixture": "local test-equipment event window with industrial technology controls",
+      "requiredEvidenceClasses": ["issuer_exposure", "technical_qualification", "test_facility_capacity", "negative_control", "holdout_validation", "market_validation"],
+      "realEvidenceRoute": {
+        "routeType": "official_test_equipment_issuer_source",
+        "allowedSources": ["SEC 10-K / 10-Q", "company IR presentation", "earnings transcript", "official product/customer announcement"],
+        "dryRunCommand": "node --import tsx scripts/run-autonomous-research-repair-loop.mjs --mode execute-safe --max-seeds 1 --max-tracks 1 --sector industrial_test_equipment",
+        "acceptanceBoundary": "official issuer/customer source with test equipment capacity or qualification bridge"
+      },
+      "validationFixtureOnly": true,
+      "productionReadinessEvidence": false
+    }
+  ]
+}
