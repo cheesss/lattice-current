@@ -1,46 +1,81 @@
 # Lattice Current
 
-Evidence-first research operating system for live signal monitoring, mechanism seed generation, evidence contract closure, guarded provider backfill, and operator review.
+**Lattice is a local-first, evidence-gated research OS that blocks confident-looking reports until the evidence is actually there.**
+
+> 한 줄 요약: Lattice는 로컬에서 도는 증거-게이트 리서치 도구입니다. 증거가 실제로 갖춰지기 전까지 보고서를 `BLOCKED` 상태로 묶어 둡니다.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-24292f?logo=github)](https://cheesss.github.io/lattice-current/)
 
-## What It Is
+## The problem, and the idea
 
-Lattice Current is a public research fork of a multi-variant intelligence platform centered on one operator shell and one evidence-bound research loop. It combines:
+Generating an AI research report is easy. Knowing when one is *not ready* is the hard part, and most tools skip it — they hand you a confident-looking memo whether or not the evidence underneath it exists.
 
-- live global news and OSINT collection
-- AI-assisted summaries, deduction, and Q&A
-- map-based geopolitical, infrastructure, and market visualization
-- ontology and graph-based relation analysis
-- canonical event resolution before downstream interpretation
-- mechanism-based research seed generation
-- universal evidence contracts and class-specific backfill planning
-- report closure diagnostics that separate discovery quality from investment readiness
-- replay and historical validation surfaces used to calibrate signal quality
-- batch compute pipelines that write reusable outputs back to PostgreSQL
+Lattice makes "not ready" a first-class output. A thesis cannot be promoted until issuer exposure, market validation, negative controls, source breadth, and accepted evidence actually exist. Until then the report stays `BLOCKED` and names the gate that is missing.
 
-## Current design center
+## What it does
 
-The main branch has shifted away from a backtest-first product identity.
+- **"Not ready" is a named output, not a silent failure.** A report sits in `BLOCKED` / needs-fix with an explicit blocker and next-action until eight evidence gates close: accepted promotion evidence, accepted evidence, independent source breadth, issuer bridge, negative control, holdout, market validation, and valuation bridge. The gate roll-up — missing-gate detection and the next-action it points to — is computed in `scripts/_shared/evidence-gate-consolidator.mjs` (the per-class `primaryBlocker` / `visualStatus` ledger lives in `scripts/_shared/report-backfill-closure.mjs`).
+- **Raw evidence can't quietly become promotion evidence.** Every collected row must clear an acceptance lane — staleness, duplicate, generic-boilerplate, fixture-only, issuer-bridge — and the negative-control and market-validation classes are hard-coded as non-promotion or local-controlled-only. See `scripts/_shared/seed-evidence-acceptance.mjs`.
+- **Every report carries a Universal Evidence Contract.** It enumerates which evidence classes are required and which are promotion-eligible (`promotionEligible` per class), so "what is still missing" is a concrete per-class list, not a vibe. See `scripts/_shared/universal-evidence-contract.mjs`.
 
-The current emphasis is:
+## Run it locally
 
-- one integrated theme shell for live signal intake, theme briefs, geo context, proposal review, validation, and runtime diagnostics
-- canonical event resolution between ingestion and candidate generation
-- mechanism seed generation from hot themes, adjacent lanes, ontology, and report artifacts
-- evidence contract closure across issuer exposure, market validation, negative controls, operating evidence, and provider gaps
-- dashboard visibility for Research Seeds, Provider Gap Review, and Report Backfill Closure
-- evidence quality and transmission analysis
-- operator-facing decision support
-- TypeScript for product surfaces, APIs, and orchestration
-- Python for CPU-bound batch compute such as canonical-event clustering and abnormal-return analytics
-- replay and NAS-backed historical validation as secondary calibration layers
+Full local stack (Postgres + pgvector via Docker, zero API keys):
+
+```bash
+docker compose up -d        # local Postgres + pgvector
+npm run demo:seed           # schema + demo data + a DB-backed report, zero keys
+npm run dev                 # open the dashboard
+```
+
+No database, no keys, one command — generates a full evidence-first report (`report.html` + audit appendix + `evidence_table.csv`):
+
+```bash
+npm run report:deep -- --type theme_report --subject "AI / Machine Learning"
+```
+
+> **Status:** the no-DB report path is verified working. The local-DB path is verified end-to-end against a real Postgres engine — the schema and seed apply cleanly, `generate-intelligence-report --db` produces a report (exit 0), and the research-seeds panel populates; re-running is idempotent. Not yet captured: a screenshot walkthrough of `npm run dev` in a browser. (The bundled image is `pgvector/pgvector:pg16`; verification used a vanilla Postgres engine, since the theme-report path does not query embeddings.)
+
+> **Boundary:** report generation and the dashboard panels run locally with zero keys. *Live* external news ingestion is an optional "go further" step that additionally needs free Guardian/NYT keys and a local Ollama embedding model — it is not part of the default demo.
+
+## What this is NOT (on purpose)
+
+These are deliberate boundaries. The conservative gates *are* the product.
+
+- Not an investment adviser, stock picker, alpha guarantee, or fully-automated decision system.
+- Not a live backtesting product. The backtest/ML modules live on the `legacy/backtest` branch; replay is not a feature here.
+- Not autonomous trading or auto-promotion. Every autonomous loop keeps readiness/candidate/portfolio writes at 0 — a human promote is always required.
+- Market validation is not durable alpha. It only reaches decision-grade from local controlled event data, and it is explicitly caveated as such.
+- Source breadth is modest by design: the gate threshold is `>= 2` independent sources. We don't claim more.
+
+## The research loop
+
+```mermaid
+flowchart TD
+    A[Hot theme / signal / report artifact] --> B[Mechanism seed]
+    B --> C[Universal Evidence Contract]
+    C --> D[Missing evidence-class detection]
+    D --> E[Provider / source-query backfill]
+    E --> F[Report closure & contradiction detection]
+    F --> G{Eight gates closed?}
+    G -- no --> H[BLOCKED: blocker + nextAction]
+    H --> D
+    G -- yes --> I[Human-reviewed promotion]
+```
+
+## The hero artifact: a real BLOCKED report
+
+A real `BLOCKED` report already lives in the repo at
+`data/reports/RPT-validated-cross-theme-bottleneck-report-blocked-*/report.html`.
+Its banner reads *"Research Priority D; not an investment memo — collect required evidence classes before treating the report as decision-ready"*, and its **"Why Not Review-Ready Yet"** section names the exact missing gates (`negative_control`, `controlled_market_validation`, `issuer_bridge`, `holdout_validation`). Dozens of sibling `RPT-...-blocked-*` folders (53 in this repo) show that blocking is the norm, not a staged one-off — it inverts the usual confident-AI-buy-signal demo.
+
+---
 
 ## Primary entry surface
 
-The canonical product entry is now the theme shell:
+The canonical product entry is the theme shell:
 
 - `/` redirects to `/event-dashboard.html`
 - `event-dashboard.html` is the main surface for live signals, theme briefs, the 2D Geo Lens, Codex proposal review, approval handling, validation snapshots, and operator diagnostics
@@ -60,46 +95,21 @@ The heavy backtest-ML modules were removed from the main branch and preserved on
 - `Signal And Validation Snapshots`: compact risk, macro, investment, and replay surfaces kept inside the same operator loop
 - `Operator Diagnostics`: automation telemetry, system health, data quality, and Codex quality
 
-The same repository still powers multiple variants:
+The same repository powers multiple variants:
 
 - `full`: geopolitics, conflict, infrastructure, intelligence
 - `tech`: AI, startups, cloud, cyber, technology ecosystems
 - `finance`: markets, macro, central banks, commodities, cross-asset analysis
 
-## Highlights
-
-- Real-time monitoring across curated feeds, strategic assets, and market data
-- AI and statistical analysis layers for summaries, trend detection, evidence handling, and operator briefs
-- Canonical event resolution that sits between raw article rows and usable signal objects
-- Evidence-first intelligence report generation with client memo, audit appendix, source-query queue, and investment-readiness caps
-- Mechanism seed pipeline that turns themes into `Activity -> Process -> Input -> Bottleneck -> Supplier -> Evidence / Counter-evidence`
-- Evidence provider routing and closure ledgers that prevent stale or weak evidence from becoming false promotion
-- Conservative dashboard readiness: `visualStatus` is the operating source of truth; `productTier` is evidence-tier context unless closure is complete
-- Python compute lane for heavy batch analytics while TypeScript remains the orchestration layer
-- Ontology graph, transmission graph, and historical validation tooling
-- Desktop runtime with Tauri sidecar, local services, and offline-capable workflows
-- Single codebase with variant-aware data, panels, and build targets
-
-## Capability areas
-
-- Signal intake: live feeds, OSINT, macro, market, and conflict-oriented datasets
-- Evidence handling: event resolution, source quality, corroboration handling, and data quality operations
-- Research workflow: Codex-assisted expansion, automation governance, ontology and graph views
-- Mechanism workflow: seed generation, seed storage/review lifecycle, evidence planning, provider gap review, and seed-to-report closure
-- Validation workflow: historical fetch/import, replay, abnormal-return computation, and loader/storage verification
-- Report workflow: evidence bundles, signal cards, long-form analyst memos, exhibits, audit appendices, and source-query/backfill tasks
-- Decision support: operator briefs, transmission interpretation, watchlist refinement, and guarded recommendations
-- Operations: scheduler loops, pipeline heartbeats, retention, and blocker visibility
-
 ## Execution boundary
 
-The repository now follows a workload split instead of forcing all compute through one language:
+The repository follows a workload split instead of forcing all compute through one language:
 
 - TypeScript: browser UI, API handlers, schedulers, ingestion, desktop shell
 - Python: canonical-event clustering, abnormal-return analytics, model training, and future heavy batch analytics
 - Rust: Tauri runtime only, with optional future hot-loop acceleration
 
-Batch compute should write results to NAS PostgreSQL so frontend and API code can consume stable outputs without importing Python directly.
+Batch compute writes results to PostgreSQL so frontend and API code can consume stable outputs without importing Python directly.
 
 ## Repository structure
 
@@ -110,37 +120,46 @@ Batch compute should write results to NAS PostgreSQL so frontend and API code ca
 - `site/`: GitHub Pages documentation site
 - `scripts/`: report generation, evidence backfill, mechanism seed lifecycle, provider gap review, daemon tasks, build tooling, and Python-first batch compute entrypoints
 
-## Research operating loop
-
-The current Lattice loop is:
-
-```text
-hot theme / signal / report artifact
--> mechanism seed
--> evidence plan and universal evidence contract
--> missing evidence class detection
--> provider/source-query backfill
--> report closure and contradiction detection
--> provider gap proposal
--> dashboard review and bounded daemon self-improvement
-```
-
-Important boundaries:
-
-- seed generation is safe to run as dry-run and does not mutate canonical state by default
-- evidence enqueue is explicit and seed/report scoped
-- canonical graph, source registry, RSS registration, and provider activation remain review-gated
-- negative-control and market-validation evidence are separated from promotion evidence
-- stale or pre-reconciliation report artifacts are blocked from appearing review-ready
-
 ## Getting started
+
+Prerequisites: Node 20+ (developed on Node 24) and, for the full local demo, Docker.
 
 ```bash
 npm install
-npm run dev
 ```
 
-`npm run dev` now starts the integrated theme-shell stack: the event dashboard API plus the Vite frontend. The root path `/` redirects to the theme shell automatically.
+### Run the full demo locally (database included)
+
+Lattice's pipeline, DB-backed reports, and dashboard panels run on Postgres. A
+self-contained local database is bundled via Docker, so anyone can run the full
+stack with no NAS and no API keys:
+
+```bash
+docker compose up -d     # start Postgres + pgvector on 127.0.0.1:5432
+npm run demo:seed        # create schema + load demo data + a DB-backed report
+npm run dev              # open the printed dashboard URL
+```
+
+`npm run demo:seed` is idempotent and zero-config: with nothing set it targets the
+bundled database above. To point at a different local Postgres, copy `.env.example`
+to `.env.local` and set the one-line `DATABASE_URL` (or `LATTICE_PG_*`). The tooling
+refuses to run against a non-local host, so it can never touch a production database.
+
+Stop the database with `docker compose down` (add `-v` to also delete its data volume).
+
+### Run without a database
+
+`npm run dev` also boots without Postgres (DB-backed panels degrade gracefully), and
+you can generate a complete, real evidence-first report from built-in sample evidence
+with no database and no keys:
+
+```bash
+npm run report:deep -- --type theme_report --subject "AI / Machine Learning"
+# -> writes data/reports/<id>/report.html + audit appendix + evidence table
+```
+
+`npm run dev` starts the integrated theme-shell stack: the event dashboard API plus
+the Vite frontend. The root path `/` redirects to the theme shell automatically.
 
 Optional Python compute setup:
 
@@ -181,12 +200,13 @@ npm run public:sync
 - Public sync workflow: [docs/public-sync.md](docs/public-sync.md)
 - Automation runbook: [docs/automation-runbook.md](docs/automation-runbook.md)
 - Script operations guide: [scripts/README.md](scripts/README.md)
+- Launch & positioning: [docs/marketing/](docs/marketing/)
 
 ## Naming note
 
 This repository is branded as `Lattice Current`.
 
-Some deep technical documents and inherited storage keys still contain older internal identifiers. They reflect implementation lineage, not the public product name of this fork.
+Some deep technical documents and inherited storage keys still contain older internal identifiers. They reflect implementation lineage, not the public product name.
 
 ## Licensing and content policy
 

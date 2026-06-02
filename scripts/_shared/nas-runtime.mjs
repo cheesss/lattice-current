@@ -37,34 +37,60 @@ export function requireEnv(keys, message) {
 }
 
 export function resolveNasPgConfig(overrides = {}) {
+  // Local-first override for the `docker compose` demo (or any local Postgres).
+  // A single DATABASE_URL (12-factor style) is normalized into the same discrete
+  // {host,port,database,user,password} shape the NAS path returns, so pool cache
+  // keys, logging, and every ~100 call sites keep working unchanged.
+  // When neither DATABASE_URL nor LATTICE_PG_* is set, the result is byte-identical
+  // to the original NAS resolver (defaults 192.168.0.2:5433/lattice/postgres).
+  const databaseUrl = String(overrides.connectionString || process.env.DATABASE_URL || '').trim();
+  if (databaseUrl && !overrides.host) {
+    try {
+      const parsed = new URL(databaseUrl);
+      return {
+        host: parsed.hostname || '127.0.0.1',
+        port: parsed.port ? Number(parsed.port) : 5432,
+        database: parsed.pathname ? decodeURIComponent(parsed.pathname.replace(/^\//, '')) : 'lattice',
+        user: parsed.username ? decodeURIComponent(parsed.username) : 'postgres',
+        password: parsed.password ? decodeURIComponent(parsed.password) : '',
+      };
+    } catch {
+      // Unparseable URL: fall through to discrete-env resolution below.
+    }
+  }
+
   const host = String(
     overrides.host
-    || firstDefinedEnv(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'])
+    || firstDefinedEnv(['LATTICE_PG_HOST', 'INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'])
     || '192.168.0.2',
   ).trim();
   const port = Number(
     overrides.port
-    || firstDefinedEnv(['INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'])
+    || firstDefinedEnv(['LATTICE_PG_PORT', 'INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'])
     || 5433,
   );
   const database = String(
     overrides.database
-    || firstDefinedEnv(['INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'])
+    || firstDefinedEnv(['LATTICE_PG_DATABASE', 'INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'])
     || 'lattice',
   ).trim();
   const user = String(
     overrides.user
-    || firstDefinedEnv(['INTEL_PG_USER', 'NAS_PG_USER', 'PG_USER', 'PGUSER'])
+    || firstDefinedEnv(['LATTICE_PG_USER', 'INTEL_PG_USER', 'NAS_PG_USER', 'PG_USER', 'PGUSER'])
     || 'postgres',
   ).trim();
   const password = String(
     overrides.password
-    || firstDefinedEnv(['INTEL_PG_PASSWORD', 'NAS_PG_PASSWORD', 'PG_PASSWORD', 'PGPASSWORD']),
+    || firstDefinedEnv(['LATTICE_PG_PASSWORD', 'INTEL_PG_PASSWORD', 'NAS_PG_PASSWORD', 'PG_PASSWORD', 'PGPASSWORD']),
   ).trim();
 
-  if (!password) {
+  // A local trust-auth Postgres may have no password; only require one for remote
+  // (NAS) hosts so the existing fail-loud behavior is preserved off the local path.
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  if (!password && !isLocalHost) {
     throw new Error(
-      'Missing PostgreSQL password. Set INTEL_PG_PASSWORD, NAS_PG_PASSWORD, PG_PASSWORD, or PGPASSWORD.',
+      'Missing PostgreSQL password. Set INTEL_PG_PASSWORD, NAS_PG_PASSWORD, PG_PASSWORD, or PGPASSWORD '
+      + '(or use DATABASE_URL / LATTICE_PG_* for a local database).',
     );
   }
 

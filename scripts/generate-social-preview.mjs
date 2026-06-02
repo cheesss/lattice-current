@@ -153,23 +153,23 @@ const html = String.raw`
   <body>
     <div class="frame">
       <div>
-        <div class="eyebrow">Independent Research Fork</div>
+        <div class="eyebrow">Local-first &middot; Evidence-gated</div>
         <h1><span class="gradient">Lattice Current</span></h1>
         <p class="lead">
-          Real-time global intelligence, AI-assisted analysis, ontology graphs, event-to-market transmission, and historical replay.
+          A research OS that blocks confident-looking reports until the evidence is actually there. "Not ready" is a first-class output.
         </p>
         <div class="pill-row">
-          <span class="pill">Live Intelligence</span>
-          <span class="pill">Ontology Graph</span>
-          <span class="pill">Replay & Backtesting</span>
-          <span class="pill">Resource Profiling</span>
+          <span class="pill">Universal Evidence Contract</span>
+          <span class="pill">Eight evidence gates</span>
+          <span class="pill">BLOCKED by default</span>
+          <span class="pill">Local-first, zero keys</span>
         </div>
       </div>
       <div class="card-wall">
         <div class="card tall">
-          <div class="label">Decision Loop</div>
-          <h2>Signal -> Score -> Connect -> Replay</h2>
-          <p>Evidence-first monitoring with adaptive priors, regime-aware analytics, and validation paths.</p>
+          <div class="label">The wedge</div>
+          <h2>"Not ready" is a named output</h2>
+          <p>A report stays BLOCKED, with the missing gate named, until issuer exposure, market validation, negative controls, and source breadth exist.</p>
           <div class="signal-grid">
             <span></span><span></span><span></span><span></span>
             <span></span><span></span><span></span><span></span>
@@ -178,14 +178,14 @@ const html = String.raw`
           </div>
         </div>
         <div class="card">
-          <div class="label">Graph Context</div>
-          <h2>Entity + relation topology</h2>
-          <p>Constrained graph state, inferred links, and interactive architecture views.</p>
+          <div class="label">Acceptance lane</div>
+          <h2>Raw evidence can't self-promote</h2>
+          <p>Every row clears staleness, duplicate, boilerplate, and issuer-bridge checks before it can count.</p>
         </div>
         <div class="card">
-          <div class="label">Market Transmission</div>
-          <h2>Assets, sectors, and spillover</h2>
-          <p>Story propagation mapped into investable themes and replayable backtests.</p>
+          <div class="label">Evidence contract</div>
+          <h2>What's missing, per class</h2>
+          <p>Each report enumerates required vs promotion-eligible evidence classes -- a concrete list, not a vibe.</p>
         </div>
       </div>
       <div class="footer">

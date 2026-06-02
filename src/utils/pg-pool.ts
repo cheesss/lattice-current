@@ -34,12 +34,36 @@ function resolveEnv(keys: string[], fallback: string): string {
 }
 
 export function resolveNasPgConfig(overrides: Partial<pg.PoolConfig> = {}): pg.PoolConfig {
-  const host = resolveEnv(['INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'], '192.168.0.2');
-  const portRaw = Number(resolveEnv(['INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'], '5433'));
+  // Local-first override for the `docker compose` demo. DATABASE_URL is normalized
+  // into discrete fields (keeping host/port/database/user populated for the pool
+  // cache key) and mirrors scripts/_shared/nas-runtime.mjs. NAS behavior is
+  // unchanged when DATABASE_URL and LATTICE_PG_* are unset.
+  const databaseUrl = String(process.env.DATABASE_URL || '').trim();
+  if (databaseUrl && !overrides.host && !overrides.connectionString) {
+    try {
+      const parsed = new URL(databaseUrl);
+      return {
+        host: parsed.hostname || '127.0.0.1',
+        port: parsed.port ? Number(parsed.port) : 5432,
+        database: parsed.pathname ? decodeURIComponent(parsed.pathname.replace(/^\//, '')) : 'lattice',
+        user: parsed.username ? decodeURIComponent(parsed.username) : 'postgres',
+        password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+        max: 4,
+        idleTimeoutMillis: 30_000,
+        allowExitOnIdle: true,
+        ...overrides,
+      };
+    } catch {
+      // Unparseable URL: fall through to discrete-env resolution below.
+    }
+  }
+
+  const host = resolveEnv(['LATTICE_PG_HOST', 'INTEL_PG_HOST', 'NAS_PG_HOST', 'PG_HOST'], '192.168.0.2');
+  const portRaw = Number(resolveEnv(['LATTICE_PG_PORT', 'INTEL_PG_PORT', 'NAS_PG_PORT', 'PG_PORT'], '5433'));
   const port = Number.isFinite(portRaw) && portRaw > 0 ? portRaw : 5433;
-  const database = resolveEnv(['INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'], 'lattice');
-  const user = resolveEnv(['INTEL_PG_USER', 'NAS_PG_USER', 'PG_USER', 'PGUSER'], 'postgres');
-  const password = resolveEnv(['INTEL_PG_PASSWORD', 'NAS_PG_PASSWORD', 'PG_PASSWORD', 'PGPASSWORD'], '');
+  const database = resolveEnv(['LATTICE_PG_DATABASE', 'INTEL_PG_DATABASE', 'NAS_PG_DATABASE', 'PG_DATABASE', 'PGDATABASE'], 'lattice');
+  const user = resolveEnv(['LATTICE_PG_USER', 'INTEL_PG_USER', 'NAS_PG_USER', 'PG_USER', 'PGUSER'], 'postgres');
+  const password = resolveEnv(['LATTICE_PG_PASSWORD', 'INTEL_PG_PASSWORD', 'NAS_PG_PASSWORD', 'PG_PASSWORD', 'PGPASSWORD'], '');
 
   return {
     host,

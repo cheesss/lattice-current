@@ -1,0 +1,35 @@
+# Local Postgres for the Lattice demo.
+#
+# Brings up a self-contained Postgres (with the pgvector extension, used by the
+# article-embedding path) so the full pipeline, DB-backed reports, and dashboard
+# panels can run locally without the maintainer's private NAS.
+#
+#   docker compose up -d      # start Postgres on 127.0.0.1:5432
+#   npm run demo:seed         # create schema + load demo data
+#   npm run dev               # open the dashboard
+#   docker compose down       # stop (add -v to also delete the data volume)
+#
+# Point the app at this database via .env.local (see .env.example):
+#   DATABASE_URL=postgres://postgres:lattice@127.0.0.1:5432/lattice
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: lattice-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: lattice
+      POSTGRES_DB: lattice
+    ports:
+      - "5432:5432"
+    volumes:
+      - lattice-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lattice"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lattice-pgdata:
