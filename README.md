@@ -8,6 +8,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-24292f?logo=github)](https://cheesss.github.io/lattice-current/)
 
+![A real BLOCKED report: "Research Priority D; not an investment memo" — the report blocks itself and names the missing evidence gates.](docs/marketing/screenshots/blocked-report-hero.png)
+
 ## The problem, and the idea
 
 Generating an AI research report is easy. Knowing when one is *not ready* is the hard part, and most tools skip it — they hand you a confident-looking memo whether or not the evidence underneath it exists.
@@ -19,6 +21,8 @@ Lattice makes "not ready" a first-class output. A thesis cannot be promoted unti
 - **"Not ready" is a named output, not a silent failure.** A report sits in `BLOCKED` / needs-fix with an explicit blocker and next-action until eight evidence gates close: accepted promotion evidence, accepted evidence, independent source breadth, issuer bridge, negative control, holdout, market validation, and valuation bridge. The gate roll-up — missing-gate detection and the next-action it points to — is computed in `scripts/_shared/evidence-gate-consolidator.mjs` (the per-class `primaryBlocker` / `visualStatus` ledger lives in `scripts/_shared/report-backfill-closure.mjs`).
 - **Raw evidence can't quietly become promotion evidence.** Every collected row must clear an acceptance lane — staleness, duplicate, generic-boilerplate, fixture-only, issuer-bridge — and the negative-control and market-validation classes are hard-coded as non-promotion or local-controlled-only. See `scripts/_shared/seed-evidence-acceptance.mjs`.
 - **Every report carries a Universal Evidence Contract.** It enumerates which evidence classes are required and which are promotion-eligible (`promotionEligible` per class), so "what is still missing" is a concrete per-class list, not a vibe. See `scripts/_shared/universal-evidence-contract.mjs`.
+
+![The operator dashboard — the Investigate surface with the live evidence-closure matrix, each class showing its blocker and next action.](docs/marketing/screenshots/dashboard-investigate.png)
 
 ## Run it locally
 

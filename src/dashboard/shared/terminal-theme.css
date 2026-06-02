@@ -1,0 +1,103 @@
+/*
+ * Terminal theme — Bloomberg-style restyle of the dashboard.
+ *
+ * Near-black canvas, square panels, amber signature accent, proportional labels
+ * with tabular/mono numerics and crisp data-grid gridlines. Loaded last in
+ * event-dashboard.html. Token overrides use !important so they win over the V3
+ * tokens regardless of the phase-CSS modules that mount later at runtime.
+ * To revert to the cyan "modern cockpit" look, remove the single
+ * <link rel="stylesheet" href="/src/dashboard/shared/terminal-theme.css">.
+ *
+ * Numbers are mono (JetBrains Mono, tabular + slashed-zero); labels/prose stay
+ * proportional. Green/red keep their validated/critical semantics; amber is the
+ * primary UI accent.
+ */
+
+:root {
+  /* Near-black base (drop the indigo tint) */
+  --v3-bg-950: #000000 !important;
+  --v3-bg-900: #070708 !important;
+  --v3-bg-850: #0c0d10 !important;
+  --v3-bg-800: #14151a !important;
+  --v3-bg-750: #1c1e25 !important;
+  --bg-void: #000000 !important;
+  --bg-base: #070708 !important;
+  --bg-surface: #0c0d10 !important;
+  --bg-elevated: #14151a !important;
+  --bg-overlay: rgba(0, 0, 0, .94) !important;
+  --modern-bg-950: #000000 !important;
+  --modern-bg-900: #070708 !important;
+  --modern-bg-850: #0c0d10 !important;
+  --modern-bg-800: #14151a !important;
+
+  /* Square panels */
+  --v3-radius-sm: 2px !important;
+  --v3-radius-md: 2px !important;
+  --v3-radius-lg: 2px !important;
+
+  /* Tighter grid */
+  --v3-space-1: 3px !important;
+  --v3-space-2: 6px !important;
+  --v3-space-3: 8px !important;
+  --v3-space-4: 11px !important;
+  --v3-space-6: 15px !important;
+  --v3-space-8: 20px !important;
+
+  /* Amber signature accent (green/red keep validated/critical meaning) */
+  --v3-accent: #ffb000 !important;
+  --v3-accent-glow: rgba(255, 176, 0, .28) !important;
+  --v3-accent-2: #ff8c00 !important;
+  --modern-accent: #ffb000 !important;
+  --modern-accent-2: #ff8c00 !important;
+  --accent: #ffb000 !important;
+  --accent2: #ffb000 !important;
+  --teal: #ffb000 !important;
+
+  /* Full monospace — terminal typography (the dominant "terminal" signal) */
+  --font-sans: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', Consolas, ui-monospace, monospace !important;
+
+  /* Crisper gridlines / borders */
+  --v3-border-hairline: rgba(255, 176, 0, .14) !important;
+  --v3-border-soft: rgba(255, 255, 255, .16) !important;
+  --v3-border-strong: rgba(255, 255, 255, .30) !important;
+  --border-dim: rgba(255, 255, 255, .07) !important;
+  --border-base: rgba(255, 255, 255, .14) !important;
+  --modern-border-hairline: rgba(255, 255, 255, .11) !important;
+  --modern-border-soft: rgba(255, 255, 255, .18) !important;
+
+  /* Neutralize residual cyan/violet so amber dominates (green/red kept) */
+  --v3-accent-2: #ff8c00 !important;
+  --modern-accent-2: #ff8c00 !important;
+  --blue: #d8b34a !important;
+  --blue-info: #d8b34a !important;
+  --v3-lane-watch: #d8b34a !important;
+  --v3-dir-up: #ffce5a !important;
+  --v3-sev-info: #ffce5a !important;
+  --v3-ev-e4: #ffd479 !important;
+  --v3-grad-tile: linear-gradient(135deg, rgba(255, 176, 0, .05), transparent 60%) !important;
+  --v3-grad-violet: linear-gradient(135deg, rgba(255, 176, 0, .06), transparent 60%) !important;
+  --v3-grad-aurora: linear-gradient(135deg, rgba(255, 176, 0, .10), rgba(255, 140, 0, .05) 60%, transparent) !important;
+  --v3-accent-2-glow: rgba(255, 140, 0, .30) !important;
+  --v3-glow-accent: 0 0 12px rgba(255, 176, 0, .25) !important;
+}
+
+/* Square everything — terminal panels, not SaaS cards */
+* { border-radius: 0 !important; }
+
+/* Pure-black canvas */
+html, body { background: #000 !important; }
+
+/* Tabular numerals everywhere (even inside the proportional label font) */
+body { font-variant-numeric: tabular-nums slashed-zero; }
+
+/* Mono for data only: tables, numeric cells, codes, keycaps, tickers */
+table, th, td,
+.v3-num, code, kbd,
+[class*="ticker"] {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, ui-monospace, monospace !important;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* Crisp data-grid gridlines */
+table { border-collapse: collapse; }
+th, td { border: 1px solid rgba(255, 255, 255, .08) !important; }

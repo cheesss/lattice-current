@@ -1980,6 +1980,10 @@ button:focus-visible,a:focus-visible,details > summary:focus-visible,
      render code. See src/dashboard/sl-banners.mjs and
      docs/DASHBOARD_SPLIT_DESIGN_2026-04-30.md. -->
 <link rel="stylesheet" href="/src/dashboard/shared/tokens.css">
+<!-- Terminal theme (Bloomberg-style): near-black, square panels, amber accent,
+     mono numerics. Loaded last so it overrides the V3 tokens above. Remove this
+     one line to revert to the cyan "modern cockpit" look. -->
+<link rel="stylesheet" href="/src/dashboard/shared/terminal-theme.css">
 <script type="module" src="/src/dashboard/sl-banners.mjs"></script>
 <script type="module" src="/src/dashboard/sl-onboarding.mjs"></script>
 <script type="module" src="/src/dashboard/sl-prefs.mjs"></script>
