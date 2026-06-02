@@ -77,6 +77,143 @@ Its banner reads *"Research Priority D; not an investment memo — collect requi
 
 ---
 
+## Architecture
+
+Lattice spans five layers — ingestion & canonical events, mechanism seeds + evidence contracts, the acceptance lane + eight evidence gates, the report pipeline, and the operator surfaces — over Postgres plus filesystem report artifacts. Full writeup, the core data model, and an honest list of what it deliberately does **not** claim are in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
+```mermaid
+flowchart TB
+  subgraph ING["1 - Ingestion & Canonical Event Resolution"]
+    direction TB
+    RSS["RSS / news fetchers"] --> AI["article-ingestor.ts<br/>ingest + Ollama embed<br/>pgvector NN theme"]
+    AI --> ART[(articles)]
+    AI --> PEND[(pending_outcomes)]
+    APP["auto-pipeline.mjs<br/>steps 1-5 enrichment"] --> ATS[(auto_theme_symbols)]
+    PEND -->|"checkPendingOutcomes"| LO[(labeled_outcomes)]
+    APP --> LO
+    ART -->|"cosine sim >= 0.7<br/>same day + theme"| EE["incremental-event-engine-fast.mjs<br/>(Python-preferred, JS fallback)"]
+    EE --> CE[(canonical_events)]
+    EE --> AEM[(article_event_map)]
+    EE --> MC[(matched_controls)]
+    LO --> UP[(event_uplift<br/>t-stat, grade E0/E1/E2)]
+    MC --> UP
+  end
+
+  subgraph SEED["2 - Mechanism Seed + Evidence Contract"]
+    direction TB
+    DISCO["Theme / discovery inputs"] --> MSG["mechanism-seed-generator.mjs<br/>chain fill + score (read-only)"]
+    MSG --> RAP["buildRouteAwareSeedEvidencePlan<br/>seed-evidence-plan.mjs"]
+    UEC["universal-evidence-contract.mjs<br/>EVIDENCE_CLASS_PROFILES<br/>promotion-eligible vs negative-control"] -.shared vocab.-> RAP
+    ROUTER["evidence-provider-router.mjs<br/>routeEvidenceProvider"] --> RAP
+    RAP -->|"--apply"| ORS[(operator_research_seeds)]
+    RAP -->|"--enqueue / API<br/>confirm-gated"| AQ[(approval_queue<br/>source-query)]
+  end
+
+  subgraph PROV["5 - Surfaces, Providers & Autonomous Runtime"]
+    direction TB
+    ROUTER --> CAP["collector-capability-matrix<br/>supported / collector_not_available"]
+    EXEC["staged-provider-live-executor.mjs<br/>discover live allowlist or fixtures"]
+    ROUTER --> EXEC
+    EXEC --> RO["*-readonly collectors<br/>DART/EDINET/TDnet/MOPS/IR<br/>ZERO_MUTATION_BOUNDARY, fixture-first"]
+    EXEC --> LIVEAD["live adapters<br/>SEC/FRED/EIA/FMP/Polygon...<br/>safeFetchJson"]
+    BURST["master-daemon / research-burst<br/>dry-run default, --apply bounded"] --> EXEC
+    BURST -.rejects unsafe boundary keys.-> ROUTER
+  end
+
+  subgraph GATE["3 - Acceptance Lane + 8 Evidence Gates + Closure"]
+    direction TB
+    ACC["acceptSeedEvidenceRows<br/>seed-evidence-acceptance.mjs<br/>(pure, no I/O)"] --> GC["buildEvidenceGateConsolidation<br/>per-seed state, 8 gates"]
+    GC --> GATES{"missingGates == 0 ?"}
+    GATES -->|"no"| BLOCKED["BLOCKED<br/>whyNotReportCandidate"]
+    GATES -->|"yes"| STAGE["reportCandidateAllowed<br/>human-review staging"]
+    GC -.->|"zeroBoundary()<br/>all write-counters = 0"| MB["mutation boundary"]
+    LEDGER["buildReportBackfillClosureLedger<br/>visualStatus / primaryBlocker / nextAction"]
+    STAGE --> LEDGER
+  end
+
+  subgraph RPT["4 - Report Pipeline (evidence-first DB-to-memo)"]
+    direction TB
+    GEN["generate-intelligence-report.mjs"] --> ADAPT["report-db-adapter<br/>buildDbReportBundle (strict fidelity)"]
+    ADAPT --> BUN["report-evidence-bundle + deep-research-pack"]
+    BUN --> ANL["report-llm-analyst<br/>signal-cards -> synthesis -> narrative<br/>(+ optional Codex overlay)"]
+    ANL --> STORE["report-local-store<br/>validate x2 -> compile -> manifest"]
+    STORE --> VALID["report-validator gates"]
+    STORE --> DISK[("data/reports/<id>/<br/>html, md, audit, csv, registry")]
+  end
+
+  subgraph DATA["Data Layer (NAS Postgres + FS artifacts)"]
+    direction LR
+    PG[(Postgres signal tables<br/>articles, canonical_events,<br/>event_uplift, theme_trend_aggregates,<br/>operator_research_seeds, approval_queue,<br/>report_backfill_tasks)]
+    FS[(data/reports artifacts<br/>evidence-gate-consolidation.json)]
+  end
+
+  ATS -.theme->symbol hints.-> SEED
+  CE --> ADAPT
+  AEM --> ADAPT
+  UP --> ADAPT
+  ORS --> EXEC
+  AQ --> EXEC
+  RO --> ACC
+  LIVEAD --> ACC
+  STORE -->|"--db only, enqueue"| RBT[(report_backfill_tasks)]
+  RBT --> LEDGER
+  LEDGER --> OPAPI["event-dashboard-api<br/>closure endpoint"]
+  OPAPI --> OPSURF["event-dashboard.html surfaces<br/>Home / Inbox / Investigate / Geo / Ops"]
+  OPSURF -->|"human promote<br/>BLOCKED vs review-ready"| DECISION{"Human review"}
+  DECISION -->|"promote"| ORS
+  DECISION -->|"reject / re-research"| BLOCKED
+
+  PG --- DATA
+  FS --- DATA
+  ING --> DATA
+  SEED --> DATA
+  GATE --> DATA
+  RPT --> DATA
+```
+
+```mermaid
+flowchart TB
+  RAW["Raw evidence rows<br/>(staged-provider-live-executor)"] --> ACC["Acceptance lane<br/>acceptSeedEvidenceRows (pure)"]
+
+  ACC -->|"blockers empty<br/>& promotion_candidate"| PROMO["promotion lane<br/>promotionEligible"]
+  ACC -->|"blockers empty<br/>(non-promotion use)"| ACCEPTED["acceptedEvidence"]
+  ACC -->|"negative_control / provider_data_gap<br/>market_validation w/o local tier<br/>fixture-backed / stale / boilerplate"| SUPP["supporting_context<br/>(never promotable)"]
+
+  PROMO --> CONS["buildEvidenceGateConsolidation<br/>per-seed state (in-memory artifacts)"]
+  ACCEPTED --> CONS
+  SUPP --> CONS
+
+  CONS --> FINAL["finalizeState — evaluate 8 gates"]
+
+  subgraph G8["The 8 Evidence Gates"]
+    direction TB
+    G1["accepted_promotion_evidence >= 1"]
+    G2["accepted_evidence >= 1"]
+    G3["independent_source_breadth >= 2"]
+    G4["issuer_bridge (CLOSED_ISSUER_BRIDGE)"]
+    G5["negative_control (CLOSED_NEGATIVE_CONTROL)"]
+    G6["holdout (holdoutConfirmed)"]
+    G7["market_validation (CLOSED_MARKET_VALIDATION)"]
+    G8a["valuation_bridge (CLOSED_VALUATION_BRIDGE)"]
+  end
+
+  FINAL --> G8
+  G8 --> SPLIT{"missingGates.length == 0 ?"}
+
+  CONS -.->|"zeroBoundary(): all<br/>write-counters = 0"| MB["mutationBoundary (self-declared)"]
+  CONS --> ISS["suppressForIssuerDiligence<br/>may re-open issuer_bridge"]
+  ISS -.-> SPLIT
+
+  SPLIT -->|"no"| BLOCKED["BLOCKED<br/>nextGateAction / whyNotReportCandidate"]
+  SPLIT -->|"yes"| READY["reportCandidateAllowedDiagnostic = true<br/>humanReviewPending"]
+
+  READY --> STAGE["human-review staging<br/>(separate step — not automated)"]
+  STAGE --> LEDGER["buildReportBackfillClosureLedger"]
+  PG[("Postgres (read-only)<br/>report_backfill_tasks, approval_queue,<br/>research_evidence_bundles,<br/>external_provider_backfill_runs")] -->|"SELECT only, fail-safe to BLOCKED"| LEDGER
+  LEDGER --> VS["visualStatus / primaryBlocker / nextAction<br/>default: blocked"]
+  VS -->|"BLOCKED vs review-ready"| OP["closure endpoint -> operator promotes"]
+```
+
 ## Primary entry surface
 
 The canonical product entry is the theme shell:
