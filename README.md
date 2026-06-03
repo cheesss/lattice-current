@@ -77,6 +77,10 @@ Its banner reads *"Research Priority D; not an investment memo — collect requi
 
 ---
 
+## Why this exists
+
+Generating an AI research report is easy; knowing when one is *not ready* is the hard part, and a tool that writes *well* is more dangerous, not less. Lattice encodes one discipline — find the hidden bottleneck beneath an obvious theme, explore widely, but promote strictly: keep a thesis `BLOCKED` until the evidence closes, and let a human, not the system, promote it. The longer motivation is in **[docs/WHY.md](docs/WHY.md)**.
+
 ## Architecture
 
 Lattice spans five layers — ingestion & canonical events, mechanism seeds + evidence contracts, the acceptance lane + eight evidence gates, the report pipeline, and the operator surfaces — over Postgres plus filesystem report artifacts. Full writeup, the core data model, and an honest list of what it deliberately does **not** claim are in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
