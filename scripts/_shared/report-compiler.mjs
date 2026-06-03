@@ -1194,6 +1194,8 @@ export function renderReportHtml(bundle = {}, options = {}) {
     .cite,.memo-nav a{border-color:rgba(255,176,0,.4) !important}
     .publishability-blocked{border-color:rgba(255,176,0,.55) !important;background:rgba(255,176,0,.08) !important}
     .signal-medium{border-color:rgba(255,176,0,.4) !important}
+    .quality div{min-width:0;overflow:hidden}
+    .quality strong,.quality span{overflow-wrap:anywhere;word-break:break-word}
   </style>
 </head>
 <body>
