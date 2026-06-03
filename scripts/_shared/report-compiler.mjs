@@ -1183,6 +1183,17 @@ export function renderReportHtml(bundle = {}, options = {}) {
     .blocker{border-color:rgba(251,113,133,.5)}
     .warning{border-color:rgba(251,191,36,.5)}
     @media(max-width:820px){main{padding:18px}.quality,.grid{grid-template-columns:1fr}}
+    /* Terminal theme — match the operator dashboard (near-black, amber, square, mono). */
+    :root{--bg:#000000;--panel:#0c0d10;--line:rgba(255,255,255,.14);--accent:#ffb000;--warn:#ffb000}
+    *{border-radius:0 !important}
+    body{background:#000000 !important;font-family:'JetBrains Mono','IBM Plex Mono',ui-monospace,Consolas,monospace !important;font-variant-numeric:tabular-nums slashed-zero}
+    section,.card,.figure-card,.signal-card,.quality div,.table-wrap,.figure-img,.figure-placeholder{background:#0c0d10 !important;box-shadow:none !important}
+    .quality{background:#000000 !important}
+    .evidence-table th{background:#101319 !important;color:#ffb000 !important}
+    code,.cite,.memo-nav a,summary,.evidence-table th{color:#ffb000 !important}
+    .cite,.memo-nav a{border-color:rgba(255,176,0,.4) !important}
+    .publishability-blocked{border-color:rgba(255,176,0,.55) !important;background:rgba(255,176,0,.08) !important}
+    .signal-medium{border-color:rgba(255,176,0,.4) !important}
   </style>
 </head>
 <body>
